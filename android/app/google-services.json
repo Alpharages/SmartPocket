@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "577440738276",
+    "project_id": "smart-pocket-fdccf",
+    "storage_bucket": "smart-pocket-fdccf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:577440738276:android:0d10322244ccd2b60275f1",
+        "android_client_info": {
+          "package_name": "com.example.smart_pocket"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChcgWXqqxsr-fRl-SihXft9UXJssDTcB8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
