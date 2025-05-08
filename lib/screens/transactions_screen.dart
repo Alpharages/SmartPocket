@@ -338,10 +338,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   Future<void> _deleteTransaction(Transaction transaction) async {
     try {
-      await firestore.FirebaseFirestore.instance
-          .collection('transactions')
-          .doc(transaction.id)
-          .delete();
+      await firestore.FirebaseFirestore.instance.collection('transactions').doc(transaction.id).delete();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -369,7 +366,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Delete Transaction'),
-          content: Text('Are you sure you want to delete this ${transaction.type == TransactionType.income ? 'income' : 'expense'} transaction?'),
+          content: Text(
+              'Are you sure you want to delete this ${transaction.type == TransactionType.income ? 'income' : 'expense'} transaction?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),

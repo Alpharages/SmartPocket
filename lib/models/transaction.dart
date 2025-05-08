@@ -68,4 +68,4 @@ class Transaction {
       isRecurring: map['isRecurring'] ?? false,
     );
   }
-} 
+}
