@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:smart_pocket/models/budget.dart';
 import 'dart:developer' as developer;
 import 'package:smart_pocket/models/transaction.dart';
+import 'package:smart_pocket/services/budget_service.dart';
 
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({Key? key}) : super(key: key);
@@ -21,6 +23,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   TransactionFrequency _selectedFrequency = TransactionFrequency.oneTime;
   bool _isRecurring = false;
   bool _isLoading = false;
+  final _budgetService = BudgetService();
 
   final List<String> _expenseCategories = [
     'Food',
@@ -51,9 +54,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   Future<void> _addTransaction() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -79,6 +80,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       );
 
       await firestore.FirebaseFirestore.instance.collection('transactions').doc(transaction.id).set(transaction.toMap());
+
+      if (transaction.type == TransactionType.expense) {
+        await _budgetService.updateBudgetForTransaction(transaction);
+      }
 
       if (mounted) {
         developer.log(
@@ -111,9 +116,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -304,6 +307,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                             ),
                           ],
                           const SizedBox(height: 24),
+                          _buildBudgetStatus(),
+                          const SizedBox(height: 24),
                           ElevatedButton(
                             onPressed: _isLoading
                                 ? null
@@ -339,6 +344,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   Future<void> _deleteTransaction(Transaction transaction) async {
     try {
       await firestore.FirebaseFirestore.instance.collection('transactions').doc(transaction.id).delete();
+
+      if (transaction.type == TransactionType.expense) {
+        await _budgetService.removeTransactionFromBudget(transaction);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -385,6 +394,57 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       },
     );
     return result ?? false;
+  }
+
+  Widget _buildBudgetStatus() {
+    if (_selectedType != TransactionType.expense) return const SizedBox.shrink();
+
+    return FutureBuilder<Budget?>(
+      future: _budgetService.getBudgetForCategory(_selectedCategory),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data == null) {
+          return const SizedBox.shrink();
+        }
+
+        final budget = snapshot.data!;
+        final remaining = budget.remaining;
+        final isOverBudget = budget.isOverBudget;
+
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Budget Status',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isOverBudget ? Colors.red : Colors.green,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                LinearProgressIndicator(
+                  value: budget.progress,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isOverBudget ? Colors.red : Colors.green,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Remaining: \$${remaining.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    color: isOverBudget ? Colors.red : Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override

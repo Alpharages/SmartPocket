@@ -60,8 +60,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           }
 
           final transactions = snapshot.data?.docs.map((doc) {
-            return Transaction.fromMap(doc.id, doc.data() as Map<String, dynamic>);
-          }).toList() ?? [];
+                return Transaction.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+              }).toList() ??
+              [];
 
           if (transactions.isEmpty) {
             return const Center(
@@ -117,15 +118,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   double _calculateTotalIncome(List<Transaction> transactions) {
-    return transactions
-        .where((t) => t.type == TransactionType.income)
-        .fold(0, (sum, t) => sum + t.amount);
+    return transactions.where((t) => t.type == TransactionType.income).fold(0, (sum, t) => sum + t.amount);
   }
 
   double _calculateTotalExpense(List<Transaction> transactions) {
-    return transactions
-        .where((t) => t.type == TransactionType.expense)
-        .fold(0, (sum, t) => sum + t.amount);
+    return transactions.where((t) => t.type == TransactionType.expense).fold(0, (sum, t) => sum + t.amount);
   }
 
   Map<String, double> _getCategoryExpenses(List<Transaction> transactions) {
@@ -133,8 +130,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final categoryExpenses = <String, double>{};
 
     for (final expense in expenses) {
-      categoryExpenses[expense.category] =
-          (categoryExpenses[expense.category] ?? 0) + expense.amount;
+      categoryExpenses[expense.category] = (categoryExpenses[expense.category] ?? 0) + expense.amount;
     }
 
     return categoryExpenses;
@@ -260,9 +256,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 Container(
                   width: 12,
                   height: 12,
-                  color: Colors.primaries[
-                      categoryExpenses.keys.toList().indexOf(entry.key) %
-                          Colors.primaries.length],
+                  color: Colors.primaries[categoryExpenses.keys.toList().indexOf(entry.key) % Colors.primaries.length],
                 ),
                 const SizedBox(width: 4),
                 Text(entry.key),
@@ -275,10 +269,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   Widget _buildRecentTransactions(List<Transaction> transactions) {
-    final recentTransactions = transactions
-        .take(5)
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final recentTransactions = transactions.take(5).toList()..sort((a, b) => b.date.compareTo(a.date));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,13 +287,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: transaction.type == TransactionType.income
-                    ? Colors.green
-                    : Colors.red,
+                backgroundColor: transaction.type == TransactionType.income ? Colors.green : Colors.red,
                 child: Icon(
-                  transaction.type == TransactionType.income
-                      ? Icons.arrow_upward
-                      : Icons.arrow_downward,
+                  transaction.type == TransactionType.income ? Icons.arrow_upward : Icons.arrow_downward,
                   color: Colors.white,
                 ),
               ),
@@ -313,9 +300,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               trailing: Text(
                 '${transaction.type == TransactionType.income ? '+' : '-'}\$${transaction.amount.toStringAsFixed(2)}',
                 style: TextStyle(
-                  color: transaction.type == TransactionType.income
-                      ? Colors.green
-                      : Colors.red,
+                  color: transaction.type == TransactionType.income ? Colors.green : Colors.red,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -325,4 +310,4 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       ],
     );
   }
-} 
+}

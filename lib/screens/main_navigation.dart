@@ -6,6 +6,7 @@ import 'home_screen.dart';
 import 'transactions_screen.dart';
 import 'statistics_screen.dart';
 import 'profile_screen.dart';
+import 'budgeting_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({Key? key}) : super(key: key);
@@ -21,6 +22,7 @@ class _MainNavigationState extends State<MainNavigation> {
     const HomeScreen(),
     const TransactionsScreen(),
     const StatisticsScreen(),
+    const BudgetingScreen(),
     const ProfileScreen(),
   ];
 
@@ -54,6 +56,10 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Statistics',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.savings),
+            label: 'Budget',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Profile',
           ),
@@ -61,4 +67,4 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
     );
   }
-} 
+}
