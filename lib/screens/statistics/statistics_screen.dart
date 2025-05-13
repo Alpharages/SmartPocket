@@ -3,10 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import '../models/transaction.dart';
-import '../models/budget.dart';
-import '../models/loan.dart';
-import '../theme/app_theme.dart';
+import '../../models/transaction.dart';
+import '../../models/budget.dart';
+import '../../models/loan.dart';
+import '../../theme/app_theme.dart';
 
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({Key? key}) : super(key: key);

@@ -3,11 +3,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
-import 'transactions_screen.dart';
-import 'statistics_screen.dart';
-import 'profile_screen.dart';
-import 'budgeting_screen.dart';
-import 'loan_management_screen.dart';
+import 'transactions_screen/transactions_screen.dart';
+import 'statistics/statistics_screen.dart';
+import 'profile/profile_screen.dart';
+import 'budget/budgeting_screen.dart';
+import 'loan_management_screen/loan_management_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({Key? key}) : super(key: key);
