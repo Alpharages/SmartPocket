@@ -7,6 +7,7 @@ import 'transactions_screen.dart';
 import 'statistics_screen.dart';
 import 'profile_screen.dart';
 import 'budgeting_screen.dart';
+import 'loan_management_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({Key? key}) : super(key: key);
@@ -19,8 +20,8 @@ class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
 
   final List<Widget> _screens = [
-    const HomeScreen(),
     const TransactionsScreen(),
+    const LoanManagementScreen(),
     const StatisticsScreen(),
     const BudgetingScreen(),
     const ProfileScreen(),
@@ -44,12 +45,12 @@ class _MainNavigationState extends State<MainNavigation> {
         onTap: _onItemTapped,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.account_balance_wallet),
             label: 'Transactions',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.money),
+            label: 'Loans',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart),

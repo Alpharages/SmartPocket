@@ -6,12 +6,16 @@ import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/main_navigation.dart';
 import 'theme/app_theme.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp();
+  
+  // Initialize notification service
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+  
   runApp(const MyApp());
 }
 
@@ -21,6 +25,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Smart Pocket',
       theme: AppTheme.lightTheme,
       initialRoute: '/',

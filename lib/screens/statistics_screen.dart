@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../models/transaction.dart';
+import '../models/budget.dart';
+import '../models/loan.dart';
 import '../theme/app_theme.dart';
 
 class StatisticsScreen extends StatefulWidget {
@@ -45,57 +47,330 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           ),
         ],
       ),
-      body: StreamBuilder<firestore.QuerySnapshot>(
-        stream: firestore.FirebaseFirestore.instance
-            .collection('transactions')
-            .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildTransactionStats(),
+            const SizedBox(height: 24),
+            _buildBudgetStats(),
+            const SizedBox(height: 24),
+            _buildLoanStats(),
+          ],
+        ),
+      ),
+    );
+  }
 
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+  Widget _buildTransactionStats() {
+    return StreamBuilder<firestore.QuerySnapshot>(
+      stream: firestore.FirebaseFirestore.instance
+          .collection('transactions')
+          .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
 
-          final transactions = snapshot.data?.docs.map((doc) {
-                return Transaction.fromMap(doc.id, doc.data() as Map<String, dynamic>);
-              }).toList() ??
-              [];
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          if (transactions.isEmpty) {
-            return const Center(
-              child: Text('No transactions yet'),
-            );
-          }
+        final transactions = snapshot.data?.docs.map((doc) {
+              return Transaction.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+            }).toList() ??
+            [];
 
-          // Filter transactions based on selected period
-          final filteredTransactions = _filterTransactionsByPeriod(transactions);
+        final filteredTransactions = _filterTransactionsByPeriod(transactions);
+        final totalIncome = _calculateTotalIncome(filteredTransactions);
+        final totalExpense = _calculateTotalExpense(filteredTransactions);
+        final balance = totalIncome - totalExpense;
+        final categoryExpenses = _getCategoryExpenses(filteredTransactions);
 
-          // Calculate totals
-          final totalIncome = _calculateTotalIncome(filteredTransactions);
-          final totalExpense = _calculateTotalExpense(filteredTransactions);
-          final balance = totalIncome - totalExpense;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Transaction Statistics',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildSummaryCards(totalIncome, totalExpense, balance),
+            const SizedBox(height: 24),
+            _buildExpenseChart(categoryExpenses),
+            const SizedBox(height: 24),
+            _buildIncomeExpenseTrend(filteredTransactions),
+          ],
+        );
+      },
+    );
+  }
 
-          // Get category-wise expenses
-          final categoryExpenses = _getCategoryExpenses(filteredTransactions);
+  Widget _buildBudgetStats() {
+    return StreamBuilder<List<Budget>>(
+      stream: firestore.FirebaseFirestore.instance
+          .collection('budgets')
+          .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+          .where('isActive', isEqualTo: true)
+          .snapshots()
+          .map((snapshot) => snapshot.docs.map((doc) => Budget.fromMap(doc.id, doc.data())).toList()),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+        final budgets = snapshot.data!;
+        final totalBudget = budgets.fold(0.0, (sum, budget) => sum + budget.amount);
+        final totalSpent = budgets.fold(0.0, (sum, budget) => sum + budget.spent);
+        final overBudgetCategories = budgets.where((b) => b.isOverBudget).length;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Budget Statistics',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _buildStatRow('Total Budget', totalBudget),
+                    const SizedBox(height: 8),
+                    _buildStatRow('Total Spent', totalSpent),
+                    const SizedBox(height: 8),
+                    _buildStatRow('Remaining', totalBudget - totalSpent),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Over Budget Categories: $overBudgetCategories',
+                      style: TextStyle(
+                        color: overBudgetCategories > 0 ? Colors.red : Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildBudgetProgressList(budgets),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildLoanStats() {
+    return StreamBuilder<List<Loan>>(
+      stream: firestore.FirebaseFirestore.instance
+          .collection('loans')
+          .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+          .snapshots()
+          .map((snapshot) => snapshot.docs.map((doc) => Loan.fromMap(doc.id, doc.data())).toList()),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final loans = snapshot.data!;
+        final totalBorrowed =
+            loans.where((loan) => loan.type == LoanType.borrow).fold(0.0, (sum, loan) => sum + loan.remainingAmount);
+        final totalLent = loans.where((loan) => loan.type == LoanType.lend).fold(0.0, (sum, loan) => sum + loan.remainingAmount);
+        final activeLoans = loans.where((loan) => loan.status == LoanStatus.active).length;
+        final overdueLoans = loans.where((loan) => loan.status == LoanStatus.overdue).length;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Loan Statistics',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _buildStatRow('Total Borrowed', totalBorrowed),
+                    const SizedBox(height: 8),
+                    _buildStatRow('Total Lent', totalLent),
+                    const SizedBox(height: 8),
+                    _buildStatRow('Net Loan Position', totalLent - totalBorrowed),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Active Loans: $activeLoans',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Overdue Loans: $overdueLoans',
+                          style: TextStyle(
+                            color: overdueLoans > 0 ? Colors.red : Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildStatRow(String label, double amount) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label),
+        Text(
+          '\$${amount.toStringAsFixed(2)}',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBudgetProgressList(List<Budget> budgets) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: budgets.map((budget) {
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildSummaryCards(totalIncome, totalExpense, balance),
-                const SizedBox(height: 24),
-                _buildExpenseChart(categoryExpenses),
-                const SizedBox(height: 24),
-                _buildRecentTransactions(filteredTransactions),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      budget.category,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      '\$${budget.spent.toStringAsFixed(2)} / \$${budget.amount.toStringAsFixed(2)}',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: budget.progress,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    budget.isOverBudget ? Colors.red : Colors.green,
+                  ),
+                ),
               ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildIncomeExpenseTrend(List<Transaction> transactions) {
+    // Group transactions by date
+    final Map<String, double> incomeByDate = {};
+    final Map<String, double> expenseByDate = {};
+
+    for (var transaction in transactions) {
+      final date = DateFormat('MMM d').format(transaction.date);
+      if (transaction.type == TransactionType.income) {
+        incomeByDate[date] = (incomeByDate[date] ?? 0) + transaction.amount;
+      } else {
+        expenseByDate[date] = (expenseByDate[date] ?? 0) + transaction.amount;
+      }
+    }
+
+    // Get all unique dates
+    final dates = {...incomeByDate.keys, ...expenseByDate.keys}.toList()..sort();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Income vs Expense Trend',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 200,
+          child: LineChart(
+            LineChartData(
+              gridData: FlGridData(show: false),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                topTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      if (value.toInt() >= 0 && value.toInt() < dates.length) {
+                        return Text(dates[value.toInt()]);
+                      }
+                      return const Text('');
+                    },
+                  ),
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: dates.asMap().entries.map((entry) {
+                    return FlSpot(
+                      entry.key.toDouble(),
+                      incomeByDate[entry.value] ?? 0,
+                    );
+                  }).toList(),
+                  isCurved: true,
+                  color: Colors.green,
+                  barWidth: 3,
+                  dotData: FlDotData(show: false),
+                ),
+                LineChartBarData(
+                  spots: dates.asMap().entries.map((entry) {
+                    return FlSpot(
+                      entry.key.toDouble(),
+                      expenseByDate[entry.value] ?? 0,
+                    );
+                  }).toList(),
+                  isCurved: true,
+                  color: Colors.red,
+                  barWidth: 3,
+                  dotData: FlDotData(show: false),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -264,49 +539,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             );
           }).toList(),
         ),
-      ],
-    );
-  }
-
-  Widget _buildRecentTransactions(List<Transaction> transactions) {
-    final recentTransactions = transactions.take(5).toList()..sort((a, b) => b.date.compareTo(a.date));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Recent Transactions',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        ...recentTransactions.map((transaction) {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: transaction.type == TransactionType.income ? Colors.green : Colors.red,
-                child: Icon(
-                  transaction.type == TransactionType.income ? Icons.arrow_upward : Icons.arrow_downward,
-                  color: Colors.white,
-                ),
-              ),
-              title: Text(transaction.description),
-              subtitle: Text(
-                '${transaction.category} • ${DateFormat('MMM d, y').format(transaction.date)}',
-              ),
-              trailing: Text(
-                '${transaction.type == TransactionType.income ? '+' : '-'}\$${transaction.amount.toStringAsFixed(2)}',
-                style: TextStyle(
-                  color: transaction.type == TransactionType.income ? Colors.green : Colors.red,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
       ],
     );
   }

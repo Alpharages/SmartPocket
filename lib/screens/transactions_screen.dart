@@ -79,7 +79,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         name: 'TransactionsScreen',
       );
 
-      await firestore.FirebaseFirestore.instance.collection('transactions').doc(transaction.id).set(transaction.toMap());
+      // Add the transaction
+      await firestore.FirebaseFirestore.instance
+          .collection('transactions')
+          .doc(transaction.id)
+          .set(transaction.toMap());
 
       if (transaction.type == TransactionType.expense) {
         await _budgetService.updateBudgetForTransaction(transaction);
@@ -343,7 +347,24 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   Future<void> _deleteTransaction(Transaction transaction) async {
     try {
-      await firestore.FirebaseFirestore.instance.collection('transactions').doc(transaction.id).delete();
+      final batch = firestore.FirebaseFirestore.instance.batch();
+      
+      // Delete the main transaction
+      final transactionRef = firestore.FirebaseFirestore.instance
+          .collection('transactions')
+          .doc(transaction.id);
+      batch.delete(transactionRef);
+
+      // If it's an expense, also delete the corresponding deduction
+      if (transaction.type == TransactionType.expense) {
+        final deductionId = 'deduction_${transaction.id}';
+        final deductionRef = firestore.FirebaseFirestore.instance
+            .collection('transactions')
+            .doc(deductionId);
+        batch.delete(deductionRef);
+      }
+
+      await batch.commit();
 
       if (transaction.type == TransactionType.expense) {
         await _budgetService.removeTransactionFromBudget(transaction);
@@ -447,6 +468,65 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     );
   }
 
+  Widget _buildTotalIncome() {
+    return StreamBuilder<firestore.QuerySnapshot>(
+      stream: firestore.FirebaseFirestore.instance
+          .collection('transactions')
+          .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+
+        double totalIncome = 0;
+        double totalExpenses = 0;
+
+        for (var doc in snapshot.data!.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final amount = (data['amount'] as num).toDouble();
+          final type = TransactionType.values.firstWhere(
+            (e) => e.toString() == data['type'],
+            orElse: () => TransactionType.expense,
+          );
+
+          if (type == TransactionType.income) {
+            totalIncome += amount;
+          } else {
+            totalExpenses += amount;
+          }
+        }
+
+        final netIncome = totalIncome - totalExpenses;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          color: Colors.green.withOpacity(0.1),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Total Income',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                '\$${netIncome.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: netIncome >= 0 ? Colors.green : Colors.red,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -462,6 +542,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       ),
       body: Column(
         children: [
+          _buildTotalIncome(),
           Expanded(
             child: StreamBuilder<firestore.QuerySnapshot>(
               stream: firestore.FirebaseFirestore.instance
