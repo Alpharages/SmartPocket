@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:smart_pocket/screens/analytics_screen.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'transactions_screen/transactions_screen.dart';
@@ -22,7 +23,8 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _screens = [
     const TransactionsScreen(),
     const LoanManagementScreen(),
-    const StatisticsScreen(),
+    // const StatisticsScreen(),
+    const AnalyticsScreen(),
     const BudgetingScreen(),
     const ProfileScreen(),
   ];

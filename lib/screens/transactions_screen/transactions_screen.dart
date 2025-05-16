@@ -62,7 +62,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         throw Exception('User not authenticated');
       }
 
-      final transaction = Transaction(
+      final transaction = Transaction1(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         userId: user.uid,
         amount: double.parse(_amountController.text),
@@ -79,11 +79,35 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         name: 'TransactionsScreen',
       );
 
+      // Start a batch write
+      final batch = firestore.FirebaseFirestore.instance.batch();
+
       // Add the transaction
-      await firestore.FirebaseFirestore.instance
-          .collection('transactions')
-          .doc(transaction.id)
-          .set(transaction.toMap());
+      final transactionRef = firestore.FirebaseFirestore.instance.collection('transactions').doc(transaction.id);
+      batch.set(transactionRef, transaction.toMap());
+
+      // If it's an expense, create a corresponding income deduction
+      if (transaction.type == TransactionType.expense) {
+        final deductionId = 'deduction_${transaction.id}';
+        final deductionRef = firestore.FirebaseFirestore.instance.collection('transactions').doc(deductionId);
+
+        final deduction = Transaction1(
+          id: deductionId,
+          userId: user.uid,
+          amount: -transaction.amount, // Negative amount to represent deduction
+          description: 'Deduction for: ${transaction.description}',
+          category: 'Deduction',
+          type: TransactionType.income, // Mark as income but with negative amount
+          date: transaction.date,
+          frequency: TransactionFrequency.oneTime,
+          isRecurring: false,
+        );
+
+        batch.set(deductionRef, deduction.toMap());
+      }
+
+      // Commit the batch
+      await batch.commit();
 
       if (transaction.type == TransactionType.expense) {
         await _budgetService.updateBudgetForTransaction(transaction);
@@ -345,22 +369,18 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     );
   }
 
-  Future<void> _deleteTransaction(Transaction transaction) async {
+  Future<void> _deleteTransaction(Transaction1 transaction) async {
     try {
       final batch = firestore.FirebaseFirestore.instance.batch();
-      
+
       // Delete the main transaction
-      final transactionRef = firestore.FirebaseFirestore.instance
-          .collection('transactions')
-          .doc(transaction.id);
+      final transactionRef = firestore.FirebaseFirestore.instance.collection('transactions').doc(transaction.id);
       batch.delete(transactionRef);
 
       // If it's an expense, also delete the corresponding deduction
       if (transaction.type == TransactionType.expense) {
         final deductionId = 'deduction_${transaction.id}';
-        final deductionRef = firestore.FirebaseFirestore.instance
-            .collection('transactions')
-            .doc(deductionId);
+        final deductionRef = firestore.FirebaseFirestore.instance.collection('transactions').doc(deductionId);
         batch.delete(deductionRef);
       }
 
@@ -390,7 +410,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     }
   }
 
-  Future<bool> _showDeleteConfirmationDialog(Transaction transaction) async {
+  Future<bool> _showDeleteConfirmationDialog(Transaction1 transaction) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -473,31 +493,20 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       stream: firestore.FirebaseFirestore.instance
           .collection('transactions')
           .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+          .where('type', isEqualTo: TransactionType.income.toString())
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const SizedBox.shrink();
         }
 
-        double totalIncome = 0;
-        double totalExpenses = 0;
-
-        for (var doc in snapshot.data!.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          final amount = (data['amount'] as num).toDouble();
-          final type = TransactionType.values.firstWhere(
-            (e) => e.toString() == data['type'],
-            orElse: () => TransactionType.expense,
-          );
-
-          if (type == TransactionType.income) {
-            totalIncome += amount;
-          } else {
-            totalExpenses += amount;
-          }
-        }
-
-        final netIncome = totalIncome - totalExpenses;
+        final totalIncome = snapshot.data!.docs.fold<double>(
+          0,
+          (sum, doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return sum + (data['amount'] as num).toDouble();
+          },
+        );
 
         return Container(
           padding: const EdgeInsets.all(16),
@@ -513,11 +522,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 ),
               ),
               Text(
-                '\$${netIncome.toStringAsFixed(2)}',
-                style: TextStyle(
+                '\$${totalIncome.toStringAsFixed(2)}',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: netIncome >= 0 ? Colors.green : Colors.red,
+                  color: Colors.green,
                 ),
               ),
             ],
@@ -568,7 +577,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 final transactions = snapshot.data?.docs
                         .map((doc) {
                           try {
-                            return Transaction.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+                            return Transaction1.fromMap(doc.id, doc.data() as Map<String, dynamic>);
                           } catch (e, stackTrace) {
                             developer.log(
                               'Error parsing transaction',
@@ -579,7 +588,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                             return null;
                           }
                         })
-                        .whereType<Transaction>()
+                        .whereType<Transaction1>()
                         .toList() ??
                     [];
 

@@ -79,7 +79,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         }
 
         final transactions = snapshot.data?.docs.map((doc) {
-              return Transaction.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+              return Transaction1.fromMap(doc.id, doc.data() as Map<String, dynamic>);
             }).toList() ??
             [];
 
@@ -285,7 +285,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     );
   }
 
-  Widget _buildIncomeExpenseTrend(List<Transaction> transactions) {
+  Widget _buildIncomeExpenseTrend(List<Transaction1> transactions) {
     // Group transactions by date
     final Map<String, double> incomeByDate = {};
     final Map<String, double> expenseByDate = {};
@@ -374,7 +374,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     );
   }
 
-  List<Transaction> _filterTransactionsByPeriod(List<Transaction> transactions) {
+  List<Transaction1> _filterTransactionsByPeriod(List<Transaction1> transactions) {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final startOfMonth = DateTime(now.year, now.month, 1);
@@ -392,15 +392,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
   }
 
-  double _calculateTotalIncome(List<Transaction> transactions) {
+  double _calculateTotalIncome(List<Transaction1> transactions) {
     return transactions.where((t) => t.type == TransactionType.income).fold(0, (sum, t) => sum + t.amount);
   }
 
-  double _calculateTotalExpense(List<Transaction> transactions) {
+  double _calculateTotalExpense(List<Transaction1> transactions) {
     return transactions.where((t) => t.type == TransactionType.expense).fold(0, (sum, t) => sum + t.amount);
   }
 
-  Map<String, double> _getCategoryExpenses(List<Transaction> transactions) {
+  Map<String, double> _getCategoryExpenses(List<Transaction1> transactions) {
     final expenses = transactions.where((t) => t.type == TransactionType.expense);
     final categoryExpenses = <String, double>{};
 

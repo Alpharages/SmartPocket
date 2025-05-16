@@ -13,7 +13,7 @@ enum TransactionFrequency {
   yearly,
 }
 
-class Transaction {
+class Transaction1 {
   final String id;
   final String userId;
   final double amount;
@@ -24,7 +24,7 @@ class Transaction {
   final TransactionFrequency frequency;
   final bool isRecurring;
 
-  Transaction({
+  Transaction1({
     required this.id,
     required this.userId,
     required this.amount,
@@ -32,8 +32,8 @@ class Transaction {
     required this.category,
     required this.type,
     required this.date,
-    this.frequency = TransactionFrequency.oneTime,
-    this.isRecurring = false,
+    required this.frequency,
+    required this.isRecurring,
   });
 
   Map<String, dynamic> toMap() {
@@ -49,13 +49,13 @@ class Transaction {
     };
   }
 
-  factory Transaction.fromMap(String id, Map<String, dynamic> map) {
-    return Transaction(
+  factory Transaction1.fromMap(String id, Map<String, dynamic> map) {
+    return Transaction1(
       id: id,
-      userId: map['userId'] ?? '',
-      amount: (map['amount'] ?? 0.0).toDouble(),
-      description: map['description'] ?? '',
-      category: map['category'] ?? '',
+      userId: map['userId'] as String,
+      amount: (map['amount'] as num).toDouble(),
+      description: map['description'] as String,
+      category: map['category'] as String,
       type: TransactionType.values.firstWhere(
         (e) => e.toString() == map['type'],
         orElse: () => TransactionType.expense,
@@ -65,7 +65,7 @@ class Transaction {
         (e) => e.toString() == map['frequency'],
         orElse: () => TransactionFrequency.oneTime,
       ),
-      isRecurring: map['isRecurring'] ?? false,
+      isRecurring: map['isRecurring'] as bool? ?? false,
     );
   }
 }
