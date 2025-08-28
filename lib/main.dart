@@ -13,13 +13,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
-  // Initialize notification service
   final notificationService = NotificationService();
   await notificationService.initialize();
 
   Gemini.init(
     apiKey: 'AIzaSyDRMY69Gr3B0LDlxt8lrOXmQ9T3QJsb-28',
-    enableDebugging: true,  // Add this for debugging
+    enableDebugging: true,
   );
 
   runApp(const MyApp());
