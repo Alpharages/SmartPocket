@@ -66,3 +66,7 @@ Thumbs.db
 
 # Manus platform scratch config — contains live secrets (DB URL, AWS creds, API keys). Never commit.
 .project-config.json
+.gitnexus
+
+# Claude Code local (machine-specific permission allowlist)
+.claude/settings.local.json
