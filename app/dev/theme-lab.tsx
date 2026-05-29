@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { ThemedView } from "@/components/themed-view";
@@ -10,13 +17,18 @@ import { useThemeContext } from "@/lib/theme-provider";
 
 type PaletteName = keyof typeof SchemeColors.light;
 
-const paletteNames: PaletteName[] = Object.keys(SchemeColors.light) as PaletteName[];
+const paletteNames: PaletteName[] = Object.keys(
+  SchemeColors.light,
+) as PaletteName[];
 
 function ColorSwatch({ name, value }: { name: PaletteName; value: string }) {
   return (
     <View className="flex-row items-center justify-between rounded-xl border border-border px-3 py-2">
       <View className="flex-row items-center gap-3">
-        <View className="h-6 w-6 rounded-full border border-border" style={{ backgroundColor: value }} />
+        <View
+          className="h-6 w-6 rounded-full border border-border"
+          style={{ backgroundColor: value }}
+        />
         <Text className="text-sm font-semibold text-foreground">{name}</Text>
       </View>
       <Text className="text-xs font-mono text-muted">{value}</Text>
@@ -112,6 +124,92 @@ export default function ThemeLabScreen() {
 
           <ThemedView className="rounded-2xl border border-border p-4">
             <Text className="text-lg font-bold text-foreground">
+              Story 1.1 tokens (spacing · radius · type · elevation)
+            </Text>
+            <Text className="mt-1 text-sm text-muted">
+              Driven entirely by NativeWind classes from theme.config.js
+            </Text>
+
+            {/* Spacing scale — bar height = spacing token */}
+            <Text className="mt-4 text-label text-muted">Spacing (xs→2xl)</Text>
+            <View className="mt-2 flex-row items-end gap-3">
+              <View className="h-xs w-6 rounded-sm bg-primary" />
+              <View className="h-sm w-6 rounded-sm bg-primary" />
+              <View className="h-md w-6 rounded-sm bg-primary" />
+              <View className="h-lg w-6 rounded-sm bg-primary" />
+              <View className="h-xl w-6 rounded-sm bg-primary" />
+              <View className="h-2xl w-6 rounded-sm bg-primary" />
+            </View>
+
+            {/* Radius scale */}
+            <Text className="mt-4 text-label text-muted">
+              Radius (sm/md/lg/full)
+            </Text>
+            <View className="mt-2 flex-row gap-3">
+              <View className="h-12 w-12 rounded-sm bg-primary" />
+              <View className="h-12 w-12 rounded-md bg-primary" />
+              <View className="h-12 w-12 rounded-lg bg-primary" />
+              <View className="h-12 w-12 rounded-full bg-primary" />
+            </View>
+
+            {/* Type scale */}
+            <Text className="mt-4 text-label text-muted">Type scale</Text>
+            <View className="mt-2 gap-1">
+              <Text
+                nativeID="qa-display"
+                className="text-display text-foreground"
+              >
+                Display
+              </Text>
+              <Text className="text-h1 text-foreground">Heading 1</Text>
+              <Text className="text-h2 text-foreground">Heading 2</Text>
+              <Text className="text-h3 text-foreground">Heading 3</Text>
+              <Text className="text-body text-foreground">Body text</Text>
+              <Text className="text-label text-foreground">Label</Text>
+              <Text className="text-caption text-muted">Caption</Text>
+            </View>
+
+            {/* Tabular numbers — should align in a column */}
+            <Text className="mt-4 text-label text-muted">
+              Tabular numbers (text-number + tabular-nums)
+            </Text>
+            <View className="mt-2 items-end">
+              <Text
+                nativeID="qa-number"
+                className="text-number tabular-nums text-foreground"
+              >
+                1,111.11
+              </Text>
+              <Text className="text-number tabular-nums text-foreground">
+                8,888.88
+              </Text>
+              <Text className="text-number tabular-nums text-foreground">
+                12.30
+              </Text>
+            </View>
+
+            {/* Elevation — shadow color derives from foreground (theme-aware) */}
+            <Text className="mt-4 text-label text-muted">
+              Elevation (sm/md/lg) on surface
+            </Text>
+            <View className="mt-2 flex-row flex-wrap gap-4 p-2">
+              <View
+                nativeID="qa-shadow-sm"
+                className="h-16 w-16 rounded-lg bg-surface shadow-sm"
+              />
+              <View
+                nativeID="qa-shadow-md"
+                className="h-16 w-16 rounded-lg bg-surface shadow-md"
+              />
+              <View
+                nativeID="qa-shadow-lg"
+                className="h-16 w-16 rounded-lg bg-surface shadow-lg"
+              />
+            </View>
+          </ThemedView>
+
+          <ThemedView className="rounded-2xl border border-border p-4">
+            <Text className="text-lg font-bold text-foreground">
               Tailwind tokens
             </Text>
             <Text className="mt-1 text-sm text-muted">
@@ -127,7 +225,9 @@ export default function ThemeLabScreen() {
                   setLastAction("Pressed Primary token");
                 }}
               >
-                <Text className="text-sm font-semibold text-background">Primary</Text>
+                <Text className="text-sm font-semibold text-background">
+                  Primary
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 className="rounded-full px-4 py-2 border border-border"
@@ -184,10 +284,12 @@ export default function ThemeLabScreen() {
                 useColors()
               </Text>
               <Text className="mt-1 text-sm text-muted">
-                Background: {colors.background} • Text: {colors.text} • Tint: {colors.tint}
+                Background: {colors.background} • Text: {colors.text} • Tint:{" "}
+                {colors.tint}
               </Text>
               <Text className="text-xs text-muted">
-                (Pressable uses style; Tailwind on Pressable is disabled via remap)
+                (Pressable uses style; Tailwind on Pressable is disabled via
+                remap)
               </Text>
               <View className="mt-3 gap-2">
                 <View className="flex-row items-center gap-2">
@@ -212,7 +314,11 @@ export default function ThemeLabScreen() {
             </Text>
             <View className="mt-3 gap-2">
               {swatches.map((item) => (
-                <ColorSwatch key={item.name} name={item.name} value={item.value} />
+                <ColorSwatch
+                  key={item.name}
+                  name={item.name}
+                  value={item.value}
+                />
               ))}
             </View>
           </ThemedView>

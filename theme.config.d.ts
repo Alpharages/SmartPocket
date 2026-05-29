@@ -8,10 +8,70 @@ export const themeColors: {
   success: { light: string; dark: string };
   warning: { light: string; dark: string };
   error: { light: string; dark: string };
+  accent: { light: string; dark: string };
+  secondary: { light: string; dark: string };
+};
+
+export const spacing: {
+  xs: number;
+  sm: number;
+  md: number;
+  lg: number;
+  xl: number;
+  "2xl": number;
+};
+
+export const radius: {
+  sm: number;
+  md: number;
+  lg: number;
+  full: number;
+};
+
+export type FontWeight =
+  | "normal"
+  | "bold"
+  | "100"
+  | "200"
+  | "300"
+  | "400"
+  | "500"
+  | "600"
+  | "700"
+  | "800"
+  | "900";
+
+export type TypographyStyle = {
+  fontSize: number;
+  lineHeight: number;
+  fontWeight: FontWeight;
+  fontVariant?: string[];
+};
+
+export const typography: {
+  display: TypographyStyle;
+  h1: TypographyStyle;
+  h2: TypographyStyle;
+  h3: TypographyStyle;
+  body: TypographyStyle;
+  label: TypographyStyle;
+  caption: TypographyStyle;
+  number: TypographyStyle;
+};
+
+export const elevation: {
+  none: string;
+  sm: string;
+  md: string;
+  lg: string;
 };
 
 declare const themeConfig: {
   themeColors: typeof themeColors;
+  spacing: typeof spacing;
+  radius: typeof radius;
+  typography: typeof typography;
+  elevation: typeof elevation;
 };
 
 export default themeConfig;

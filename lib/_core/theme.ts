@@ -6,6 +6,14 @@ export type ColorScheme = "light" | "dark";
 
 export const ThemeColors = themeConfig.themeColors;
 
+export const Spacing = themeConfig.spacing;
+
+export const Radius = themeConfig.radius;
+
+export const Typography = themeConfig.typography;
+
+export const Elevation = themeConfig.elevation;
+
 type ThemeColorTokens = typeof ThemeColors;
 type ThemeColorName = keyof ThemeColorTokens;
 type SchemePalette = Record<ColorScheme, Record<ThemeColorName, string>>;
@@ -81,7 +89,8 @@ export const Fonts = Platform.select({
   web: {
     sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
+    rounded:
+      "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });
