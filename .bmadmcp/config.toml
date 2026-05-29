@@ -1,0 +1,17 @@
+[clickup]
+pinned_space_id = "90182124701"
+pinned_space_name = "Team Space"
+pinned_backlog_list_id = "901818439632"
+
+[clickup_create_story]
+pinned_sprint_folder_id = "901814337560"
+
+# ---------------------------------------------------------------------------
+# Doc-path cascade — this project keeps planning docs under docs/, not the
+# default planning-artifacts/. Paths are relative to the project root.
+# ---------------------------------------------------------------------------
+
+[docs]
+prd_path          = "docs/prd.md"
+architecture_path = "docs/ARCHITECTURE.md"
+epics_path        = "docs/epics.md"
