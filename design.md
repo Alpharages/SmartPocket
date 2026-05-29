@@ -1,8 +1,18 @@
-# Expense Tracker Mobile App - Interface Design
+# SmartPocket — Interface Design
+
+> **Source of truth:** the authoritative design system, tokens, components, and UX
+> patterns live in [`docs/ux-design-specification.md`](./docs/ux-design-specification.md).
+> This file is the screen-level companion: screen inventory, content, and user flows.
+> Where the two ever disagree, the UX specification wins. The retired teal palette
+> previously documented here has been replaced by the **Refined Indigo** system below.
 
 ## Overview
 
-A personal finance management app designed for iOS-like experience with portrait orientation (9:16) and one-handed usage. The app enables users to track income and expenses, categorize transactions, view monthly summaries, and manage credit cards.
+SmartPocket is a privacy-conscious, AI-assisted personal finance app designed for an
+iOS-like experience: portrait orientation (9:16), one-handed use, primary actions in the
+thumb zone. It runs from a single Expo / React Native codebase across iOS, Android, and web.
+Users track income and expenses, categorize transactions, view monthly summaries, and manage
+credit cards — with Budgets, Loans, Accounts, an opt-in AI assistant, and Settings on the roadmap.
 
 ---
 
@@ -10,231 +20,179 @@ A personal finance management app designed for iOS-like experience with portrait
 
 ### 1. **Dashboard (Home Screen)**
    - Primary screen showing financial overview
-   - Quick stats: Total balance, month-to-date income, month-to-date expenses
-   - Recent transactions list (last 5-7 transactions)
-   - Quick action buttons: Add Income, Add Expense, View All
+   - Gradient **balance hero** (indigo → violet): total balance + month-to-date income/expenses
+   - Recent transactions list (last 5–7 transactions)
+   - Quick actions: Add Income, Add Expense, View All (real buttons, in-flow — must not overlap the hero)
    - Credit card summary badge (if cards exist)
 
 ### 2. **Add Transaction Screen**
-   - Modal/sheet for adding income or expense
-   - Transaction type selector (Income / Expense toggle)
-   - Amount input field
-   - Category picker (dropdown or button grid)
+   - Bottom-sheet modal for adding income or expense
+   - Transaction type selector (Income / Expense segmented control)
+   - Large, focused amount input
+   - Category picker (color+icon grid; recently used float first)
    - Date picker (defaults to today)
    - Optional description/notes field
-   - Credit card selector (if applicable for expense)
-   - Save/Cancel buttons
+   - Credit card selector (expenses only)
+   - Optional inline AI category suggestion (planned — non-blocking, opt-in)
+   - Save/Cancel
 
-### 3. **Transactions List Screen**
-   - Full list of all transactions with filtering
-   - Filter options: Date range, Category, Type (Income/Expense)
-   - Each transaction shows: Amount, Category, Date, Description
-   - Swipe-to-delete or long-press menu
+### 3. **Transactions List Screen (Activity)**
+   - Full list with filtering; grouped by date (Today, Yesterday, This Week…)
+   - Filter **pills** (single-tap, multi-select, clearable): All, Income, Expense, This Month, This Week
+   - Each row: category color+icon avatar, description + date, signed amount
+   - Swipe-to-edit / swipe-to-delete (destructive confirmed)
    - Search by description
-   - Grouped by date (Today, Yesterday, This Week, etc.)
+   - Designed empty state
 
 ### 4. **Categories Screen**
-   - Predefined and custom categories
-   - Expense categories: Food, Transport, Entertainment, Utilities, Shopping, Healthcare, Other
-   - Income categories: Salary, Freelance, Investment, Bonus, Other
-   - Add custom category option
-   - Edit/delete categories
-   - Category color picker
+   - Predefined + custom categories, split into Expense and Income groups
+   - "Add New Category" is a real **Button** (not a full-width banner)
+   - Edit/delete categories; color + icon picker
    - View spending by category
 
-### 5. **Monthly Summary Screen**
-   - Monthly overview with date picker
-   - Total income, total expenses, net balance
-   - Pie chart or bar chart showing expense breakdown by category
+### 5. **Insights Screen (Monthly Summary)**
+   - Month stepper (`‹ May 2026 ›`) + horizontal swipe between months
+   - Total income, total expenses, net balance (StatCards)
+   - Pie/bar chart of expense breakdown by category
    - Category-wise spending list with percentages
-   - Comparison with previous month (optional)
-   - Export or share summary option
+   - Tap a category → filtered transactions
+   - Natural-language ask-bar (planned)
+   - Export/share summary
 
 ### 6. **Credit Cards Screen**
-   - List of saved credit cards
-   - Card details: Name, Last 4 digits, Card type, Balance/Limit
-   - Add new card button
-   - Edit/delete card options
-   - View transactions for specific card
+   - List of saved cards: name, last 4 digits, type, balance/limit
+   - Add card button; edit/delete; view transactions per card
    - Card color/theme selector
 
 ### 7. **Add/Edit Credit Card Screen**
-   - Card name input
-   - Card number input (masked)
-   - Cardholder name
-   - Expiry date
-   - Credit limit input
+   - Card name, masked number, cardholder, expiry, credit limit
    - Card color/icon picker
-   - Save/Cancel buttons
+   - Save/Cancel
 
-### 8. **Settings Screen**
-   - Currency selection
-   - Theme (Light/Dark mode)
-   - Notification preferences
-   - Data export/backup
+### 8. **Settings Screen** (planned)
+   - Currency, theme (system/light/dark), notification preferences
+   - Data export/backup, AI toggles (opt-in, with clear data disclosure)
    - About app
-
----
-
-## Primary Content and Functionality
-
-### Dashboard
-- **Top Section**: Summary cards showing:
-  - Current month balance (green for positive, red for negative)
-  - Total income (green badge)
-  - Total expenses (red badge)
-- **Recent Transactions**: Horizontal scrollable or vertical list
-  - Each item: Category icon, Description, Amount, Date
-  - Tap to view/edit details
-- **Quick Actions**: Three prominent buttons at bottom
-  - "Add Income" (green)
-  - "Add Expense" (red)
-  - "View All Transactions" (neutral)
-
-### Add Transaction
-- **Type Toggle**: Segmented control (Income / Expense)
-- **Amount Input**: Large, prominent numeric input with currency symbol
-- **Category Picker**: Grid of category buttons with icons and colors
-- **Date/Time**: Date picker with time (optional)
-- **Description**: Optional text field
-- **Card Selector**: Dropdown for credit card selection (if expense)
-- **Save Button**: Prominent, enabled only when amount is entered
-
-### Transactions List
-- **Filter Bar**: Horizontal scroll of filter chips (All, This Month, This Week, etc.)
-- **Category Filter**: Dropdown or expandable filter section
-- **Transaction Items**: 
-  - Left: Category icon with color
-  - Middle: Description + Date
-  - Right: Amount (green for income, red for expense)
-- **Swipe Actions**: Delete or Edit on swipe
-- **Empty State**: "No transactions" message with add button
-
-### Monthly Summary
-- **Header**: Month/Year selector with prev/next arrows
-- **Summary Cards**: Income, Expenses, Net (with trend indicators)
-- **Chart**: Pie chart or horizontal bar chart of expenses by category
-- **Category Breakdown**: List showing each category with amount and percentage
-- **Actions**: Export as PDF, Share, Print
-
-### Credit Cards
-- **Card List**: Vertical list of cards
-  - Each card shows: Card name, last 4 digits, card type icon, balance/limit
-  - Tap to view details or edit
-- **Add Card Button**: Prominent button at bottom
-- **Card Actions**: Edit, Delete, View Transactions
 
 ---
 
 ## Key User Flows
 
 ### Flow 1: Add an Expense
-1. User taps "Add Expense" button on Dashboard
-2. Add Transaction modal opens with Expense pre-selected
-3. User enters amount (e.g., 25.50)
-4. User selects category (e.g., Food)
-5. User selects date (defaults to today)
-6. User optionally adds description (e.g., "Lunch at cafe")
-7. User optionally selects credit card
-8. User taps "Save"
-9. Modal closes, Dashboard updates with new transaction
+1. Tap "Add Expense" on Dashboard → sheet opens with Expense preselected
+2. Enter amount → pick category → (optional) link card → (optional) note/date
+3. Tap Save → optimistic update + haptic; sheet closes; balance & Recent Activity update
+4. On network error → non-blocking toast + rollback; sheet stays open
 
-### Flow 2: View Monthly Summary
-1. User navigates to Monthly Summary tab
-2. Current month is displayed by default
-3. User sees total income, expenses, and net balance
-4. User sees pie chart of expense breakdown
-5. User can tap on a category in the chart to filter transactions for that category
-6. User can swipe left/right to view previous/next months
-7. User can tap "Export" to save summary as PDF
+### Flow 2: Review Monthly Summary
+1. Open Insights → current month shown by default
+2. See income / expenses / net + expense-breakdown chart
+3. Tap a category → filter transactions for it
+4. Swipe or use the stepper for previous/next months
+5. Export/share
 
 ### Flow 3: Manage Credit Card
-1. User navigates to Credit Cards screen
-2. User taps "Add Card" button
-3. Add Card modal opens
-4. User enters card details (name, number, expiry, limit)
-5. User selects card color/theme
-6. User taps "Save"
-7. Card appears in list
-8. User can tap card to view associated transactions
-9. User can swipe to delete or tap menu to edit
+1. Cards screen → Add Card → enter details → pick color → Save
+2. Tap a card to view its transactions; swipe to delete / menu to edit
 
 ### Flow 4: Filter Transactions
-1. User navigates to Transactions List
-2. User taps on a category filter chip (e.g., "Food")
-3. List updates to show only Food category transactions
-4. User can add more filters (e.g., "This Month")
-5. User can clear all filters with "Reset" button
+1. Activity screen → tap a filter pill (e.g. "Food")
+2. List updates; add more pills (e.g. "This Month"); clear all to reset
+
+### Flow 5: Enable AI Categorization (planned)
+1. First use shows an opt-in card: what's sent, why, and that it's reversible
+2. On enable, a suggested category chip appears in Add-Transaction; one tap accepts, ignore to pick manually
 
 ---
 
-## Color Choices
+## Color System — Refined Indigo
 
-### Primary Colors
-- **Primary Accent**: #0a7ea4 (Teal/Blue) - Used for buttons, active states, highlights
-- **Success Green**: #22C55E - Income, positive balance, confirmations
-- **Error Red**: #EF4444 - Expenses, negative balance, deletions
-- **Warning Orange**: #F59E0B - Alerts, pending transactions
+Tokens are defined in `theme.config.js` and consumed via NativeWind. **Discipline:**
+`success`/`error` are reserved for money & destructive actions; `accent`/`secondary` are
+rare (AI/insight highlights, hero gradient end-stop). Indigo is the single brand/action color.
 
-### Neutral Colors
-- **Background**: #ffffff (Light mode) / #151718 (Dark mode)
-- **Surface**: #f5f5f5 (Light mode) / #1e2022 (Dark mode)
-- **Foreground**: #11181C (Light mode) / #ECEDEE (Dark mode)
-- **Muted**: #687076 (Light mode) / #9BA1A6 (Dark mode)
-- **Border**: #E5E7EB (Light mode) / #334155 (Dark mode)
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `primary` | `#4F46E5` | `#818CF8` | Brand, primary actions, active states |
+| `background` | `#F8FAFC` | `#0B0F19` | App background |
+| `surface` | `#FFFFFF` | `#151B2B` | Cards, sheets, elevated surfaces |
+| `foreground` | `#111827` | `#F1F5F9` | Primary text |
+| `muted` | `#6B7280` | `#9CA3AF` | Secondary text, inactive icons |
+| `border` | `#E5E7EB` | `#2D3748` | Dividers, outlines |
+| `success` | `#059669` | `#34D399` | **Income / positive (semantic only)** |
+| `error` | `#DC2626` | `#FCA5A5` | **Expense / negative / destructive (semantic only)** |
+| `warning` | `#D97706` | `#FBBF24` | Alerts, over-budget, due-soon |
+| `accent` | `#DB2777` | `#F472B6` | Rare small accents (AI/insight) |
+| `secondary` | `#7C3AED` | `#A78BFA` | Hero gradient end-stop, rare accents |
 
-### Category Colors
-- **Food**: #FF6B6B (Red)
-- **Transport**: #4ECDC4 (Teal)
-- **Entertainment**: #FFE66D (Yellow)
-- **Utilities**: #95E1D3 (Mint)
-- **Shopping**: #FF85A2 (Pink)
-- **Healthcare**: #A8E6CF (Light Green)
-- **Salary**: #22C55E (Green)
-- **Freelance**: #3B82F6 (Blue)
-- **Investment**: #8B5CF6 (Purple)
-- **Other**: #6B7280 (Gray)
+**Balance hero gradient:** `primary → secondary` (indigo → violet), used only on the dashboard.
+
+### Category Colors (data-driven; defaults)
+- **Food** `#FF6B6B` · **Transport** `#4ECDC4` · **Entertainment** `#FFE66D` ·
+  **Utilities** `#95E1D3` · **Shopping** `#FF85A2` · **Healthcare** `#A8E6CF`
+- **Salary** `#059669` · **Freelance** `#3B82F6` · **Investment** `#8B5CF6` · **Other** `#6B7280`
+
+> Each category owns a color + icon; defaults should be verified for WCAG AA contrast on both themes.
 
 ---
 
 ## Typography & Spacing
 
-### Font Sizes
-- **Heading 1**: 32px (Dashboard title)
-- **Heading 2**: 24px (Section titles)
-- **Heading 3**: 18px (Card titles)
-- **Body**: 16px (Regular text)
-- **Caption**: 14px (Secondary text)
-- **Small**: 12px (Timestamps, hints)
+### Type Scale (system font stack: SF Pro / Roboto / system-ui)
+| Token | Size / Line | Weight | Use |
+|---|---|---|---|
+| `display` | 32 / 38 | 700 | Balance hero amount |
+| `h1` | 28 / 34 | 700 | Screen titles |
+| `h2` | 22 / 28 | 600 | Section titles |
+| `h3` | 18 / 24 | 600 | Card titles |
+| `body` | 16 / 24 | 400 | Default text |
+| `label` | 14 / 20 | 500 | Field labels, chips |
+| `caption` | 12 / 16 | 400 | Timestamps, hints |
+| `number` | tabular | 600 | All monetary figures (tabular-nums) |
 
-### Spacing
-- **Padding**: 16px (standard), 12px (compact), 20px (generous)
-- **Gap**: 8px (tight), 12px (standard), 16px (loose)
-- **Border Radius**: 12px (standard), 8px (compact), 16px (large)
+Monetary values use tabular figures; support Dynamic Type up to 200%.
+
+### Spacing (4-pt base)
+- `xs 4` · `sm 8` · `md 12` (default) · `lg 16` (screen/card padding) · `xl 20` · `2xl 24`
+- **Radius:** `sm 8` · `md 12` (default) · `lg 16` (cards) · `full` (pills/chips)
+- **Elevation:** subtle, low-opacity shadows; dark mode relies on `surface` lightness over heavy shadows
 
 ---
 
 ## Interaction Patterns
 
 ### Feedback
-- **Button Press**: Scale 0.97 + light haptic feedback
-- **List Item Tap**: Opacity 0.7 + navigation
-- **Swipe Delete**: Confirm with haptic feedback
-- **Success**: Green checkmark + success haptic
-- **Error**: Red alert + error haptic
+- **Button press:** scale 0.97 + light haptic
+- **List item tap:** opacity 0.7 + navigation
+- **Save success:** toast + success haptic; affected number animates to its new value
+- **Error:** non-blocking error toast + error haptic; optimistic change rolls back
+- **Swipe delete:** confirm with haptic; destructive actions always confirmable
 
 ### Animations
-- **Screen Transitions**: Subtle slide (150ms)
-- **Modal Entry**: Fade + slide up (250ms)
-- **List Item Deletion**: Fade out (200ms)
-- **Chart Animation**: Staggered bar animation (500ms)
+- Screen transitions: subtle slide (150ms)
+- Sheet entry: fade + slide up (250ms)
+- List item deletion: fade out (200ms)
+- Chart: staggered animation (500ms)
+- Respect reduced-motion: disable non-essential animation when the OS flag is set
 
 ---
 
 ## Accessibility
 
-- Minimum touch target: 44x44pt
-- Color contrast: WCAG AA compliant
-- Text scaling: Support up to 200% scaling
-- VoiceOver support for all interactive elements
-- Haptic feedback for all confirmations
+- Minimum touch target: 44×44 pt
+- Color contrast: WCAG 2.1 AA on both themes (verify category colors)
+- **Never encode meaning in color alone** — pair income/expense color with sign (`+`/`−`) and/or icon
+- Text scaling up to 200%
+- VoiceOver / TalkBack labels on all interactive elements; charts have text-equivalent summaries
+
+---
+
+## Known Consistency Fixes (from the UX spec audit)
+
+These were observed in the built screens and should be corrected during the token/primitive rollout:
+
+- Remove the stray **`index` tab** still visible in the tab bar (`href:null` not taking effect)
+- Fix Dashboard **quick-action chips overlapping** the balance hero (use Button primitives in-flow)
+- Convert the **"Add New Category"** full-width banner into a real Button
+- Standardize **Activity filter chips** on the shared `Pill` primitive
+- Unify app title to **SmartPocket** (currently shows "Expense Tracker")
