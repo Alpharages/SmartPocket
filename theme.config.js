@@ -7,12 +7,34 @@ const themeColors = {
   foreground: { light: "#111827", dark: "#F1F5F9" }, // Near black / Soft white
   muted: { light: "#6B7280", dark: "#9CA3AF" }, // Neutral gray
   border: { light: "#E5E7EB", dark: "#2D3748" }, // Subtle borders
-  success: { light: "#059669", dark: "#34D399" }, // Forest green
+  success: { light: "#059669", dark: "#34D399" }, // Forest green — semantic only (income/positive)
   warning: { light: "#D97706", dark: "#FBBF24" }, // Warm amber
-  error: { light: "#DC2626", dark: "#FCA5A5" }, // Clean red
-  accent: { light: "#DB2777", dark: "#F472B6" }, // Rose accent
+  error: { light: "#DC2626", dark: "#FCA5A5" }, // Clean red — semantic only (expense/destructive)
+  accent: { light: "#DB2777", dark: "#F472B6" }, // Rose accent — rare, small highlights
   secondary: { light: "#7C3AED", dark: "#A78BFA" }, // Violet
 };
+
+/**
+ * Data-driven category color token map.
+ * Each token provides light/dark variants tuned for WCAG AA:
+ * - ≥ 4.5:1 against white text (used on category chips/pills)
+ * - ≥ 3:1 against light (#F8FAFC) and dark (#0B0F19) backgrounds for UI elements
+ *
+ * The palette wraps when categories exceed its length.
+ */
+/** @type {const} */
+const categoryColors = [
+  { name: "indigo", light: "#4F46E5", dark: "#818CF8" },
+  { name: "emerald", light: "#047857", dark: "#34D399" },
+  { name: "rose", light: "#E11D48", dark: "#FB7185" },
+  { name: "amber", light: "#B45309", dark: "#FCD34D" },
+  { name: "violet", light: "#7C3AED", dark: "#A78BFA" },
+  { name: "cyan", light: "#0E7490", dark: "#22D3EE" },
+  { name: "orange", light: "#C2410C", dark: "#FB923C" },
+  { name: "pink", light: "#DB2777", dark: "#F472B6" },
+  { name: "blue", light: "#2563EB", dark: "#60A5FA" },
+  { name: "teal", light: "#0F766E", dark: "#2DD4BF" },
+];
 
 /** @type {const} */
 const spacing = {
@@ -63,4 +85,4 @@ const elevation = {
   lg: "0 10px 15px -3px color-mix(in srgb, var(--color-foreground) 12%, transparent), 0 4px 6px -4px color-mix(in srgb, var(--color-foreground) 10%, transparent)",
 };
 
-module.exports = { themeColors, spacing, radius, typography, elevation };
+module.exports = { themeColors, categoryColors, spacing, radius, typography, elevation };

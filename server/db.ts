@@ -1,6 +1,10 @@
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { callDataApi } from "./_core/dataApi";
 import {
+  CATEGORY_DEFAULT_COLOR,
+  getCategoryColorForName,
+} from "../shared/theme";
+import {
   categories,
   creditCards,
   transactions,
@@ -79,7 +83,10 @@ export async function upsertUser(data: {
 // CATEGORIES
 // ============================================================================
 
-export async function getUserCategories(userId: number, type?: "income" | "expense") {
+export async function getUserCategories(
+  userId: number,
+  type?: "income" | "expense",
+) {
   try {
     const query = type
       ? "SELECT * FROM categories WHERE userId = ? AND type = ? ORDER BY name"
@@ -106,7 +113,8 @@ export async function createCategory(data: InsertCategory) {
         data.userId,
         data.name,
         data.type,
-        data.color || "#0a7ea4",
+        // Assign a distinct palette token by name when no color is supplied.
+        data.color || getCategoryColorForName(data.name),
         data.icon || "tag",
         data.isDefault || false,
       ],
@@ -117,7 +125,10 @@ export async function createCategory(data: InsertCategory) {
     : 0;
 }
 
-export async function updateCategory(id: number, data: Partial<InsertCategory>) {
+export async function updateCategory(
+  id: number,
+  data: Partial<InsertCategory>,
+) {
   const updates = Object.entries(data)
     .map(([key]) => `${key} = ?`)
     .join(", ");
@@ -187,7 +198,7 @@ export async function createCreditCard(data: InsertCreditCard) {
         data.expiryMonth,
         data.expiryYear,
         data.creditLimit,
-        data.color || "#0a7ea4",
+        data.color || CATEGORY_DEFAULT_COLOR,
         data.cardType || "credit",
       ],
     },
@@ -197,7 +208,10 @@ export async function createCreditCard(data: InsertCreditCard) {
     : 0;
 }
 
-export async function updateCreditCard(id: number, data: Partial<InsertCreditCard>) {
+export async function updateCreditCard(
+  id: number,
+  data: Partial<InsertCreditCard>,
+) {
   const updates = Object.entries(data)
     .map(([key]) => `${key} = ?`)
     .join(", ");
@@ -238,9 +252,14 @@ export async function getCreditCardById(id: number) {
 // TRANSACTIONS
 // ============================================================================
 
-export async function getUserTransactions(userId: number, limit?: number, offset?: number) {
+export async function getUserTransactions(
+  userId: number,
+  limit?: number,
+  offset?: number,
+) {
   try {
-    let query = "SELECT * FROM transactions WHERE userId = ? ORDER BY date DESC";
+    let query =
+      "SELECT * FROM transactions WHERE userId = ? ORDER BY date DESC";
     const params: unknown[] = [userId];
 
     if (limit) {
@@ -264,12 +283,13 @@ export async function getUserTransactions(userId: number, limit?: number, offset
 export async function getTransactionsByDateRange(
   userId: number,
   startDate: Date,
-  endDate: Date
+  endDate: Date,
 ) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? ORDER BY date DESC",
+        query:
+          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? ORDER BY date DESC",
         params: [userId, startDate, endDate],
       },
     });
@@ -279,11 +299,15 @@ export async function getTransactionsByDateRange(
   }
 }
 
-export async function getTransactionsByCategory(userId: number, categoryId: number) {
+export async function getTransactionsByCategory(
+  userId: number,
+  categoryId: number,
+) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM transactions WHERE userId = ? AND categoryId = ? ORDER BY date DESC",
+        query:
+          "SELECT * FROM transactions WHERE userId = ? AND categoryId = ? ORDER BY date DESC",
         params: [userId, categoryId],
       },
     });
@@ -293,11 +317,15 @@ export async function getTransactionsByCategory(userId: number, categoryId: numb
   }
 }
 
-export async function getTransactionsByCreditCard(userId: number, creditCardId: number) {
+export async function getTransactionsByCreditCard(
+  userId: number,
+  creditCardId: number,
+) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM transactions WHERE userId = ? AND creditCardId = ? ORDER BY date DESC",
+        query:
+          "SELECT * FROM transactions WHERE userId = ? AND creditCardId = ? ORDER BY date DESC",
         params: [userId, creditCardId],
       },
     });
@@ -330,7 +358,10 @@ export async function createTransaction(data: InsertTransaction) {
     : 0;
 }
 
-export async function updateTransaction(id: number, data: Partial<InsertTransaction>) {
+export async function updateTransaction(
+  id: number,
+  data: Partial<InsertTransaction>,
+) {
   const updates = Object.entries(data)
     .map(([key]) => `${key} = ?`)
     .join(", ");
@@ -371,11 +402,16 @@ export async function getTransactionById(id: number) {
 // MONTHLY SUMMARIES
 // ============================================================================
 
-export async function getMonthlySummary(userId: number, year: number, month: number) {
+export async function getMonthlySummary(
+  userId: number,
+  year: number,
+  month: number,
+) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM monthlySummaries WHERE userId = ? AND year = ? AND month = ?",
+        query:
+          "SELECT * FROM monthlySummaries WHERE userId = ? AND year = ? AND month = ?",
         params: [userId, year, month],
       },
     });
@@ -409,7 +445,7 @@ export async function createMonthlySummary(data: InsertMonthlySummary) {
 
 export async function updateMonthlySummary(
   id: number,
-  data: Partial<InsertMonthlySummary>
+  data: Partial<InsertMonthlySummary>,
 ) {
   const updates = Object.entries(data)
     .map(([key]) => `${key} = ?`)
@@ -432,14 +468,19 @@ export async function updateMonthlySummary(
  * Get monthly statistics for a user.
  * Calculates total income, expenses, and net balance for a given month.
  */
-export async function getMonthlyStats(userId: number, year: number, month: number) {
+export async function getMonthlyStats(
+  userId: number,
+  year: number,
+  month: number,
+) {
   try {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ?",
+        query:
+          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ?",
         params: [userId, startDate, endDate],
       },
     });
@@ -470,14 +511,19 @@ export async function getMonthlyStats(userId: number, year: number, month: numbe
 /**
  * Get expense breakdown by category for a given month.
  */
-export async function getExpensesByCategory(userId: number, year: number, month: number) {
+export async function getExpensesByCategory(
+  userId: number,
+  year: number,
+  month: number,
+) {
   try {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ?",
+        query:
+          "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ?",
         params: [userId, startDate, endDate],
       },
     });
@@ -512,7 +558,8 @@ export async function getRecentTransactions(userId: number, limit: number = 7) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM transactions WHERE userId = ? ORDER BY date DESC LIMIT ?",
+        query:
+          "SELECT * FROM transactions WHERE userId = ? ORDER BY date DESC LIMIT ?",
         params: [userId, limit],
       },
     });

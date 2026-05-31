@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "./_core/trpc";
 import * as db from "./db";
+import {
+  CATEGORY_DEFAULT_COLOR,
+  getCategoryColorForName,
+} from "../shared/theme";
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -9,7 +13,10 @@ import * as db from "./db";
 const categorySchema = z.object({
   name: z.string().min(1).max(100),
   type: z.enum(["income", "expense"]),
-  color: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9A-F]{6}$/i)
+    .optional(),
   icon: z.string().max(50).optional(),
 });
 
@@ -20,7 +27,10 @@ const creditCardSchema = z.object({
   expiryMonth: z.number().min(1).max(12),
   expiryYear: z.number().min(2024).max(2099),
   creditLimit: z.string().regex(/^\d+(\.\d{1,2})?$/),
-  color: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9A-F]{6}$/i)
+    .optional(),
   cardType: z.string().max(50).optional(),
 });
 
@@ -39,7 +49,9 @@ const transactionSchema = z.object({
 
 const categoriesRouter = router({
   list: protectedProcedure
-    .input(z.object({ type: z.enum(["income", "expense"]).optional() }).optional())
+    .input(
+      z.object({ type: z.enum(["income", "expense"]).optional() }).optional(),
+    )
     .query(({ ctx, input }) => {
       return db.getUserCategories(ctx.user.id, input?.type);
     }),
@@ -50,7 +62,9 @@ const categoriesRouter = router({
       return db.createCategory({
         userId: ctx.user.id,
         ...input,
-        color: input.color || "#0a7ea4",
+        // No explicit color → assign a distinct palette token by hashing the
+        // name, so auto-defaulted categories don't all collide on indigo.
+        color: input.color || getCategoryColorForName(input.name),
         icon: input.icon || "tag",
       });
     }),
@@ -94,7 +108,7 @@ const creditCardsRouter = router({
         expiryMonth: input.expiryMonth,
         expiryYear: input.expiryYear,
         creditLimit: input.creditLimit,
-        color: input.color || "#0a7ea4",
+        color: input.color || CATEGORY_DEFAULT_COLOR,
         cardType: input.cardType || "credit",
         name: input.name,
       });
@@ -130,10 +144,12 @@ const creditCardsRouter = router({
 const transactionsRouter = router({
   list: protectedProcedure
     .input(
-      z.object({
-        limit: z.number().optional(),
-        offset: z.number().optional(),
-      }).optional()
+      z
+        .object({
+          limit: z.number().optional(),
+          offset: z.number().optional(),
+        })
+        .optional(),
     )
     .query(({ ctx, input }) => {
       return db.getUserTransactions(ctx.user.id, input?.limit, input?.offset);
@@ -144,13 +160,13 @@ const transactionsRouter = router({
       z.object({
         startDate: z.date(),
         endDate: z.date(),
-      })
+      }),
     )
     .query(({ ctx, input }) => {
       return db.getTransactionsByDateRange(
         ctx.user.id,
         input.startDate,
-        input.endDate
+        input.endDate,
       );
     }),
 
@@ -216,7 +232,7 @@ const summaryRouter = router({
       z.object({
         year: z.number(),
         month: z.number().min(1).max(12),
-      })
+      }),
     )
     .query(({ ctx, input }) => {
       return db.getMonthlyStats(ctx.user.id, input.year, input.month);
@@ -227,7 +243,7 @@ const summaryRouter = router({
       z.object({
         year: z.number(),
         month: z.number().min(1).max(12),
-      })
+      }),
     )
     .query(({ ctx, input }) => {
       return db.getExpensesByCategory(ctx.user.id, input.year, input.month);

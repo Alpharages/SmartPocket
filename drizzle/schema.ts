@@ -1,4 +1,5 @@
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean } from "drizzle-orm/mysql-core";
+import { CATEGORY_DEFAULT_COLOR } from "../shared/theme";
 
 /**
  * Core user table backing auth flow.
@@ -34,7 +35,7 @@ export const categories = mysqlTable("categories", {
   userId: int("userId").notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   type: mysqlEnum("type", ["income", "expense"]).notNull(),
-  color: varchar("color", { length: 7 }).default("#0a7ea4").notNull(), // Hex color
+  color: varchar("color", { length: 7 }).default(CATEGORY_DEFAULT_COLOR).notNull(), // Hex color
   icon: varchar("icon", { length: 50 }).default("tag").notNull(),
   isDefault: boolean("isDefault").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -57,7 +58,7 @@ export const creditCards = mysqlTable("creditCards", {
   expiryYear: int("expiryYear").notNull(),
   creditLimit: decimal("creditLimit", { precision: 12, scale: 2 }).notNull(),
   currentBalance: decimal("currentBalance", { precision: 12, scale: 2 }).default("0").notNull(),
-  color: varchar("color", { length: 7 }).default("#0a7ea4").notNull(),
+  color: varchar("color", { length: 7 }).default(CATEGORY_DEFAULT_COLOR).notNull(),
   cardType: varchar("cardType", { length: 50 }).default("credit").notNull(), // credit, debit, etc.
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

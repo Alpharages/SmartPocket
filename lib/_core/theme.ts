@@ -69,6 +69,21 @@ export const Colors = {
 
 export type ThemeColorPalette = (typeof Colors)[ColorScheme];
 
+// Category color tokens and their assignment/resolution helpers live in the
+// server-safe `shared/theme` module (single source of truth). Re-exported here
+// so client code can keep importing them from `@/constants/theme`.
+export {
+  CategoryColors,
+  CATEGORY_COLOR_LIGHT_VALUES,
+  CATEGORY_COLOR_DARK_VALUES,
+  CATEGORY_DEFAULT_COLOR,
+  getCategoryColorByIndex,
+  getCategoryColorForName,
+  hashToPaletteIndex,
+  resolveCategoryColor,
+  type CategoryColorToken,
+} from "@/shared/theme";
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

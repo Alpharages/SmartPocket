@@ -12,6 +12,14 @@ export const themeColors: {
   secondary: { light: string; dark: string };
 };
 
+export type CategoryColorToken = {
+  name: string;
+  light: string;
+  dark: string;
+};
+
+export const categoryColors: readonly CategoryColorToken[];
+
 export const spacing: {
   xs: number;
   sm: number;
@@ -68,6 +76,7 @@ export const elevation: {
 
 declare const themeConfig: {
   themeColors: typeof themeColors;
+  categoryColors: typeof categoryColors;
   spacing: typeof spacing;
   radius: typeof radius;
   typography: typeof typography;
