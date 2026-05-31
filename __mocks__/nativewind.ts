@@ -1,0 +1,12 @@
+export const colorScheme = { set: () => {}, get: () => "light" };
+export const vars = () => ({}) as any;
+export const cssInterop = () => ({}) as any;
+export const StyleSheet = {};
+export const createInteropElement = () => null;
+export const remapProps = () => ({}) as any;
+export const rem = () => 0;
+export const useSafeAreaEnv = () => null;
+export const useUnstableNativeVariable = () => undefined;
+export const useColorScheme = () => "light";
+export const createElement = () => null;
+export const verifyInstallation = () => {};

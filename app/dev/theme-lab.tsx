@@ -10,6 +10,7 @@ import {
 
 import { ScreenContainer } from "@/components/screen-container";
 import { ThemedView } from "@/components/themed-view";
+import { Button } from "@/components/ui/Button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { SchemeColors, type ColorScheme } from "@/constants/theme";
 import { useColors } from "@/hooks/use-colors";
@@ -301,6 +302,63 @@ export default function ThemeLabScreen() {
                 <Text className="text-sm text-muted">
                   Last action: {lastAction}
                 </Text>
+              </View>
+            </View>
+          </ThemedView>
+
+          <ThemedView className="rounded-2xl border border-border p-4">
+            <Text className="text-lg font-bold text-foreground">
+              Button primitive
+            </Text>
+            <Text className="mt-1 text-sm text-muted">
+              All variants, sizes, and states
+            </Text>
+            <View className="mt-4 gap-3">
+              <Text className="text-label text-muted">Variants</Text>
+              <View className="flex-row flex-wrap gap-2">
+                <Button variant="primary" label="Primary" />
+                <Button variant="secondary" label="Secondary" />
+                <Button variant="ghost" label="Ghost" />
+                <Button variant="destructive" label="Destructive" />
+                <Button variant="income" label="Income" />
+                <Button
+                  variant="icon-only"
+                  accessibilityLabel="Add"
+                  leftIcon={
+                    <IconSymbol name="plus" color="#FFFFFF" size={20} />
+                  }
+                />
+              </View>
+
+              <Text className="text-label text-muted">Sizes</Text>
+              <View className="flex-row flex-wrap gap-2 items-center">
+                <Button size="sm" label="Small" />
+                <Button size="md" label="Medium" />
+                <Button size="lg" label="Large" />
+              </View>
+
+              <Text className="text-label text-muted">States</Text>
+              <View className="flex-row flex-wrap gap-2">
+                <Button label="Default" />
+                <Button label="Disabled" disabled />
+                <Button label="Loading" loading />
+              </View>
+
+              <Text className="text-label text-muted">With icons</Text>
+              <View className="flex-row flex-wrap gap-2">
+                <Button
+                  label="Left"
+                  leftIcon={
+                    <IconSymbol name="arrow.left" color="#FFFFFF" size={16} />
+                  }
+                />
+                <Button
+                  variant="secondary"
+                  label="Right"
+                  rightIcon={
+                    <IconSymbol name="arrow.right" color="#111827" size={16} />
+                  }
+                />
               </View>
             </View>
           </ThemedView>
