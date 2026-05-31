@@ -161,6 +161,49 @@ describe("Button", () => {
         act(() => renderer?.unmount());
       }
     });
+
+    it("keeps a 44pt touch target across every size AND variant (incl. icon-only)", () => {
+      const sizes = ["sm", "md", "lg"] as const;
+      const labelVariants = [
+        "primary",
+        "secondary",
+        "ghost",
+        "destructive",
+        "income",
+      ] as const;
+      for (const size of sizes) {
+        for (const variant of labelVariants) {
+          const root = render(
+            <Button variant={variant} label="X" size={size} />,
+          );
+          const style = StyleSheet.flatten(getButton(root).props.style);
+          if (style.minHeight < 44) {
+            throw new Error(`${variant}/${size}: minHeight ${style.minHeight} < 44`);
+          }
+          expect(style.minHeight).toBeGreaterThanOrEqual(44);
+          act(() => renderer?.unmount());
+        }
+        // icon-only is a fixed square — both width and height must clear 44.
+        const root = render(
+          <Button
+            variant="icon-only"
+            accessibilityLabel="Action"
+            size={size}
+            leftIcon={<Text>+</Text>}
+          />,
+        );
+        const style = StyleSheet.flatten(getButton(root).props.style);
+        if (style.height < 44 || style.width < 44) {
+          throw new Error(
+            `icon-only/${size}: ${style.width}x${style.height} below 44`,
+          );
+        }
+        expect(style.minHeight).toBeGreaterThanOrEqual(44);
+        expect(style.height).toBeGreaterThanOrEqual(44);
+        expect(style.width).toBeGreaterThanOrEqual(44);
+        act(() => renderer?.unmount());
+      }
+    });
   });
 
   describe("interaction", () => {

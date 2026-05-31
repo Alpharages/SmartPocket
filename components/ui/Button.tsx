@@ -36,6 +36,12 @@ export type ButtonVariant =
 
 export type ButtonSize = "sm" | "md" | "lg";
 
+// NFR-5 / WCAG 2.1 AA: every button — every size and variant, icon-only
+// included — must present at least a 44pt touch target. Size tokens below set
+// the *design* height; this floor is enforced at the style layer so a compact
+// `sm` can never render below the accessible minimum.
+const MIN_TOUCH_TARGET = 44;
+
 type BaseButtonProps = {
   variant?: ButtonVariant;
   size?: ButtonSize;
@@ -179,7 +185,9 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
           break;
       }
 
-      const dim = iconOnly ? SIZE_ICON_ONLY_DIMENSION[size] : undefined;
+      const dim = iconOnly
+        ? Math.max(MIN_TOUCH_TARGET, SIZE_ICON_ONLY_DIMENSION[size])
+        : undefined;
       const pad = iconOnly ? undefined : SIZE_PADDING[size];
 
       return {
@@ -187,7 +195,7 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
           backgroundColor: bg,
           borderColor: border,
           borderWidth: border ? 1 : 0,
-          minHeight: SIZE_HEIGHT[size],
+          minHeight: Math.max(MIN_TOUCH_TARGET, SIZE_HEIGHT[size]),
           height: dim,
           width: dim,
           paddingHorizontal: pad?.px,

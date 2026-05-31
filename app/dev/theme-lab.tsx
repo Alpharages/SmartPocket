@@ -339,7 +339,13 @@ export default function ThemeLabScreen() {
 
               <Text className="text-label text-muted">States</Text>
               <View className="flex-row flex-wrap gap-2">
-                <Button label="Default" />
+                <Button
+                  label="Default"
+                  onPress={() => {
+                    setPressCount((count) => count + 1);
+                    setLastAction("Button: Default");
+                  }}
+                />
                 <Button label="Disabled" disabled />
                 <Button label="Loading" loading />
               </View>
