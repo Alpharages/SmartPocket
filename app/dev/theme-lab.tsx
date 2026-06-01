@@ -11,6 +11,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { ThemedView } from "@/components/themed-view";
 import { Button } from "@/components/ui/Button";
+import { FilterChipGroup, Pill } from "@/components/ui";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { SchemeColors, type ColorScheme } from "@/constants/theme";
 import { useColors } from "@/hooks/use-colors";
@@ -34,6 +35,40 @@ function ColorSwatch({ name, value }: { name: PaletteName; value: string }) {
       </View>
       <Text className="text-xs font-mono text-muted">{value}</Text>
     </View>
+  );
+}
+
+function SegmentDemo() {
+  const [value, setValue] = useState<string>("all");
+  return (
+    <FilterChipGroup
+      mode="single"
+      value={value}
+      onChange={setValue}
+      options={[
+        { value: "all", label: "All" },
+        { value: "income", label: "Income" },
+        { value: "expense", label: "Expense" },
+        { value: "thisMonth", label: "This Month" },
+      ]}
+    />
+  );
+}
+
+function FilterDemo() {
+  const [value, setValue] = useState<string[]>(["food"]);
+  return (
+    <FilterChipGroup
+      mode="multi"
+      value={value}
+      onChange={setValue}
+      options={[
+        { value: "food", label: "Food" },
+        { value: "transport", label: "Transport" },
+        { value: "utilities", label: "Utilities" },
+        { value: "entertainment", label: "Entertainment" },
+      ]}
+    />
   );
 }
 
@@ -366,6 +401,44 @@ export default function ThemeLabScreen() {
                   }
                 />
               </View>
+            </View>
+          </ThemedView>
+
+          <ThemedView className="rounded-2xl border border-border p-4">
+            <Text className="text-lg font-bold text-foreground">
+              Pill / FilterChip primitive
+            </Text>
+            <Text className="mt-1 text-sm text-muted">
+              Filter (multi-select) and segment (single-select) variants
+            </Text>
+
+            <Text className="mt-4 text-label text-muted">States</Text>
+            <View className="mt-2 flex-row flex-wrap gap-2">
+              <Pill label="Default" />
+              <Pill label="Selected" selected />
+              <Pill label="Disabled" disabled />
+              <Pill label="With count" selected count={3} />
+              <Pill
+                label="With icon"
+                selected
+                leftIcon={
+                  <IconSymbol name="house.fill" color="#FFFFFF" size={14} />
+                }
+              />
+            </View>
+
+            <Text className="mt-4 text-label text-muted">
+              Segment (single-select)
+            </Text>
+            <View className="mt-2">
+              <SegmentDemo />
+            </View>
+
+            <Text className="mt-4 text-label text-muted">
+              Filter (multi-select)
+            </Text>
+            <View className="mt-2">
+              <FilterDemo />
             </View>
           </ThemedView>
 
