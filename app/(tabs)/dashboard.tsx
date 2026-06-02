@@ -1,4 +1,11 @@
-import { ScrollView, View, Text, Pressable, ActivityIndicator, FlatList } from "react-native";
+import {
+  ScrollView,
+  View,
+  Text,
+  Pressable,
+  ActivityIndicator,
+  FlatList,
+} from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
@@ -6,6 +13,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import { StatCard } from "@/components/ui/StatCard";
 
 interface DashboardStats {
   totalIncome: number;
@@ -16,7 +24,8 @@ interface DashboardStats {
 export default function DashboardScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { transactions, monthlyStats, loadingTransactions, loadingStats } = useExpense();
+  const { transactions, monthlyStats, loadingTransactions, loadingStats } =
+    useExpense();
   const [stats, setStats] = useState<DashboardStats>({
     totalIncome: 0,
     totalExpense: 0,
@@ -42,8 +51,13 @@ export default function DashboardScreen() {
         contentContainerStyle={{ paddingBottom: 32 }}
       >
         {/* Header */}
-        <Animated.View entering={FadeInDown.duration(500)} className="px-6 pt-6 pb-2">
-          <Text className="text-[28px] font-bold text-foreground">Expense Tracker</Text>
+        <Animated.View
+          entering={FadeInDown.duration(500)}
+          className="px-6 pt-6 pb-2"
+        >
+          <Text className="text-[28px] font-bold text-foreground">
+            Expense Tracker
+          </Text>
           <Text className="text-sm text-muted font-medium mt-1">
             {new Date().toLocaleDateString("en-US", {
               weekday: "long",
@@ -55,71 +69,59 @@ export default function DashboardScreen() {
 
         {/* Balance Card */}
         <View className="px-6 mt-6">
-          {loadingStats ? (
-            <View className="h-48 rounded-3xl items-center justify-center" style={{ backgroundColor: colors.surface }}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <Animated.View
-              entering={FadeInDown.delay(100).duration(600)}
-              className="rounded-3xl p-6 overflow-hidden"
-              style={{
-                backgroundColor: colors.primary,
-                shadowColor: colors.primary,
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.25,
-                shadowRadius: 16,
-                elevation: 8,
-              }}
-            >
-              <View>
-                <Text className="text-white/70 text-sm font-medium">Total Balance</Text>
-                <Text className="text-[42px] font-bold text-white mt-2 tracking-tight">
-                  ${Math.abs(stats.netBalance).toFixed(2)}
-                </Text>
+          <Animated.View entering={FadeInDown.delay(100).duration(600)}>
+            <StatCard
+              variant="hero"
+              label="Total Balance"
+              amount={stats.netBalance}
+              sign="neutral"
+              loading={loadingStats}
+            />
+          </Animated.View>
 
-                <View className="flex-row mt-6 gap-4">
-                  <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.12)" }}>
-                    <View className="flex-row items-center gap-1.5 mb-1">
-                      <View className="w-5 h-5 rounded-full items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.2)" }}>
-                        <Ionicons name="arrow-down" size={12} color="white" />
-                      </View>
-                      <Text className="text-white/70 text-xs font-medium">Income</Text>
-                    </View>
-                    <Text className="text-white font-bold text-base">
-                      +${stats.totalIncome.toFixed(2)}
-                    </Text>
-                  </View>
-
-                  <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.12)" }}>
-                    <View className="flex-row items-center gap-1.5 mb-1">
-                      <View className="w-5 h-5 rounded-full items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.2)" }}>
-                        <Ionicons name="arrow-up" size={12} color="white" />
-                      </View>
-                      <Text className="text-white/70 text-xs font-medium">Expenses</Text>
-                    </View>
-                    <Text className="text-white font-bold text-base">
-                      -${stats.totalExpense.toFixed(2)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </Animated.View>
-          )}
+          <Animated.View
+            entering={FadeInUp.delay(150).duration(500)}
+            className="flex-row mt-4 gap-3"
+          >
+            <StatCard
+              variant="compact"
+              label="Income"
+              amount={stats.totalIncome}
+              sign="positive"
+              icon="arrow-down"
+              loading={loadingStats}
+            />
+            <StatCard
+              variant="compact"
+              label="Expenses"
+              amount={stats.totalExpense}
+              sign="negative"
+              icon="arrow-up"
+              loading={loadingStats}
+            />
+          </Animated.View>
         </View>
 
         {/* Quick Actions */}
-        <Animated.View entering={FadeInUp.delay(200).duration(500)} className="px-6 mt-6">
+        <Animated.View
+          entering={FadeInUp.delay(200).duration(500)}
+          className="px-6 mt-6"
+        >
           <View className="flex-row gap-3">
             <Pressable
               onPress={() => router.push("/add-transaction?type=income")}
               style={{ backgroundColor: colors.success + "14" }}
               className="flex-1 flex-row items-center justify-center gap-2 py-4 rounded-2xl active:opacity-80"
             >
-              <View className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: colors.success + "24" }}>
+              <View
+                className="w-8 h-8 rounded-full items-center justify-center"
+                style={{ backgroundColor: colors.success + "24" }}
+              >
                 <Ionicons name="add" size={16} color={colors.success} />
               </View>
-              <Text className="text-success font-semibold text-sm">Add Income</Text>
+              <Text className="text-success font-semibold text-sm">
+                Add Income
+              </Text>
             </Pressable>
 
             <Pressable
@@ -127,21 +129,40 @@ export default function DashboardScreen() {
               style={{ backgroundColor: colors.error + "14" }}
               className="flex-1 flex-row items-center justify-center gap-2 py-4 rounded-2xl active:opacity-80"
             >
-              <View className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: colors.error + "24" }}>
+              <View
+                className="w-8 h-8 rounded-full items-center justify-center"
+                style={{ backgroundColor: colors.error + "24" }}
+              >
                 <Ionicons name="remove" size={16} color={colors.error} />
               </View>
-              <Text className="text-error font-semibold text-sm">Add Expense</Text>
+              <Text className="text-error font-semibold text-sm">
+                Add Expense
+              </Text>
             </Pressable>
           </View>
         </Animated.View>
 
         {/* Recent Transactions */}
-        <Animated.View entering={FadeInUp.delay(300).duration(500)} className="px-6 mt-8">
+        <Animated.View
+          entering={FadeInUp.delay(300).duration(500)}
+          className="px-6 mt-8"
+        >
           <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-lg font-bold text-foreground">Recent Activity</Text>
-            <Pressable onPress={() => router.push("/transactions")} className="flex-row items-center gap-0.5">
-              <Text className="text-primary font-semibold text-sm">View All</Text>
-              <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+            <Text className="text-lg font-bold text-foreground">
+              Recent Activity
+            </Text>
+            <Pressable
+              onPress={() => router.push("/transactions")}
+              className="flex-row items-center gap-0.5"
+            >
+              <Text className="text-primary font-semibold text-sm">
+                View All
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={14}
+                color={colors.primary}
+              />
             </Pressable>
           </View>
 
@@ -166,7 +187,9 @@ export default function DashboardScreen() {
                 keyExtractor={(item) => item.id.toString()}
                 renderItem={({ item, index }) => {
                   const isIncome = item.type === "income";
-                  const categoryName = item.categoryId ? `Category ${item.categoryId}` : "Uncategorized";
+                  const categoryName = item.categoryId
+                    ? `Category ${item.categoryId}`
+                    : "Uncategorized";
 
                   return (
                     <Animated.View
@@ -177,7 +200,9 @@ export default function DashboardScreen() {
                         <View
                           className="w-10 h-10 rounded-full items-center justify-center"
                           style={{
-                            backgroundColor: isIncome ? colors.success + "18" : colors.error + "18",
+                            backgroundColor: isIncome
+                              ? colors.success + "18"
+                              : colors.error + "18",
                           }}
                         >
                           <Ionicons
@@ -187,7 +212,9 @@ export default function DashboardScreen() {
                           />
                         </View>
                         <View className="flex-1">
-                          <Text className="text-foreground font-semibold text-sm">{categoryName}</Text>
+                          <Text className="text-foreground font-semibold text-sm">
+                            {categoryName}
+                          </Text>
                           <Text className="text-xs text-muted mt-0.5">
                             {new Date(item.date).toLocaleDateString()}
                           </Text>
@@ -195,29 +222,46 @@ export default function DashboardScreen() {
                       </View>
                       <Text
                         className="font-bold text-sm"
-                        style={{ color: isIncome ? colors.success : colors.error }}
+                        style={{
+                          color: isIncome ? colors.success : colors.error,
+                        }}
                       >
-                        {isIncome ? "+" : "-"}${Math.abs(parseFloat(item.amount)).toFixed(2)}
+                        {isIncome ? "+" : "-"}$
+                        {Math.abs(parseFloat(item.amount)).toFixed(2)}
                       </Text>
                     </Animated.View>
                   );
                 }}
                 scrollEnabled={false}
                 ItemSeparatorComponent={() => (
-                  <View className="mx-4" style={{ height: 0.5, backgroundColor: colors.border }} />
+                  <View
+                    className="mx-4"
+                    style={{ height: 0.5, backgroundColor: colors.border }}
+                  />
                 )}
               />
             </View>
           ) : (
-            <View className="items-center justify-center py-12 rounded-3xl" style={{ backgroundColor: colors.surface }}>
+            <View
+              className="items-center justify-center py-12 rounded-3xl"
+              style={{ backgroundColor: colors.surface }}
+            >
               <View
                 className="w-14 h-14 rounded-full items-center justify-center mb-3"
                 style={{ backgroundColor: colors.border }}
               >
-                <Ionicons name="wallet-outline" size={28} color={colors.muted} />
+                <Ionicons
+                  name="wallet-outline"
+                  size={28}
+                  color={colors.muted}
+                />
               </View>
-              <Text className="text-muted font-medium text-sm">No transactions yet</Text>
-              <Text className="text-xs text-muted mt-1">Start by adding your first transaction</Text>
+              <Text className="text-muted font-medium text-sm">
+                No transactions yet
+              </Text>
+              <Text className="text-xs text-muted mt-1">
+                Start by adding your first transaction
+              </Text>
             </View>
           )}
         </Animated.View>

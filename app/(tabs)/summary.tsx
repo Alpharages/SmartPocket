@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import { StatCard } from "@/components/ui/StatCard";
 
 export default function SummaryScreen() {
   const colors = useColors();
@@ -148,108 +149,35 @@ export default function SummaryScreen() {
 
         {/* Stats Cards */}
         <View className="px-6 mt-6">
-          {loadingStats ? (
-            <View className="items-center justify-center py-12">
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <Animated.View
-              entering={FadeInUp.delay(150).duration(500)}
-              className="flex-row gap-3"
-            >
-              <View
-                className="flex-1 rounded-2xl p-4 gap-2"
-                style={{
-                  backgroundColor: colors.surface,
-                  shadowColor: colors.foreground,
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.04,
-                  shadowRadius: 6,
-                  elevation: 2,
-                }}
-              >
-                <View
-                  className="w-8 h-8 rounded-full items-center justify-center"
-                  style={{ backgroundColor: colors.primary + "14" }}
-                >
-                  <Ionicons
-                    name="wallet-outline"
-                    size={16}
-                    color={colors.primary}
-                  />
-                </View>
-                <Text className="text-xs text-muted font-medium mt-1">
-                  Balance
-                </Text>
-                <Text
-                  className="text-lg font-bold"
-                  style={{ color: colors.primary }}
-                >
-                  ${Math.abs(monthlyStats?.netBalance || 0).toFixed(2)}
-                </Text>
-              </View>
-
-              <View
-                className="flex-1 rounded-2xl p-4 gap-2"
-                style={{
-                  backgroundColor: colors.surface,
-                  shadowColor: colors.foreground,
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.04,
-                  shadowRadius: 6,
-                  elevation: 2,
-                }}
-              >
-                <View
-                  className="w-8 h-8 rounded-full items-center justify-center"
-                  style={{ backgroundColor: colors.success + "14" }}
-                >
-                  <Ionicons
-                    name="arrow-down"
-                    size={16}
-                    color={colors.success}
-                  />
-                </View>
-                <Text className="text-xs text-muted font-medium mt-1">
-                  Income
-                </Text>
-                <Text
-                  className="text-lg font-bold"
-                  style={{ color: colors.success }}
-                >
-                  +${(monthlyStats?.totalIncome || 0).toFixed(2)}
-                </Text>
-              </View>
-
-              <View
-                className="flex-1 rounded-2xl p-4 gap-2"
-                style={{
-                  backgroundColor: colors.surface,
-                  shadowColor: colors.foreground,
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.04,
-                  shadowRadius: 6,
-                  elevation: 2,
-                }}
-              >
-                <View
-                  className="w-8 h-8 rounded-full items-center justify-center"
-                  style={{ backgroundColor: colors.error + "14" }}
-                >
-                  <Ionicons name="arrow-up" size={16} color={colors.error} />
-                </View>
-                <Text className="text-xs text-muted font-medium mt-1">
-                  Expenses
-                </Text>
-                <Text
-                  className="text-lg font-bold"
-                  style={{ color: colors.error }}
-                >
-                  -${(monthlyStats?.totalExpense || 0).toFixed(2)}
-                </Text>
-              </View>
-            </Animated.View>
-          )}
+          <Animated.View
+            entering={FadeInUp.delay(150).duration(500)}
+            className="flex-row gap-3"
+          >
+            <StatCard
+              variant="compact"
+              label="Balance"
+              amount={monthlyStats?.netBalance ?? 0}
+              sign="neutral"
+              icon="wallet-outline"
+              loading={loadingStats}
+            />
+            <StatCard
+              variant="compact"
+              label="Income"
+              amount={monthlyStats?.totalIncome ?? 0}
+              sign="positive"
+              icon="arrow-down"
+              loading={loadingStats}
+            />
+            <StatCard
+              variant="compact"
+              label="Expenses"
+              amount={monthlyStats?.totalExpense ?? 0}
+              sign="negative"
+              icon="arrow-up"
+              loading={loadingStats}
+            />
+          </Animated.View>
         </View>
 
         {/* Category Breakdown */}

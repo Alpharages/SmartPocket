@@ -6,3 +6,5 @@ export { FilterChipGroup } from "./FilterChipGroup";
 export type { FilterChipGroupProps, ChipOption } from "./FilterChipGroup";
 export { ScreenHeader } from "./ScreenHeader";
 export type { ScreenHeaderProps } from "./ScreenHeader";
+export { StatCard } from "./StatCard";
+export type { StatCardProps, StatCardVariant, StatSign } from "./StatCard";
