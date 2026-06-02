@@ -11,7 +11,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { ThemedView } from "@/components/themed-view";
 import { Button } from "@/components/ui/Button";
-import { FilterChipGroup, Pill } from "@/components/ui";
+import { FilterChipGroup, Pill, ScreenHeader } from "@/components/ui";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { SchemeColors, type ColorScheme } from "@/constants/theme";
 import { useColors } from "@/hooks/use-colors";
@@ -338,6 +338,42 @@ export default function ThemeLabScreen() {
                   Last action: {lastAction}
                 </Text>
               </View>
+            </View>
+          </ThemedView>
+
+          <ThemedView className="rounded-2xl border border-border p-4">
+            <Text className="text-lg font-bold text-foreground">
+              ScreenHeader primitive
+            </Text>
+            <Text className="mt-1 text-sm text-muted">
+              Title, subtitle, count, and action slot
+            </Text>
+            <View className="mt-4 gap-4">
+              <ScreenHeader title="Title only" />
+              <ScreenHeader
+                title="With subtitle"
+                subtitle="Monthly breakdown"
+              />
+              <ScreenHeader title="With count" count={12} />
+              <ScreenHeader
+                title="Subtitle + count"
+                subtitle="Transactions"
+                count={42}
+              />
+              <ScreenHeader
+                title="With action"
+                subtitle="Manage your cards"
+                action={
+                  <Button
+                    variant="icon-only"
+                    size="sm"
+                    accessibilityLabel="Add card"
+                    leftIcon={
+                      <IconSymbol name="plus" color="#FFFFFF" size={18} />
+                    }
+                  />
+                }
+              />
             </View>
           </ThemedView>
 
