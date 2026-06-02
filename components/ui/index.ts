@@ -8,3 +8,5 @@ export { ScreenHeader } from "./ScreenHeader";
 export type { ScreenHeaderProps } from "./ScreenHeader";
 export { StatCard } from "./StatCard";
 export type { StatCardProps, StatCardVariant, StatSign } from "./StatCard";
+export { TransactionRow } from "./TransactionRow";
+export type { TransactionRowProps } from "./TransactionRow";

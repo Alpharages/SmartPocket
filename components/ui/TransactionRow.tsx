@@ -1,0 +1,345 @@
+import React, { useCallback, useMemo } from "react";
+import {
+  Pressable,
+  Text,
+  View,
+  type AccessibilityActionEvent,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
+import { Swipeable } from "react-native-gesture-handler";
+import * as Haptics from "expo-haptics";
+
+import { useColors } from "@/hooks/use-colors";
+import { cn } from "@/lib/utils";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+export interface TransactionRowProps {
+  title: string;
+  date: string | Date;
+  amount: string | number;
+  type: "income" | "expense";
+  categoryColor: string;
+  categoryIcon: keyof typeof Ionicons.glyphMap;
+  note?: string;
+  cardLabel?: string;
+  selected?: boolean;
+  onPress?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  className?: string;
+  style?: StyleProp<ViewStyle>;
+}
+
+/** Parse a money prop defensively. DB `decimal(12,2)` strings are valid today,
+ *  but the reusable primitive has no schema guarantee at its boundary, so a
+ *  non-numeric/empty value falls back to 0 instead of rendering "$NaN". */
+function toSafeNumber(amount: string | number): number {
+  const parsed = typeof amount === "string" ? parseFloat(amount) : amount;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Coerce a date prop to a valid Date, or null if unparseable — never let
+ *  `new Date(bad)` leak a literal "Invalid Date" into the UI or a11y label. */
+function toValidDate(date: string | Date): Date | null {
+  const dateObj = typeof date === "string" ? new Date(date) : date;
+  return Number.isNaN(dateObj.getTime()) ? null : dateObj;
+}
+
+/** Append a 2-digit hex alpha to a 6-digit hex color. Prop/DB-sourced colors
+ *  aren't guaranteed `#RRGGBB`, so anything else passes through opaque rather
+ *  than producing an unparseable "#RRGGBBAA18"-style value. */
+function withAlpha(color: string, alphaHex: string): string {
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? `${color}${alphaHex}` : color;
+}
+
+/** Format a decimal amount as signed currency. */
+function formatSignedAmount(
+  amount: string | number,
+  type: "income" | "expense",
+): string {
+  const absValue = Math.abs(toSafeNumber(amount)).toFixed(2);
+  return `${type === "income" ? "+" : "-"}$${absValue}`;
+}
+
+/** Build a screen-reader friendly summary label. */
+function buildAccessibilityLabel(
+  title: string,
+  type: "income" | "expense",
+  amount: string | number,
+  date: string | Date,
+  note?: string,
+  cardLabel?: string,
+): string {
+  const absValue = Math.abs(toSafeNumber(amount)).toFixed(2);
+  const dateObj = toValidDate(date);
+  const dateStr = dateObj
+    ? dateObj.toLocaleDateString("en-US", { month: "long", day: "numeric" })
+    : "";
+
+  const parts: string[] = [title, type, `$${absValue}`];
+  if (dateStr) parts.push(dateStr);
+  if (cardLabel) parts.push(`via ${cardLabel}`);
+  if (note) parts.push(note);
+
+  return parts.join(", ");
+}
+
+/** Format date for display. Falls back to an em dash for invalid input. */
+function formatDate(date: string | Date): string {
+  const dateObj = toValidDate(date);
+  return dateObj
+    ? dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    : "—";
+}
+
+/**
+ * TransactionRow — reusable ledger row primitive.
+ *
+ * Composes a category color+icon avatar, title+date, and a trailing signed
+ * amount. Supports default / pressed / swipe-revealed / selected states and
+ * with-card-badge / with-note variants.
+ *
+ * Architecture guardrails:
+ * - Uses tokens from theme.config.js via NativeWind classes (spacing, radius,
+ *   typography, elevation) and never hardcodes px/hex.
+ * - Colors come from useColors() / constants/theme.ts.
+ * - Presentational only — screens pass data in via props.
+ */
+export function TransactionRow({
+  title,
+  date,
+  amount,
+  type,
+  categoryColor,
+  categoryIcon,
+  note,
+  cardLabel,
+  selected = false,
+  onPress,
+  onEdit,
+  onDelete,
+  className,
+  style,
+}: TransactionRowProps) {
+  const colors = useColors();
+  const reducedMotion = useReducedMotion();
+  const scale = useSharedValue(1);
+
+  const hasSwipeActions = Boolean(onEdit || onDelete);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = useCallback(() => {
+    if (!reducedMotion) {
+      scale.value = withTiming(0.97, { duration: 120 });
+    }
+    if (process.env.EXPO_OS === "ios") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+  }, [reducedMotion, scale]);
+
+  const handlePressOut = useCallback(() => {
+    if (!reducedMotion) {
+      scale.value = withTiming(1, { duration: 120 });
+    }
+  }, [reducedMotion, scale]);
+
+  const handlePress = useCallback(() => {
+    onPress?.();
+  }, [onPress]);
+
+  const displayAmount = useMemo(
+    () => formatSignedAmount(amount, type),
+    [amount, type],
+  );
+
+  const displayDate = useMemo(() => formatDate(date), [date]);
+
+  const accessibilityLabel = useMemo(
+    () => buildAccessibilityLabel(title, type, amount, date, note, cardLabel),
+    [title, type, amount, date, note, cardLabel],
+  );
+
+  // `categoryIcon` is typed `keyof glyphMap`, but that type is erased at
+  // runtime and the value is DB-sourced (categories.icon) — a stale/typo'd
+  // name renders a blank glyph. Validate against the runtime map and fall back.
+  const iconName = useMemo(
+    () =>
+      categoryIcon in Ionicons.glyphMap ? categoryIcon : "pricetag-outline",
+    [categoryIcon],
+  );
+
+  // Edit/Delete are swipe-only for sighted touch users; expose the same actions
+  // to assistive tech via accessibilityActions so VoiceOver/TalkBack (and
+  // motor-impaired) users can invoke them without performing a swipe (NFR-5).
+  const accessibilityActions = useMemo(() => {
+    const actions: { name: string; label: string }[] = [];
+    if (onEdit) actions.push({ name: "edit", label: "Edit" });
+    if (onDelete) actions.push({ name: "delete", label: "Delete" });
+    return actions;
+  }, [onEdit, onDelete]);
+
+  const handleAccessibilityAction = useCallback(
+    (event: AccessibilityActionEvent) => {
+      switch (event.nativeEvent.actionName) {
+        case "edit":
+          onEdit?.();
+          break;
+        case "delete":
+          onDelete?.();
+          break;
+      }
+    },
+    [onEdit, onDelete],
+  );
+
+  const amountColor = type === "income" ? colors.success : colors.error;
+
+  const rowContent = (
+    <AnimatedPressable
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={handlePress}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected }}
+      accessibilityActions={
+        accessibilityActions.length ? accessibilityActions : undefined
+      }
+      onAccessibilityAction={
+        accessibilityActions.length ? handleAccessibilityAction : undefined
+      }
+      className={cn("flex-row items-center justify-between", className)}
+      style={[
+        {
+          // Padding and the selected fill live in `style`, not className: this
+          // app drops NativeWind className visual styles on Pressable (notably
+          // on web), so px/py and the background must be set here to render.
+          minHeight: 56, // ≥ 44pt touch target with comfortable padding
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          backgroundColor: selected
+            ? withAlpha(colors.primary, "0D")
+            : undefined,
+        },
+        animatedStyle,
+        style,
+      ]}
+    >
+      {/* Left: Avatar + Title/Date */}
+      <View className="flex-row items-center gap-3 flex-1">
+        {/* Category Avatar */}
+        <View
+          className="w-10 h-10 rounded-full items-center justify-center shrink-0"
+          style={{ backgroundColor: withAlpha(categoryColor, "18") }}
+        >
+          {/* TODO(1.8): swap to CategoryToken primitive when Story 1.8 lands */}
+          <Ionicons name={iconName} size={16} color={categoryColor} />
+        </View>
+
+        {/* Title + Date + Note */}
+        <View className="flex-1">
+          <View className="flex-row items-center gap-1.5">
+            <Text
+              className="text-foreground font-semibold text-sm shrink"
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
+            {cardLabel ? (
+              <View
+                className="px-1.5 py-0.5 rounded-md"
+                style={{ backgroundColor: colors.border }}
+              >
+                <Text
+                  className="text-[10px] font-medium"
+                  style={{ color: colors.muted }}
+                  numberOfLines={1}
+                >
+                  {cardLabel}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Text className="text-xs text-muted mt-0.5">{displayDate}</Text>
+          {note ? (
+            <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
+              {note}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+
+      {/* Right: Amount */}
+      <View className="items-end ml-2">
+        <Text
+          className="font-bold text-sm tabular-nums"
+          style={{ color: amountColor }}
+        >
+          {displayAmount}
+        </Text>
+      </View>
+    </AnimatedPressable>
+  );
+
+  if (hasSwipeActions) {
+    return (
+      <Swipeable
+        friction={2}
+        rightThreshold={40}
+        renderRightActions={() => (
+          <View className="flex-row items-center">
+            {onEdit ? (
+              <Pressable
+                onPress={onEdit}
+                className="items-center justify-center px-4"
+                style={{
+                  minHeight: 56,
+                  backgroundColor: withAlpha(colors.primary, "14"),
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${title}`}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={20}
+                  color={colors.primary}
+                />
+              </Pressable>
+            ) : null}
+            {onDelete ? (
+              <Pressable
+                onPress={onDelete}
+                className="items-center justify-center px-4"
+                style={{
+                  minHeight: 56,
+                  backgroundColor: withAlpha(colors.error, "14"),
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${title}`}
+              >
+                <Ionicons name="trash-outline" size={20} color={colors.error} />
+              </Pressable>
+            ) : null}
+          </View>
+        )}
+      >
+        {rowContent}
+      </Swipeable>
+    );
+  }
+
+  return rowContent;
+}

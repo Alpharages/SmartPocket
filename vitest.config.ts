@@ -22,6 +22,10 @@ export default defineConfig({
         __dirname,
         "./__mocks__/react-native-css-interop.ts",
       ),
+      "react-native-gesture-handler": path.resolve(
+        __dirname,
+        "./__mocks__/react-native-gesture-handler.ts",
+      ),
     },
   },
   optimizeDeps: {
@@ -31,6 +35,7 @@ export default defineConfig({
       "expo-haptics",
       "nativewind",
       "react-native-css-interop",
+      "react-native-gesture-handler",
     ],
   },
   test: {
