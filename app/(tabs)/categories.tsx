@@ -12,18 +12,14 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
-import {
-  CATEGORY_COLOR_LIGHT_VALUES,
-  resolveCategoryColor,
-} from "@/constants/theme";
+import { CATEGORY_COLOR_LIGHT_VALUES } from "@/constants/theme";
+import { CategoryToken } from "@/components/ui/CategoryToken";
 
 export default function CategoriesScreen() {
   const colors = useColors();
-  const scheme = (useColorScheme() ?? "light") as "light" | "dark";
   const { categories, loadingCategories, addCategory, deleteCategory } =
     useExpense();
   const [showModal, setShowModal] = useState(false);
@@ -61,19 +57,19 @@ export default function CategoriesScreen() {
     item: any;
     index: number;
   }) => {
-    const itemColor = resolveCategoryColor(item.color, scheme);
     return (
       <Animated.View entering={FadeInDown.delay(index * 30).duration(400)}>
         <Pressable
           onLongPress={() => deleteCategory(item.id)}
           className="flex-row items-center gap-3 py-3.5 px-4 active:opacity-70"
         >
-          <View
-            className="w-10 h-10 rounded-full items-center justify-center"
-            style={{ backgroundColor: itemColor + "20" }}
-          >
-            <Ionicons name="pricetag" size={18} color={itemColor} />
-          </View>
+          <CategoryToken
+            name={item.name}
+            color={item.color}
+            icon={item.icon}
+            state="default"
+            size="md"
+          />
           <View className="flex-1">
             <Text className="text-foreground font-semibold text-sm">
               {item.name}

@@ -1,4 +1,12 @@
-import { View, Text, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -6,15 +14,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { useExpense } from "@/lib/expense-context";
 import Animated, { FadeInUp } from "react-native-reanimated";
+import { CategoryPickerGrid } from "@/components/ui/CategoryPickerGrid";
 
 export default function AddTransactionScreen() {
   const router = useRouter();
   const colors = useColors();
   const { type: queryType } = useLocalSearchParams();
-  const { categories, addTransaction } = useExpense();
+  const { categories, transactions, addTransaction } = useExpense();
 
   const [type, setType] = useState<"income" | "expense">(
-    (queryType as "income" | "expense") || "expense"
+    (queryType as "income" | "expense") || "expense",
   );
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -43,7 +52,10 @@ export default function AddTransactionScreen() {
   const isFormValid = amount && selectedCategory;
 
   return (
-    <ScreenContainer className="flex-1 bg-background" edges={["top", "left", "right", "bottom"]}>
+    <ScreenContainer
+      className="flex-1 bg-background"
+      edges={["top", "left", "right", "bottom"]}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
@@ -55,15 +67,27 @@ export default function AddTransactionScreen() {
         >
           {/* Header */}
           <View className="flex-row items-center justify-between px-6 pt-6 pb-2">
-            <Text className="text-[28px] font-bold text-foreground">Add Transaction</Text>
-            <Pressable onPress={() => router.back()} hitSlop={8} className="w-10 h-10 rounded-full items-center justify-center" style={{ backgroundColor: colors.surface }}>
+            <Text className="text-[28px] font-bold text-foreground">
+              Add Transaction
+            </Text>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={8}
+              className="w-10 h-10 rounded-full items-center justify-center"
+              style={{ backgroundColor: colors.surface }}
+            >
               <Ionicons name="close" size={22} color={colors.foreground} />
             </Pressable>
           </View>
 
           {/* Type Selector */}
-          <Animated.View entering={FadeInUp.delay(100).duration(400)} className="px-6 mt-6">
-            <Text className="text-sm font-semibold text-muted mb-2.5">Transaction Type</Text>
+          <Animated.View
+            entering={FadeInUp.delay(100).duration(400)}
+            className="px-6 mt-6"
+          >
+            <Text className="text-sm font-semibold text-muted mb-2.5">
+              Transaction Type
+            </Text>
             <View className="flex-row gap-3">
               <Pressable
                 onPress={() => {
@@ -72,16 +96,23 @@ export default function AddTransactionScreen() {
                 }}
                 className="flex-1 py-3.5 rounded-2xl items-center flex-row justify-center gap-2"
                 style={{
-                  backgroundColor: type === "expense" ? colors.error + "14" : colors.surface,
+                  backgroundColor:
+                    type === "expense" ? colors.error + "14" : colors.surface,
                   borderWidth: type === "expense" ? 1.5 : 0.5,
-                  borderColor: type === "expense" ? colors.error : colors.border,
+                  borderColor:
+                    type === "expense" ? colors.error : colors.border,
                 }}
               >
-                <Ionicons name="arrow-up" size={16} color={type === "expense" ? colors.error : colors.muted} />
+                <Ionicons
+                  name="arrow-up"
+                  size={16}
+                  color={type === "expense" ? colors.error : colors.muted}
+                />
                 <Text
                   className="font-semibold"
                   style={{
-                    color: type === "expense" ? colors.error : colors.foreground,
+                    color:
+                      type === "expense" ? colors.error : colors.foreground,
                   }}
                 >
                   Expense
@@ -94,16 +125,23 @@ export default function AddTransactionScreen() {
                 }}
                 className="flex-1 py-3.5 rounded-2xl items-center flex-row justify-center gap-2"
                 style={{
-                  backgroundColor: type === "income" ? colors.success + "14" : colors.surface,
+                  backgroundColor:
+                    type === "income" ? colors.success + "14" : colors.surface,
                   borderWidth: type === "income" ? 1.5 : 0.5,
-                  borderColor: type === "income" ? colors.success : colors.border,
+                  borderColor:
+                    type === "income" ? colors.success : colors.border,
                 }}
               >
-                <Ionicons name="arrow-down" size={16} color={type === "income" ? colors.success : colors.muted} />
+                <Ionicons
+                  name="arrow-down"
+                  size={16}
+                  color={type === "income" ? colors.success : colors.muted}
+                />
                 <Text
                   className="font-semibold"
                   style={{
-                    color: type === "income" ? colors.success : colors.foreground,
+                    color:
+                      type === "income" ? colors.success : colors.foreground,
                   }}
                 >
                   Income
@@ -113,11 +151,20 @@ export default function AddTransactionScreen() {
           </Animated.View>
 
           {/* Amount Input */}
-          <Animated.View entering={FadeInUp.delay(150).duration(400)} className="px-6 mt-6">
-            <Text className="text-sm font-semibold text-muted mb-2.5">Amount</Text>
+          <Animated.View
+            entering={FadeInUp.delay(150).duration(400)}
+            className="px-6 mt-6"
+          >
+            <Text className="text-sm font-semibold text-muted mb-2.5">
+              Amount
+            </Text>
             <View
               className="flex-row items-center rounded-2xl px-5 py-4"
-              style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.border }}
+              style={{
+                backgroundColor: colors.surface,
+                borderWidth: 0.5,
+                borderColor: colors.border,
+              }}
             >
               <Text className="text-foreground text-2xl font-bold mr-2">$</Text>
               <TextInput
@@ -133,48 +180,37 @@ export default function AddTransactionScreen() {
           </Animated.View>
 
           {/* Category Selector */}
-          <Animated.View entering={FadeInUp.delay(200).duration(400)} className="px-6 mt-6">
-            <Text className="text-sm font-semibold text-muted mb-2.5">Category</Text>
-            {filteredCategories.length > 0 ? (
-              <View className="flex-row flex-wrap gap-2">
-                {filteredCategories.map((cat) => (
-                  <Pressable
-                    key={cat.id}
-                    onPress={() => setSelectedCategory(cat.id)}
-                    className="px-4 py-2.5 rounded-xl flex-row items-center gap-2"
-                    style={{
-                      backgroundColor: selectedCategory === cat.id ? cat.color : colors.surface,
-                      borderWidth: selectedCategory === cat.id ? 0 : 0.5,
-                      borderColor: colors.border,
-                    }}
-                  >
-                    {selectedCategory === cat.id && (
-                      <Ionicons name="checkmark" size={14} color="white" />
-                    )}
-                    <Text
-                      style={{
-                        color: selectedCategory === cat.id ? "white" : colors.foreground,
-                      }}
-                      className="font-semibold text-sm"
-                    >
-                      {cat.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : (
-              <View className="py-4 px-4 rounded-2xl items-center" style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.border }}>
-                <Text className="text-muted text-sm">No {type} categories available</Text>
-              </View>
-            )}
+          <Animated.View
+            entering={FadeInUp.delay(200).duration(400)}
+            className="px-6 mt-6"
+          >
+            <Text className="text-sm font-semibold text-muted mb-2.5">
+              Category
+            </Text>
+            <CategoryPickerGrid
+              categories={filteredCategories}
+              selectedId={selectedCategory}
+              onSelect={setSelectedCategory}
+              transactions={transactions}
+              emptyText={`No ${type} categories available`}
+            />
           </Animated.View>
 
           {/* Description */}
-          <Animated.View entering={FadeInUp.delay(250).duration(400)} className="px-6 mt-6">
-            <Text className="text-sm font-semibold text-muted mb-2.5">Description (Optional)</Text>
+          <Animated.View
+            entering={FadeInUp.delay(250).duration(400)}
+            className="px-6 mt-6"
+          >
+            <Text className="text-sm font-semibold text-muted mb-2.5">
+              Description (Optional)
+            </Text>
             <View
               className="rounded-2xl px-4 py-3.5"
-              style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.border }}
+              style={{
+                backgroundColor: colors.surface,
+                borderWidth: 0.5,
+                borderColor: colors.border,
+              }}
             >
               <TextInput
                 placeholder="Add a note..."
@@ -190,11 +226,18 @@ export default function AddTransactionScreen() {
           </Animated.View>
 
           {/* Action Buttons */}
-          <Animated.View entering={FadeInUp.delay(300).duration(400)} className="px-6 mt-8 flex-row gap-3">
+          <Animated.View
+            entering={FadeInUp.delay(300).duration(400)}
+            className="px-6 mt-8 flex-row gap-3"
+          >
             <Pressable
               onPress={() => router.back()}
               className="flex-1 py-4 rounded-2xl items-center"
-              style={{ backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.border }}
+              style={{
+                backgroundColor: colors.surface,
+                borderWidth: 0.5,
+                borderColor: colors.border,
+              }}
             >
               <Text className="font-semibold text-foreground">Cancel</Text>
             </Pressable>

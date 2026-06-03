@@ -10,3 +10,11 @@ export { StatCard } from "./StatCard";
 export type { StatCardProps, StatCardVariant, StatSign } from "./StatCard";
 export { TransactionRow } from "./TransactionRow";
 export type { TransactionRowProps } from "./TransactionRow";
+export { CategoryToken } from "./CategoryToken";
+export type {
+  CategoryTokenProps,
+  CategoryTokenState,
+  CategoryTokenSize,
+} from "./CategoryToken";
+export { CategoryPickerGrid } from "./CategoryPickerGrid";
+export type { CategoryPickerGridProps } from "./CategoryPickerGrid";

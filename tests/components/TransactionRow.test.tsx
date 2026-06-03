@@ -32,6 +32,10 @@ vi.mock("@/hooks/use-colors", () => ({
   useColors: () => mockColors,
 }));
 
+vi.mock("@/hooks/use-color-scheme", () => ({
+  useColorScheme: () => "light",
+}));
+
 vi.mock("@expo/vector-icons", () => {
   const Ionicons = ({
     name,
@@ -228,9 +232,8 @@ describe("TransactionRow", () => {
           categoryIcon={"totally-not-a-real-icon" as never}
         />,
       );
-      expect(
-        root.findByProps({ testID: "icon-pricetag-outline" }),
-      ).toBeTruthy();
+      // CategoryToken falls back to "tag" for unknown icons.
+      expect(root.findByProps({ testID: "icon-tag" })).toBeTruthy();
       expect(
         root.findAll((n) => n.props.testID === "icon-totally-not-a-real-icon"),
       ).toHaveLength(0);

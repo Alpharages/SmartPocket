@@ -19,6 +19,7 @@ import * as Haptics from "expo-haptics";
 
 import { useColors } from "@/hooks/use-colors";
 import { cn } from "@/lib/utils";
+import { CategoryToken } from "./CategoryToken";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -171,15 +172,6 @@ export function TransactionRow({
     [title, type, amount, date, note, cardLabel],
   );
 
-  // `categoryIcon` is typed `keyof glyphMap`, but that type is erased at
-  // runtime and the value is DB-sourced (categories.icon) — a stale/typo'd
-  // name renders a blank glyph. Validate against the runtime map and fall back.
-  const iconName = useMemo(
-    () =>
-      categoryIcon in Ionicons.glyphMap ? categoryIcon : "pricetag-outline",
-    [categoryIcon],
-  );
-
   // Edit/Delete are swipe-only for sighted touch users; expose the same actions
   // to assistive tech via accessibilityActions so VoiceOver/TalkBack (and
   // motor-impaired) users can invoke them without performing a swipe (NFR-5).
@@ -241,13 +233,13 @@ export function TransactionRow({
       {/* Left: Avatar + Title/Date */}
       <View className="flex-row items-center gap-3 flex-1">
         {/* Category Avatar */}
-        <View
-          className="w-10 h-10 rounded-full items-center justify-center shrink-0"
-          style={{ backgroundColor: withAlpha(categoryColor, "18") }}
-        >
-          {/* TODO(1.8): swap to CategoryToken primitive when Story 1.8 lands */}
-          <Ionicons name={iconName} size={16} color={categoryColor} />
-        </View>
+        <CategoryToken
+          name={title}
+          color={categoryColor}
+          icon={categoryIcon}
+          state="default"
+          size="md"
+        />
 
         {/* Title + Date + Note */}
         <View className="flex-1">
