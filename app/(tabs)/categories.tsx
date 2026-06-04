@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import {
   ScrollView,
   View,
@@ -5,18 +6,15 @@ import {
   Pressable,
   ActivityIndicator,
   FlatList,
-  Modal,
   TextInput,
-  StyleSheet,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { useExpense } from "@/lib/expense-context";
+import { useExpense, type Category } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { CATEGORY_COLOR_LIGHT_VALUES } from "@/constants/theme";
-import { CategoryToken } from "@/components/ui/CategoryToken";
+import { Button, CategoryToken, EmptyState, Sheet } from "@/components/ui";
 
 export default function CategoriesScreen() {
   const colors = useColors();
@@ -46,6 +44,7 @@ export default function CategoriesScreen() {
     });
 
     setCategoryName("");
+    setCategoryType("expense");
     setSelectedColor(CATEGORY_COLOR_LIGHT_VALUES[0]);
     setShowModal(false);
   };
@@ -54,19 +53,37 @@ export default function CategoriesScreen() {
     item,
     index,
   }: {
-    item: any;
+    item: Category;
     index: number;
   }) => {
     return (
       <Animated.View entering={FadeInDown.delay(index * 30).duration(400)}>
+        {/* Lesson 90e1d916: long-press is gesture-only → expose delete via
+            accessibilityActions so VoiceOver/TalkBack users can invoke it
+            without performing the swipe/long-press gesture (NFR-5). */}
         <Pressable
           onLongPress={() => deleteCategory(item.id)}
-          className="flex-row items-center gap-3 py-3.5 px-4 active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={`${item.name}, ${item.type} category`}
+          accessibilityHint="Long press to delete"
+          accessibilityActions={[{ name: "delete", label: `Delete ${item.name}` }]}
+          onAccessibilityAction={(e) => {
+            if (e.nativeEvent.actionName === "delete") deleteCategory(item.id);
+          }}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            paddingHorizontal: 16,
+            // ≥44pt touch target (NFR-5)
+            minHeight: 44,
+            paddingVertical: 14,
+          }}
         >
           <CategoryToken
             name={item.name}
             color={item.color}
-            icon={item.icon}
+            icon={item.icon || "tag"}
             state="default"
             size="md"
           />
@@ -86,7 +103,7 @@ export default function CategoriesScreen() {
 
   const renderCategorySection = (
     title: string,
-    data: any[],
+    data: Category[],
     startIndex: number,
   ) => (
     <Animated.View
@@ -123,11 +140,21 @@ export default function CategoriesScreen() {
         </View>
       ) : (
         <View
-          className="rounded-3xl p-6 items-center"
+          className="rounded-3xl overflow-hidden"
           style={{ backgroundColor: colors.surface }}
         >
-          <Ionicons name="folder-outline" size={32} color={colors.muted} />
-          <Text className="text-muted text-sm mt-2">No categories yet</Text>
+          <EmptyState
+            variant="no-data"
+            icon={
+              <Ionicons name="folder-outline" size={28} color={colors.muted} />
+            }
+            title="No categories yet"
+            description={`Add your first ${title.toLowerCase().replace(" categories", "")} category`}
+            action={{
+              label: "Add Category",
+              onPress: () => setShowModal(true),
+            }}
+          />
         </View>
       )}
     </Animated.View>
@@ -152,19 +179,18 @@ export default function CategoriesScreen() {
           </Text>
         </Animated.View>
 
-        {/* Add Category Button */}
+        {/* Add Category Button — proper Button primitive, not a full-width banner */}
         <Animated.View
           entering={FadeInUp.delay(100).duration(500)}
           className="px-6 mt-5"
         >
-          <Pressable
+          <Button
+            variant="primary"
+            label="Add New Category"
+            leftIcon={<Ionicons name="add" size={18} color="white" />}
             onPress={() => setShowModal(true)}
-            style={{ backgroundColor: colors.primary }}
-            className="flex-row items-center justify-center gap-2 py-4 rounded-2xl active:opacity-90"
-          >
-            <Ionicons name="add" size={20} color="white" />
-            <Text className="text-white font-semibold">Add New Category</Text>
-          </Pressable>
+            testID="add-category-button"
+          />
         </Animated.View>
 
         {/* Categories Lists */}
@@ -190,147 +216,119 @@ export default function CategoriesScreen() {
         </View>
       </ScrollView>
 
-      {/* Add Category Modal */}
-      <Modal
+      <Sheet
         visible={showModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowModal(false)}
+        onClose={() => setShowModal(false)}
+        title="New Category"
+        testID="add-category-sheet"
       >
-        <View
-          className="flex-1 justify-end"
-          style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ gap: 16, paddingBottom: 24 }}
         >
-          <Animated.View
-            entering={FadeInUp.duration(400)}
-            className="rounded-t-3xl p-6 gap-4"
-            style={{ backgroundColor: colors.surface, maxHeight: "85%" }}
-          >
-            {/* Handle indicator */}
-            <View className="items-center mb-2">
-              <View
-                className="w-10 h-1 rounded-full"
-                style={{ backgroundColor: colors.border }}
-              />
-            </View>
-
-            {/* Header */}
-            <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-xl font-bold text-foreground">
-                New Category
-              </Text>
-              <Pressable onPress={() => setShowModal(false)} hitSlop={8}>
-                <Ionicons name="close" size={24} color={colors.foreground} />
-              </Pressable>
-            </View>
-
-            {/* Category Type Toggle */}
-            <View className="flex-row gap-3 mb-2">
-              {(["expense", "income"] as const).map((type) => (
-                <Pressable
-                  key={type}
-                  onPress={() => setCategoryType(type)}
-                  className="flex-1 py-3 rounded-xl items-center"
+          {/* Category Type Toggle */}
+          <View className="flex-row gap-3">
+            {(["expense", "income"] as const).map((type) => (
+              <Pressable
+                key={type}
+                onPress={() => setCategoryType(type)}
+                className="flex-1 py-3 rounded-xl items-center"
+                style={{
+                  backgroundColor:
+                    categoryType === type ? colors.primary : colors.background,
+                  borderWidth: categoryType === type ? 0 : 0.5,
+                  borderColor: colors.border,
+                }}
+              >
+                <Text
+                  className="font-semibold capitalize"
                   style={{
-                    backgroundColor:
-                      categoryType === type
-                        ? colors.primary
-                        : colors.background,
-                    borderWidth: categoryType === type ? 0 : 0.5,
-                    borderColor: colors.border,
+                    color: categoryType === type ? "white" : colors.foreground,
                   }}
                 >
-                  <Text
-                    className="font-semibold capitalize"
-                    style={{
-                      color:
-                        categoryType === type ? "white" : colors.foreground,
-                    }}
-                  >
-                    {type}
-                  </Text>
+                  {type}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Category Name Input */}
+          <View>
+            <Text className="text-sm font-semibold text-foreground mb-2">
+              Category Name
+            </Text>
+            <View
+              className="px-4 py-3.5 rounded-xl flex-row items-center"
+              style={{
+                backgroundColor: colors.background,
+                borderWidth: 0.5,
+                borderColor: colors.border,
+              }}
+            >
+              <TextInput
+                placeholder="e.g., Groceries"
+                placeholderTextColor={colors.muted}
+                value={categoryName}
+                onChangeText={setCategoryName}
+                className="flex-1 text-foreground"
+                style={{ fontSize: 15 }}
+              />
+            </View>
+          </View>
+
+          {/* Color Picker */}
+          <View>
+            <Text className="text-sm font-semibold text-foreground mb-3">
+              Choose Color
+            </Text>
+            <View className="flex-row flex-wrap gap-3">
+              {CATEGORY_COLOR_LIGHT_VALUES.map((color) => (
+                <Pressable
+                  key={color}
+                  onPress={() => setSelectedColor(color)}
+                  className="w-12 h-12 rounded-full items-center justify-center"
+                  style={{
+                    backgroundColor: color,
+                    borderWidth: selectedColor === color ? 3 : 0,
+                    borderColor: colors.foreground,
+                  }}
+                >
+                  {selectedColor === color && (
+                    <Ionicons name="checkmark" size={20} color="white" />
+                  )}
                 </Pressable>
               ))}
             </View>
+          </View>
 
-            {/* Category Name Input */}
-            <View>
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Category Name
-              </Text>
-              <View
-                className="px-4 py-3.5 rounded-xl flex-row items-center"
-                style={{
-                  backgroundColor: colors.background,
-                  borderWidth: 0.5,
-                  borderColor: colors.border,
-                }}
-              >
-                <TextInput
-                  placeholder="e.g., Groceries"
-                  placeholderTextColor={colors.muted}
-                  value={categoryName}
-                  onChangeText={setCategoryName}
-                  className="flex-1 text-foreground"
-                  style={{ fontSize: 15 }}
-                />
-              </View>
-            </View>
-
-            {/* Color Picker */}
-            <View>
-              <Text className="text-sm font-semibold text-foreground mb-3">
-                Choose Color
-              </Text>
-              <View className="flex-row flex-wrap gap-3">
-                {CATEGORY_COLOR_LIGHT_VALUES.map((color) => (
-                  <Pressable
-                    key={color}
-                    onPress={() => setSelectedColor(color)}
-                    className="w-12 h-12 rounded-full items-center justify-center"
-                    style={{
-                      backgroundColor: color,
-                      borderWidth: selectedColor === color ? 3 : 0,
-                      borderColor: colors.foreground,
-                    }}
-                  >
-                    {selectedColor === color && (
-                      <Ionicons name="checkmark" size={20} color="white" />
-                    )}
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            {/* Action Buttons */}
-            <View className="flex-row gap-3 mt-2">
-              <Pressable
-                onPress={() => setShowModal(false)}
-                className="flex-1 py-3.5 rounded-xl items-center"
-                style={{
-                  backgroundColor: colors.background,
-                  borderWidth: 0.5,
-                  borderColor: colors.border,
-                }}
-              >
-                <Text className="text-foreground font-semibold">Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleAddCategory}
-                disabled={!categoryName.trim()}
-                className="flex-1 py-3.5 rounded-xl items-center"
-                style={{
-                  backgroundColor: categoryName.trim()
-                    ? colors.primary
-                    : colors.muted,
-                }}
-              >
-                <Text className="text-white font-semibold">Add Category</Text>
-              </Pressable>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
+          {/* Action Buttons */}
+          <View className="flex-row gap-3 mt-2">
+            <Pressable
+              onPress={() => setShowModal(false)}
+              className="flex-1 py-3.5 rounded-xl items-center"
+              style={{
+                backgroundColor: colors.background,
+                borderWidth: 0.5,
+                borderColor: colors.border,
+              }}
+            >
+              <Text className="text-foreground font-semibold">Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleAddCategory}
+              disabled={!categoryName.trim()}
+              className="flex-1 py-3.5 rounded-xl items-center"
+              style={{
+                backgroundColor: categoryName.trim()
+                  ? colors.primary
+                  : colors.muted,
+              }}
+            >
+              <Text className="text-white font-semibold">Add Category</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </Sheet>
     </ScreenContainer>
   );
 }

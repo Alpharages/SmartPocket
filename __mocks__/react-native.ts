@@ -39,6 +39,9 @@ export const SafeAreaView = View;
 export const Modal = hostComponent("Modal");
 (Modal as any).displayName = "Modal";
 
+export const KeyboardAvoidingView = hostComponent("KeyboardAvoidingView");
+(KeyboardAvoidingView as any).displayName = "KeyboardAvoidingView";
+
 export const Pressable = React.forwardRef<any, any>(
   ({ children, ...props }, ref) => {
     // Pressable supports a render-prop child; resolve it to the default
@@ -138,6 +141,8 @@ export const Animated = {
   Text,
   createAnimatedComponent: (Component: any) => Component,
 };
+
+export const useWindowDimensions = () => ({ width: 390, height: 844 });
 
 export const I18nManager = {
   isRTL: false,

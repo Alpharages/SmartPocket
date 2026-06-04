@@ -14,6 +14,8 @@ export const Typography = themeConfig.typography;
 
 export const Elevation = themeConfig.elevation;
 
+export const Motion = themeConfig.motion;
+
 type ThemeColorTokens = typeof ThemeColors;
 type ThemeColorName = keyof ThemeColorTokens;
 type SchemePalette = Record<ColorScheme, Record<ThemeColorName, string>>;

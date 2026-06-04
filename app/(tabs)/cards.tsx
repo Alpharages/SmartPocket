@@ -5,9 +5,7 @@ import {
   Pressable,
   ActivityIndicator,
   FlatList,
-  Modal,
   TextInput,
-  StyleSheet,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
@@ -15,6 +13,7 @@ import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import { EmptyState, Sheet } from "@/components/ui";
 
 const PREDEFINED_COLORS = [
   "#6366F1", "#EC4899", "#10B981", "#F59E0B",
@@ -152,39 +151,30 @@ export default function CardsScreen() {
               />
             </Animated.View>
           ) : (
-            <Animated.View entering={FadeInUp.delay(150).duration(500)} className="items-center justify-center py-16 rounded-3xl" style={{ backgroundColor: colors.surface }}>
-              <View className="w-14 h-14 rounded-full items-center justify-center mb-3" style={{ backgroundColor: colors.border }}>
-                <Ionicons name="card-outline" size={28} color={colors.muted} />
-              </View>
-              <Text className="text-muted font-medium text-sm">No cards added yet</Text>
-              <Text className="text-xs text-muted mt-1">Add your first card to get started</Text>
+            <Animated.View
+              entering={FadeInUp.delay(150).duration(500)}
+              className="rounded-3xl overflow-hidden"
+              style={{ backgroundColor: colors.surface }}
+            >
+              <EmptyState
+                variant="no-data"
+                icon={<Ionicons name="card-outline" size={28} color={colors.muted} />}
+                title="No cards added yet"
+                description="Add your first card to get started"
+                action={{ label: "Add Card", onPress: () => setShowModal(true) }}
+              />
             </Animated.View>
           )}
         </View>
       </ScrollView>
 
-      {/* Add Card Modal */}
-      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
-        <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
-          <Animated.View
-            entering={FadeInUp.duration(400)}
-            className="rounded-t-3xl p-6"
-            style={{ backgroundColor: colors.surface, maxHeight: "90%" }}
-          >
-            {/* Handle indicator */}
-            <View className="items-center mb-2">
-              <View className="w-10 h-1 rounded-full" style={{ backgroundColor: colors.border }} />
-            </View>
-
-            {/* Header */}
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-xl font-bold text-foreground">New Card</Text>
-              <Pressable onPress={() => setShowModal(false)} hitSlop={8}>
-                <Ionicons name="close" size={24} color={colors.foreground} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 24 }}>
+      <Sheet
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        title="New Card"
+        testID="add-card-sheet"
+      >
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 24 }}>
               {/* Card Name Input */}
               <View>
                 <Text className="text-sm font-semibold text-foreground mb-2">Card Name</Text>
@@ -343,10 +333,8 @@ export default function CardsScreen() {
                   <Text className="text-white font-semibold">Add Card</Text>
                 </Pressable>
               </View>
-            </ScrollView>
-          </Animated.View>
-        </View>
-      </Modal>
+        </ScrollView>
+      </Sheet>
     </ScreenContainer>
   );
 }

@@ -1,48 +1,46 @@
-import {
-  ScrollView,
-  View,
-  Text,
-  Pressable,
-  ActivityIndicator,
-  FlatList,
-} from "react-native";
+import React, { useMemo } from "react";
+import { ScrollView, View, Text, Pressable, ActivityIndicator, FlatList } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useEffect } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
-import { StatCard } from "@/components/ui/StatCard";
-
-interface DashboardStats {
-  totalIncome: number;
-  totalExpense: number;
-  netBalance: number;
-}
+import {
+  ScreenHeader,
+  StatCard,
+  Button,
+  TransactionRow,
+  EmptyState,
+} from "@/components/ui";
 
 export default function DashboardScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { transactions, monthlyStats, loadingTransactions, loadingStats } =
-    useExpense();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalIncome: 0,
-    totalExpense: 0,
-    netBalance: 0,
-  });
+  const {
+    transactions,
+    monthlyStats,
+    categories,
+    loadingTransactions,
+    loadingStats,
+  } = useExpense();
 
-  useEffect(() => {
-    if (monthlyStats) {
-      setStats({
-        totalIncome: monthlyStats.totalIncome,
-        totalExpense: monthlyStats.totalExpense,
-        netBalance: monthlyStats.netBalance,
-      });
-    }
-  }, [monthlyStats]);
+  const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions]);
 
-  const recentTransactions = transactions.slice(0, 5);
+  const categoriesById = useMemo(
+    () => Object.fromEntries(categories.map((c) => [c.id, c])),
+    [categories],
+  );
+
+  const formattedDate = useMemo(
+    () =>
+      new Date().toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+      }),
+    [],
+  );
 
   return (
     <ScreenContainer className="flex-1 bg-background">
@@ -51,42 +49,33 @@ export default function DashboardScreen() {
         contentContainerStyle={{ paddingBottom: 32 }}
       >
         {/* Header */}
-        <Animated.View
-          entering={FadeInDown.duration(500)}
-          className="px-6 pt-6 pb-2"
-        >
-          <Text className="text-[28px] font-bold text-foreground">
-            Expense Tracker
-          </Text>
-          <Text className="text-sm text-muted font-medium mt-1">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "short",
-              day: "numeric",
-            })}
-          </Text>
+        <Animated.View entering={FadeInDown.duration(500)}>
+          <ScreenHeader title="Home" subtitle={formattedDate} />
         </Animated.View>
 
-        {/* Balance Card */}
-        <View className="px-6 mt-6">
-          <Animated.View entering={FadeInDown.delay(100).duration(600)}>
-            <StatCard
-              variant="hero"
-              label="Total Balance"
-              amount={stats.netBalance}
-              sign="neutral"
-              loading={loadingStats}
-            />
-          </Animated.View>
+        {/* Balance + Quick Actions — all in one container so no shadow bleeds between sections */}
+        <Animated.View
+          entering={FadeInDown.delay(100).duration(600)}
+          className="px-2xl gap-md mt-sm"
+        >
+          {/* Hero balance card */}
+          <StatCard
+            variant="hero"
+            label="Total Balance"
+            amount={monthlyStats?.netBalance ?? 0}
+            sign="neutral"
+            loading={loadingStats}
+          />
 
+          {/* Income / Expense compact pair */}
           <Animated.View
             entering={FadeInUp.delay(150).duration(500)}
-            className="flex-row mt-4 gap-3"
+            className="flex-row gap-md"
           >
             <StatCard
               variant="compact"
               label="Income"
-              amount={stats.totalIncome}
+              amount={monthlyStats?.totalIncome ?? 0}
               sign="positive"
               icon="arrow-down"
               loading={loadingStats}
@@ -94,68 +83,49 @@ export default function DashboardScreen() {
             <StatCard
               variant="compact"
               label="Expenses"
-              amount={stats.totalExpense}
+              amount={monthlyStats?.totalExpense ?? 0}
               sign="negative"
               icon="arrow-up"
               loading={loadingStats}
             />
           </Animated.View>
-        </View>
 
-        {/* Quick Actions */}
-        <Animated.View
-          entering={FadeInUp.delay(200).duration(500)}
-          className="px-6 mt-6"
-        >
-          <View className="flex-row gap-3">
-            <Pressable
+          {/* Quick action buttons — token spacing clears the hero card shadow */}
+          <Animated.View
+            entering={FadeInUp.delay(200).duration(500)}
+            className="flex-row gap-md mt-sm"
+          >
+            <Button
+              variant="income"
+              label="Add Income"
               onPress={() => router.push("/add-transaction?type=income")}
-              style={{ backgroundColor: colors.success + "14" }}
-              className="flex-1 flex-row items-center justify-center gap-2 py-4 rounded-2xl active:opacity-80"
-            >
-              <View
-                className="w-8 h-8 rounded-full items-center justify-center"
-                style={{ backgroundColor: colors.success + "24" }}
-              >
-                <Ionicons name="add" size={16} color={colors.success} />
-              </View>
-              <Text className="text-success font-semibold text-sm">
-                Add Income
-              </Text>
-            </Pressable>
-
-            <Pressable
+              className="flex-1"
+              size="lg"
+            />
+            <Button
+              variant="destructive"
+              label="Add Expense"
               onPress={() => router.push("/add-transaction?type=expense")}
-              style={{ backgroundColor: colors.error + "14" }}
-              className="flex-1 flex-row items-center justify-center gap-2 py-4 rounded-2xl active:opacity-80"
-            >
-              <View
-                className="w-8 h-8 rounded-full items-center justify-center"
-                style={{ backgroundColor: colors.error + "24" }}
-              >
-                <Ionicons name="remove" size={16} color={colors.error} />
-              </View>
-              <Text className="text-error font-semibold text-sm">
-                Add Expense
-              </Text>
-            </Pressable>
-          </View>
+              className="flex-1"
+              size="lg"
+            />
+          </Animated.View>
         </Animated.View>
 
         {/* Recent Transactions */}
         <Animated.View
           entering={FadeInUp.delay(300).duration(500)}
-          className="px-6 mt-8"
+          className="px-2xl mt-2xl"
         >
-          <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-lg font-bold text-foreground">
+          <View className="flex-row items-center justify-between mb-lg">
+            <Text className="text-h3 font-bold text-foreground">
               Recent Activity
             </Text>
             <Pressable
               onPress={() => router.push("/transactions")}
-              className="flex-row items-center gap-0.5"
+              className="flex-row items-center gap-xs"
             >
-              <Text className="text-primary font-semibold text-sm">
+              <Text className="text-primary font-semibold text-label">
                 View All
               </Text>
               <Ionicons
@@ -167,7 +137,7 @@ export default function DashboardScreen() {
           </View>
 
           {loadingTransactions ? (
-            <View className="items-center justify-center py-12">
+            <View className="items-center justify-center py-2xl">
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : recentTransactions.length > 0 ? (
@@ -186,83 +156,42 @@ export default function DashboardScreen() {
                 data={recentTransactions}
                 keyExtractor={(item) => item.id.toString()}
                 renderItem={({ item, index }) => {
-                  const isIncome = item.type === "income";
-                  const categoryName = item.categoryId
-                    ? `Category ${item.categoryId}`
-                    : "Uncategorized";
-
+                  const category = categoriesById[item.categoryId];
                   return (
                     <Animated.View
                       entering={FadeInDown.delay(index * 40).duration(400)}
-                      className="flex-row items-center justify-between py-3.5 px-4"
                     >
-                      <View className="flex-row items-center gap-3 flex-1">
-                        <View
-                          className="w-10 h-10 rounded-full items-center justify-center"
-                          style={{
-                            backgroundColor: isIncome
-                              ? colors.success + "18"
-                              : colors.error + "18",
-                          }}
-                        >
-                          <Ionicons
-                            name={isIncome ? "arrow-down" : "arrow-up"}
-                            size={16}
-                            color={isIncome ? colors.success : colors.error}
-                          />
-                        </View>
-                        <View className="flex-1">
-                          <Text className="text-foreground font-semibold text-sm">
-                            {categoryName}
-                          </Text>
-                          <Text className="text-xs text-muted mt-0.5">
-                            {new Date(item.date).toLocaleDateString()}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text
-                        className="font-bold text-sm"
-                        style={{
-                          color: isIncome ? colors.success : colors.error,
-                        }}
-                      >
-                        {isIncome ? "+" : "-"}$
-                        {Math.abs(parseFloat(item.amount)).toFixed(2)}
-                      </Text>
+                      <TransactionRow
+                        title={category?.name ?? `Category ${item.categoryId}`}
+                        date={item.date}
+                        amount={item.amount}
+                        type={item.type}
+                        categoryColor={category?.color ?? colors.muted}
+                        categoryIcon={
+                          (category?.icon as keyof typeof Ionicons.glyphMap) ??
+                          "pricetag-outline"
+                        }
+                      />
                     </Animated.View>
                   );
                 }}
                 scrollEnabled={false}
                 ItemSeparatorComponent={() => (
                   <View
-                    className="mx-4"
+                    className="mx-lg"
                     style={{ height: 0.5, backgroundColor: colors.border }}
                   />
                 )}
               />
             </View>
           ) : (
-            <View
-              className="items-center justify-center py-12 rounded-3xl"
-              style={{ backgroundColor: colors.surface }}
-            >
-              <View
-                className="w-14 h-14 rounded-full items-center justify-center mb-3"
-                style={{ backgroundColor: colors.border }}
-              >
-                <Ionicons
-                  name="wallet-outline"
-                  size={28}
-                  color={colors.muted}
-                />
-              </View>
-              <Text className="text-muted font-medium text-sm">
-                No transactions yet
-              </Text>
-              <Text className="text-xs text-muted mt-1">
-                Start by adding your first transaction
-              </Text>
-            </View>
+            <EmptyState
+              icon={
+                <Ionicons name="wallet-outline" size={28} color={colors.muted} />
+              }
+              title="No transactions yet"
+              description="Start by adding your first transaction"
+            />
           )}
         </Animated.View>
       </ScrollView>

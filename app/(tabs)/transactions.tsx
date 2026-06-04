@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   FlatList,
   TextInput,
-  StyleSheet,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
@@ -15,15 +14,19 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useMemo } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import { EmptyState } from "@/components/ui";
 
 type FilterType = "all" | "income" | "expense" | "thisMonth" | "thisWeek";
 
 export default function TransactionsScreen() {
   const router = useRouter();
-  const colors = useColors();
   const { transactions, loadingTransactions } = useExpense();
   const [searchText, setSearchText] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
+
+  const colors = useColors();
+  const isSearchOrFilterActive =
+    searchText.length > 0 || filterType !== "all";
 
   const filteredTransactions = useMemo(() => {
     let filtered = transactions;
@@ -214,15 +217,36 @@ export default function TransactionsScreen() {
               />
             </Animated.View>
           ) : (
-            <Animated.View entering={FadeInUp.delay(200).duration(500)} className="items-center justify-center py-20 rounded-3xl" style={{ backgroundColor: colors.surface }}>
-              <View
-                className="w-14 h-14 rounded-full items-center justify-center mb-3"
-                style={{ backgroundColor: colors.border }}
-              >
-                <Ionicons name="search-outline" size={28} color={colors.muted} />
-              </View>
-              <Text className="text-muted font-medium text-sm">No transactions found</Text>
-              <Text className="text-xs text-muted mt-1">Try adjusting your filters or search</Text>
+            <Animated.View
+              entering={FadeInUp.delay(200).duration(500)}
+              className="rounded-3xl overflow-hidden"
+              style={{ backgroundColor: colors.surface }}
+            >
+              <EmptyState
+                variant={isSearchOrFilterActive ? "no-results" : "no-data"}
+                icon={
+                  <Ionicons
+                    name={isSearchOrFilterActive ? "search-outline" : "receipt-outline"}
+                    size={28}
+                    color={colors.muted}
+                  />
+                }
+                title={
+                  isSearchOrFilterActive
+                    ? "No results found"
+                    : "No transactions yet"
+                }
+                description={
+                  isSearchOrFilterActive
+                    ? "Try adjusting your filters or search term"
+                    : "Add your first income or expense to get started"
+                }
+                action={
+                  isSearchOrFilterActive
+                    ? undefined
+                    : { label: "Add Transaction", onPress: () => router.push("/add-transaction") }
+                }
+              />
             </Animated.View>
           )}
         </View>

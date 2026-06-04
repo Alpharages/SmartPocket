@@ -24,6 +24,9 @@ export const Easing = {
   ease: (t: number) => t,
   quad: (t: number) => t * t,
   cubic: (t: number) => t * t * t,
+  out: (fn: (t: number) => number) => fn,
+  in: (fn: (t: number) => number) => fn,
+  inOut: (fn: (t: number) => number) => fn,
 };
 
 export const interpolate = (
@@ -39,14 +42,40 @@ export const runOnUI = (fn: any) => fn;
 
 export const createAnimatedPropAdapter = () => ({});
 
-const AnimatedView = React.forwardRef<any, any>(({ children, ...props }, ref) =>
-  React.createElement("div", { ref, ...props }, children),
-);
+// Layout animation stubs — return a chainable no-op object so
+// entering/exiting props on Animated.View don't throw in tests.
+function makeLayoutAnimation() {
+  const obj: Record<string, () => typeof obj> = {};
+  const methods = [
+    "duration", "delay", "springify", "damping", "stiffness", "mass",
+    "withCallback", "withInitialValues", "randomDelay", "easing",
+  ];
+  for (const m of methods) {
+    obj[m] = () => obj;
+  }
+  return obj;
+}
+
+export const FadeIn = makeLayoutAnimation();
+export const FadeInDown = makeLayoutAnimation();
+export const FadeInUp = makeLayoutAnimation();
+export const FadeOut = makeLayoutAnimation();
+export const FadeOutDown = makeLayoutAnimation();
+export const FadeOutUp = makeLayoutAnimation();
+export const SlideInUp = makeLayoutAnimation();
+export const SlideOutDown = makeLayoutAnimation();
+export const Layout = makeLayoutAnimation();
+export const ZoomIn = makeLayoutAnimation();
+export const ZoomOut = makeLayoutAnimation();
+
+const AnimatedView = React.forwardRef<any, any>(function AnimatedViewFn({ children, ...props }, ref) {
+  return React.createElement("div", { ref, ...props }, children);
+});
 (AnimatedView as any).displayName = "Animated.View";
 
-const AnimatedText = React.forwardRef<any, any>(({ children, ...props }, ref) =>
-  React.createElement("span", { ref, ...props }, children),
-);
+const AnimatedText = React.forwardRef<any, any>(function AnimatedTextFn({ children, ...props }, ref) {
+  return React.createElement("span", { ref, ...props }, children);
+});
 (AnimatedText as any).displayName = "Animated.Text";
 
 const Animated = {

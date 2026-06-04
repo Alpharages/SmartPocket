@@ -10,6 +10,7 @@ export const themeColors: {
   error: { light: string; dark: string };
   accent: { light: string; dark: string };
   secondary: { light: string; dark: string };
+  overlay: { light: string; dark: string };
 };
 
 export type CategoryColorToken = {
@@ -74,6 +75,15 @@ export const elevation: {
   lg: string;
 };
 
+export const motion: {
+  sheet: {
+    durationMs: number;
+    easing: string;
+    backdropOpacity: number;
+    dragDismissThreshold: number;
+  };
+};
+
 declare const themeConfig: {
   themeColors: typeof themeColors;
   categoryColors: typeof categoryColors;
@@ -81,6 +91,7 @@ declare const themeConfig: {
   radius: typeof radius;
   typography: typeof typography;
   elevation: typeof elevation;
+  motion: typeof motion;
 };
 
 export default themeConfig;

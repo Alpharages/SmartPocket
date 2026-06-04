@@ -1,7 +1,7 @@
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HapticTab } from "@/components/haptic-tab";
-import { Platform, StyleSheet } from "react-native";
+import { Platform } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -13,6 +13,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="dashboard"
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
@@ -39,7 +40,6 @@ export default function TabLayout() {
         },
       }}
     >
-      <Tabs.Screen name="index" options={{ href: null }} />
       <Tabs.Screen
         name="dashboard"
         options={{

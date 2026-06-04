@@ -12,6 +12,7 @@ const themeColors = {
   error: { light: "#DC2626", dark: "#FCA5A5" }, // Clean red — semantic only (expense/destructive)
   accent: { light: "#DB2777", dark: "#F472B6" }, // Rose accent — rare, small highlights
   secondary: { light: "#7C3AED", dark: "#A78BFA" }, // Violet
+  overlay: { light: "#000000", dark: "#000000" }, // Backdrop / modal scrim
 };
 
 /**
@@ -85,4 +86,23 @@ const elevation = {
   lg: "0 10px 15px -3px color-mix(in srgb, var(--color-foreground) 12%, transparent), 0 4px 6px -4px color-mix(in srgb, var(--color-foreground) 10%, transparent)",
 };
 
-module.exports = { themeColors, categoryColors, spacing, radius, typography, elevation };
+/** Sheet / modal motion — ~250ms fade + slide (Story 1.9). */
+const motion = {
+  sheet: {
+    durationMs: 250,
+    /** Maps to Reanimated Easing.out(Easing.cubic) in Sheet.tsx */
+    easing: "easeOutCubic",
+    backdropOpacity: 0.4,
+    dragDismissThreshold: 0.35,
+  },
+};
+
+module.exports = {
+  themeColors,
+  categoryColors,
+  spacing,
+  radius,
+  typography,
+  elevation,
+  motion,
+};
