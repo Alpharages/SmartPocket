@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { CATEGORY_COLOR_LIGHT_VALUES } from "@/constants/theme";
 import { Button, CategoryToken, EmptyState, Sheet } from "@/components/ui";
+import { type Category } from "@/lib/expense-context";
 
 export default function CategoriesScreen() {
   const colors = useColors();
