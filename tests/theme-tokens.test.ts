@@ -5,6 +5,7 @@ import {
   CATEGORY_DEFAULT_COLOR,
   Colors,
 } from "@/lib/_core/theme";
+import { readableTextOn, contrastRatio as ratioFromHelper } from "@/lib/_core/contrast";
 
 /**
  * Parse a hex color string to RGB values.
@@ -186,6 +187,34 @@ describe("Theme Tokens", () => {
               `${token.name} (${color}) on ${scheme} ${bg.key} (${bg.value}) = ${ratio.toFixed(2)}:1`,
             ).toBeGreaterThanOrEqual(3);
           }
+        });
+      }
+    }
+  });
+
+  describe("WCAG AA Contrast — text on FILLED/active controls (white-on-fill regression)", () => {
+    // Filled/active controls (Button income/destructive/primary, the selected
+    // Pill/segment) render text directly ON a token fill. Hardcoding white here
+    // failed AA in dark mode where the tokens are light tints (success #34D399
+    // 1.92:1, error #FCA5A5 1.90:1, primary #818CF8 2.98:1). Assert the
+    // *resolved* ink from readableTextOn() — the exact helper the primitives
+    // use — clears AA against every fill on both themes.
+    const fills: { control: string; key: "primary" | "success" | "error" }[] = [
+      { control: "Button primary / icon-only · active Pill/segment", key: "primary" },
+      { control: "Button income", key: "success" },
+      { control: "Button destructive", key: "error" },
+    ];
+
+    for (const scheme of ["light", "dark"] as const) {
+      for (const { control, key } of fills) {
+        it(`resolved ink meets AA (≥4.5:1) on ${scheme} ${control}`, () => {
+          const fill = Colors[scheme][key];
+          const ink = readableTextOn(fill);
+          const ratio = ratioFromHelper(ink, fill);
+          expect(
+            ratio,
+            `${control}: ink ${ink} on ${scheme} ${key} (${fill}) = ${ratio.toFixed(2)}:1`,
+          ).toBeGreaterThanOrEqual(4.5);
         });
       }
     }

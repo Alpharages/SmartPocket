@@ -15,6 +15,7 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 
 import { useColors } from "@/hooks/use-colors";
+import { readableTextOn } from "@/lib/_core/contrast";
 import { cn } from "@/lib/utils";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -93,7 +94,10 @@ export const Pill = forwardRef<PillRef, PillProps>(
     const { containerStyle, textColor, badgeStyle } = useMemo(() => {
       const active = selected && !disabled;
       const bg = active ? colors.primary : colors.surface;
-      const fg = active ? "#FFFFFF" : colors.foreground;
+      // Don't hardcode white on the active fill: dark-mode primary (#818CF8) is
+      // a light tint that fails AA behind white. Resolve the readable ink per
+      // fill so the selected chip/segment meets AC1 on both themes.
+      const fg = active ? readableTextOn(colors.primary) : colors.foreground;
       const border = active ? undefined : colors.border;
 
       return {

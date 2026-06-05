@@ -15,6 +15,7 @@ import Animated from "react-native-reanimated";
 
 import { useColors } from "@/hooks/use-colors";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
+import { readableTextOn } from "@/lib/_core/contrast";
 import { cn } from "@/lib/utils";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -141,10 +142,14 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
       let border: string | undefined;
       let fg: string;
 
+      // Filled variants must not hardcode white: in dark mode the semantic/
+      // primary tokens are light tints that fail AA behind white text. Resolve
+      // the readable ink (white vs near-black) per fill so AC1 holds on both
+      // themes — see lib/_core/contrast.ts.
       switch (variant) {
         case "primary":
           bg = colors.primary;
-          fg = "#FFFFFF";
+          fg = readableTextOn(bg);
           break;
         case "secondary":
           bg = colors.surface;
@@ -157,15 +162,15 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
           break;
         case "destructive":
           bg = colors.error;
-          fg = "#FFFFFF";
+          fg = readableTextOn(bg);
           break;
         case "income":
           bg = colors.success;
-          fg = "#FFFFFF";
+          fg = readableTextOn(bg);
           break;
         case "icon-only":
           bg = colors.primary;
-          fg = "#FFFFFF";
+          fg = readableTextOn(bg);
           break;
       }
 

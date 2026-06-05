@@ -1,8 +1,9 @@
 import React, { useMemo } from "react";
 import { View, Text, type ViewProps } from "react-native";
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
@@ -98,11 +99,16 @@ function SkeletonPulse({
   className?: string;
   style?: React.ComponentProps<typeof View>["style"];
 }) {
-  const opacity = useSharedValue(1);
+  const reducedMotion = useReducedMotion();
+  // Hold a static mid-opacity when reduce-motion is on so the skeleton is still
+  // visible but does not pulse — AC5 names "skeleton shimmer" as non-essential
+  // animation that must be disabled. Mirrors the gate in the shared <Skeleton>.
+  const opacity = useSharedValue(reducedMotion ? 0.6 : 1);
 
   React.useEffect(() => {
+    if (reducedMotion) return;
     opacity.value = withRepeat(withTiming(0.4, { duration: 900 }), -1, true);
-  }, [opacity]);
+  }, [opacity, reducedMotion]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
