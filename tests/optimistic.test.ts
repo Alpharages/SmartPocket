@@ -15,16 +15,30 @@ const items: Item[] = [
 
 describe("applyOptimistic", () => {
   describe("add", () => {
-    it("prepends the item to the list", () => {
+    it("prepends the item to the list by default", () => {
       const next = applyOptimistic(items, { type: "add", item: { id: 4, name: "d", value: 40 } });
       expect(next).toHaveLength(4);
       expect(next[0]).toEqual({ id: 4, name: "d", value: 40 });
       expect(next.slice(1)).toEqual(items);
     });
 
+    it("prepends when position is 'start'", () => {
+      const next = applyOptimistic(items, { type: "add", item: { id: 4, name: "d", value: 40 }, position: "start" });
+      expect(next[0]).toEqual({ id: 4, name: "d", value: 40 });
+      expect(next.slice(1)).toEqual(items);
+    });
+
+    it("appends when position is 'end' (preserves categories/cards ordering)", () => {
+      const next = applyOptimistic(items, { type: "add", item: { id: 4, name: "d", value: 40 }, position: "end" });
+      expect(next).toHaveLength(4);
+      expect(next[next.length - 1]).toEqual({ id: 4, name: "d", value: 40 });
+      expect(next.slice(0, -1)).toEqual(items);
+    });
+
     it("does not mutate the original list", () => {
       const before = [...items];
       applyOptimistic(items, { type: "add", item: { id: 99, name: "z", value: 0 } });
+      applyOptimistic(items, { type: "add", item: { id: 98, name: "y", value: 0 }, position: "end" });
       expect(items).toEqual(before);
     });
   });

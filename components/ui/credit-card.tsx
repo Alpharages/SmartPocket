@@ -2,6 +2,10 @@ import React from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 
+import { usePressFeedback } from "@/hooks/use-press-feedback";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export type CreditCardProps = {
   name: string;
   cardNumber: string;
@@ -29,15 +33,19 @@ export function CreditCard({
 
   const expiry = `${String(expiryMonth).padStart(2, "0")}/${String(expiryYear).slice(-2)}`;
 
+  const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
+
   return (
     <Animated.View entering={FadeInUp.delay(index * 80).duration(400)}>
-      <Pressable
+      <AnimatedPressable
         onLongPress={onLongPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
         accessibilityRole="button"
         accessibilityLabel={`${name} card ending in ${cardNumber.slice(-4)}`}
         accessibilityHint="Long press to delete"
         className="rounded-2xl p-5 mb-3"
-        style={{ backgroundColor: color }}
+        style={[{ backgroundColor: color }, animatedStyle]}
       >
         <View className="flex-row justify-between items-start mb-6">
           <Text className="text-white font-bold text-lg">{name}</Text>
@@ -55,7 +63,7 @@ export function CreditCard({
             <Text className="text-white font-medium text-sm">{expiry}</Text>
           </View>
         </View>
-      </Pressable>
+      </AnimatedPressable>
     </Animated.View>
   );
 }

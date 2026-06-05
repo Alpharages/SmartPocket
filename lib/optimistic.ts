@@ -1,5 +1,5 @@
 export type OptimisticOp<T> =
-  | { type: "add"; item: T }
+  | { type: "add"; item: T; position?: "start" | "end" }
   | { type: "update"; id: number; data: Partial<T> }
   | { type: "delete"; id: number };
 
@@ -7,6 +7,10 @@ export type OptimisticOp<T> =
  * Apply an optimistic operation to a list, returning the modified list.
  * This is a pure function — the caller is responsible for snapshotting
  * the original list if rollback is required.
+ *
+ * For "add", `position` controls where the optimistic item is inserted so
+ * each caller can preserve its list's existing ordering (e.g. transactions
+ * prepend newest-first, while categories/cards append). Defaults to "start".
  */
 export function applyOptimistic<T extends { id: number }>(
   list: T[],
@@ -14,7 +18,7 @@ export function applyOptimistic<T extends { id: number }>(
 ): T[] {
   switch (op.type) {
     case "add":
-      return [op.item, ...list];
+      return op.position === "end" ? [...list, op.item] : [op.item, ...list];
     case "update":
       return list.map((item) =>
         item.id === op.id ? { ...item, ...op.data } : item,

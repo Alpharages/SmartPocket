@@ -16,6 +16,77 @@ import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { CATEGORY_COLOR_LIGHT_VALUES } from "@/constants/theme";
 import { Button, CategoryToken, ConfirmSheet, EmptyState, Sheet } from "@/components/ui";
 import { useConfirm } from "@/hooks/use-confirm";
+import { usePressFeedback } from "@/hooks/use-press-feedback";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * A single category row. Extracted into its own component so it can use the
+ * shared scale-0.97 + haptic press feedback hook (Story 1.18 AC5) at the
+ * component top level rather than inside a FlatList render callback.
+ *
+ * Lesson 90e1d916: long-press is gesture-only → expose delete via
+ * accessibilityActions so VoiceOver/TalkBack users can invoke it without
+ * performing the swipe/long-press gesture (NFR-5).
+ */
+function CategoryRow({
+  item,
+  index,
+  mutedColor,
+  onRequestDelete,
+}: {
+  item: Category;
+  index: number;
+  mutedColor: string;
+  onRequestDelete: (item: Category) => void;
+}) {
+  const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
+  return (
+    <Animated.View entering={FadeInDown.delay(index * 30).duration(400)}>
+      <AnimatedPressable
+        onLongPress={() => onRequestDelete(item)}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}, ${item.type} category`}
+        accessibilityHint="Long press to delete"
+        accessibilityActions={[{ name: "delete", label: `Delete ${item.name}` }]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === "delete") onRequestDelete(item);
+        }}
+        style={[
+          {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            paddingHorizontal: 16,
+            // ≥44pt touch target (NFR-5)
+            minHeight: 44,
+            paddingVertical: 14,
+          },
+          animatedStyle,
+        ]}
+      >
+        <CategoryToken
+          name={item.name}
+          color={item.color}
+          icon={item.icon || "tag"}
+          state="default"
+          size="md"
+        />
+        <View className="flex-1">
+          <Text className="text-foreground font-semibold text-sm">
+            {item.name}
+          </Text>
+          <Text className="text-xs text-muted capitalize mt-0.5">
+            {item.type}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={mutedColor} />
+      </AnimatedPressable>
+    </Animated.View>
+  );
+}
 
 export default function CategoriesScreen() {
   const colors = useColors();
@@ -51,77 +122,32 @@ export default function CategoriesScreen() {
     setShowModal(false);
   };
 
+  const requestDelete = async (item: Category) => {
+    const confirmed = await confirm({
+      title: "Delete Category",
+      message: `Are you sure you want to delete "${item.name}"?`,
+      destructive: true,
+      confirmLabel: "Delete",
+    });
+    if (confirmed) {
+      await deleteCategory(item.id);
+    }
+  };
+
   const renderCategoryItem = ({
     item,
     index,
   }: {
     item: Category;
     index: number;
-  }) => {
-    return (
-      <Animated.View entering={FadeInDown.delay(index * 30).duration(400)}>
-        {/* Lesson 90e1d916: long-press is gesture-only → expose delete via
-            accessibilityActions so VoiceOver/TalkBack users can invoke it
-            without performing the swipe/long-press gesture (NFR-5). */}
-        <Pressable
-          onLongPress={async () => {
-            const confirmed = await confirm({
-              title: "Delete Category",
-              message: `Are you sure you want to delete "${item.name}"?`,
-              destructive: true,
-              confirmLabel: "Delete",
-            });
-            if (confirmed) {
-              await deleteCategory(item.id);
-            }
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`${item.name}, ${item.type} category`}
-          accessibilityHint="Long press to delete"
-          accessibilityActions={[{ name: "delete", label: `Delete ${item.name}` }]}
-          onAccessibilityAction={async (e) => {
-            if (e.nativeEvent.actionName === "delete") {
-              const confirmed = await confirm({
-                title: "Delete Category",
-                message: `Are you sure you want to delete "${item.name}"?`,
-                destructive: true,
-                confirmLabel: "Delete",
-              });
-              if (confirmed) {
-                await deleteCategory(item.id);
-              }
-            }
-          }}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-            paddingHorizontal: 16,
-            // ≥44pt touch target (NFR-5)
-            minHeight: 44,
-            paddingVertical: 14,
-          }}
-        >
-          <CategoryToken
-            name={item.name}
-            color={item.color}
-            icon={item.icon || "tag"}
-            state="default"
-            size="md"
-          />
-          <View className="flex-1">
-            <Text className="text-foreground font-semibold text-sm">
-              {item.name}
-            </Text>
-            <Text className="text-xs text-muted capitalize mt-0.5">
-              {item.type}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-        </Pressable>
-      </Animated.View>
-    );
-  };
+  }) => (
+    <CategoryRow
+      item={item}
+      index={index}
+      mutedColor={colors.muted}
+      onRequestDelete={requestDelete}
+    />
+  );
 
   const renderCategorySection = (
     title: string,

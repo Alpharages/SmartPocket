@@ -122,7 +122,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       const now = new Date();
       const optimistic: Category = { ...data, id: -Date.now(), userId: 0, createdAt: now, updatedAt: now };
       const snapshot = snapshotList(categories);
-      setCategories((prev) => applyOptimistic(prev, { type: "add", item: optimistic }));
+      setCategories((prev) => applyOptimistic(prev, { type: "add", item: optimistic, position: "end" }));
       try {
         await createCategoryMutation.mutateAsync(data);
         await refreshCategories();
@@ -191,7 +191,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       const now = new Date();
       const optimistic: CreditCard = { ...data, id: -Date.now(), userId: 0, createdAt: now, updatedAt: now };
       const snapshot = snapshotList(creditCards);
-      setCreditCards((prev) => applyOptimistic(prev, { type: "add", item: optimistic }));
+      setCreditCards((prev) => applyOptimistic(prev, { type: "add", item: optimistic, position: "end" }));
       try {
         await createCardMutation.mutateAsync(data);
         await refreshCreditCards();
