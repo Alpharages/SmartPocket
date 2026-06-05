@@ -261,14 +261,16 @@ describe("FilterChipGroup", () => {
           onChange={() => {}}
         />,
       );
+      // Single-select children announce as radio (checked), matching the
+      // radiogroup container — not as toggle buttons.
       const pills = root.findAll(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "button",
+        (n) => typeof n.type === "string" && n.props.accessibilityRole === "radio",
       );
       const incomePill = pills.find((p) =>
         p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Income").length > 0,
       );
       expect(incomePill).toBeTruthy();
-      expect(incomePill!.props.accessibilityState.selected).toBe(true);
+      expect(incomePill!.props.accessibilityState.checked).toBe(true);
     });
 
     it("calls onChange with the new value when a different pill is pressed", () => {
@@ -282,7 +284,7 @@ describe("FilterChipGroup", () => {
         />,
       );
       const pills = root.findAll(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "button",
+        (n) => typeof n.type === "string" && n.props.accessibilityRole === "radio",
       );
       const expensePill = pills.find((p) =>
         p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Expense").length > 0,
@@ -422,7 +424,7 @@ describe("FilterChipGroup", () => {
         />,
       );
       const pills = root.findAll(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "button",
+        (n) => typeof n.type === "string" && n.props.accessibilityRole === "radio",
       );
       const bPill = pills.find((p) =>
         p.findAll((n) => String(n.type) === "Text" && textOf(n) === "B").length > 0,

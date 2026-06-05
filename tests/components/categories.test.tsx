@@ -79,10 +79,11 @@ vi.mock("@/hooks/use-color-scheme", () => ({
   useColorScheme: () => "light",
 }));
 
-vi.mock("@/constants/theme", () => ({
-  resolveCategoryColor: (color: string) => color,
-  CATEGORY_COLOR_LIGHT_VALUES: ["#4F46E5", "#047857", "#E11D48"],
-  CATEGORY_DEFAULT_COLOR: "#4F46E5",
+// Shared token literals — hoisted so both the `@/constants/theme` and
+// `@/lib/_core/theme` mock factories reference one source of truth instead of
+// duplicating the same Typography/Spacing/Radius values (which would silently
+// diverge if the real tokens change).
+const TOKENS = vi.hoisted(() => ({
   Radius: { sm: 8, md: 12, lg: 16, full: 9999 },
   Spacing: { sm: 8, md: 12, lg: 16, xl: 24, "2xl": 32 },
   Typography: {
@@ -93,15 +94,15 @@ vi.mock("@/constants/theme", () => ({
   },
 }));
 
+vi.mock("@/constants/theme", () => ({
+  resolveCategoryColor: (color: string) => color,
+  CATEGORY_COLOR_LIGHT_VALUES: ["#4F46E5", "#047857", "#E11D48"],
+  CATEGORY_DEFAULT_COLOR: "#4F46E5",
+  ...TOKENS,
+}));
+
 vi.mock("@/lib/_core/theme", () => ({
-  Typography: {
-    body: { fontSize: 14, lineHeight: 20, fontWeight: "400" },
-    caption: { fontSize: 12, lineHeight: 16, fontWeight: "400" },
-    h3: { fontSize: 18, lineHeight: 26, fontWeight: "600" },
-    label: { fontSize: 13, lineHeight: 18, fontWeight: "500" },
-  },
-  Spacing: { sm: 8, md: 12, lg: 16, xl: 24, "2xl": 32 },
-  Radius: { sm: 8, md: 12, lg: 16, full: 9999 },
+  ...TOKENS,
   Motion: {
     sheet: { durationMs: 300, closeDurationMs: 250 },
     fade: { durationMs: 200 },

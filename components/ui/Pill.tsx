@@ -29,6 +29,13 @@ export type PillProps = {
   count?: number;
   leftIcon?: React.ReactNode;
   accessibilityLabel?: string;
+  /**
+   * Screen-reader role for the control. Defaults to "button" (multi-select /
+   * standalone). Pass "radio" when the pill is one option in a single-select
+   * group so it matches a `radiogroup` container and announces mutually
+   * exclusive selection via `checked` rather than `selected`.
+   */
+  role?: "button" | "radio";
   className?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -46,6 +53,7 @@ export const Pill = forwardRef<PillRef, PillProps>(
       count,
       leftIcon,
       accessibilityLabel,
+      role = "button",
       className,
       style,
       ...pressableProps
@@ -113,12 +121,14 @@ export const Pill = forwardRef<PillRef, PillProps>(
       };
     }, [selected, disabled, colors]);
 
+    // A "radio" announces selection via `checked` (single-select exclusivity);
+    // a "button" uses `selected` (toggle). Match the state key to the role.
     const accessibilityState = useMemo(
-      () => ({
-        selected,
-        disabled,
-      }),
-      [selected, disabled],
+      () =>
+        role === "radio"
+          ? { checked: selected, disabled }
+          : { selected, disabled },
+      [role, selected, disabled],
     );
 
     const resolvedAccessibilityLabel =
@@ -130,7 +140,7 @@ export const Pill = forwardRef<PillRef, PillProps>(
     return (
       <AnimatedPressable
         ref={ref}
-        accessibilityRole="button"
+        accessibilityRole={role}
         accessibilityLabel={resolvedAccessibilityLabel}
         accessibilityState={accessibilityState}
         disabled={disabled}

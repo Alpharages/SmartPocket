@@ -165,20 +165,29 @@ describe("Theme Tokens", () => {
     );
   });
 
-  describe("WCAG AA Contrast — Category Colors on Surface", () => {
+  describe("WCAG AA Contrast — Category Colors on every rendered background", () => {
+    // Category chips/tokens render on BOTH the page background and on raised
+    // surfaces (cards). A color passing on `surface` can land just under AA on
+    // the slightly darker `background`, so assert against every background a
+    // token is actually composited onto — not a single representative one.
     for (const scheme of ["light", "dark"] as const) {
-      const surface = Colors[scheme].surface;
+      const backgrounds = [
+        { key: "background", value: Colors[scheme].background },
+        { key: "surface", value: Colors[scheme].surface },
+      ];
 
-      it(`should meet AA for UI elements (≥3:1) on ${scheme} surface`, () => {
-        for (const token of CategoryColors) {
-          const color = scheme === "dark" ? token.dark : token.light;
-          const ratio = contrastRatio(color, surface);
-          expect(
-            ratio,
-            `${token.name} (${color}) on ${scheme} surface (${surface}) = ${ratio.toFixed(2)}:1`,
-          ).toBeGreaterThanOrEqual(3);
-        }
-      });
+      for (const bg of backgrounds) {
+        it(`should meet AA for UI elements (≥3:1) on ${scheme} ${bg.key}`, () => {
+          for (const token of CategoryColors) {
+            const color = scheme === "dark" ? token.dark : token.light;
+            const ratio = contrastRatio(color, bg.value);
+            expect(
+              ratio,
+              `${token.name} (${color}) on ${scheme} ${bg.key} (${bg.value}) = ${ratio.toFixed(2)}:1`,
+            ).toBeGreaterThanOrEqual(3);
+          }
+        });
+      }
     }
   });
 });

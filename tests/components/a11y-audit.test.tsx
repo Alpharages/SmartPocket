@@ -208,7 +208,7 @@ describe("A11y Audit — AC3 Screen-reader labels", () => {
     });
   });
 
-  it("FilterChipGroup single exposes accessibilityRole=radiogroup", () => {
+  it("FilterChipGroup single is a radiogroup whose children announce as radio", () => {
     const root = render(
       <FilterChipGroup
         mode="single"
@@ -220,9 +220,13 @@ describe("A11y Audit — AC3 Screen-reader labels", () => {
     const group = findByProp(root, "accessibilityRole", "radiogroup");
     expect(group).toBeDefined();
     expect(group.props.accessibilityLabel).toBe("Filter options");
+    // Child role must match the container contract: radio, not button.
+    const radio = findByProp(root, "accessibilityRole", "radio");
+    expect(radio).toBeDefined();
+    expect(radio.props.accessibilityState).toMatchObject({ checked: true });
   });
 
-  it("FilterChipGroup multi exposes accessibilityRole=menu", () => {
+  it("FilterChipGroup multi is a toolbar whose children announce as button", () => {
     const root = render(
       <FilterChipGroup
         mode="multi"
@@ -231,11 +235,14 @@ describe("A11y Audit — AC3 Screen-reader labels", () => {
         onChange={() => {}}
       />,
     );
-    const group = findByProp(root, "accessibilityRole", "menu");
+    const group = findByProp(root, "accessibilityRole", "toolbar");
     expect(group).toBeDefined();
     expect(group.props.accessibilityLabel).toBe(
       "Filter options (multi-select)",
     );
+    const btn = findByProp(root, "accessibilityRole", "button");
+    expect(btn).toBeDefined();
+    expect(btn.props.accessibilityState).toMatchObject({ selected: true });
   });
 
   it("Sheet backdrop exposes accessibilityRole + accessibilityLabel", () => {

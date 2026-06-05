@@ -67,8 +67,14 @@ export function FilterChipGroup<T>({
     [mode, onChange, selectedSet],
   );
 
-  const accessibilityRole = mode === "single" ? "radiogroup" : "menu";
-  const accessibilityLabel = mode === "single" ? "Filter options" : "Filter options (multi-select)";
+  // Match the container role to what its children announce: a single-select
+  // group is a `radiogroup` of `radio` options (mutually exclusive); a
+  // multi-select group is a `toolbar` of toggle `button`s. Using `menu` here
+  // would imply `menuitem` children and misdescribe the controls to AT.
+  const accessibilityRole = mode === "single" ? "radiogroup" : "toolbar";
+  const accessibilityLabel =
+    mode === "single" ? "Filter options" : "Filter options (multi-select)";
+  const childRole = mode === "single" ? "radio" : "button";
 
   return (
     <View className={className} style={style} accessibilityRole={accessibilityRole} accessibilityLabel={accessibilityLabel}>
@@ -83,6 +89,7 @@ export function FilterChipGroup<T>({
             <Pill
               key={String(option.value)}
               label={option.label}
+              role={childRole}
               selected={isSelected}
               disabled={option.disabled}
               count={option.count}
