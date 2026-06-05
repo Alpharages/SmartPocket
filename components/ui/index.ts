@@ -36,3 +36,5 @@ export { ToastProvider, useToast } from "./ToastProvider";
 export type { ShowToastOptions } from "./ToastProvider";
 export { ConfirmSheet } from "./ConfirmSheet";
 export type { ConfirmOptions, ConfirmSheetProps } from "./ConfirmSheet";
+export { TwoPaneLayout } from "./TwoPaneLayout";
+export type { TwoPaneLayoutProps } from "./TwoPaneLayout";

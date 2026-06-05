@@ -19,9 +19,9 @@ import { useBreakpoints } from "@/hooks/use-breakpoint";
 import {
   EmptyState,
   FilterChipGroup,
-  Pill,
   ScreenHeader,
   TransactionRow,
+  TwoPaneLayout,
 } from "@/components/ui";
 import type { ChipOption } from "@/components/ui";
 import { Spacing, Typography } from "@/lib/_core/theme";
@@ -101,6 +101,150 @@ export function groupTransactionsByDate(
 }
 
 // ---------------------------------------------------------------------------
+// Detail pane — inline transaction detail for two-pane layout
+// ---------------------------------------------------------------------------
+
+function formatDate(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
+function TransactionDetailPane({
+  transaction,
+}: {
+  transaction: ExpenseTransaction;
+}) {
+  const colors = useColors();
+  const { categories, deleteTransaction } = useExpense();
+
+  const isIncome = transaction.type === "income";
+  const accent = isIncome ? colors.success : colors.error;
+  const category = categories.find((c) => c.id === transaction.categoryId);
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete transaction",
+      "This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteTransaction(transaction.id),
+        },
+      ],
+      { cancelable: true },
+    );
+  };
+
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+    >
+      {/* Header */}
+      <View className="flex-row items-center justify-between px-6 pt-6 pb-2">
+        <Text className="text-h1 text-foreground">Details</Text>
+        <Pressable
+          onPress={handleDelete}
+          hitSlop={8}
+          accessibilityLabel="Delete transaction"
+          className="w-10 h-10 rounded-full items-center justify-center"
+          style={{ backgroundColor: colors.error + "14" }}
+        >
+          <Ionicons name="trash-outline" size={20} color={colors.error} />
+        </Pressable>
+      </View>
+
+      {/* Amount */}
+      <View className="items-center mt-6 px-6">
+        <View
+          className="w-16 h-16 rounded-full items-center justify-center mb-3"
+          style={{ backgroundColor: accent + "18" }}
+        >
+          <Ionicons
+            name={isIncome ? "arrow-down" : "arrow-up"}
+            size={26}
+            color={accent}
+          />
+        </View>
+        <Text className="text-4xl font-bold" style={{ color: accent }}>
+          {isIncome ? "+" : "-"}${transaction.amount}
+        </Text>
+        <Text className="mt-xs text-sm text-muted font-medium capitalize">
+          {transaction.type}
+        </Text>
+      </View>
+
+      {/* Details card */}
+      <View
+        className="mx-6 mt-8 rounded-2xl overflow-hidden"
+        style={{
+          backgroundColor: colors.surface,
+          borderWidth: 0.5,
+          borderColor: colors.border,
+        }}
+      >
+        {/* Category */}
+        <View className="flex-row items-center justify-between px-5 py-4">
+          <Text className="text-sm font-medium text-muted">Category</Text>
+          <View className="flex-row items-center gap-2">
+            {category && (
+              <View
+                className="w-6 h-6 rounded-full items-center justify-center"
+                style={{ backgroundColor: category.color }}
+              >
+                <Ionicons
+                  name={(category.icon as IoniconName) ?? "pricetag"}
+                  size={13}
+                  color="white"
+                />
+              </View>
+            )}
+            <Text className="text-sm font-semibold text-foreground">
+              {category?.name ?? "Uncategorized"}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ height: 0.5, backgroundColor: colors.border }} />
+
+        {/* Date */}
+        <View className="flex-row items-center justify-between px-5 py-4">
+          <Text className="text-sm font-medium text-muted">Date</Text>
+          <Text className="text-sm font-semibold text-foreground">
+            {formatDate(transaction.date)}
+          </Text>
+        </View>
+
+        {transaction.description ? (
+          <>
+            <View style={{ height: 0.5, backgroundColor: colors.border }} />
+            {/* Description */}
+            <View className="px-5 py-4">
+              <Text className="text-sm font-medium text-muted mb-1.5">
+                Description
+              </Text>
+              <Text className="text-sm text-foreground leading-5">
+                {transaction.description}
+              </Text>
+            </View>
+          </>
+        ) : null}
+      </View>
+    </ScrollView>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
@@ -110,6 +254,9 @@ export default function TransactionsScreen() {
     useExpense();
   const [searchText, setSearchText] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
+  const [selectedTransactionId, setSelectedTransactionId] = useState<
+    number | null
+  >(null);
   const colors = useColors();
   const { isLg } = useBreakpoints();
 
@@ -177,6 +324,22 @@ export default function TransactionsScreen() {
       );
     },
     [deleteTransaction],
+  );
+
+  const handleTransactionPress = useCallback(
+    (id: number) => {
+      if (isLg) {
+        setSelectedTransactionId(id);
+      } else {
+        router.push(`/transaction/${id}`);
+      }
+    },
+    [isLg, router],
+  );
+
+  const selectedTransaction = useMemo(
+    () => transactions.find((t) => t.id === selectedTransactionId) ?? null,
+    [transactions, selectedTransactionId],
   );
 
   // ListHeaderComponent passed as a React element (not a component function)
@@ -290,7 +453,7 @@ export default function TransactionsScreen() {
     <SectionList<ExpenseTransaction, TransactionSection>
       sections={sections}
       keyExtractor={(item) => item.id.toString()}
-      ListHeaderComponent={isLg ? undefined : listHeader}
+      ListHeaderComponent={listHeader}
       ListEmptyComponent={listEmpty}
       stickySectionHeadersEnabled={false}
       showsVerticalScrollIndicator={false}
@@ -328,6 +491,8 @@ export default function TransactionsScreen() {
             categoryColor={categoryColor}
             categoryIcon={categoryIcon}
             note={item.description ?? undefined}
+            selected={selectedTransactionId === item.id}
+            onPress={() => handleTransactionPress(item.id)}
             onDelete={() => handleDelete(item.id, title)}
             style={{ backgroundColor: colors.surface }}
           />
@@ -351,92 +516,32 @@ export default function TransactionsScreen() {
   );
 
   if (isLg) {
-    return (
-      <ScreenContainer className="flex-row bg-background">
-        {/* Left pane: header + search + filter chips (sticky sidebar) */}
-        <ScrollView
-          style={{
-            width: 280,
-            borderRightWidth: 0.5,
-            borderRightColor: colors.border,
-          }}
-          contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
-          showsVerticalScrollIndicator={false}
-        >
-          <ScreenHeader
-            title="Activity"
-            subtitle={`${filteredTransactions.length} transaction${filteredTransactions.length !== 1 ? "s" : ""}`}
-            accessibilityLabel="Activity screen"
-            action={
-              <Pressable
-                onPress={() => router.push("/add-transaction")}
-                accessibilityRole="button"
-                accessibilityLabel="Add transaction"
-                hitSlop={8}
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: colors.primary,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Ionicons name="add" size={22} color="#fff" />
-              </Pressable>
-            }
-          />
-
-          {/* Search bar */}
-          <View
-            className="mx-lg mb-md flex-row items-center gap-md rounded-md px-md"
-            style={{
-              backgroundColor: colors.surface,
-              borderWidth: 0.5,
-              borderColor: colors.border,
-              minHeight: 44,
-            }}
-          >
-            <Ionicons name="search" size={18} color={colors.muted} />
-            <TextInput
-              placeholder="Search…"
-              placeholderTextColor={colors.muted}
-              value={searchText}
-              onChangeText={setSearchText}
-              className="flex-1 text-foreground"
-              style={{ fontSize: Typography.body.fontSize }}
-              returnKeyType="search"
-              accessibilityLabel="Search transactions"
+    const detailPane = selectedTransaction ? (
+      <TransactionDetailPane transaction={selectedTransaction} />
+    ) : (
+      <View className="flex-1 items-center justify-center">
+        <EmptyState
+          variant="no-data"
+          icon={
+            <Ionicons
+              name="receipt-outline"
+              size={28}
+              color={colors.muted}
             />
-            {searchText ? (
-              <Pressable
-                onPress={() => setSearchText("")}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Clear search"
-              >
-                <Ionicons name="close-circle" size={18} color={colors.muted} />
-              </Pressable>
-            ) : null}
-          </View>
+          }
+          title="No transaction selected"
+          description="Tap a transaction in the list to view its details"
+        />
+      </View>
+    );
 
-          {/* Filter pills stacked vertically in the sidebar */}
-          <View style={{ paddingHorizontal: Spacing.lg, gap: Spacing.sm }}>
-            {FILTER_OPTIONS.map((option) => (
-              <Pill
-                key={option.value}
-                label={option.label}
-                selected={filterType === option.value}
-                onPress={() => setFilterType(option.value)}
-              />
-            ))}
-          </View>
-        </ScrollView>
-
-        {/* Right pane: transaction list */}
-        <View style={{ flex: 1 }}>
-          {transactionList}
-        </View>
+    return (
+      <ScreenContainer className="flex-1 bg-background">
+        <TwoPaneLayout
+          master={transactionList}
+          detail={detailPane}
+          detailVisible={selectedTransactionId != null}
+        />
       </ScreenContainer>
     );
   }
