@@ -14,13 +14,14 @@ import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { CATEGORY_COLOR_LIGHT_VALUES } from "@/constants/theme";
-import { Button, CategoryToken, EmptyState, Sheet } from "@/components/ui";
-import { type Category } from "@/lib/expense-context";
+import { Button, CategoryToken, ConfirmSheet, EmptyState, Sheet } from "@/components/ui";
+import { useConfirm } from "@/hooks/use-confirm";
 
 export default function CategoriesScreen() {
   const colors = useColors();
   const { categories, loadingCategories, addCategory, deleteCategory } =
     useExpense();
+  const { visible: confirmVisible, options: confirmOptions, confirm, onConfirm, onCancel } = useConfirm();
   const [showModal, setShowModal] = useState(false);
   const [categoryType, setCategoryType] = useState<"income" | "expense">(
     "expense",
@@ -63,13 +64,33 @@ export default function CategoriesScreen() {
             accessibilityActions so VoiceOver/TalkBack users can invoke it
             without performing the swipe/long-press gesture (NFR-5). */}
         <Pressable
-          onLongPress={() => deleteCategory(item.id)}
+          onLongPress={async () => {
+            const confirmed = await confirm({
+              title: "Delete Category",
+              message: `Are you sure you want to delete "${item.name}"?`,
+              destructive: true,
+              confirmLabel: "Delete",
+            });
+            if (confirmed) {
+              await deleteCategory(item.id);
+            }
+          }}
           accessibilityRole="button"
           accessibilityLabel={`${item.name}, ${item.type} category`}
           accessibilityHint="Long press to delete"
           accessibilityActions={[{ name: "delete", label: `Delete ${item.name}` }]}
-          onAccessibilityAction={(e) => {
-            if (e.nativeEvent.actionName === "delete") deleteCategory(item.id);
+          onAccessibilityAction={async (e) => {
+            if (e.nativeEvent.actionName === "delete") {
+              const confirmed = await confirm({
+                title: "Delete Category",
+                message: `Are you sure you want to delete "${item.name}"?`,
+                destructive: true,
+                confirmLabel: "Delete",
+              });
+              if (confirmed) {
+                await deleteCategory(item.id);
+              }
+            }
           }}
           style={{
             flexDirection: "row",
@@ -216,6 +237,13 @@ export default function CategoriesScreen() {
           )}
         </View>
       </ScrollView>
+
+      <ConfirmSheet
+        visible={confirmVisible}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+        {...confirmOptions}
+      />
 
       <Sheet
         visible={showModal}

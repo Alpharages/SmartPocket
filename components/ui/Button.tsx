@@ -11,16 +11,10 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import Animated, {
-  interpolate,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
+import Animated from "react-native-reanimated";
 
 import { useColors } from "@/hooks/use-colors";
+import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { cn } from "@/lib/utils";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -112,11 +106,6 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
     ref,
   ) => {
     const colors = useColors();
-    const reducedMotion = useReducedMotion();
-    // Use opacity feedback instead of scale to avoid visual overlap with
-    // elevated sibling views (e.g. StatCard elevation:8 shadow bleeding onto
-    // the button area when transform:scale shrinks the button on press).
-    const pressed = useSharedValue(0);
 
     // Dev-time guard: icon-only must have accessibilityLabel
     if (__DEV__ && variant === "icon-only" && !accessibilityLabel) {
@@ -125,25 +114,16 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
       );
     }
 
-    const animatedStyle = useAnimatedStyle(() => ({
-      opacity: interpolate(pressed.value, [0, 1], [1, 0.75]),
-    }));
+    const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
 
     const handlePressIn = useCallback(() => {
       if (disabled || loading) return;
-      if (!reducedMotion) {
-        pressed.value = withTiming(1, { duration: 100 });
-      }
-      if (process.env.EXPO_OS === "ios") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    }, [disabled, loading, reducedMotion, pressed]);
+      onPressIn();
+    }, [disabled, loading, onPressIn]);
 
     const handlePressOut = useCallback(() => {
-      if (!reducedMotion) {
-        pressed.value = withTiming(0, { duration: 150 });
-      }
-    }, [reducedMotion, pressed]);
+      onPressOut();
+    }, [onPressOut]);
 
     const handlePress = useCallback(() => {
       if (!disabled && !loading) {

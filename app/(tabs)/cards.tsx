@@ -13,8 +13,9 @@ import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInUp } from "react-native-reanimated";
-import { Button, CreditCard, EmptyState, ScreenHeader, Sheet } from "@/components/ui";
+import { Button, ConfirmSheet, CreditCard, EmptyState, ScreenHeader, Sheet } from "@/components/ui";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useConfirm } from "@/hooks/use-confirm";
 
 const PREDEFINED_COLORS = [
   "#6366F1", "#EC4899", "#10B981", "#F59E0B",
@@ -25,6 +26,7 @@ export default function CardsScreen() {
   const colors = useColors();
   const { creditCards, loadingCards, addCreditCard, deleteCreditCard } = useExpense();
   const toast = useToast();
+  const { visible: confirmVisible, options: confirmOptions, confirm, onConfirm, onCancel } = useConfirm();
   const [showModal, setShowModal] = useState(false);
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -108,7 +110,17 @@ export default function CardsScreen() {
                     expiryYear={item.expiryYear}
                     color={item.color}
                     index={index}
-                    onLongPress={() => deleteCreditCard(item.id)}
+                    onLongPress={async () => {
+                      const confirmed = await confirm({
+                        title: "Delete Card",
+                        message: `Are you sure you want to delete "${item.name}"?`,
+                        destructive: true,
+                        confirmLabel: "Delete",
+                      });
+                      if (confirmed) {
+                        await deleteCreditCard(item.id);
+                      }
+                    }}
                   />
                 )}
                 scrollEnabled={false}
@@ -131,6 +143,13 @@ export default function CardsScreen() {
           )}
         </View>
       </ScrollView>
+
+      <ConfirmSheet
+        visible={confirmVisible}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+        {...confirmOptions}
+      />
 
       <Sheet
         visible={showModal}

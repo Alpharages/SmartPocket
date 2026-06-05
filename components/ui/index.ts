@@ -34,3 +34,5 @@ export { Toast } from "./Toast";
 export type { ToastProps, ToastItem, ToastType } from "./Toast";
 export { ToastProvider, useToast } from "./ToastProvider";
 export type { ShowToastOptions } from "./ToastProvider";
+export { ConfirmSheet } from "./ConfirmSheet";
+export type { ConfirmOptions, ConfirmSheetProps } from "./ConfirmSheet";

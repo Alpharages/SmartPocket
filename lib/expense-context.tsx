@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { trpc } from "./trpc";
 import { useToast } from "@/components/ui/ToastProvider";
+import { applyOptimistic, snapshotList } from "./optimistic";
 
 export interface Category {
   id: number;
@@ -118,11 +119,10 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const addCategory = useCallback(
     async (data: Omit<Category, "id" | "userId" | "createdAt" | "updatedAt">) => {
-      // Optimistic insert with a temporary id that will be replaced on refetch.
       const now = new Date();
       const optimistic: Category = { ...data, id: -Date.now(), userId: 0, createdAt: now, updatedAt: now };
-      const snapshot = categories;
-      setCategories((prev) => [...prev, optimistic]);
+      const snapshot = snapshotList(categories);
+      setCategories((prev) => applyOptimistic(prev, { type: "add", item: optimistic }));
       try {
         await createCategoryMutation.mutateAsync(data);
         await refreshCategories();
@@ -138,11 +138,8 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const updateCategory = useCallback(
     async (id: number, data: Partial<Category>) => {
-      // Optimistic update
-      const snapshot = categories;
-      setCategories((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, ...data } : c)),
-      );
+      const snapshot = snapshotList(categories);
+      setCategories((prev) => applyOptimistic(prev, { type: "update", id, data }));
       try {
         await updateCategoryMutation.mutateAsync({ id, ...data } as any);
         toast.show({ type: "success", message: "Category updated" });
@@ -157,9 +154,8 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const deleteCategory = useCallback(
     async (id: number) => {
-      // Optimistic delete
-      const snapshot = categories;
-      setCategories((prev) => prev.filter((c) => c.id !== id));
+      const snapshot = snapshotList(categories);
+      setCategories((prev) => applyOptimistic(prev, { type: "delete", id }));
       try {
         await deleteCategoryMutation.mutateAsync({ id });
         toast.show({ type: "success", message: "Category deleted" });
@@ -192,11 +188,10 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const addCreditCard = useCallback(
     async (data: Omit<CreditCard, "id" | "userId" | "createdAt" | "updatedAt">) => {
-      // Optimistic insert with a temporary id replaced on refetch.
       const now = new Date();
       const optimistic: CreditCard = { ...data, id: -Date.now(), userId: 0, createdAt: now, updatedAt: now };
-      const snapshot = creditCards;
-      setCreditCards((prev) => [...prev, optimistic]);
+      const snapshot = snapshotList(creditCards);
+      setCreditCards((prev) => applyOptimistic(prev, { type: "add", item: optimistic }));
       try {
         await createCardMutation.mutateAsync(data);
         await refreshCreditCards();
@@ -212,11 +207,8 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const updateCreditCard = useCallback(
     async (id: number, data: Partial<CreditCard>) => {
-      // Optimistic update
-      const snapshot = creditCards;
-      setCreditCards((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, ...data } : c)),
-      );
+      const snapshot = snapshotList(creditCards);
+      setCreditCards((prev) => applyOptimistic(prev, { type: "update", id, data }));
       try {
         await updateCardMutation.mutateAsync({ id, ...data } as any);
         toast.show({ type: "success", message: "Card updated" });
@@ -231,9 +223,8 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const deleteCreditCard = useCallback(
     async (id: number) => {
-      // Optimistic delete
-      const snapshot = creditCards;
-      setCreditCards((prev) => prev.filter((c) => c.id !== id));
+      const snapshot = snapshotList(creditCards);
+      setCreditCards((prev) => applyOptimistic(prev, { type: "delete", id }));
       try {
         await deleteCardMutation.mutateAsync({ id });
         toast.show({ type: "success", message: "Card deleted" });
@@ -266,11 +257,10 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const addTransaction = useCallback(
     async (data: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">) => {
-      // Optimistic insert with a temporary id replaced on refetch.
       const now = new Date();
       const optimistic: Transaction = { ...data, id: -Date.now(), userId: 0, createdAt: now, updatedAt: now };
-      const snapshot = transactions;
-      setTransactions((prev) => [optimistic, ...prev]);
+      const snapshot = snapshotList(transactions);
+      setTransactions((prev) => applyOptimistic(prev, { type: "add", item: optimistic }));
       try {
         await createTransactionMutation.mutateAsync(data);
         await refreshTransactions();
@@ -286,11 +276,8 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const updateTransaction = useCallback(
     async (id: number, data: Partial<Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">>) => {
-      // Optimistic update
-      const snapshot = transactions;
-      setTransactions((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, ...data } : t)),
-      );
+      const snapshot = snapshotList(transactions);
+      setTransactions((prev) => applyOptimistic(prev, { type: "update", id, data: data as Partial<Transaction> }));
       try {
         await updateTransactionMutation.mutateAsync({ id, ...data } as any);
         toast.show({ type: "success", message: "Transaction updated" });
@@ -305,9 +292,8 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const deleteTransaction = useCallback(
     async (id: number) => {
-      // Optimistic delete
-      const snapshot = transactions;
-      setTransactions((prev) => prev.filter((t) => t.id !== id));
+      const snapshot = snapshotList(transactions);
+      setTransactions((prev) => applyOptimistic(prev, { type: "delete", id }));
       try {
         await deleteTransactionMutation.mutateAsync({ id });
         toast.show({ type: "success", message: "Transaction deleted" });
