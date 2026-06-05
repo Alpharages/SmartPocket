@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { CategoryColors, ThemeColors, CATEGORY_DEFAULT_COLOR } from "@/lib/_core/theme";
+import {
+  CategoryColors,
+  ThemeColors,
+  CATEGORY_DEFAULT_COLOR,
+  Colors,
+} from "@/lib/_core/theme";
 
 /**
  * Parse a hex color string to RGB values.
@@ -103,7 +108,7 @@ describe("Theme Tokens", () => {
 
   describe("Semantic Color Reservation", () => {
     it("should reserve success for income/positive semantics only", () => {
-      expect(ThemeColors.success.light).toBe("#059669");
+      expect(ThemeColors.success.light).toBe("#047857");
       expect(ThemeColors.success.dark).toBe("#34D399");
     });
 
@@ -111,5 +116,69 @@ describe("Theme Tokens", () => {
       expect(ThemeColors.error.light).toBe("#DC2626");
       expect(ThemeColors.error.dark).toBe("#FCA5A5");
     });
+  });
+
+  describe("WCAG AA Contrast — All Theme Pairings", () => {
+    const fgBgPairs: { name: string; fg: string; bg: string }[] = [];
+
+    for (const scheme of ["light", "dark"] as const) {
+      const palette = Colors[scheme];
+      const bg = palette.background;
+      const surface = palette.surface;
+
+      // Foreground tokens that render as text on background or surface
+      const textTokens = [
+        { key: "text", value: palette.text },
+        { key: "foreground", value: palette.foreground },
+        { key: "muted", value: palette.muted },
+        { key: "primary", value: palette.primary },
+        { key: "success", value: palette.success },
+        { key: "warning", value: palette.warning },
+        { key: "error", value: palette.error },
+        { key: "accent", value: palette.accent },
+        { key: "secondary", value: palette.secondary },
+      ];
+
+      for (const { key, value } of textTokens) {
+        fgBgPairs.push({
+          name: `${scheme}:${key} on background`,
+          fg: value,
+          bg,
+        });
+        fgBgPairs.push({
+          name: `${scheme}:${key} on surface`,
+          fg: value,
+          bg: surface,
+        });
+      }
+    }
+
+    it.each(fgBgPairs)(
+      "should meet AA for normal text (≥4.5:1) — $name",
+      ({ fg, bg }) => {
+        const ratio = contrastRatio(fg, bg);
+        expect(
+          ratio,
+          `contrast ratio ${ratio.toFixed(2)}:1 for ${fg} on ${bg}`,
+        ).toBeGreaterThanOrEqual(4.5);
+      },
+    );
+  });
+
+  describe("WCAG AA Contrast — Category Colors on Surface", () => {
+    for (const scheme of ["light", "dark"] as const) {
+      const surface = Colors[scheme].surface;
+
+      it(`should meet AA for UI elements (≥3:1) on ${scheme} surface`, () => {
+        for (const token of CategoryColors) {
+          const color = scheme === "dark" ? token.dark : token.light;
+          const ratio = contrastRatio(color, surface);
+          expect(
+            ratio,
+            `${token.name} (${color}) on ${scheme} surface (${surface}) = ${ratio.toFixed(2)}:1`,
+          ).toBeGreaterThanOrEqual(3);
+        }
+      });
+    }
   });
 });

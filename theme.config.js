@@ -7,10 +7,10 @@ const themeColors = {
   foreground: { light: "#111827", dark: "#F1F5F9" }, // Near black / Soft white
   muted: { light: "#6B7280", dark: "#9CA3AF" }, // Neutral gray
   border: { light: "#E5E7EB", dark: "#2D3748" }, // Subtle borders
-  success: { light: "#059669", dark: "#34D399" }, // Forest green — semantic only (income/positive)
-  warning: { light: "#D97706", dark: "#FBBF24" }, // Warm amber
+  success: { light: "#047857", dark: "#34D399" }, // Forest green — semantic only (income/positive)
+  warning: { light: "#B45309", dark: "#FBBF24" }, // Warm amber
   error: { light: "#DC2626", dark: "#FCA5A5" }, // Clean red — semantic only (expense/destructive)
-  accent: { light: "#DB2777", dark: "#F472B6" }, // Rose accent — rare, small highlights
+  accent: { light: "#BE185D", dark: "#F472B6" }, // Rose accent — rare, small highlights
   secondary: { light: "#7C3AED", dark: "#A78BFA" }, // Violet
   overlay: { light: "#000000", dark: "#000000" }, // Backdrop / modal scrim
 };

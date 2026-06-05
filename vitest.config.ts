@@ -26,6 +26,7 @@ export default defineConfig({
         __dirname,
         "./__mocks__/react-native-gesture-handler.ts",
       ),
+      "@shared/": path.resolve(__dirname, "./shared/") + "/",
     },
   },
   optimizeDeps: {

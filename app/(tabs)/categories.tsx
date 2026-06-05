@@ -231,10 +231,10 @@ export default function CategoriesScreen() {
           entering={FadeInDown.duration(500)}
           className="px-6 pt-6 pb-2"
         >
-          <Text className="text-[28px] font-bold text-foreground">
+          <Text className="text-h1 font-bold text-foreground">
             Categories
           </Text>
-          <Text className="text-sm text-muted font-medium mt-1">
+          <Text className="text-sm text-muted font-medium mt-xs">
             {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
           </Text>
         </Animated.View>
@@ -299,12 +299,16 @@ export default function CategoriesScreen() {
               <Pressable
                 key={type}
                 onPress={() => setCategoryType(type)}
+                accessibilityRole="button"
+                accessibilityLabel={`${type} category type`}
+                accessibilityState={{ selected: categoryType === type }}
                 className="flex-1 py-3 rounded-xl items-center"
                 style={{
                   backgroundColor:
                     categoryType === type ? colors.primary : colors.background,
                   borderWidth: categoryType === type ? 0 : 0.5,
                   borderColor: colors.border,
+                  minHeight: 44,
                 }}
               >
                 <Text
@@ -353,6 +357,9 @@ export default function CategoriesScreen() {
                 <Pressable
                   key={color}
                   onPress={() => setSelectedColor(color)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select color ${color}`}
+                  accessibilityState={{ selected: selectedColor === color }}
                   className="w-12 h-12 rounded-full items-center justify-center"
                   style={{
                     backgroundColor: color,
@@ -372,11 +379,14 @@ export default function CategoriesScreen() {
           <View className="flex-row gap-3 mt-2">
             <Pressable
               onPress={() => setShowModal(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
               className="flex-1 py-3.5 rounded-xl items-center"
               style={{
                 backgroundColor: colors.background,
                 borderWidth: 0.5,
                 borderColor: colors.border,
+                minHeight: 44,
               }}
             >
               <Text className="text-foreground font-semibold">Cancel</Text>
@@ -384,11 +394,15 @@ export default function CategoriesScreen() {
             <Pressable
               onPress={handleAddCategory}
               disabled={!categoryName.trim()}
+              accessibilityRole="button"
+              accessibilityLabel="Add Category"
+              accessibilityState={{ disabled: !categoryName.trim() }}
               className="flex-1 py-3.5 rounded-xl items-center"
               style={{
                 backgroundColor: categoryName.trim()
                   ? colors.primary
                   : colors.muted,
+                minHeight: 44,
               }}
             >
               <Text className="text-white font-semibold">Add Category</Text>

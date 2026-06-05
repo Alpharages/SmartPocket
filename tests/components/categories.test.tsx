@@ -82,6 +82,15 @@ vi.mock("@/hooks/use-color-scheme", () => ({
 vi.mock("@/constants/theme", () => ({
   resolveCategoryColor: (color: string) => color,
   CATEGORY_COLOR_LIGHT_VALUES: ["#4F46E5", "#047857", "#E11D48"],
+  CATEGORY_DEFAULT_COLOR: "#4F46E5",
+  Radius: { sm: 8, md: 12, lg: 16, full: 9999 },
+  Spacing: { sm: 8, md: 12, lg: 16, xl: 24, "2xl": 32 },
+  Typography: {
+    body: { fontSize: 14, lineHeight: 20, fontWeight: "400" },
+    caption: { fontSize: 12, lineHeight: 16, fontWeight: "400" },
+    h3: { fontSize: 18, lineHeight: 26, fontWeight: "600" },
+    label: { fontSize: 13, lineHeight: 18, fontWeight: "500" },
+  },
 }));
 
 vi.mock("@/lib/_core/theme", () => ({
@@ -102,6 +111,16 @@ vi.mock("@/lib/_core/theme", () => ({
 
 vi.mock("@/lib/expense-context", () => ({
   useExpense: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-confirm", () => ({
+  useConfirm: () => ({
+    visible: false,
+    options: {},
+    confirm: vi.fn().mockResolvedValue(true),
+    onConfirm: vi.fn(),
+    onCancel: vi.fn(),
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -232,8 +251,11 @@ describe("CategoriesScreen", () => {
 
   it("AC: CategoryToken displays the correct name for each category", () => {
     const root = renderScreen();
+    // CategoryToken in rows uses showLabel=false; the name is in an adjacent Text
     const nameNodes = root.findAll(
-      (n) => n.props.testID === "category-token-name",
+      (n) =>
+        String(n.type) === "Text" &&
+        (n.props.children === "Food" || n.props.children === "Salary"),
     );
     const names = nameNodes.map((n) => n.props.children);
     expect(names).toContain("Food");
@@ -289,7 +311,7 @@ describe("CategoriesScreen", () => {
 
   // --- AC: FR-5 — delete unchanged ---
 
-  it("AC (FR-5): long-press on row calls deleteCategory with correct id", () => {
+  it("AC (FR-5): long-press on row calls deleteCategory with correct id", async () => {
     const root = renderScreen();
     const rowPressable = root.find(
       (n) =>
@@ -297,13 +319,15 @@ describe("CategoriesScreen", () => {
         typeof n.props.accessibilityLabel === "string" &&
         n.props.accessibilityLabel.includes("Food"),
     );
-    act(() => {
+    await act(async () => {
       rowPressable.props.onLongPress?.();
+      // Allow the async confirm + delete to resolve
+      await new Promise((r) => setTimeout(r, 10));
     });
     expect(mockDeleteCategory).toHaveBeenCalledWith(mockExpenseCategory.id);
   });
 
-  it("AC (FR-5): onAccessibilityAction calls deleteCategory (AT path)", () => {
+  it("AC (FR-5): onAccessibilityAction calls deleteCategory (AT path)", async () => {
     const root = renderScreen();
     const rowPressable = root.find(
       (n) =>
@@ -311,10 +335,12 @@ describe("CategoriesScreen", () => {
         typeof n.props.accessibilityLabel === "string" &&
         n.props.accessibilityLabel.includes("Salary"),
     );
-    act(() => {
+    await act(async () => {
       rowPressable.props.onAccessibilityAction?.({
         nativeEvent: { actionName: "delete" },
       });
+      // Allow the async confirm + delete to resolve
+      await new Promise((r) => setTimeout(r, 10));
     });
     expect(mockDeleteCategory).toHaveBeenCalledWith(mockIncomeCategory.id);
   });

@@ -199,6 +199,14 @@ vi.mock("@/lib/expense-context", () => ({
   useExpense: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-colors", () => ({
+  useColors: () => mockColors,
+}));
+
+vi.mock("@/hooks/use-color-scheme", () => ({
+  useColorScheme: () => "light",
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

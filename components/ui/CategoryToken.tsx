@@ -238,6 +238,7 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
         />
         {showLabel && (
           <Text
+            testID="category-token-name"
             numberOfLines={1}
             style={{
               fontSize: Typography.label.fontSize,
@@ -272,6 +273,7 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
     if (!hasPressHandler) {
       return (
         <View
+          testID="category-token"
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
           className={cn(className)}

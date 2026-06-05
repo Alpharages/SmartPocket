@@ -17,6 +17,7 @@ import Animated, {
   interpolate,
   runOnJS,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
@@ -62,6 +63,7 @@ export default function AddTransactionScreen() {
 
   // Single 0→1 progress drives both backdrop opacity and panel translateY.
   const progress = useSharedValue(0);
+  const reducedMotion = useReducedMotion();
 
   const goBack = useCallback(() => router.back(), [router]);
 
@@ -69,15 +71,17 @@ export default function AddTransactionScreen() {
     if (closingRef.current) return;
     closingRef.current = true;
     Keyboard.dismiss();
-    progress.value = withTiming(0, { duration: CLOSE_DURATION }, (finished) => {
-      if (finished) runOnJS(goBack)();
-    });
-  }, [progress, goBack]);
+    progress.value = reducedMotion
+      ? 0
+      : withTiming(0, { duration: CLOSE_DURATION }, (finished) => {
+          if (finished) runOnJS(goBack)();
+        });
+  }, [progress, goBack, reducedMotion]);
 
   // Animate open on mount.
   useEffect(() => {
-    progress.value = withTiming(1, { duration: OPEN_DURATION });
-  }, [progress]);
+    progress.value = reducedMotion ? 1 : withTiming(1, { duration: OPEN_DURATION });
+  }, [progress, reducedMotion]);
 
   const handleSave = async () => {
     if (!amount || !selectedCategory) {

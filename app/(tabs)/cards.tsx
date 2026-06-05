@@ -294,6 +294,9 @@ export default function CardsScreen() {
                     <Pressable
                       key={color}
                       onPress={() => setSelectedColor(color)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select color ${color}`}
+                      accessibilityState={{ selected: selectedColor === color }}
                       className="w-12 h-12 rounded-full items-center justify-center"
                       style={{
                         backgroundColor: color,

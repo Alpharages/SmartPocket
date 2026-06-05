@@ -67,10 +67,11 @@ export function FilterChipGroup<T>({
     [mode, onChange, selectedSet],
   );
 
-  const accessibilityRole = mode === "single" ? "radiogroup" : undefined;
+  const accessibilityRole = mode === "single" ? "radiogroup" : "menu";
+  const accessibilityLabel = mode === "single" ? "Filter options" : "Filter options (multi-select)";
 
   return (
-    <View className={className} style={style} accessibilityRole={accessibilityRole}>
+    <View className={className} style={style} accessibilityRole={accessibilityRole} accessibilityLabel={accessibilityLabel}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
