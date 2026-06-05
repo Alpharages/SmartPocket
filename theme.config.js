@@ -92,7 +92,7 @@ const motion = {
     durationMs: 250,
     /** Maps to Reanimated Easing.out(Easing.cubic) in Sheet.tsx */
     easing: "easeOutCubic",
-    backdropOpacity: 0.4,
+    backdropOpacity: 0.65,
     dragDismissThreshold: 0.35,
   },
 };

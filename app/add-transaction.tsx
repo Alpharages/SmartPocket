@@ -1,26 +1,55 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  ScrollView,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
 } from "react-native";
-import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import Animated, {
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { useExpense } from "@/lib/expense-context";
-import Animated, { FadeInUp } from "react-native-reanimated";
-import { CategoryPickerGrid } from "@/components/ui/CategoryPickerGrid";
+import { useColors } from "@/hooks/use-colors";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { Button, CategoryPickerGrid, EmptyState, Pill } from "@/components/ui";
+import { useToast } from "@/components/ui/ToastProvider";
+import { Radius, Spacing, Typography } from "@/lib/_core/theme";
+import { resolveCategoryColor } from "@/constants/theme";
+
+const OPEN_DURATION = 250;
+const CLOSE_DURATION = 220;
+// How far the panel slides in from below — larger than any screen height.
+const SLIDE_DISTANCE = 700;
+
+const MIN_TOUCH_TARGET = 44;
+
+// Static scrim. Matches the theme `overlay` token (#000000) at 60% — a fixed
+// color so the dim never depends on a Reanimated worklet running.
+const SCRIM_COLOR = "rgba(0, 0, 0, 0.6)";
 
 export default function AddTransactionScreen() {
   const router = useRouter();
   const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
   const { type: queryType } = useLocalSearchParams();
+  const scheme = (useColorScheme() ?? "light") as "light" | "dark";
   const { categories, transactions, addTransaction } = useExpense();
+  const toast = useToast();
 
   const [type, setType] = useState<"income" | "expense">(
     (queryType as "income" | "expense") || "expense",
@@ -29,15 +58,32 @@ export default function AddTransactionScreen() {
   const [description, setDescription] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [date] = useState(new Date());
+  const closingRef = useRef(false);
 
-  const filteredCategories = categories.filter((c) => c.type === type);
+  // Single 0→1 progress drives both backdrop opacity and panel translateY.
+  const progress = useSharedValue(0);
+
+  const goBack = useCallback(() => router.back(), [router]);
+
+  const close = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    Keyboard.dismiss();
+    progress.value = withTiming(0, { duration: CLOSE_DURATION }, (finished) => {
+      if (finished) runOnJS(goBack)();
+    });
+  }, [progress, goBack]);
+
+  // Animate open on mount.
+  useEffect(() => {
+    progress.value = withTiming(1, { duration: OPEN_DURATION });
+  }, [progress]);
 
   const handleSave = async () => {
     if (!amount || !selectedCategory) {
-      alert("Please fill in all fields");
+      toast.show({ type: "error", message: "Please fill in all required fields" });
       return;
     }
-
     await addTransaction({
       categoryId: selectedCategory,
       type,
@@ -45,220 +91,318 @@ export default function AddTransactionScreen() {
       description: description || undefined,
       date,
     });
-
-    router.back();
+    close();
   };
 
-  const isFormValid = amount && selectedCategory;
+  const filteredCategories = categories.filter((c) => c.type === type);
+  const isFormValid = !!amount && !!selectedCategory;
+
+  // Derive recently-used category IDs for the current type from transaction
+  // history (up to 5 unique IDs, most-recent first).
+  const recentlyUsedIds = useMemo(() => {
+    const seen = new Set<number>();
+    const result: number[] = [];
+    for (const tx of transactions) {
+      if (tx.categoryId == null) continue;
+      const cat = categories.find((c) => c.id === tx.categoryId);
+      if (!cat || cat.type !== type) continue;
+      if (!seen.has(tx.categoryId)) {
+        seen.add(tx.categoryId);
+        result.push(tx.categoryId);
+        if (result.length >= 5) break;
+      }
+    }
+    return result;
+  }, [transactions, categories, type]);
+
+  // Map filtered categories to CategoryPickerGrid items with resolved colors.
+  const pickerCategories = useMemo(
+    () =>
+      filteredCategories.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        type: cat.type,
+        color: resolveCategoryColor(cat.color, scheme),
+        icon: cat.icon,
+      })),
+    [filteredCategories, scheme],
+  );
+
+  const panelAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(progress.value, [0, 1], [SLIDE_DISTANCE, 0]) },
+    ],
+  }));
 
   return (
-    <ScreenContainer
-      className="flex-1 bg-background"
-      edges={["top", "left", "right", "bottom"]}
-    >
+    // absoluteFillObject fills the entire transparentModal route layer,
+    // which is rendered above the tabs Activity on Android — guaranteed to
+    // cover elevated views (elevation:8 StatCard, etc.) without a nested Modal.
+    <View style={StyleSheet.absoluteFillObject} testID="add-transaction-screen">
+      {/* ── Backdrop ──────────────────────────────────────────────────────── */}
+      {/* The scrim dim is a STATIC color (not a Reanimated animated opacity):
+          animated opacity on this view was unreliable on Android inside the
+          transparentModal route, leaving the dashboard bleeding through. A
+          solid theme-overlay scrim guarantees the dashboard is always covered. */}
+      <Pressable
+        style={[
+          StyleSheet.absoluteFillObject,
+          { backgroundColor: SCRIM_COLOR },
+        ]}
+        onPress={close}
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss"
+        testID="add-transaction-backdrop"
+      />
+
+      {/* ── Sheet panel ───────────────────────────────────────────────────── */}
+      {/* KeyboardAvoidingView wraps only the panel so the keyboard lifts it
+          on iOS. On Android the transparent overlay activity adjusts natively. */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.panelWrapper}
       >
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Header */}
-          <View className="flex-row items-center justify-between px-6 pt-6 pb-2">
-            <Text className="text-[28px] font-bold text-foreground">
+        {/* Animated.View carries ONLY the slide transform. The solid surface
+            background lives on the inner plain View below — on this Android
+            build the Reanimated view dropped its own static backgroundColor,
+            leaving the panel transparent, so the background must sit on a
+            regular View (which renders reliably, like the form inputs do). */}
+        <Animated.View style={panelAnimStyle} testID="add-transaction-panel">
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderTopLeftRadius: Radius.lg,
+              borderTopRightRadius: Radius.lg,
+              paddingTop: Spacing.sm,
+              paddingHorizontal: Spacing.lg,
+              paddingBottom: Math.max(insets.bottom, Spacing.lg),
+              maxHeight: screenHeight * 0.9,
+            }}
+            testID="add-transaction-panel-surface"
+          >
+          {/* ── Header ──────────────────────────────────────────────────── */}
+          <View style={styles.dragHandle} accessibilityElementsHidden>
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: colors.border,
+              }}
+            />
+          </View>
+
+          <View style={styles.header}>
+            <Text
+              className="text-foreground font-semibold flex-1 pr-2"
+              style={{
+                fontSize: Typography.h3.fontSize,
+                lineHeight: Typography.h3.lineHeight,
+                fontWeight: Typography.h3.fontWeight,
+              }}
+              accessibilityRole="header"
+            >
               Add Transaction
             </Text>
             <Pressable
-              onPress={() => router.back()}
+              onPress={close}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
               hitSlop={8}
-              className="w-10 h-10 rounded-full items-center justify-center"
-              style={{ backgroundColor: colors.surface }}
+              style={styles.closeButton}
+              testID="add-transaction-close"
             >
-              <Ionicons name="close" size={22} color={colors.foreground} />
+              <Ionicons name="close" size={24} color={colors.foreground} />
             </Pressable>
           </View>
 
-          {/* Type Selector */}
-          <Animated.View
-            entering={FadeInUp.delay(100).duration(400)}
-            className="px-6 mt-6"
+          {/* ── Scrollable form content ──────────────────────────────────── */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ gap: Spacing.lg, paddingBottom: Spacing.sm }}
           >
-            <Text className="text-sm font-semibold text-muted mb-2.5">
-              Transaction Type
-            </Text>
-            <View className="flex-row gap-3">
-              <Pressable
-                onPress={() => {
-                  setType("expense");
-                  setSelectedCategory(null);
-                }}
-                className="flex-1 py-3.5 rounded-2xl items-center flex-row justify-center gap-2"
+            {/* Transaction Type */}
+            <View>
+              <Text
+                className="text-muted font-semibold mb-xs"
+                style={{ fontSize: Typography.label.fontSize }}
+              >
+                Transaction Type
+              </Text>
+              <View className="flex-row gap-md">
+                <Pill
+                  label="Expense"
+                  selected={type === "expense"}
+                  onPress={() => {
+                    setType("expense");
+                    setSelectedCategory(null);
+                  }}
+                  leftIcon={
+                    <Ionicons
+                      name="arrow-up"
+                      size={16}
+                      color={type === "expense" ? colors.surface : colors.muted}
+                    />
+                  }
+                  style={{ flex: 1 }}
+                />
+                <Pill
+                  label="Income"
+                  selected={type === "income"}
+                  onPress={() => {
+                    setType("income");
+                    setSelectedCategory(null);
+                  }}
+                  leftIcon={
+                    <Ionicons
+                      name="arrow-down"
+                      size={16}
+                      color={type === "income" ? colors.surface : colors.muted}
+                    />
+                  }
+                  style={{ flex: 1 }}
+                />
+              </View>
+            </View>
+
+            {/* Amount */}
+            <View>
+              <Text
+                className="text-muted font-semibold mb-xs"
+                style={{ fontSize: Typography.label.fontSize }}
+              >
+                Amount
+              </Text>
+              <View
+                className="flex-row items-center rounded-md px-lg py-md"
                 style={{
-                  backgroundColor:
-                    type === "expense" ? colors.error + "14" : colors.surface,
-                  borderWidth: type === "expense" ? 1.5 : 0.5,
-                  borderColor:
-                    type === "expense" ? colors.error : colors.border,
+                  backgroundColor: colors.surface,
+                  borderWidth: 0.5,
+                  borderColor: colors.border,
                 }}
               >
-                <Ionicons
-                  name="arrow-up"
-                  size={16}
-                  color={type === "expense" ? colors.error : colors.muted}
-                />
                 <Text
-                  className="font-semibold"
-                  style={{
-                    color:
-                      type === "expense" ? colors.error : colors.foreground,
-                  }}
+                  className="text-foreground font-bold mr-sm"
+                  style={{ fontSize: Typography.h2.fontSize }}
                 >
-                  Expense
+                  $
                 </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  setType("income");
-                  setSelectedCategory(null);
-                }}
-                className="flex-1 py-3.5 rounded-2xl items-center flex-row justify-center gap-2"
+                <TextInput
+                  autoFocus
+                  placeholder="0.00"
+                  placeholderTextColor={colors.muted}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="decimal-pad"
+                  className="flex-1 text-foreground"
+                  style={{ fontSize: Typography.h2.fontSize, fontWeight: "700" }}
+                />
+              </View>
+            </View>
+
+            {/* Category */}
+            <View>
+              <Text
+                className="text-muted font-semibold mb-xs"
+                style={{ fontSize: Typography.label.fontSize }}
+              >
+                Category
+              </Text>
+              {pickerCategories.length > 0 ? (
+                <CategoryPickerGrid
+                  categories={pickerCategories}
+                  selectedId={selectedCategory}
+                  onSelect={(id) => setSelectedCategory(id)}
+                  recentlyUsedIds={recentlyUsedIds}
+                  contentContainerStyle={{ paddingHorizontal: 0 }}
+                />
+              ) : (
+                <EmptyState
+                  icon={<Ionicons name="grid-outline" size={24} color={colors.muted} />}
+                  title={`No ${type} categories`}
+                  description="Add categories in the Categories tab."
+                />
+              )}
+            </View>
+
+            {/* Note */}
+            <View>
+              <Text
+                className="text-muted font-semibold mb-xs"
+                style={{ fontSize: Typography.label.fontSize }}
+              >
+                Note (Optional)
+              </Text>
+              <View
+                className="rounded-md px-lg py-md"
                 style={{
-                  backgroundColor:
-                    type === "income" ? colors.success + "14" : colors.surface,
-                  borderWidth: type === "income" ? 1.5 : 0.5,
-                  borderColor:
-                    type === "income" ? colors.success : colors.border,
+                  backgroundColor: colors.surface,
+                  borderWidth: 0.5,
+                  borderColor: colors.border,
+                  minHeight: 72,
                 }}
               >
-                <Ionicons
-                  name="arrow-down"
-                  size={16}
-                  color={type === "income" ? colors.success : colors.muted}
+                <TextInput
+                  placeholder="Add a note…"
+                  placeholderTextColor={colors.muted}
+                  value={description}
+                  onChangeText={setDescription}
+                  className="text-foreground"
+                  style={{ fontSize: Typography.body.fontSize }}
+                  multiline
+                  textAlignVertical="top"
                 />
-                <Text
-                  className="font-semibold"
-                  style={{
-                    color:
-                      type === "income" ? colors.success : colors.foreground,
-                  }}
-                >
-                  Income
-                </Text>
-              </Pressable>
+              </View>
             </View>
-          </Animated.View>
+          </ScrollView>
 
-          {/* Amount Input */}
-          <Animated.View
-            entering={FadeInUp.delay(150).duration(400)}
-            className="px-6 mt-6"
-          >
-            <Text className="text-sm font-semibold text-muted mb-2.5">
-              Amount
-            </Text>
-            <View
-              className="flex-row items-center rounded-2xl px-5 py-4"
-              style={{
-                backgroundColor: colors.surface,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-              }}
-            >
-              <Text className="text-foreground text-2xl font-bold mr-2">$</Text>
-              <TextInput
-                placeholder="0.00"
-                placeholderTextColor={colors.muted}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="decimal-pad"
-                className="flex-1 text-foreground"
-                style={{ fontSize: 24, fontWeight: "700" }}
-              />
-            </View>
-          </Animated.View>
-
-          {/* Category Selector */}
-          <Animated.View
-            entering={FadeInUp.delay(200).duration(400)}
-            className="px-6 mt-6"
-          >
-            <Text className="text-sm font-semibold text-muted mb-2.5">
-              Category
-            </Text>
-            <CategoryPickerGrid
-              categories={filteredCategories}
-              selectedId={selectedCategory}
-              onSelect={setSelectedCategory}
-              transactions={transactions}
-              emptyText={`No ${type} categories available`}
+          {/* ── Action buttons ───────────────────────────────────────────── */}
+          <View className="flex-row gap-md mt-lg">
+            <Button
+              variant="secondary"
+              label="Cancel"
+              onPress={close}
+              className="flex-1"
+              size="lg"
             />
-          </Animated.View>
-
-          {/* Description */}
-          <Animated.View
-            entering={FadeInUp.delay(250).duration(400)}
-            className="px-6 mt-6"
-          >
-            <Text className="text-sm font-semibold text-muted mb-2.5">
-              Description (Optional)
-            </Text>
-            <View
-              className="rounded-2xl px-4 py-3.5"
-              style={{
-                backgroundColor: colors.surface,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-              }}
-            >
-              <TextInput
-                placeholder="Add a note..."
-                placeholderTextColor={colors.muted}
-                value={description}
-                onChangeText={setDescription}
-                className="text-foreground"
-                style={{ fontSize: 15, minHeight: 60 }}
-                multiline
-                textAlignVertical="top"
-              />
-            </View>
-          </Animated.View>
-
-          {/* Action Buttons */}
-          <Animated.View
-            entering={FadeInUp.delay(300).duration(400)}
-            className="px-6 mt-8 flex-row gap-3"
-          >
-            <Pressable
-              onPress={() => router.back()}
-              className="flex-1 py-4 rounded-2xl items-center"
-              style={{
-                backgroundColor: colors.surface,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-              }}
-            >
-              <Text className="font-semibold text-foreground">Cancel</Text>
-            </Pressable>
-            <Pressable
+            <Button
+              variant="primary"
+              label="Save"
               onPress={handleSave}
               disabled={!isFormValid}
-              className="flex-1 py-4 rounded-2xl items-center"
-              style={{
-                backgroundColor: isFormValid ? colors.primary : colors.muted,
-                shadowColor: isFormValid ? colors.primary : "transparent",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.2,
-                shadowRadius: 8,
-                elevation: isFormValid ? 4 : 0,
-              }}
-            >
-              <Text className="font-semibold text-white">Save</Text>
-            </Pressable>
-          </Animated.View>
-        </ScrollView>
+              className="flex-1"
+              size="lg"
+            />
+          </View>
+          </View>
+        </Animated.View>
       </KeyboardAvoidingView>
-    </ScreenContainer>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  panelWrapper: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  dragHandle: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  closeButton: {
+    minWidth: MIN_TOUCH_TARGET,
+    minHeight: MIN_TOUCH_TARGET,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});

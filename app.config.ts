@@ -117,6 +117,8 @@ const config: ExpoConfig = {
         android: {
           buildArchs: ["armeabi-v7a", "arm64-v8a"],
           minSdkVersion: 24,
+          // Allow http:// only in dev builds — never in production.
+          ...(process.env.APP_ENV !== "production" && { usesCleartextTraffic: true }),
         },
       },
     ],

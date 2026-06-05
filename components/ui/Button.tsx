@@ -12,6 +12,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  interpolate,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -112,7 +113,10 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
   ) => {
     const colors = useColors();
     const reducedMotion = useReducedMotion();
-    const scale = useSharedValue(1);
+    // Use opacity feedback instead of scale to avoid visual overlap with
+    // elevated sibling views (e.g. StatCard elevation:8 shadow bleeding onto
+    // the button area when transform:scale shrinks the button on press).
+    const pressed = useSharedValue(0);
 
     // Dev-time guard: icon-only must have accessibilityLabel
     if (__DEV__ && variant === "icon-only" && !accessibilityLabel) {
@@ -122,24 +126,24 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
     }
 
     const animatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: scale.value }],
+      opacity: interpolate(pressed.value, [0, 1], [1, 0.75]),
     }));
 
     const handlePressIn = useCallback(() => {
       if (disabled || loading) return;
       if (!reducedMotion) {
-        scale.value = withTiming(0.97, { duration: 120 });
+        pressed.value = withTiming(1, { duration: 100 });
       }
       if (process.env.EXPO_OS === "ios") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
-    }, [disabled, loading, reducedMotion, scale]);
+    }, [disabled, loading, reducedMotion, pressed]);
 
     const handlePressOut = useCallback(() => {
       if (!reducedMotion) {
-        scale.value = withTiming(1, { duration: 120 });
+        pressed.value = withTiming(0, { duration: 150 });
       }
-    }, [reducedMotion, scale]);
+    }, [reducedMotion, pressed]);
 
     const handlePress = useCallback(() => {
       if (!disabled && !loading) {

@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import {
   ScrollView,
   View,
@@ -11,9 +12,9 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
-import { EmptyState, Sheet } from "@/components/ui";
+import Animated, { FadeInUp } from "react-native-reanimated";
+import { Button, CreditCard, EmptyState, ScreenHeader, Sheet } from "@/components/ui";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const PREDEFINED_COLORS = [
   "#6366F1", "#EC4899", "#10B981", "#F59E0B",
@@ -23,6 +24,7 @@ const PREDEFINED_COLORS = [
 export default function CardsScreen() {
   const colors = useColors();
   const { creditCards, loadingCards, addCreditCard, deleteCreditCard } = useExpense();
+  const toast = useToast();
   const [showModal, setShowModal] = useState(false);
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -34,7 +36,7 @@ export default function CardsScreen() {
 
   const handleAddCard = async () => {
     if (!cardName.trim() || !cardNumber.trim() || !cardholderName.trim() || !expiryMonth || !expiryYear || !creditLimit) {
-      alert("Please fill in all fields");
+      toast.show({ type: "error", message: "Please fill in all fields" });
       return;
     }
 
@@ -61,53 +63,6 @@ export default function CardsScreen() {
     setShowModal(false);
   };
 
-  const renderCardItem = ({ item, index }: { item: any; index: number }) => {
-    const lastFourDigits = item.cardNumber.slice(-4);
-
-    return (
-      <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
-        <Pressable
-          onLongPress={() => deleteCreditCard(item.id)}
-          style={{
-            backgroundColor: item.color,
-            shadowColor: item.color,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.2,
-            shadowRadius: 12,
-            elevation: 6,
-          }}
-          className="rounded-3xl p-6 mb-4 overflow-hidden active:opacity-90"
-        >
-          <View>
-            <View className="flex-row items-center justify-between mb-8">
-              <Text className="text-white text-sm font-semibold opacity-80">{item.name}</Text>
-              <Ionicons name="card" size={22} color="white" />
-            </View>
-
-            <View className="mb-8">
-              <Text className="text-white text-xs opacity-60 mb-1">Card Number</Text>
-              <Text className="text-white text-xl font-bold tracking-[4px]">
-                •••• •••• •••• {lastFourDigits}
-              </Text>
-            </View>
-
-            <View className="flex-row items-end justify-between">
-              <View>
-                <Text className="text-white text-xs opacity-60 mb-1">Cardholder</Text>
-                <Text className="text-white font-semibold text-sm">{item.cardholderName}</Text>
-              </View>
-              <View className="items-end">
-                <Text className="text-white text-xs opacity-60 mb-1">Expires</Text>
-                <Text className="text-white font-semibold text-sm">
-                  {String(item.expiryMonth).padStart(2, "0")}/{String(item.expiryYear).slice(-2)}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </Pressable>
-      </Animated.View>
-    );
-  };
 
   return (
     <ScreenContainer className="flex-1 bg-background">
@@ -116,23 +71,21 @@ export default function CardsScreen() {
         contentContainerStyle={{ paddingBottom: 32 }}
       >
         {/* Header */}
-        <Animated.View entering={FadeInDown.duration(500)} className="px-6 pt-6 pb-2">
-          <Text className="text-[28px] font-bold text-foreground">Cards</Text>
-          <Text className="text-sm text-muted font-medium mt-1">
-            {creditCards.length} card{creditCards.length !== 1 ? "s" : ""}
-          </Text>
-        </Animated.View>
+        <ScreenHeader
+          title="Cards"
+          subtitle={`${creditCards.length} card${creditCards.length !== 1 ? "s" : ""}`}
+          accessibilityLabel="Cards screen"
+        />
 
         {/* Add Card Button */}
         <Animated.View entering={FadeInUp.delay(100).duration(500)} className="px-6 mt-5">
-          <Pressable
+          <Button
+            variant="primary"
+            label="Add New Card"
+            leftIcon={<Ionicons name="add" size={18} color="white" />}
             onPress={() => setShowModal(true)}
-            style={{ backgroundColor: colors.primary }}
-            className="flex-row items-center justify-center gap-2 py-4 rounded-2xl active:opacity-90"
-          >
-            <Ionicons name="add" size={20} color="white" />
-            <Text className="text-white font-semibold">Add New Card</Text>
-          </Pressable>
+            size="lg"
+          />
         </Animated.View>
 
         {/* Cards List */}
@@ -146,7 +99,18 @@ export default function CardsScreen() {
               <FlatList
                 data={creditCards}
                 keyExtractor={(item) => item.id.toString()}
-                renderItem={renderCardItem}
+                renderItem={({ item, index }) => (
+                  <CreditCard
+                    name={item.name}
+                    cardNumber={item.cardNumber}
+                    cardholderName={item.cardholderName}
+                    expiryMonth={item.expiryMonth}
+                    expiryYear={item.expiryYear}
+                    color={item.color}
+                    index={index}
+                    onLongPress={() => deleteCreditCard(item.id)}
+                  />
+                )}
                 scrollEnabled={false}
               />
             </Animated.View>
@@ -315,23 +279,28 @@ export default function CardsScreen() {
 
               {/* Action Buttons */}
               <View className="flex-row gap-3 mt-2">
-                <Pressable
+                <Button
+                  variant="secondary"
+                  label="Cancel"
                   onPress={() => setShowModal(false)}
-                  className="flex-1 py-3.5 rounded-xl items-center"
-                  style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
-                >
-                  <Text className="text-foreground font-semibold">Cancel</Text>
-                </Pressable>
-                <Pressable
+                  className="flex-1"
+                  size="lg"
+                />
+                <Button
+                  variant="primary"
+                  label="Add Card"
                   onPress={handleAddCard}
-                  disabled={!cardName.trim() || !cardNumber.trim() || !cardholderName.trim() || !expiryMonth || !expiryYear || !creditLimit}
-                  className="flex-1 py-3.5 rounded-xl items-center"
-                  style={{
-                    backgroundColor: cardName.trim() && cardNumber.trim() && cardholderName.trim() && expiryMonth && expiryYear && creditLimit ? colors.primary : colors.muted,
-                  }}
-                >
-                  <Text className="text-white font-semibold">Add Card</Text>
-                </Pressable>
+                  disabled={
+                    !cardName.trim() ||
+                    !cardNumber.trim() ||
+                    !cardholderName.trim() ||
+                    !expiryMonth ||
+                    !expiryYear ||
+                    !creditLimit
+                  }
+                  className="flex-1"
+                  size="lg"
+                />
               </View>
         </ScrollView>
       </Sheet>

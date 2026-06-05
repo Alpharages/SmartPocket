@@ -1,4 +1,6 @@
 export { Button } from "./Button";
+export { CreditCard } from "./credit-card";
+export type { CreditCardProps } from "./credit-card";
 export type { ButtonProps, ButtonVariant, ButtonSize } from "./Button";
 export { Pill } from "./Pill";
 export type { PillProps } from "./Pill";

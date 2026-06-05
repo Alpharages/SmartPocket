@@ -13,7 +13,14 @@ export const useAnimatedStyle = (fn: any) => {
   }
 };
 
-export const withTiming = (toValue: any, _config?: any) => toValue;
+export const withTiming = (
+  toValue: any,
+  _config?: any,
+  callback?: (finished: boolean) => void,
+) => {
+  callback?.(true);
+  return toValue;
+};
 export const withSpring = (toValue: any, _config?: any) => toValue;
 export const withRepeat = (animation: any, _numberOfReps?: number, _reverse?: boolean) => animation;
 // The real reanimated hook returns a boolean, not a SharedValue.

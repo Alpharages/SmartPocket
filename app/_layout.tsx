@@ -20,6 +20,8 @@ import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { ExpenseProvider } from "@/lib/expense-context";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import * as Auth from "@/lib/_core/auth";
+import { getApiBaseUrl } from "@/constants/oauth";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -38,6 +40,25 @@ export default function RootLayout() {
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
     initManusRuntime();
+  }, []);
+
+  // In development, automatically obtain a dev session if none exists.
+  useEffect(() => {
+    if (!__DEV__) return;
+    (async () => {
+      const existing = await Auth.getSessionToken();
+      if (existing) return;
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/api/dev/login`, { method: "POST" });
+        const data = await res.json();
+        if (data.token) {
+          await Auth.setSessionToken(data.token);
+          console.log("[Dev] Auto-login successful");
+        }
+      } catch (err) {
+        console.warn("[Dev] Auto-login skipped (server not reachable):", err);
+      }
+    })();
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
@@ -91,6 +112,10 @@ export default function RootLayout() {
             <ExpenseProvider>
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="(tabs)" />
+                <Stack.Screen
+                  name="add-transaction"
+                  options={{ presentation: "transparentModal", animation: "none" }}
+                />
                 <Stack.Screen name="oauth/callback" />
               </Stack>
               <StatusBar style="auto" />

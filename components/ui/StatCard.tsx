@@ -234,7 +234,7 @@ export function StatCard({
       {loading ? (
         <>
           <SkeletonPulse className="h-8 w-8 rounded-full" />
-          <SkeletonPulse className="h-3 w-16 rounded-md mt-1" />
+          <SkeletonPulse className="h-3 w-16 rounded-md mt-xs" />
           <SkeletonPulse className="h-6 w-24 rounded-md" />
         </>
       ) : (
@@ -245,7 +245,7 @@ export function StatCard({
           >
             <Ionicons name={semanticIcon} size={16} color={semanticColor} />
           </View>
-          <Text className="text-xs text-muted font-medium mt-1">{label}</Text>
+          <Text className="text-xs text-muted font-medium mt-xs">{label}</Text>
           <Text
             className="text-lg font-bold tabular-nums"
             style={{ color: semanticColor }}

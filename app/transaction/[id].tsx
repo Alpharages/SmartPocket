@@ -120,7 +120,7 @@ export default function TransactionDetailScreen() {
           >
             <Ionicons name="chevron-back" size={22} color={colors.foreground} />
           </Pressable>
-          <Text className="text-[28px] font-bold text-foreground">Details</Text>
+          <Text className="text-h1 text-foreground">Details</Text>
           <Pressable
             onPress={handleDelete}
             hitSlop={8}
@@ -150,7 +150,7 @@ export default function TransactionDetailScreen() {
           <Text className="text-4xl font-bold" style={{ color: accent }}>
             {isIncome ? "+" : "-"}${transaction.amount}
           </Text>
-          <Text className="mt-1 text-sm text-muted font-medium capitalize">
+          <Text className="mt-xs text-sm text-muted font-medium capitalize">
             {transaction.type}
           </Text>
         </Animated.View>

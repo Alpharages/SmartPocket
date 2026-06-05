@@ -42,6 +42,14 @@ export type SheetProps = {
   children: React.ReactNode;
   snapToContent?: boolean;
   testID?: string;
+  /**
+   * When true, renders as an absoluteFill View instead of a React Native Modal.
+   * Use this when the Sheet is already inside a transparent/modal Stack route
+   * (e.g. `presentation: "transparentModal"`) to avoid double-modal layering
+   * issues on Android where a nested Modal cannot reliably cover the outer
+   * navigation layer's elevated views.
+   */
+  noModal?: boolean;
 };
 
 export function Sheet({
@@ -51,6 +59,7 @@ export function Sheet({
   children,
   snapToContent = false,
   testID = "smartpocket-sheet",
+  noModal = false,
 }: SheetProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -208,6 +217,121 @@ export function Sheet({
     return null;
   }
 
+  const backdrop = (
+    <Animated.View
+      style={[
+        {
+          ...StyleSheet.absoluteFillObject,
+          backgroundColor: colors.overlay,
+        },
+        backdropStyle,
+      ]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss sheet"
+        onPress={requestClose}
+        style={{ flex: 1 }}
+        testID={`${testID}-backdrop`}
+      />
+    </Animated.View>
+  );
+
+  const panel = (
+    <GestureDetector gesture={panGesture}>
+      <Animated.View
+        accessible={true}
+        {...(title ? { accessibilityLabel: title } : {})}
+        className={cn("shadow-lg", !snapToContent && "max-h-[90%]")}
+        style={[
+          {
+            backgroundColor: colors.surface,
+            borderTopLeftRadius: Radius.lg,
+            borderTopRightRadius: Radius.lg,
+            paddingTop: Spacing.sm,
+            paddingHorizontal: Spacing.lg,
+            paddingBottom: Math.max(insets.bottom, Spacing.lg),
+            width: "100%",
+            ...(Platform.OS === "web"
+              ? { boxShadow: Elevation.lg }
+              : {}),
+          },
+          panelStyle,
+          panelWebProps as StyleProp<ViewStyle>,
+        ]}
+        testID={`${testID}-panel`}
+      >
+        <View className="items-center mb-2" accessibilityElementsHidden>
+          <View
+            className="rounded-full"
+            style={{
+              width: 40,
+              height: 4,
+              backgroundColor: colors.border,
+            }}
+            testID={`${testID}-handle`}
+          />
+        </View>
+
+        <View className="flex-row items-center justify-between mb-4">
+          {title ? (
+            <Text
+              className="text-foreground font-semibold flex-1 pr-2"
+              style={{
+                fontSize: titleTypography.fontSize,
+                lineHeight: titleTypography.lineHeight,
+                fontWeight: titleTypography.fontWeight,
+              }}
+              accessibilityRole="header"
+            >
+              {title}
+            </Text>
+          ) : (
+            <View className="flex-1" />
+          )}
+          <Pressable
+            onPress={requestClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={8}
+            style={{
+              minWidth: MIN_TOUCH_TARGET,
+              minHeight: MIN_TOUCH_TARGET,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            testID={`${testID}-close`}
+          >
+            <Ionicons name="close" size={24} color={colors.foreground} />
+          </Pressable>
+        </View>
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
+        >
+          <View testID={`${testID}-content`}>{children}</View>
+        </KeyboardAvoidingView>
+      </Animated.View>
+    </GestureDetector>
+  );
+
+  // noModal: render as an absoluteFill View so the transparentModal Stack
+  // route's own layer acts as the modal surface — avoids double-modal issues
+  // on Android where a nested <Modal> cannot reliably cover the outer
+  // navigation layer's elevated views (elevation: 8 StatCard, etc).
+  if (noModal) {
+    return (
+      <View
+        style={[StyleSheet.absoluteFillObject, { justifyContent: "flex-end" }]}
+        testID={testID}
+      >
+        {backdrop}
+        {panel}
+      </View>
+    );
+  }
+
   return (
     <Modal
       visible={mounted}
@@ -218,100 +342,8 @@ export function Sheet({
       testID={testID}
     >
       <View className="flex-1 justify-end">
-        <Animated.View
-          style={[
-            {
-              ...StyleSheet.absoluteFillObject,
-              backgroundColor: colors.overlay,
-            },
-            backdropStyle,
-          ]}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss sheet"
-            onPress={requestClose}
-            style={{ flex: 1 }}
-            testID={`${testID}-backdrop`}
-          />
-        </Animated.View>
-
-        <GestureDetector gesture={panGesture}>
-          <Animated.View
-            accessible={true}
-            {...(title ? { accessibilityLabel: title } : {})}
-            className={cn("shadow-lg", !snapToContent && "max-h-[90%]")}
-            style={[
-              {
-                backgroundColor: colors.surface,
-                borderTopLeftRadius: Radius.lg,
-                borderTopRightRadius: Radius.lg,
-                paddingTop: Spacing.sm,
-                paddingHorizontal: Spacing.lg,
-                paddingBottom: Math.max(insets.bottom, Spacing.lg),
-                width: "100%",
-                ...(Platform.OS === "web"
-                  ? { boxShadow: Elevation.lg }
-                  : {}),
-              },
-              panelStyle,
-              panelWebProps as StyleProp<ViewStyle>,
-            ]}
-            testID={`${testID}-panel`}
-          >
-            <View className="items-center mb-2" accessibilityElementsHidden>
-              <View
-                className="rounded-full"
-                style={{
-                  width: 40,
-                  height: 4,
-                  backgroundColor: colors.border,
-                }}
-                testID={`${testID}-handle`}
-              />
-            </View>
-
-            <View className="flex-row items-center justify-between mb-4">
-              {title ? (
-                <Text
-                  className="text-foreground font-semibold flex-1 pr-2"
-                  style={{
-                    fontSize: titleTypography.fontSize,
-                    lineHeight: titleTypography.lineHeight,
-                    fontWeight: titleTypography.fontWeight,
-                  }}
-                  accessibilityRole="header"
-                >
-                  {title}
-                </Text>
-              ) : (
-                <View className="flex-1" />
-              )}
-              <Pressable
-                onPress={requestClose}
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-                hitSlop={8}
-                style={{
-                  minWidth: MIN_TOUCH_TARGET,
-                  minHeight: MIN_TOUCH_TARGET,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                testID={`${testID}-close`}
-              >
-                <Ionicons name="close" size={24} color={colors.foreground} />
-              </Pressable>
-            </View>
-
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              keyboardVerticalOffset={0}
-            >
-              <View testID={`${testID}-content`}>{children}</View>
-            </KeyboardAvoidingView>
-          </Animated.View>
-        </GestureDetector>
+        {backdrop}
+        {panel}
       </View>
     </Modal>
   );

@@ -260,6 +260,23 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
+    // Dev mode: auto-recreate the dev user if missing (handles server restarts
+    // where the in-memory store was cleared but the client still holds a token).
+    if (!user && !ENV.isProduction && sessionUserId === "dev_local_user") {
+      try {
+        await db.upsertUser({
+          openId: "dev_local_user",
+          name: "Dev User",
+          email: "dev@localhost",
+          loginMethod: "dev",
+          lastSignedIn: signedInAt,
+        });
+        user = await db.getUserByOpenId("dev_local_user");
+      } catch {
+        // ignore – falls through to OAuth sync attempt below
+      }
+    }
+
     // If user not in DB, sync from OAuth server automatically
     if (!user) {
       try {

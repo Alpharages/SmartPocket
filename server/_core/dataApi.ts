@@ -5,6 +5,7 @@
  *   })
  */
 import { ENV } from "./env";
+import { devQuery } from "./devDb";
 
 export type DataApiCallOptions = {
   query?: Record<string, unknown>;
@@ -17,11 +18,19 @@ export async function callDataApi(
   apiId: string,
   options: DataApiCallOptions = {},
 ): Promise<unknown> {
-  if (!ENV.forgeApiUrl) {
-    throw new Error("BUILT_IN_FORGE_API_URL is not configured");
-  }
-  if (!ENV.forgeApiKey) {
-    throw new Error("BUILT_IN_FORGE_API_KEY is not configured");
+  // In dev mode without Manus Forge credentials, route Database/query calls to
+  // the in-memory store so the app is fully functional without platform setup.
+  if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
+    if (ENV.isProduction) {
+      throw new Error("BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY are required in production");
+    }
+    if (apiId === "Database/query") {
+      const sql = options.body?.query as string | undefined;
+      const params = (options.body?.params as unknown[]) ?? [];
+      if (!sql) throw new Error("devDb: missing query in body");
+      return devQuery(sql, params);
+    }
+    throw new Error(`Dev mode: API "${apiId}" requires Manus Forge credentials`);
   }
 
   // Build the full URL by appending the service path to the base URL

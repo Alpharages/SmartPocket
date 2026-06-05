@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { trpc } from "./trpc";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export interface Category {
   id: number;
@@ -83,6 +84,8 @@ interface ExpenseContextType {
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
 
 export function ExpenseProvider({ children }: { children: React.ReactNode }) {
+  const toast = useToast();
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
 
@@ -115,26 +118,58 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const addCategory = useCallback(
     async (data: Omit<Category, "id" | "userId" | "createdAt" | "updatedAt">) => {
-      await createCategoryMutation.mutateAsync(data);
-      await refreshCategories();
+      // Optimistic insert with a temporary id that will be replaced on refetch.
+      const now = new Date();
+      const optimistic: Category = { ...data, id: -Date.now(), userId: 0, createdAt: now, updatedAt: now };
+      const snapshot = categories;
+      setCategories((prev) => [...prev, optimistic]);
+      try {
+        await createCategoryMutation.mutateAsync(data);
+        await refreshCategories();
+        toast.show({ type: "success", message: "Category added" });
+      } catch {
+        setCategories(snapshot);
+        toast.show({ type: "error", message: "Failed to add category" });
+        throw new Error("addCategory failed");
+      }
     },
-    [createCategoryMutation, refreshCategories]
+    [createCategoryMutation, refreshCategories, categories, toast]
   );
 
   const updateCategory = useCallback(
     async (id: number, data: Partial<Category>) => {
-      await updateCategoryMutation.mutateAsync({ id, ...data } as any);
-      await refreshCategories();
+      // Optimistic update
+      const snapshot = categories;
+      setCategories((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...data } : c)),
+      );
+      try {
+        await updateCategoryMutation.mutateAsync({ id, ...data } as any);
+        toast.show({ type: "success", message: "Category updated" });
+      } catch {
+        setCategories(snapshot);
+        toast.show({ type: "error", message: "Failed to update category" });
+        throw new Error("updateCategory failed");
+      }
     },
-    [updateCategoryMutation, refreshCategories]
+    [updateCategoryMutation, categories, toast]
   );
 
   const deleteCategory = useCallback(
     async (id: number) => {
-      await deleteCategoryMutation.mutateAsync({ id });
-      await refreshCategories();
+      // Optimistic delete
+      const snapshot = categories;
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      try {
+        await deleteCategoryMutation.mutateAsync({ id });
+        toast.show({ type: "success", message: "Category deleted" });
+      } catch {
+        setCategories(snapshot);
+        toast.show({ type: "error", message: "Failed to delete category" });
+        throw new Error("deleteCategory failed");
+      }
     },
-    [deleteCategoryMutation, refreshCategories]
+    [deleteCategoryMutation, categories, toast]
   );
 
   // Credit Cards
@@ -157,26 +192,58 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const addCreditCard = useCallback(
     async (data: Omit<CreditCard, "id" | "userId" | "createdAt" | "updatedAt">) => {
-      await createCardMutation.mutateAsync(data);
-      await refreshCreditCards();
+      // Optimistic insert with a temporary id replaced on refetch.
+      const now = new Date();
+      const optimistic: CreditCard = { ...data, id: -Date.now(), userId: 0, createdAt: now, updatedAt: now };
+      const snapshot = creditCards;
+      setCreditCards((prev) => [...prev, optimistic]);
+      try {
+        await createCardMutation.mutateAsync(data);
+        await refreshCreditCards();
+        toast.show({ type: "success", message: "Card added" });
+      } catch {
+        setCreditCards(snapshot);
+        toast.show({ type: "error", message: "Failed to add card" });
+        throw new Error("addCreditCard failed");
+      }
     },
-    [createCardMutation, refreshCreditCards]
+    [createCardMutation, refreshCreditCards, creditCards, toast]
   );
 
   const updateCreditCard = useCallback(
     async (id: number, data: Partial<CreditCard>) => {
-      await updateCardMutation.mutateAsync({ id, ...data } as any);
-      await refreshCreditCards();
+      // Optimistic update
+      const snapshot = creditCards;
+      setCreditCards((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...data } : c)),
+      );
+      try {
+        await updateCardMutation.mutateAsync({ id, ...data } as any);
+        toast.show({ type: "success", message: "Card updated" });
+      } catch {
+        setCreditCards(snapshot);
+        toast.show({ type: "error", message: "Failed to update card" });
+        throw new Error("updateCreditCard failed");
+      }
     },
-    [updateCardMutation, refreshCreditCards]
+    [updateCardMutation, creditCards, toast]
   );
 
   const deleteCreditCard = useCallback(
     async (id: number) => {
-      await deleteCardMutation.mutateAsync({ id });
-      await refreshCreditCards();
+      // Optimistic delete
+      const snapshot = creditCards;
+      setCreditCards((prev) => prev.filter((c) => c.id !== id));
+      try {
+        await deleteCardMutation.mutateAsync({ id });
+        toast.show({ type: "success", message: "Card deleted" });
+      } catch {
+        setCreditCards(snapshot);
+        toast.show({ type: "error", message: "Failed to delete card" });
+        throw new Error("deleteCreditCard failed");
+      }
     },
-    [deleteCardMutation, refreshCreditCards]
+    [deleteCardMutation, creditCards, toast]
   );
 
   // Transactions
@@ -199,26 +266,58 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const addTransaction = useCallback(
     async (data: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">) => {
-      await createTransactionMutation.mutateAsync(data);
-      await refreshTransactions();
+      // Optimistic insert with a temporary id replaced on refetch.
+      const now = new Date();
+      const optimistic: Transaction = { ...data, id: -Date.now(), userId: 0, createdAt: now, updatedAt: now };
+      const snapshot = transactions;
+      setTransactions((prev) => [optimistic, ...prev]);
+      try {
+        await createTransactionMutation.mutateAsync(data);
+        await refreshTransactions();
+        toast.show({ type: "success", message: "Transaction added" });
+      } catch {
+        setTransactions(snapshot);
+        toast.show({ type: "error", message: "Failed to add transaction" });
+        throw new Error("addTransaction failed");
+      }
     },
-    [createTransactionMutation, refreshTransactions]
+    [createTransactionMutation, refreshTransactions, transactions, toast]
   );
 
   const updateTransaction = useCallback(
     async (id: number, data: Partial<Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">>) => {
-      await updateTransactionMutation.mutateAsync({ id, ...data } as any);
-      await refreshTransactions();
+      // Optimistic update
+      const snapshot = transactions;
+      setTransactions((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...data } : t)),
+      );
+      try {
+        await updateTransactionMutation.mutateAsync({ id, ...data } as any);
+        toast.show({ type: "success", message: "Transaction updated" });
+      } catch {
+        setTransactions(snapshot);
+        toast.show({ type: "error", message: "Failed to update transaction" });
+        throw new Error("updateTransaction failed");
+      }
     },
-    [updateTransactionMutation, refreshTransactions]
+    [updateTransactionMutation, transactions, toast]
   );
 
   const deleteTransaction = useCallback(
     async (id: number) => {
-      await deleteTransactionMutation.mutateAsync({ id });
-      await refreshTransactions();
+      // Optimistic delete
+      const snapshot = transactions;
+      setTransactions((prev) => prev.filter((t) => t.id !== id));
+      try {
+        await deleteTransactionMutation.mutateAsync({ id });
+        toast.show({ type: "success", message: "Transaction deleted" });
+      } catch {
+        setTransactions(snapshot);
+        toast.show({ type: "error", message: "Failed to delete transaction" });
+        throw new Error("deleteTransaction failed");
+      }
     },
-    [deleteTransactionMutation, refreshTransactions]
+    [deleteTransactionMutation, transactions, toast]
   );
 
   // Monthly Stats

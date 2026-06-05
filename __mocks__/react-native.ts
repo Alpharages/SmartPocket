@@ -85,6 +85,65 @@ export const FlatList = React.forwardRef<any, any>(
 );
 (FlatList as any).displayName = "FlatList";
 
+export const SectionList = React.forwardRef<any, any>(
+  (
+    {
+      sections,
+      renderItem,
+      renderSectionHeader,
+      ListHeaderComponent,
+      ListEmptyComponent,
+      keyExtractor,
+      ...props
+    }: any,
+    ref: any,
+  ) => {
+    const isEmpty =
+      !sections ||
+      sections.every((s: any) => !s.data?.length);
+
+    const emptyNode = isEmpty
+      ? typeof ListEmptyComponent === "function"
+        ? React.createElement(ListEmptyComponent)
+        : ListEmptyComponent
+      : null;
+
+    const sectionNodes = !isEmpty
+      ? sections?.flatMap((section: any, si: number) => [
+          renderSectionHeader?.({ section }),
+          ...(section.data ?? []).map((item: any, index: number) =>
+            React.createElement(
+              React.Fragment,
+              {
+                key: keyExtractor
+                  ? keyExtractor(item, index)
+                  : item?.id ?? `${si}-${index}`,
+              },
+              renderItem?.({ item, index, section, separators: {} as any }),
+            ),
+          ),
+        ])
+      : null;
+
+    return React.createElement(
+      "View",
+      { ref, ...props },
+      ListHeaderComponent,
+      emptyNode,
+      sectionNodes,
+    );
+  },
+);
+(SectionList as any).displayName = "SectionList";
+
+export const Alert = {
+  alert: (
+    _title: string,
+    _message?: string,
+    _buttons?: Array<{ text: string; style?: string; onPress?: () => void }>,
+  ) => {},
+};
+
 export const Platform = {
   select: <T>(spec: {
     ios?: T;
@@ -156,4 +215,9 @@ export const StatusBar = {
   setBackgroundColor: () => {},
   setTranslucent: () => {},
   currentHeight: 44,
+};
+
+export const Keyboard = {
+  dismiss: () => {},
+  addListener: () => ({ remove: () => {} }),
 };

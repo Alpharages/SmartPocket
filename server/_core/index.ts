@@ -7,6 +7,9 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { sdk } from "./sdk";
+import * as db from "../db";
+import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -61,6 +64,28 @@ async function startServer() {
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });
+
+  // Dev-only login — creates a local dev user and returns a signed session token.
+  // Never available in production.
+  if (!ENV.isProduction) {
+    app.post("/api/dev/login", async (_req, res) => {
+      try {
+        const DEV_OPEN_ID = "dev_local_user";
+        await db.upsertUser({
+          openId: DEV_OPEN_ID,
+          name: "Dev User",
+          email: "dev@localhost",
+          loginMethod: "dev",
+          lastSignedIn: new Date(),
+        });
+        const token = await sdk.createSessionToken(DEV_OPEN_ID, { name: "Dev User" });
+        res.json({ token });
+      } catch (err) {
+        console.error("[dev/login] failed:", err);
+        res.status(500).json({ error: "Dev login failed" });
+      }
+    });
+  }
 
   app.use(
     "/api/trpc",

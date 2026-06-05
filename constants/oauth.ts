@@ -1,5 +1,8 @@
+import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import * as ReactNative from "react-native";
+
+const API_PORT = process.env.EXPO_PUBLIC_API_PORT ?? "3000";
 
 // Extract scheme from bundle ID (last segment timestamp, prefixed with "manus")
 // e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
@@ -24,6 +27,15 @@ export const OWNER_OPEN_ID = env.ownerId;
 export const OWNER_NAME = env.ownerName;
 export const API_BASE_URL = env.apiBaseUrl;
 
+/** Host Metro reports in dev — e.g. "192.168.1.5:8081" or "localhost:8081". */
+function getMetroDevHost(): string | null {
+  const hostUri =
+    Constants.expoConfig?.hostUri ??
+    (Constants.expoGoConfig as { debuggerHost?: string } | undefined)?.debuggerHost;
+  if (!hostUri) return null;
+  return hostUri.split(":")[0] ?? null;
+}
+
 /**
  * Get the API base URL, deriving from current hostname if not set.
  * Metro runs on 8081, API server runs on 3000.
@@ -45,7 +57,23 @@ export function getApiBaseUrl(): string {
     }
   }
 
-  // Fallback to empty (will use relative URL)
+  // Native dev: relative URLs fail on React Native — point at the local API server.
+  // Android emulator: 10.0.2.2 reaches the host machine's localhost.
+  // Physical device / iOS simulator: use the same LAN host Metro uses.
+  if (__DEV__ && ReactNative.Platform.OS !== "web") {
+    const metroHost = getMetroDevHost();
+    if (ReactNative.Platform.OS === "android") {
+      const host =
+        !metroHost || metroHost === "localhost" || metroHost === "127.0.0.1"
+          ? "10.0.2.2"
+          : metroHost;
+      return `http://${host}:${API_PORT}`;
+    }
+    const host = metroHost ?? "localhost";
+    return `http://${host}:${API_PORT}`;
+  }
+
+  // Production native builds must set EXPO_PUBLIC_API_BASE_URL explicitly.
   return "";
 }
 
