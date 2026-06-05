@@ -108,9 +108,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const refreshCategories = useCallback(async () => {
     setLoadingCategories(true);
     try {
-      await categoriesQuery.refetch();
-      if (categoriesQuery.data) {
-        setCategories(categoriesQuery.data);
+      // Use the value refetch() resolves with — reading categoriesQuery.data
+      // here would be the stale closure snapshot from render time and miss the
+      // just-fetched rows (e.g. an item added via an optimistic mutation).
+      const { data } = await categoriesQuery.refetch();
+      if (data) {
+        setCategories(data);
       }
     } finally {
       setLoadingCategories(false);
@@ -177,9 +180,10 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const refreshCreditCards = useCallback(async () => {
     setLoadingCards(true);
     try {
-      await creditCardsQuery.refetch();
-      if (creditCardsQuery.data) {
-        setCreditCards(creditCardsQuery.data);
+      // Use refetch()'s resolved value, not the stale-closure query.data.
+      const { data } = await creditCardsQuery.refetch();
+      if (data) {
+        setCreditCards(data);
       }
     } finally {
       setLoadingCards(false);
@@ -246,9 +250,10 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const refreshTransactions = useCallback(async () => {
     setLoadingTransactions(true);
     try {
-      await transactionsQuery.refetch();
-      if (transactionsQuery.data) {
-        setTransactions(transactionsQuery.data);
+      // Use refetch()'s resolved value, not the stale-closure query.data.
+      const { data } = await transactionsQuery.refetch();
+      if (data) {
+        setTransactions(data);
       }
     } finally {
       setLoadingTransactions(false);

@@ -3,7 +3,7 @@ import { callDataApi } from "./_core/dataApi";
 import {
   CATEGORY_DEFAULT_COLOR,
   getCategoryColorForName,
-} from "../shared/theme";
+} from "@shared/theme";
 import {
   categories,
   creditCards,
@@ -19,7 +19,7 @@ import {
   Transaction,
   MonthlySummary,
   User,
-} from "../drizzle/schema";
+} from "@/drizzle/schema";
 
 /**
  * Get database connection.
@@ -57,24 +57,28 @@ export async function upsertUser(data: {
   loginMethod?: string | null;
   lastSignedIn?: Date;
 }) {
+  const fields = [
+    ["openId", data.openId],
+    ["name", data.name],
+    ["email", data.email],
+    ["loginMethod", data.loginMethod],
+    ["lastSignedIn", data.lastSignedIn],
+  ].filter(([, value]) => value !== undefined) as [string, unknown][];
+  const columns = fields.map(([column]) => column);
+  const values = fields.map(([, value]) => value);
+  const updates = columns
+    .filter((column) => column !== "openId")
+    .map((column) => `${column} = VALUES(${column})`);
+
   await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO users (openId, name, email, loginMethod, lastSignedIn)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO users (${columns.join(", ")})
+        VALUES (${columns.map(() => "?").join(", ")})
         ON DUPLICATE KEY UPDATE
-          name = VALUES(name),
-          email = VALUES(email),
-          loginMethod = VALUES(loginMethod),
-          lastSignedIn = VALUES(lastSignedIn)
+          ${updates.length > 0 ? updates.join(", ") : "openId = openId"}
       `,
-      params: [
-        data.openId,
-        data.name || null,
-        data.email || null,
-        data.loginMethod || null,
-        data.lastSignedIn || new Date(),
-      ],
+      params: values,
     },
   });
 }

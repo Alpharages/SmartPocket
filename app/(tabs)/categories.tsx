@@ -108,13 +108,20 @@ export default function CategoriesScreen() {
   const handleAddCategory = async () => {
     if (!categoryName.trim()) return;
 
-    await addCategory({
-      name: categoryName,
-      type: categoryType,
-      color: selectedColor,
-      icon: "tag",
-      isDefault: false,
-    });
+    try {
+      await addCategory({
+        name: categoryName,
+        type: categoryType,
+        color: selectedColor,
+        icon: "tag",
+        isDefault: false,
+      });
+    } catch {
+      // addCategory already rolled back and showed an error toast before
+      // re-throwing; swallow here so the failure doesn't surface as an
+      // unhandled rejection. Keep the sheet open so the user can retry.
+      return;
+    }
 
     setCategoryName("");
     setCategoryType("expense");
@@ -130,7 +137,12 @@ export default function CategoriesScreen() {
       confirmLabel: "Delete",
     });
     if (confirmed) {
-      await deleteCategory(item.id);
+      try {
+        await deleteCategory(item.id);
+      } catch {
+        // deleteCategory rolled back + showed an error toast before
+        // re-throwing; swallow to avoid an unhandled rejection.
+      }
     }
   };
 

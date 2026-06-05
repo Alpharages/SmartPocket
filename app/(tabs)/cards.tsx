@@ -42,18 +42,25 @@ export default function CardsScreen() {
       return;
     }
 
-    await addCreditCard({
-      name: cardName,
-      cardNumber,
-      cardholderName,
-      expiryMonth: parseInt(expiryMonth),
-      expiryYear: parseInt(expiryYear),
-      creditLimit,
-      color: selectedColor,
-      cardType: "credit",
-      currentBalance: "0",
-      isActive: true,
-    } as any);
+    try {
+      await addCreditCard({
+        name: cardName,
+        cardNumber,
+        cardholderName,
+        expiryMonth: parseInt(expiryMonth),
+        expiryYear: parseInt(expiryYear),
+        creditLimit,
+        color: selectedColor,
+        cardType: "credit",
+        currentBalance: "0",
+        isActive: true,
+      } as any);
+    } catch {
+      // addCreditCard already rolled back and showed an error toast before
+      // re-throwing; swallow so it isn't an unhandled rejection. Keep the
+      // sheet open so the user can retry.
+      return;
+    }
 
     setCardName("");
     setCardNumber("");
@@ -118,7 +125,13 @@ export default function CardsScreen() {
                         confirmLabel: "Delete",
                       });
                       if (confirmed) {
-                        await deleteCreditCard(item.id);
+                        try {
+                          await deleteCreditCard(item.id);
+                        } catch {
+                          // deleteCreditCard rolled back + showed an error
+                          // toast before re-throwing; swallow to avoid an
+                          // unhandled rejection.
+                        }
                       }
                     }}
                   />

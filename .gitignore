@@ -70,3 +70,5 @@ Thumbs.db
 
 # Claude Code local (machine-specific permission allowlist)
 .claude/settings.local.json
+
+.env
