@@ -18,6 +18,7 @@ import { Swipeable } from "react-native-gesture-handler";
 import * as Haptics from "expo-haptics";
 
 import { useColors } from "@/hooks/use-colors";
+import { Typography } from "@/lib/_core/theme";
 import { cn } from "@/lib/utils";
 import { CategoryToken } from "./CategoryToken";
 
@@ -256,8 +257,12 @@ export function TransactionRow({
                 style={{ backgroundColor: colors.border }}
               >
                 <Text
-                  className="text-[10px] font-medium"
-                  style={{ color: colors.muted }}
+                  className="font-medium"
+                  style={{
+                    color: colors.muted,
+                    fontSize: Typography.micro.fontSize,
+                    lineHeight: Typography.micro.lineHeight,
+                  }}
                   numberOfLines={1}
                 >
                   {cardLabel}

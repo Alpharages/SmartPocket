@@ -16,6 +16,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { useBreakpoints } from "@/hooks/use-breakpoint";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   EmptyState,
   FilterChipGroup,
@@ -24,7 +25,8 @@ import {
   TwoPaneLayout,
 } from "@/components/ui";
 import type { ChipOption } from "@/components/ui";
-import { Spacing, Typography } from "@/lib/_core/theme";
+import { readableTextOn } from "@/lib/_core/contrast";
+import { Spacing, Typography, resolveCategoryColor } from "@/lib/_core/theme";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -125,9 +127,15 @@ function TransactionDetailPane({
   const colors = useColors();
   const { categories, deleteTransaction } = useExpense();
 
+  const scheme = (useColorScheme() ?? "light") as "light" | "dark";
   const isIncome = transaction.type === "income";
   const accent = isIncome ? colors.success : colors.error;
   const category = categories.find((c) => c.id === transaction.categoryId);
+  // Resolve the scheme-appropriate swatch so the on-color icon contrast is
+  // computed against what actually renders (mirrors the Insights detail pane).
+  const categorySwatchColor = category
+    ? resolveCategoryColor(category.color, scheme)
+    : undefined;
 
   const handleDelete = () => {
     Alert.alert(
@@ -197,15 +205,15 @@ function TransactionDetailPane({
         <View className="flex-row items-center justify-between px-5 py-4">
           <Text className="text-sm font-medium text-muted">Category</Text>
           <View className="flex-row items-center gap-2">
-            {category && (
+            {category && categorySwatchColor && (
               <View
                 className="w-6 h-6 rounded-full items-center justify-center"
-                style={{ backgroundColor: category.color }}
+                style={{ backgroundColor: categorySwatchColor }}
               >
                 <Ionicons
                   name={(category.icon as IoniconName) ?? "pricetag"}
                   size={13}
-                  color="white"
+                  color={readableTextOn(categorySwatchColor)}
                 />
               </View>
             )}
@@ -374,7 +382,11 @@ export default function TransactionsScreen() {
               justifyContent: "center",
             }}
           >
-            <Ionicons name="add" size={22} color="#fff" />
+            <Ionicons
+              name="add"
+              size={22}
+              color={readableTextOn(colors.primary)}
+            />
           </Pressable>
         }
       />
@@ -485,9 +497,8 @@ export default function TransactionsScreen() {
           ? categoryById.get(item.categoryId)
           : undefined;
         const categoryColor = category?.color ?? colors.muted;
-        const categoryIcon = (
-          category?.icon ?? "pricetag-outline"
-        ) as keyof typeof Ionicons.glyphMap;
+        const categoryIcon = (category?.icon ??
+          "pricetag-outline") as keyof typeof Ionicons.glyphMap;
         const title = category?.name ?? "Uncategorized";
 
         return (
@@ -530,11 +541,7 @@ export default function TransactionsScreen() {
       <EmptyState
         variant="no-data"
         icon={
-          <Ionicons
-            name="receipt-outline"
-            size={28}
-            color={colors.muted}
-          />
+          <Ionicons name="receipt-outline" size={28} color={colors.muted} />
         }
         title="No transaction selected"
         description="Tap a transaction in the list to view its details"
