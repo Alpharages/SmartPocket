@@ -8,17 +8,23 @@ import {
   resolveCategoryColor,
 } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
-import { CategoryToken, EmptyState, ScreenHeader, StatCard, TransactionRow, TwoPaneLayout } from "@/components/ui";
+import { CategoryToken, EmptyState, ScreenHeader, Skeleton, StatCard, TransactionRow, TwoPaneLayout } from "@/components/ui";
 import { useBreakpoints } from "@/hooks/use-breakpoint";
 import { Spacing } from "@/lib/_core/theme";
 
 export default function SummaryScreen() {
   const colors = useColors();
   const scheme = (useColorScheme() ?? "light") as "light" | "dark";
-  const { monthlyStats, loadingStats, refreshMonthlyStats, categories, transactions } =
-    useExpense();
+  const {
+    monthlyStats,
+    loadingStats,
+    loadingTransactions,
+    refreshMonthlyStats,
+    categories,
+    transactions,
+  } = useExpense();
   const { isLg } = useBreakpoints();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -72,6 +78,18 @@ export default function SummaryScreen() {
     () => categories.find((c) => c.id === selectedCategoryId),
     [categories, selectedCategoryId],
   );
+  const selectedCategoryColor = selectedCategory?.color
+    ? resolveCategoryColor(selectedCategory.color, scheme)
+    : selectedCategory
+      ? getCategoryColorByIndex(selectedCategory.id, scheme)
+      : colors.muted;
+
+  // Clear the selection if the selected category no longer exists (e.g. deleted).
+  useEffect(() => {
+    if (selectedCategoryId != null && !selectedCategory) {
+      setSelectedCategoryId(null);
+    }
+  }, [selectedCategoryId, selectedCategory]);
 
   const categoryById = useMemo(() => {
     const map = new Map<number, (typeof categories)[number]>();
@@ -230,7 +248,23 @@ export default function SummaryScreen() {
         </Text>
       </View>
 
-      {categoryExpenses.length === 0 ? (
+      {loadingTransactions && categoryExpenses.length === 0 ? (
+        <View
+          className="rounded-3xl p-4"
+          style={{ backgroundColor: colors.surface }}
+          accessibilityLabel="Loading spending breakdown"
+        >
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} className="py-2">
+              <View className="flex-row items-center justify-between mb-2">
+                <Skeleton variant="line" width="50%" height={14} />
+                <Skeleton variant="line" width={48} height={14} />
+              </View>
+              <Skeleton variant="line" width="100%" height={6} radius={3} />
+            </View>
+          ))}
+        </View>
+      ) : categoryExpenses.length === 0 ? (
         <View
           className="rounded-3xl p-8 items-center"
           style={{ backgroundColor: colors.surface }}
@@ -266,55 +300,64 @@ export default function SummaryScreen() {
               const percentage =
                 totalExpenses > 0 ? (item.total / totalExpenses) * 100 : 0;
               const isSelected = selectedCategoryId === item.categoryId;
+              const rowContent = (
+                <View className="py-4 px-4">
+                  <View className="flex-row items-center justify-between mb-2">
+                    <CategoryToken
+                      color={item.categoryColor}
+                      icon={item.categoryIcon}
+                      name={item.categoryName}
+                      type={item.type}
+                      size="sm"
+                      className="flex-1"
+                    />
+                    <View className="items-end">
+                      <Text className="text-foreground font-bold text-sm">
+                        ${item.total.toFixed(2)}
+                      </Text>
+                      <Text className="text-xs text-muted">
+                        {percentage.toFixed(1)}%
+                      </Text>
+                    </View>
+                  </View>
+                  <View
+                    className="h-1.5 rounded-full overflow-hidden"
+                    style={{ backgroundColor: colors.border }}
+                  >
+                    <View
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.max(percentage, 2)}%`,
+                        backgroundColor: item.categoryColor,
+                      }}
+                    />
+                  </View>
+                </View>
+              );
 
               return (
                 <Animated.View
                   entering={FadeInDown.delay(index * 30).duration(400)}
                 >
-                  <Pressable
-                    onPress={() => handleCategoryPress(item.categoryId)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${item.categoryName}, $${item.total.toFixed(2)}, ${percentage.toFixed(1)} percent`}
-                    accessibilityState={{ selected: isSelected }}
-                    style={{
-                      backgroundColor: isSelected
-                        ? colors.primary + "0D"
-                        : undefined,
-                    }}
-                  >
-                    <View className="py-4 px-4">
-                      <View className="flex-row items-center justify-between mb-2">
-                        <CategoryToken
-                          color={item.categoryColor}
-                          icon={item.categoryIcon}
-                          name={item.categoryName}
-                          type={item.type}
-                          size="sm"
-                          className="flex-1"
-                        />
-                        <View className="items-end">
-                          <Text className="text-foreground font-bold text-sm">
-                            ${item.total.toFixed(2)}
-                          </Text>
-                          <Text className="text-xs text-muted">
-                            {percentage.toFixed(1)}%
-                          </Text>
-                        </View>
-                      </View>
-                      <View
-                        className="h-1.5 rounded-full overflow-hidden"
-                        style={{ backgroundColor: colors.border }}
-                      >
-                        <View
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${Math.max(percentage, 2)}%`,
-                            backgroundColor: item.categoryColor,
-                          }}
-                        />
-                      </View>
+                  {isLg ? (
+                    <Pressable
+                      onPress={() => handleCategoryPress(item.categoryId)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${item.categoryName}, $${item.total.toFixed(2)}, ${percentage.toFixed(1)} percent`}
+                      accessibilityState={{ selected: isSelected }}
+                      style={{
+                        backgroundColor: isSelected
+                          ? colors.primary + "0D"
+                          : undefined,
+                      }}
+                    >
+                      {rowContent}
+                    </Pressable>
+                  ) : (
+                    <View style={{ backgroundColor: colors.surface }}>
+                      {rowContent}
                     </View>
-                  </Pressable>
+                  )}
                 </Animated.View>
               );
             }}
@@ -350,7 +393,7 @@ export default function SummaryScreen() {
             <View className="flex-row items-center gap-3">
               <View
                 className="w-10 h-10 rounded-full items-center justify-center"
-                style={{ backgroundColor: selectedCategory.color }}
+                style={{ backgroundColor: selectedCategoryColor }}
               >
                 <Ionicons
                   name={(selectedCategory.icon as React.ComponentProps<typeof Ionicons>["name"]) ?? "pricetag"}
@@ -373,8 +416,12 @@ export default function SummaryScreen() {
           {/* Transaction list */}
           {selectedCategoryTransactions.length > 0 ? (
             <View className="mt-4 px-6">
-              {selectedCategoryTransactions.map((t, i) => {
+              {selectedCategoryTransactions.map((t) => {
                 const cat = categoryById.get(t.categoryId);
+                const categoryColor = cat?.color
+                  ? resolveCategoryColor(cat.color, scheme)
+                  : getCategoryColorByIndex(t.categoryId, scheme);
+
                 return (
                   <TransactionRow
                     key={t.id}
@@ -382,7 +429,7 @@ export default function SummaryScreen() {
                     date={t.date}
                     amount={t.amount}
                     type={t.type}
-                    categoryColor={cat?.color ?? colors.muted}
+                    categoryColor={categoryColor}
                     categoryIcon={
                       (cat?.icon ?? "pricetag-outline") as keyof typeof Ionicons.glyphMap
                     }
@@ -428,39 +475,25 @@ export default function SummaryScreen() {
     </View>
   );
 
-  if (isLg) {
-    return (
-      <ScreenContainer className="flex-1 bg-background">
-        <TwoPaneLayout
-          master={
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
-            >
-              {header}
-              {monthNav}
-              {statsPane}
-              {categoryPane}
-            </ScrollView>
-          }
-          detail={categoryDetailPane}
-          detailVisible={selectedCategoryId != null}
-        />
-      </ScreenContainer>
-    );
-  }
-
+  // Single render tree for both breakpoints — TwoPaneLayout hides the detail
+  // pane below `lg` via CSS (`hidden lg:flex`), so crossing the 1024 boundary
+  // reflows in place without remounting the list or resetting scroll position.
   return (
     <ScreenContainer className="flex-1 bg-background">
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
-      >
-        {header}
-        {monthNav}
-        {statsPane}
-        {categoryPane}
-      </ScrollView>
+      <TwoPaneLayout
+        master={
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+          >
+            {header}
+            {monthNav}
+            {statsPane}
+            {categoryPane}
+          </ScrollView>
+        }
+        detail={categoryDetailPane}
+      />
     </ScreenContainer>
   );
 }

@@ -8,8 +8,6 @@ export interface TwoPaneLayoutProps extends ViewProps {
   master: React.ReactNode;
   /** Content rendered in the right (detail) pane. */
   detail: React.ReactNode;
-  /** Whether the detail pane should be shown. Hidden on mobile regardless. */
-  detailVisible?: boolean;
   /** Additional className for the outer container. */
   containerClassName?: string;
   /** Additional className for the master pane. */
@@ -30,14 +28,12 @@ export interface TwoPaneLayoutProps extends ViewProps {
  * <TwoPaneLayout
  *   master={<TransactionList />}
  *   detail={<TransactionDetail id={selectedId} />}
- *   detailVisible={selectedId != null}
  * />
  * ```
  */
 export function TwoPaneLayout({
   master,
   detail,
-  detailVisible = true,
   className,
   containerClassName,
   masterClassName,
@@ -47,7 +43,7 @@ export function TwoPaneLayout({
 }: TwoPaneLayoutProps) {
   return (
     <View
-      className={cn("flex-1 flex-col lg:flex-row", containerClassName)}
+      className={cn("flex-1 flex-col lg:flex-row", className, containerClassName)}
       style={style}
       {...props}
     >
@@ -63,13 +59,12 @@ export function TwoPaneLayout({
         {master}
       </View>
 
-      {/* Detail pane — hidden on mobile, visible at lg when detailVisible is true */}
+      {/* Detail pane — hidden on mobile, visible at lg */}
       <View
         className={cn(
           "hidden",
           // At lg the detail pane takes 3/5 of the available width (fluid).
           "lg:flex lg:flex-[3]",
-          !detailVisible && "lg:hidden",
           detailClassName,
         )}
       >

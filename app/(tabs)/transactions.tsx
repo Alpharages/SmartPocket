@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   ActivityIndicator,
@@ -342,6 +342,13 @@ export default function TransactionsScreen() {
     [transactions, selectedTransactionId],
   );
 
+  // Clear the selection if the selected transaction no longer exists (e.g. deleted).
+  useEffect(() => {
+    if (selectedTransactionId != null && !selectedTransaction) {
+      setSelectedTransactionId(null);
+    }
+  }, [selectedTransactionId, selectedTransaction]);
+
   // ListHeaderComponent passed as a React element (not a component function)
   // so React reconciles TextInput in-place on state updates and focus is kept.
   const listHeader = (
@@ -515,40 +522,31 @@ export default function TransactionsScreen() {
     />
   );
 
-  if (isLg) {
-    const detailPane = selectedTransaction ? (
-      <TransactionDetailPane transaction={selectedTransaction} />
-    ) : (
-      <View className="flex-1 items-center justify-center">
-        <EmptyState
-          variant="no-data"
-          icon={
-            <Ionicons
-              name="receipt-outline"
-              size={28}
-              color={colors.muted}
-            />
-          }
-          title="No transaction selected"
-          description="Tap a transaction in the list to view its details"
-        />
-      </View>
-    );
+  const detailPane = selectedTransaction ? (
+    <TransactionDetailPane transaction={selectedTransaction} />
+  ) : (
+    <View className="flex-1 items-center justify-center">
+      <EmptyState
+        variant="no-data"
+        icon={
+          <Ionicons
+            name="receipt-outline"
+            size={28}
+            color={colors.muted}
+          />
+        }
+        title="No transaction selected"
+        description="Tap a transaction in the list to view its details"
+      />
+    </View>
+  );
 
-    return (
-      <ScreenContainer className="flex-1 bg-background">
-        <TwoPaneLayout
-          master={transactionList}
-          detail={detailPane}
-          detailVisible={selectedTransactionId != null}
-        />
-      </ScreenContainer>
-    );
-  }
-
+  // Single render tree for both breakpoints — TwoPaneLayout hides the detail
+  // pane below `lg` via CSS (`hidden lg:flex`), so crossing the 1024 boundary
+  // reflows in place without remounting the list or resetting scroll position.
   return (
     <ScreenContainer className="flex-1 bg-background">
-      {transactionList}
+      <TwoPaneLayout master={transactionList} detail={detailPane} />
     </ScreenContainer>
   );
 }

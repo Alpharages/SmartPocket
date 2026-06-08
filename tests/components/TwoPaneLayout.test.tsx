@@ -58,14 +58,13 @@ describe("TwoPaneLayout", () => {
     act(() => renderer?.unmount());
   });
 
-  it("renders both master and detail when detailVisible is true", () => {
+  it("renders the detail pane at lg by default", () => {
     let renderer: TestRenderer.ReactTestRenderer | null = null;
     act(() => {
       renderer = TestRenderer.create(
         <TwoPaneLayout
           master={<Text testID="master">Master Content</Text>}
           detail={<Text testID="detail">Detail Content</Text>}
-          detailVisible
         />,
       );
     });
@@ -148,30 +147,6 @@ describe("TwoPaneLayout", () => {
       (n) =>
         typeof n.props.className === "string" &&
         n.props.className.includes("custom-detail"),
-    );
-    expect(detailPane).toBeTruthy();
-
-    act(() => renderer?.unmount());
-  });
-
-  it("hides detail pane when detailVisible is false", () => {
-    let renderer: TestRenderer.ReactTestRenderer | null = null;
-    act(() => {
-      renderer = TestRenderer.create(
-        <TwoPaneLayout
-          master={<Text testID="master">Master</Text>}
-          detail={<Text testID="detail">Detail</Text>}
-          detailVisible={false}
-        />,
-      );
-    });
-
-    const root = renderer!.root;
-    // Find detail pane by checking className includes lg:hidden
-    const detailPane = root.find(
-      (n) =>
-        typeof n.props.className === "string" &&
-        n.props.className.includes("lg:hidden"),
     );
     expect(detailPane).toBeTruthy();
 
