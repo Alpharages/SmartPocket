@@ -84,6 +84,20 @@ describe("EmptyState", () => {
     );
     const title = findByTestId(root, "empty-state-title");
     expect(title.props.accessibilityRole).toBe("header");
+    expect(title.props["aria-level"]).toBe(2);
+  });
+
+  it("allows callers to override the empty-state title heading level", () => {
+    const root = render(
+      <EmptyState
+        icon={icon}
+        title="No category selected"
+        description="Select one"
+        titleLevel={3}
+      />,
+    );
+    const title = findByTestId(root, "empty-state-title");
+    expect(title.props["aria-level"]).toBe(3);
   });
 
   it("AC3: primary action delegates to Button and fires onPress", () => {

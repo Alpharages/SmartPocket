@@ -15,6 +15,7 @@ export type ScreenHeaderProps = {
   count?: number;
   action?: React.ReactNode;
   accessibilityLabel?: string;
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
   className?: string;
   style?: StyleProp<ViewStyle>;
 } & Omit<ViewProps, "style">;
@@ -25,6 +26,7 @@ export function ScreenHeader({
   count,
   action,
   accessibilityLabel,
+  headingLevel = 1,
   className,
   style,
   ...viewProps
@@ -62,7 +64,11 @@ export function ScreenHeader({
       {...viewProps}
     >
       <View className="flex-1">
-        <Text className="text-h1 text-foreground" accessibilityRole="header">
+        <Text
+          className="text-h1 text-foreground"
+          accessibilityRole="header"
+          aria-level={headingLevel}
+        >
           {title}
         </Text>
         {captionText !== null && (

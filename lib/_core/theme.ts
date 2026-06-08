@@ -16,6 +16,18 @@ export const Elevation = themeConfig.elevation;
 
 export const Motion = themeConfig.motion;
 
+// Maximum content widths (px) used to cap and center mobile-first layouts on
+// web so they don't stretch edge-to-edge. Native layouts stay unconstrained.
+// Single source of truth — screens/sheets reference these instead of inlining
+// the same literals.
+export const ContentMaxWidth = {
+  dashboard: 1120,
+  screen: 960,
+  sheet: 560,
+  modal: 640,
+  card: 420,
+} as const;
+
 type ThemeColorTokens = typeof ThemeColors;
 type ThemeColorName = keyof ThemeColorTokens;
 type SchemePalette = Record<ColorScheme, Record<ThemeColorName, string>>;

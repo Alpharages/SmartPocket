@@ -86,6 +86,7 @@ describe("ScreenHeader", () => {
     it("exposes accessibilityRole='header' on the title", () => {
       const root = render(<ScreenHeader title="Dashboard" />);
       expect(getTitle(root).props.accessibilityRole).toBe("header");
+      expect(getTitle(root).props["aria-level"]).toBe(1);
     });
 
     it("renders without throwing in light mode", () => {
@@ -146,6 +147,7 @@ describe("ScreenHeader", () => {
       const root = render(
         <ScreenHeader
           title="Cards"
+          accessibilityLabel="Cards header"
           action={<Pressable accessibilityLabel="Add card" />}
         />,
       );
@@ -206,6 +208,11 @@ describe("ScreenHeader", () => {
       );
       expect(warnSpy).not.toHaveBeenCalled();
       warnSpy.mockRestore();
+    });
+
+    it("allows callers to override the heading level", () => {
+      const root = render(<ScreenHeader title="Details" headingLevel={2} />);
+      expect(getTitle(root).props["aria-level"]).toBe(2);
     });
   });
 

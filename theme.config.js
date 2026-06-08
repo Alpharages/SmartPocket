@@ -64,6 +64,9 @@ const typography = {
   body: { fontSize: 16, lineHeight: 24, fontWeight: "400" },
   label: { fontSize: 14, lineHeight: 20, fontWeight: "500" },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: "400" },
+  // Dense micro-labels (month badge, card-label chip) that sit below the
+  // caption scale. Preserves the prior 10px literal as a named token.
+  micro: { fontSize: 10, lineHeight: 14, fontWeight: "400" },
   number: {
     fontSize: 16,
     lineHeight: 24,

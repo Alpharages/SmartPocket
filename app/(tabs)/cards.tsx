@@ -7,7 +7,10 @@ import {
   ActivityIndicator,
   FlatList,
   TextInput,
+  Platform,
+  type ViewStyle,
 } from "react-native";
+import { ResponsiveContent } from "@/components/responsive-content";
 import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
@@ -16,6 +19,7 @@ import Animated, { FadeInUp } from "react-native-reanimated";
 import { Button, ConfirmSheet, CreditCard, EmptyState, ScreenHeader, Sheet } from "@/components/ui";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/hooks/use-confirm";
+import { ContentMaxWidth } from "@/lib/_core/theme";
 
 const PREDEFINED_COLORS = [
   "#6366F1", "#EC4899", "#10B981", "#F59E0B",
@@ -35,6 +39,12 @@ export default function CardsScreen() {
   const [expiryYear, setExpiryYear] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
   const [selectedColor, setSelectedColor] = useState(PREDEFINED_COLORS[0]);
+  const desktopActionStyle: ViewStyle | undefined =
+    Platform.OS === "web" ? { alignSelf: "flex-start" } : undefined;
+  const cardPreviewStyle: ViewStyle | undefined =
+    Platform.OS === "web"
+      ? { width: "100%" as const, maxWidth: ContentMaxWidth.card, alignSelf: "flex-start" }
+      : undefined;
 
   const handleAddCard = async () => {
     if (!cardName.trim() || !cardNumber.trim() || !cardholderName.trim() || !expiryMonth || !expiryYear || !creditLimit) {
@@ -79,82 +89,88 @@ export default function CardsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
       >
-        {/* Header */}
-        <ScreenHeader
-          title="Cards"
-          subtitle={`${creditCards.length} card${creditCards.length !== 1 ? "s" : ""}`}
-          accessibilityLabel="Cards screen"
-        />
-
-        {/* Add Card Button */}
-        <Animated.View entering={FadeInUp.delay(100).duration(500)} className="px-6 mt-5">
-          <Button
-            variant="primary"
-            label="Add New Card"
-            leftIcon={<Ionicons name="add" size={18} color="white" />}
-            onPress={() => setShowModal(true)}
-            size="lg"
+        <ResponsiveContent maxWidth={ContentMaxWidth.screen}>
+          {/* Header */}
+          <ScreenHeader
+            title="Cards"
+            subtitle={`${creditCards.length} card${creditCards.length !== 1 ? "s" : ""}`}
+            accessibilityLabel="Cards screen"
           />
-        </Animated.View>
 
-        {/* Cards List */}
-        <View className="px-6 mt-6">
-          {loadingCards ? (
-            <View className="items-center justify-center py-20">
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : creditCards.length > 0 ? (
-            <Animated.View entering={FadeInUp.delay(150).duration(500)}>
-              <FlatList
-                data={creditCards}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item, index }) => (
-                  <CreditCard
-                    name={item.name}
-                    cardNumber={item.cardNumber}
-                    cardholderName={item.cardholderName}
-                    expiryMonth={item.expiryMonth}
-                    expiryYear={item.expiryYear}
-                    color={item.color}
-                    index={index}
-                    onLongPress={async () => {
-                      const confirmed = await confirm({
-                        title: "Delete Card",
-                        message: `Are you sure you want to delete "${item.name}"?`,
-                        destructive: true,
-                        confirmLabel: "Delete",
-                      });
-                      if (confirmed) {
-                        try {
-                          await deleteCreditCard(item.id);
-                        } catch {
-                          // deleteCreditCard rolled back + showed an error
-                          // toast before re-throwing; swallow to avoid an
-                          // unhandled rejection.
-                        }
-                      }
-                    }}
-                  />
-                )}
-                scrollEnabled={false}
-              />
-            </Animated.View>
-          ) : (
-            <Animated.View
-              entering={FadeInUp.delay(150).duration(500)}
-              className="rounded-3xl overflow-hidden"
-              style={{ backgroundColor: colors.surface }}
-            >
-              <EmptyState
-                variant="no-data"
-                icon={<Ionicons name="card-outline" size={28} color={colors.muted} />}
-                title="No cards added yet"
-                description="Add your first card to get started"
-                action={{ label: "Add Card", onPress: () => setShowModal(true) }}
-              />
-            </Animated.View>
-          )}
-        </View>
+          {/* Add Card Button */}
+          <Animated.View entering={FadeInUp.delay(100).duration(500)} className="px-6 mt-5">
+            <Button
+              variant="primary"
+              label="Add New Card"
+              leftIcon={<Ionicons name="add" size={18} color="white" />}
+              onPress={() => setShowModal(true)}
+              style={desktopActionStyle}
+              size="lg"
+              testID="add-card-button"
+            />
+          </Animated.View>
+
+          {/* Cards List */}
+          <View className="px-6 mt-6">
+            {loadingCards ? (
+              <View className="items-center justify-center py-20">
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : creditCards.length > 0 ? (
+              <Animated.View entering={FadeInUp.delay(150).duration(500)}>
+                <FlatList
+                  data={creditCards}
+                  keyExtractor={(item) => item.id.toString()}
+                  renderItem={({ item, index }) => (
+                    <View style={cardPreviewStyle} testID={`card-preview-${index}`}>
+                      <CreditCard
+                        name={item.name}
+                        cardNumber={item.cardNumber}
+                        cardholderName={item.cardholderName}
+                        expiryMonth={item.expiryMonth}
+                        expiryYear={item.expiryYear}
+                        color={item.color}
+                        index={index}
+                        onLongPress={async () => {
+                          const confirmed = await confirm({
+                            title: "Delete Card",
+                            message: `Are you sure you want to delete "${item.name}"?`,
+                            destructive: true,
+                            confirmLabel: "Delete",
+                          });
+                          if (confirmed) {
+                            try {
+                              await deleteCreditCard(item.id);
+                            } catch {
+                              // deleteCreditCard rolled back + showed an error
+                              // toast before re-throwing; swallow to avoid an
+                              // unhandled rejection.
+                            }
+                          }
+                        }}
+                      />
+                    </View>
+                  )}
+                  scrollEnabled={false}
+                />
+              </Animated.View>
+            ) : (
+              <Animated.View
+                entering={FadeInUp.delay(150).duration(500)}
+                className="rounded-3xl overflow-hidden"
+                style={{ backgroundColor: colors.surface }}
+              >
+                <EmptyState
+                  variant="no-data"
+                  icon={<Ionicons name="card-outline" size={28} color={colors.muted} />}
+                  title="No cards added yet"
+                  description="Add your first card to get started"
+                  action={{ label: "Add Card", onPress: () => setShowModal(true) }}
+                />
+              </Animated.View>
+            )}
+          </View>
+        </ResponsiveContent>
       </ScrollView>
 
       <ConfirmSheet

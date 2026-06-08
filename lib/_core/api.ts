@@ -1,35 +1,28 @@
-import { Platform } from "react-native";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "./auth";
 
-type ApiResponse<T> = {
-  data?: T;
-  error?: string;
-};
-
-export async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function apiCall<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((options.headers as Record<string, string>) || {}),
   };
 
-  // Determine the auth method:
-  // - Native platform: use stored session token as Bearer auth
-  // - Web (including iframe): use cookie-based auth (browser handles automatically)
-  //   Cookie is set on backend domain via POST /api/auth/session after receiving token via postMessage
-  if (Platform.OS !== "web") {
-    const sessionToken = await Auth.getSessionToken();
-    console.log("[API] apiCall:", {
-      endpoint,
-      hasToken: !!sessionToken,
-      method: options.method || "GET",
-    });
-    if (sessionToken) {
-      headers["Authorization"] = `Bearer ${sessionToken}`;
-      console.log("[API] Authorization header added");
-    }
-  } else {
-    console.log("[API] apiCall:", { endpoint, platform: "web", method: options.method || "GET" });
+  // Attach the stored session token as Bearer auth on every platform. The token
+  // lives in localStorage on web and SecureStore on native, both surfaced via
+  // Auth.getSessionToken(). `credentials: "include"` below still carries any
+  // cookie the backend sets, so cookie- and bearer-based backends both work.
+  const sessionToken = await Auth.getSessionToken();
+  console.log("[API] apiCall:", {
+    endpoint,
+    hasToken: !!sessionToken,
+    method: options.method || "GET",
+  });
+  if (sessionToken) {
+    headers["Authorization"] = `Bearer ${sessionToken}`;
+    console.log("[API] Authorization header added");
   }
 
   const baseUrl = getApiBaseUrl();
@@ -48,14 +41,6 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
     });
 
     console.log("[API] Response status:", response.status, response.statusText);
-    const responseHeaders = Object.fromEntries(response.headers.entries());
-    console.log("[API] Response headers:", responseHeaders);
-
-    // Check if Set-Cookie header is present (cookies are automatically handled in React Native)
-    const setCookie = response.headers.get("Set-Cookie");
-    if (setCookie) {
-      console.log("[API] Set-Cookie header received:", setCookie);
-    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -67,7 +52,9 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
       } catch {
         // Not JSON, use text as is
       }
-      throw new Error(errorMessage || `API call failed: ${response.statusText}`);
+      throw new Error(
+        errorMessage || `API call failed: ${response.statusText}`,
+      );
     }
 
     const contentType = response.headers.get("content-type");
@@ -123,7 +110,8 @@ export async function logout(): Promise<void> {
   });
 }
 
-// Get current authenticated user (web uses cookie-based auth)
+// Get current authenticated user. `apiCall` will attach the stored token on web
+// or native when one is available, so this stays transport-agnostic here.
 export async function getMe(): Promise<{
   id: number;
   openId: string;
@@ -138,35 +126,5 @@ export async function getMe(): Promise<{
   } catch (error) {
     console.error("[API] getMe failed:", error);
     return null;
-  }
-}
-
-// Establish session cookie on the backend (3000-xxx domain)
-// Called after receiving token via postMessage to get a proper Set-Cookie from the backend
-export async function establishSession(token: string): Promise<boolean> {
-  try {
-    console.log("[API] establishSession: setting cookie on backend...");
-    const baseUrl = getApiBaseUrl();
-    const url = `${baseUrl}/api/auth/session`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      credentials: "include", // Important: allows Set-Cookie to be stored
-    });
-
-    if (!response.ok) {
-      console.error("[API] establishSession failed:", response.status);
-      return false;
-    }
-
-    console.log("[API] establishSession: cookie set successfully");
-    return true;
-  } catch (error) {
-    console.error("[API] establishSession error:", error);
-    return false;
   }
 }

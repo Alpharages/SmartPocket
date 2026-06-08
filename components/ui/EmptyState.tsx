@@ -17,6 +17,7 @@ export type EmptyStateProps = {
   icon: React.ReactNode;
   title: string;
   description: string;
+  titleLevel?: 1 | 2 | 3 | 4 | 5 | 6;
   /**
    * Primary action. Pass `{ label, onPress }` to render a `Button`, or pass a
    * pre-built `Button` node directly (Story 1.3 AC: no new button styles).
@@ -40,6 +41,7 @@ export function EmptyState({
   icon,
   title,
   description,
+  titleLevel = 2,
   action,
   variant: _variant = "no-data",
   testID = "empty-state",
@@ -75,6 +77,7 @@ export function EmptyState({
       <Text
         testID={`${testID}-title`}
         accessibilityRole="header"
+        aria-level={titleLevel}
         className="text-foreground text-center font-semibold mb-1"
         style={{
           fontSize: titleTypo.fontSize,

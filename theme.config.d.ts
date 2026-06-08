@@ -65,6 +65,7 @@ export const typography: {
   body: TypographyStyle;
   label: TypographyStyle;
   caption: TypographyStyle;
+  micro: TypographyStyle;
   number: TypographyStyle;
 };
 

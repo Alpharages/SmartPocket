@@ -16,6 +16,7 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 
 import { useColors } from "@/hooks/use-colors";
+import { readableTextOn } from "@/lib/_core/contrast";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { cn } from "@/lib/utils";
 import {
@@ -59,11 +60,6 @@ export interface CategoryTokenProps {
 
 // NFR-5 / WCAG 2.1 AA: every interactive token must present at least a 44pt touch target.
 const MIN_TOUCH_TARGET = 44;
-
-// The category color palette (theme.config.js) is tuned for ≥ 4.5:1 contrast
-// against white, so white is the guaranteed-legible foreground for the selected
-// checkmark drawn on the category color.
-const ON_COLOR_FOREGROUND = "#FFFFFF";
 
 const SIZE_TOKENS: Record<
   CategoryTokenSize,
@@ -261,7 +257,11 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
               backgroundColor: resolvedColor,
             }}
           >
-            <Ionicons name="checkmark" size={12} color={ON_COLOR_FOREGROUND} />
+            <Ionicons
+              name="checkmark"
+              size={12}
+              color={readableTextOn(resolvedColor)}
+            />
           </View>
         )}
       </View>

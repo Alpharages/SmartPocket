@@ -5,6 +5,7 @@ import TestRenderer, {
   type ReactTestInstance,
   type ReactTestRenderer,
 } from "react-test-renderer";
+import { Platform } from "react-native";
 
 import { Sheet } from "@/components/ui/Sheet";
 import { __gesture } from "../../__mocks__/react-native-gesture-handler";
@@ -62,6 +63,7 @@ afterEach(() => {
     renderer?.unmount();
   });
   renderer = null;
+  Platform.OS = "ios";
 });
 
 function findByTestId(root: ReactTestInstance, testID: string): ReactTestInstance {
@@ -197,6 +199,23 @@ describe("Sheet", () => {
       ? Object.assign({}, ...panel.props.style.filter(Boolean))
       : panel.props.style;
     expect(flat.paddingBottom).toBeGreaterThanOrEqual(16);
+  });
+
+  it("centers and constrains the panel on web", () => {
+    Platform.OS = "web";
+    const root = render(
+      <Sheet visible onClose={vi.fn()} title="Web sheet">
+        <></>
+      </Sheet>,
+    );
+    const panel = findByTestId(root, "smartpocket-sheet-panel");
+    const flat = Array.isArray(panel.props.style)
+      ? Object.assign({}, ...panel.props.style.filter(Boolean))
+      : panel.props.style;
+
+    expect(flat.width).toBe("100%");
+    expect(flat.maxWidth).toBe(560);
+    expect(flat.alignSelf).toBe("center");
   });
 
   it("renders header without title text when title is omitted", () => {

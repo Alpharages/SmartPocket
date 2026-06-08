@@ -11,12 +11,34 @@ export type User = {
   lastSignedIn: Date;
 };
 
+type WebStorageLike = {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+};
+
+// Web stores the session token in localStorage so the dev-login flow (and any
+// web OAuth flow) can send it as a Bearer token. Trade-off: localStorage is
+// readable by any JS on the page, so a stored JWT is exposed to XSS — acceptable
+// for the dev build, but production web should prefer an httpOnly cookie for the
+// session token. Mirrors the existing getUserInfo/setUserInfo web behaviour.
+function getWebStorage(): WebStorageLike | null {
+  const storage = (
+    globalThis as typeof globalThis & { localStorage?: WebStorageLike }
+  ).localStorage;
+  return storage ?? null;
+}
+
 export async function getSessionToken(): Promise<string | null> {
   try {
-    // Web platform uses cookie-based auth, no manual token management needed
     if (Platform.OS === "web") {
-      console.log("[Auth] Web platform uses cookie-based auth, skipping token retrieval");
-      return null;
+      const storage = getWebStorage();
+      const token = storage?.getItem(SESSION_TOKEN_KEY) ?? null;
+      console.log(
+        "[Auth] Session token retrieved from localStorage:",
+        token ? "present" : "missing",
+      );
+      return token;
     }
 
     // Use SecureStore for native
@@ -24,7 +46,7 @@ export async function getSessionToken(): Promise<string | null> {
     const token = await SecureStore.getItemAsync(SESSION_TOKEN_KEY);
     console.log(
       "[Auth] Session token retrieved from SecureStore:",
-      token ? `present (${token.substring(0, 20)}...)` : "missing",
+      token ? "present" : "missing",
     );
     return token;
   } catch (error) {
@@ -35,14 +57,23 @@ export async function getSessionToken(): Promise<string | null> {
 
 export async function setSessionToken(token: string): Promise<void> {
   try {
-    // Web platform uses cookie-based auth, no manual token management needed
     if (Platform.OS === "web") {
-      console.log("[Auth] Web platform uses cookie-based auth, skipping token storage");
+      const storage = getWebStorage();
+      if (!storage) {
+        console.warn(
+          "[Auth] localStorage unavailable, skipping session token storage",
+        );
+        return;
+      }
+
+      console.log("[Auth] Setting session token in localStorage...");
+      storage.setItem(SESSION_TOKEN_KEY, token);
+      console.log("[Auth] Session token stored in localStorage successfully");
       return;
     }
 
     // Use SecureStore for native
-    console.log("[Auth] Setting session token...", token.substring(0, 20) + "...");
+    console.log("[Auth] Setting session token...");
     await SecureStore.setItemAsync(SESSION_TOKEN_KEY, token);
     console.log("[Auth] Session token stored in SecureStore successfully");
   } catch (error) {
@@ -53,9 +84,20 @@ export async function setSessionToken(token: string): Promise<void> {
 
 export async function removeSessionToken(): Promise<void> {
   try {
-    // Web platform uses cookie-based auth, logout is handled by server clearing cookie
     if (Platform.OS === "web") {
-      console.log("[Auth] Web platform uses cookie-based auth, skipping token removal");
+      const storage = getWebStorage();
+      if (!storage) {
+        console.warn(
+          "[Auth] localStorage unavailable, skipping session token removal",
+        );
+        return;
+      }
+
+      console.log("[Auth] Removing session token from localStorage...");
+      storage.removeItem(SESSION_TOKEN_KEY);
+      console.log(
+        "[Auth] Session token removed from localStorage successfully",
+      );
       return;
     }
 

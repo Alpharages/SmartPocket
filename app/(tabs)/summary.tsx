@@ -10,9 +10,18 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState, useMemo } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
-import { CategoryToken, EmptyState, ScreenHeader, Skeleton, StatCard, TransactionRow, TwoPaneLayout } from "@/components/ui";
+import {
+  CategoryToken,
+  EmptyState,
+  ScreenHeader,
+  Skeleton,
+  StatCard,
+  TransactionRow,
+  TwoPaneLayout,
+} from "@/components/ui";
 import { useBreakpoints } from "@/hooks/use-breakpoint";
-import { Spacing } from "@/lib/_core/theme";
+import { Spacing, Typography } from "@/lib/_core/theme";
+import { readableTextOn } from "@/lib/_core/contrast";
 
 export default function SummaryScreen() {
   const colors = useColors();
@@ -27,7 +36,9 @@ export default function SummaryScreen() {
   } = useExpense();
   const { isLg } = useBreakpoints();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+    null,
+  );
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
@@ -117,11 +128,7 @@ export default function SummaryScreen() {
           }}
           className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
         >
-          <Ionicons
-            name="chevron-back"
-            size={20}
-            color={colors.foreground}
-          />
+          <Ionicons name="chevron-back" size={20} color={colors.foreground} />
         </Pressable>
 
         <View className="items-center">
@@ -134,8 +141,12 @@ export default function SummaryScreen() {
               style={{ backgroundColor: colors.primary + "18" }}
             >
               <Text
-                className="text-[10px] font-semibold"
-                style={{ color: colors.primary }}
+                className="font-semibold"
+                style={{
+                  color: colors.primary,
+                  fontSize: Typography.micro.fontSize,
+                  lineHeight: Typography.micro.lineHeight,
+                }}
               >
                 Current
               </Text>
@@ -206,7 +217,10 @@ export default function SummaryScreen() {
     const map = new Map<number, number>();
     for (const t of monthTransactions) {
       if (t.type === "expense") {
-        map.set(t.categoryId, (map.get(t.categoryId) ?? 0) + parseFloat(t.amount));
+        map.set(
+          t.categoryId,
+          (map.get(t.categoryId) ?? 0) + parseFloat(t.amount),
+        );
       }
     }
     return Array.from(map.entries())
@@ -233,7 +247,9 @@ export default function SummaryScreen() {
 
   const handleCategoryPress = (categoryId: number) => {
     if (isLg) {
-      setSelectedCategoryId((prev) => (prev === categoryId ? null : categoryId));
+      setSelectedCategoryId((prev) =>
+        prev === categoryId ? null : categoryId,
+      );
     }
   };
 
@@ -269,11 +285,7 @@ export default function SummaryScreen() {
           className="rounded-3xl p-8 items-center"
           style={{ backgroundColor: colors.surface }}
         >
-          <Ionicons
-            name="pie-chart-outline"
-            size={36}
-            color={colors.muted}
-          />
+          <Ionicons name="pie-chart-outline" size={36} color={colors.muted} />
           <Text className="text-muted font-medium mt-3 text-sm">
             No spending data
           </Text>
@@ -402,9 +414,13 @@ export default function SummaryScreen() {
                 style={{ backgroundColor: selectedCategoryColor }}
               >
                 <Ionicons
-                  name={(selectedCategory.icon as React.ComponentProps<typeof Ionicons>["name"]) ?? "pricetag"}
+                  name={
+                    (selectedCategory.icon as React.ComponentProps<
+                      typeof Ionicons
+                    >["name"]) ?? "pricetag"
+                  }
                   size={18}
-                  color="white"
+                  color={readableTextOn(selectedCategoryColor)}
                 />
               </View>
               <View>
@@ -437,7 +453,8 @@ export default function SummaryScreen() {
                     type={t.type}
                     categoryColor={categoryColor}
                     categoryIcon={
-                      (cat?.icon ?? "pricetag-outline") as keyof typeof Ionicons.glyphMap
+                      (cat?.icon ??
+                        "pricetag-outline") as keyof typeof Ionicons.glyphMap
                     }
                     note={t.description ?? undefined}
                     style={{ backgroundColor: colors.surface }}

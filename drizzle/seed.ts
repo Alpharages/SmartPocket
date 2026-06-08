@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { and, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { categories, creditCards, transactions, users } from "./schema";
 
@@ -11,14 +11,15 @@ if (!DATABASE_URL) {
   throw new Error("DATABASE_URL is required to seed the database");
 }
 
-type Db = ReturnType<typeof drizzle>;
+const SCHEMA = { categories, creditCards, transactions, users };
+type Db = MySql2Database<typeof SCHEMA>;
 
 function escapeIdentifier(identifier: string): string {
   return `\`${identifier.replace(/`/g, "``")}\``;
 }
 
 async function ensureDatabaseExists() {
-  const url = new URL(DATABASE_URL);
+  const url = new URL(DATABASE_URL!);
   const databaseName = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
   if (!databaseName) {
     throw new Error("DATABASE_URL must include a database name");
@@ -171,10 +172,10 @@ async function ensureTransaction(
 async function main() {
   await ensureDatabaseExists();
 
-  const pool = mysql.createPool(DATABASE_URL);
+  const pool = mysql.createPool(DATABASE_URL!);
   const db = drizzle(pool, {
     mode: "default",
-    schema: { categories, creditCards, transactions, users },
+    schema: SCHEMA,
   });
 
   try {

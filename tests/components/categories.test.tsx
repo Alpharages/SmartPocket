@@ -1,4 +1,5 @@
 import React from "react";
+import { Platform } from "react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TestRenderer, {
   act,
@@ -108,6 +109,7 @@ vi.mock("@/lib/_core/theme", () => ({
     fade: { durationMs: 200 },
   },
   Elevation: { card: { shadowColor: "#000", shadowOpacity: 0.1, elevation: 2 } },
+  ContentMaxWidth: { dashboard: 1120, screen: 960, sheet: 560, modal: 640, card: 420 },
 }));
 
 vi.mock("@/lib/expense-context", () => ({
@@ -209,6 +211,7 @@ describe("CategoriesScreen", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    Platform.OS = "ios";
   });
 
   // --- AC: Add button ---
@@ -225,8 +228,18 @@ describe("CategoriesScreen", () => {
   it("AC: add button label is 'Add New Category'", () => {
     const root = renderScreen();
     const btn = findByTestId(root, "add-category-button");
-    const label = btn.find((n) => n.type === "Text" && n.props.children === "Add New Category");
+    const label = btn.find((n) => String(n.type) === "Text" && n.props.children === "Add New Category");
     expect(label).toBeDefined();
+  });
+
+  it("AC: add button opts out of desktop full-width stretch", () => {
+    Platform.OS = "web";
+    const root = renderScreen();
+    const btn = findByTestId(root, "add-category-button");
+    const pressable = btn.find((n) => n.props.accessibilityRole === "button");
+    expect(pressable.props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ alignSelf: "flex-start" })]),
+    );
   });
 
   it("AC: add button is not a full-width colored Pressable banner — it is a Button primitive", () => {
