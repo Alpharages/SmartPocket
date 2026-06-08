@@ -1,8 +1,8 @@
 import "@/global.css";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
@@ -17,14 +17,33 @@ import {
 import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
 import { trpc, createTRPCClient } from "@/lib/trpc";
-import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
+import {
+  initManusRuntime,
+  subscribeSafeAreaInsets,
+} from "@/lib/_core/manus-runtime";
 import { ExpenseProvider } from "@/lib/expense-context";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import * as Auth from "@/lib/_core/auth";
-import { getApiBaseUrl } from "@/constants/oauth";
+import { getApiBaseUrl, SESSION_TOKEN_KEY } from "@/constants/oauth";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
+
+type WebStorageLike = {
+  getItem(key: string): string | null;
+};
+
+function hasWebSessionToken(): boolean {
+  const storage = (
+    globalThis as typeof globalThis & { localStorage?: WebStorageLike }
+  ).localStorage;
+
+  try {
+    return storage?.getItem(SESSION_TOKEN_KEY) != null;
+  } catch {
+    return false;
+  }
+}
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -33,32 +52,58 @@ export const unstable_settings = {
 export default function RootLayout() {
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
+  const isDevWeb = __DEV__ && Platform.OS === "web";
 
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
+  // Gate the first render on dev-web cold starts only, where the tRPC client
+  // would otherwise mount and fire its first authenticated batch before dev
+  // auto-login stores the session token (transient 401). The synchronous
+  // localStorage read is safe: this gate is dev-only (`isDevWeb` requires
+  // `__DEV__`), and the web static-export path runs with `__DEV__ === false`,
+  // so the gate never engages there and cannot cause a hydration mismatch.
+  const [isAppShellReady, setIsAppShellReady] = useState(
+    () => !isDevWeb || hasWebSessionToken(),
+  );
 
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
     initManusRuntime();
   }, []);
 
-  // In development, automatically obtain a dev session if none exists.
+  // In development, automatically obtain a dev session if none exists. This
+  // runs on every dev platform (native + web) — native relies on it for its
+  // dev auto-login. The `isAppShellReady` gate above is what defers web's
+  // first render until the token is stored; native renders immediately.
   useEffect(() => {
     if (!__DEV__) return;
+    let cancelled = false;
+
     (async () => {
-      const existing = await Auth.getSessionToken();
-      if (existing) return;
       try {
-        const res = await fetch(`${getApiBaseUrl()}/api/dev/login`, { method: "POST" });
-        const data = await res.json();
-        if (data.token) {
-          await Auth.setSessionToken(data.token);
-          console.log("[Dev] Auto-login successful");
+        const existing = await Auth.getSessionToken();
+        if (!existing) {
+          const res = await fetch(`${getApiBaseUrl()}/api/dev/login`, {
+            method: "POST",
+          });
+          const data = await res.json();
+          if (data.token) {
+            await Auth.setSessionToken(data.token);
+            console.log("[Dev] Auto-login successful");
+          }
         }
       } catch (err) {
         console.warn("[Dev] Auto-login skipped (server not reachable):", err);
+      } finally {
+        if (!cancelled) {
+          setIsAppShellReady(true);
+        }
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
@@ -90,7 +135,10 @@ export default function RootLayout() {
 
   // Ensure minimum 8px padding for top and bottom on mobile
   const providerInitialMetrics = useMemo(() => {
-    const metrics = initialWindowMetrics ?? { insets: initialInsets, frame: initialFrame };
+    const metrics = initialWindowMetrics ?? {
+      insets: initialInsets,
+      frame: initialFrame,
+    };
     return {
       ...metrics,
       insets: {
@@ -100,6 +148,10 @@ export default function RootLayout() {
       },
     };
   }, [initialInsets, initialFrame]);
+
+  if (!isAppShellReady) {
+    return null;
+  }
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -114,7 +166,10 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen
                   name="add-transaction"
-                  options={{ presentation: "transparentModal", animation: "none" }}
+                  options={{
+                    presentation: "transparentModal",
+                    animation: "none",
+                  }}
                 />
                 <Stack.Screen name="oauth/callback" />
               </Stack>
@@ -144,7 +199,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>
+      <SafeAreaProvider initialMetrics={providerInitialMetrics}>
+        {content}
+      </SafeAreaProvider>
     </ThemeProvider>
   );
 }
