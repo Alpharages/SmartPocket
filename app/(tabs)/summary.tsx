@@ -303,14 +303,20 @@ export default function SummaryScreen() {
               const rowContent = (
                 <View className="py-4 px-4">
                   <View className="flex-row items-center justify-between mb-2">
-                    <CategoryToken
-                      color={item.categoryColor}
-                      icon={item.categoryIcon}
-                      name={item.categoryName}
-                      type={item.type}
-                      size="sm"
-                      className="flex-1"
-                    />
+                    <View className="flex-row items-center gap-3 flex-1 mr-3">
+                      <CategoryToken
+                        color={item.categoryColor}
+                        icon={item.categoryIcon}
+                        name={item.categoryName}
+                        size="sm"
+                      />
+                      <Text
+                        className="text-foreground font-semibold text-sm flex-1"
+                        numberOfLines={1}
+                      >
+                        {item.categoryName}
+                      </Text>
+                    </View>
                     <View className="items-end">
                       <Text className="text-foreground font-bold text-sm">
                         ${item.total.toFixed(2)}
