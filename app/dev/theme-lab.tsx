@@ -363,6 +363,7 @@ export default function ThemeLabScreen() {
               <ScreenHeader
                 title="With action"
                 subtitle="Manage your cards"
+                accessibilityLabel="Cards header"
                 action={
                   <Button
                     variant="icon-only"

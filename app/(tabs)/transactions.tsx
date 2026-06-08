@@ -358,7 +358,7 @@ export default function TransactionsScreen() {
         subtitle={`${filteredTransactions.length} transaction${
           filteredTransactions.length !== 1 ? "s" : ""
         }`}
-        accessibilityLabel="Activity screen"
+        accessibilityLabel="Activity screen header"
         action={
           <Pressable
             onPress={() => router.push("/add-transaction")}
@@ -469,11 +469,12 @@ export default function TransactionsScreen() {
         <View
           className="px-lg py-xs"
           style={{ backgroundColor: colors.background }}
-          accessibilityRole="header"
         >
           <Text
             className="text-muted font-semibold"
             style={{ fontSize: Typography.label.fontSize }}
+            accessibilityRole="header"
+            aria-level={2}
           >
             {section.title}
           </Text>
