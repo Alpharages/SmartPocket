@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { ScrollView, View, Text, Pressable, ActivityIndicator, FlatList } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { ResponsiveContent } from "@/components/responsive-content";
 import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { useBreakpoints } from "@/hooks/use-breakpoint";
@@ -14,7 +15,7 @@ import {
   TransactionRow,
   EmptyState,
 } from "@/components/ui";
-import { Spacing } from "@/lib/_core/theme";
+import { ContentMaxWidth, Spacing } from "@/lib/_core/theme";
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -205,31 +206,33 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
       >
-        {/* Header */}
-        <Animated.View entering={FadeInDown.duration(500)}>
-          <ScreenHeader title="Home" subtitle={formattedDate} />
-        </Animated.View>
+        <ResponsiveContent maxWidth={ContentMaxWidth.dashboard}>
+          {/* Header */}
+          <Animated.View entering={FadeInDown.duration(500)}>
+            <ScreenHeader title="Home" subtitle={formattedDate} />
+          </Animated.View>
 
-        {isLg ? (
-          /* Two-pane layout: stats left, recent activity right */
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "flex-start",
-              gap: Spacing["2xl"],
-              paddingTop: Spacing.sm,
-            }}
-          >
-            {statsPane}
-            {recentActivityPane}
-          </View>
-        ) : (
-          /* Single-column layout for phones */
-          <>
-            {statsPane}
-            {recentActivityPane}
-          </>
-        )}
+          {isLg ? (
+            /* Two-pane layout: stats left, recent activity right */
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: Spacing["2xl"],
+                paddingTop: Spacing.sm,
+              }}
+            >
+              {statsPane}
+              {recentActivityPane}
+            </View>
+          ) : (
+            /* Single-column layout for phones */
+            <>
+              {statsPane}
+              {recentActivityPane}
+            </>
+          )}
+        </ResponsiveContent>
       </ScrollView>
     </ScreenContainer>
   );

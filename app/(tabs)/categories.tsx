@@ -7,8 +7,12 @@ import {
   ActivityIndicator,
   FlatList,
   TextInput,
+  Platform,
+  type ViewStyle,
 } from "react-native";
+import { ResponsiveContent } from "@/components/responsive-content";
 import { ScreenContainer } from "@/components/screen-container";
+import { ContentMaxWidth } from "@/lib/_core/theme";
 import { useExpense, type Category } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
@@ -90,6 +94,8 @@ function CategoryRow({
 
 export default function CategoriesScreen() {
   const colors = useColors();
+  const desktopActionStyle: ViewStyle | undefined =
+    Platform.OS === "web" ? { alignSelf: "flex-start" } : undefined;
   const { categories, loadingCategories, addCategory, deleteCategory } =
     useExpense();
   const { visible: confirmVisible, options: confirmOptions, confirm, onConfirm, onCancel } = useConfirm();
@@ -226,54 +232,57 @@ export default function CategoriesScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
       >
-        {/* Header */}
-        <Animated.View
-          entering={FadeInDown.duration(500)}
-          className="px-6 pt-6 pb-2"
-        >
-          <Text className="text-h1 font-bold text-foreground">
-            Categories
-          </Text>
-          <Text className="text-sm text-muted font-medium mt-xs">
-            {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
-          </Text>
-        </Animated.View>
+        <ResponsiveContent maxWidth={ContentMaxWidth.screen}>
+          {/* Header */}
+          <Animated.View
+            entering={FadeInDown.duration(500)}
+            className="px-6 pt-6 pb-2"
+          >
+            <Text className="text-h1 font-bold text-foreground">
+              Categories
+            </Text>
+            <Text className="text-sm text-muted font-medium mt-xs">
+              {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
+            </Text>
+          </Animated.View>
 
-        {/* Add Category Button — proper Button primitive, not a full-width banner */}
-        <Animated.View
-          entering={FadeInUp.delay(100).duration(500)}
-          className="px-6 mt-5"
-        >
-          <Button
-            variant="primary"
-            label="Add New Category"
-            leftIcon={<Ionicons name="add" size={18} color="white" />}
-            onPress={() => setShowModal(true)}
-            testID="add-category-button"
-          />
-        </Animated.View>
+          {/* Add Category Button — proper Button primitive, not a full-width banner */}
+          <Animated.View
+            entering={FadeInUp.delay(100).duration(500)}
+            className="px-6 mt-5"
+          >
+            <Button
+              variant="primary"
+              label="Add New Category"
+              leftIcon={<Ionicons name="add" size={18} color="white" />}
+              onPress={() => setShowModal(true)}
+              style={desktopActionStyle}
+              testID="add-category-button"
+            />
+          </Animated.View>
 
-        {/* Categories Lists */}
-        <View className="px-6 mt-6">
-          {loadingCategories ? (
-            <View className="items-center justify-center py-20">
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <>
-              {renderCategorySection(
-                "Expense Categories",
-                expenseCategories,
-                0,
-              )}
-              {renderCategorySection(
-                "Income Categories",
-                incomeCategories,
-                expenseCategories.length,
-              )}
-            </>
-          )}
-        </View>
+          {/* Categories Lists */}
+          <View className="px-6 mt-6">
+            {loadingCategories ? (
+              <View className="items-center justify-center py-20">
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : (
+              <>
+                {renderCategorySection(
+                  "Expense Categories",
+                  expenseCategories,
+                  0,
+                )}
+                {renderCategorySection(
+                  "Income Categories",
+                  incomeCategories,
+                  expenseCategories.length,
+                )}
+              </>
+            )}
+          </View>
+        </ResponsiveContent>
       </ScrollView>
 
       <ConfirmSheet

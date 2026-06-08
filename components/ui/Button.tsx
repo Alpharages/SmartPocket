@@ -8,6 +8,7 @@ import {
   Pressable,
   Text,
   View,
+  type PressableProps,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -38,7 +39,7 @@ export type ButtonSize = "sm" | "md" | "lg";
 // `sm` can never render below the accessible minimum.
 const MIN_TOUCH_TARGET = 44;
 
-type BaseButtonProps = {
+type BaseButtonProps = PressableProps & {
   variant?: ButtonVariant;
   size?: ButtonSize;
   onPress?: () => void;
@@ -251,6 +252,10 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
     return (
       <AnimatedPressable
         ref={ref}
+        // Forwarded Pressable props (testID, etc.) are spread FIRST so the
+        // primitive's own behavior, a11y, and styling below always win — a
+        // forwarded handler can never silently clobber press-feedback/a11y.
+        {...pressableProps}
         accessibilityRole="button"
         accessibilityLabel={resolvedAccessibilityLabel}
         accessibilityState={accessibilityState}
@@ -264,7 +269,6 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
           className,
         )}
         style={[containerStyle, animatedStyle, style]}
-        {...pressableProps}
       >
         {content}
       </AnimatedPressable>

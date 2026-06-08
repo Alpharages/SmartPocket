@@ -7,6 +7,7 @@ import {
   expect,
   it,
   vi,
+  type MockInstance,
 } from "vitest";
 import TestRenderer, { act, type ReactTestRenderer } from "react-test-renderer";
 import { Platform } from "react-native";
@@ -110,7 +111,7 @@ function createLocalStorageMock() {
 
 describe("RootLayout dev auth bootstrap", () => {
   let renderer: ReactTestRenderer | null = null;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: MockInstance;
 
   beforeAll(async () => {
     ({ default: RootLayout } = await import("@/app/_layout"));
@@ -150,7 +151,7 @@ describe("RootLayout dev auth bootstrap", () => {
       renderer = TestRenderer.create(<RootLayout />);
     });
 
-    expect(renderer!.root.findAllByType("ExpenseProvider")).toHaveLength(0);
+    expect(renderer!.root.findAllByType("ExpenseProvider" as unknown as React.ElementType)).toHaveLength(0);
 
     await act(async () => {
       await Promise.resolve();
@@ -158,7 +159,7 @@ describe("RootLayout dev auth bootstrap", () => {
     });
 
     expect(auth.setSessionToken).toHaveBeenCalledWith("dev-token");
-    expect(renderer!.root.findByType("ExpenseProvider")).toBeTruthy();
+    expect(renderer!.root.findByType("ExpenseProvider" as unknown as React.ElementType)).toBeTruthy();
   });
 
   it("renders the app shell immediately when a web session token already exists", async () => {
@@ -173,7 +174,7 @@ describe("RootLayout dev auth bootstrap", () => {
       renderer = TestRenderer.create(<RootLayout />);
     });
 
-    expect(renderer!.root.findByType("ExpenseProvider")).toBeTruthy();
+    expect(renderer!.root.findByType("ExpenseProvider" as unknown as React.ElementType)).toBeTruthy();
     expect(fetchSpy).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -191,7 +192,7 @@ describe("RootLayout dev auth bootstrap", () => {
 
     // Native is never gated — the shell is present from the first render even
     // before auto-login resolves.
-    expect(renderer!.root.findByType("ExpenseProvider")).toBeTruthy();
+    expect(renderer!.root.findByType("ExpenseProvider" as unknown as React.ElementType)).toBeTruthy();
 
     await act(async () => {
       await Promise.resolve();

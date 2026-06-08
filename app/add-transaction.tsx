@@ -28,7 +28,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Button, CategoryPickerGrid, EmptyState, Pill } from "@/components/ui";
 import { useToast } from "@/components/ui/ToastProvider";
-import { Radius, Spacing, Typography } from "@/lib/_core/theme";
+import { ContentMaxWidth, Radius, Spacing, Typography } from "@/lib/_core/theme";
 import { resolveCategoryColor } from "@/constants/theme";
 
 const OPEN_DURATION = 250;
@@ -46,7 +46,7 @@ export default function AddTransactionScreen() {
   const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const { type: queryType } = useLocalSearchParams();
   const scheme = (useColorScheme() ?? "light") as "light" | "dark";
   const { categories, transactions, addTransaction } = useExpense();
@@ -100,34 +100,14 @@ export default function AddTransactionScreen() {
 
   const filteredCategories = categories.filter((c) => c.type === type);
   const isFormValid = !!amount && !!selectedCategory;
-
-  // Derive recently-used category IDs for the current type from transaction
-  // history (up to 5 unique IDs, most-recent first).
-  const recentlyUsedIds = useMemo(() => {
-    const seen = new Set<number>();
-    const result: number[] = [];
-    for (const tx of transactions) {
-      if (tx.categoryId == null) continue;
-      const cat = categories.find((c) => c.id === tx.categoryId);
-      if (!cat || cat.type !== type) continue;
-      if (!seen.has(tx.categoryId)) {
-        seen.add(tx.categoryId);
-        result.push(tx.categoryId);
-        if (result.length >= 5) break;
-      }
-    }
-    return result;
-  }, [transactions, categories, type]);
+  const panelMaxWidth = ContentMaxWidth.modal;
 
   // Map filtered categories to CategoryPickerGrid items with resolved colors.
   const pickerCategories = useMemo(
     () =>
       filteredCategories.map((cat) => ({
-        id: cat.id,
-        name: cat.name,
-        type: cat.type,
+        ...cat,
         color: resolveCategoryColor(cat.color, scheme),
-        icon: cat.icon,
       })),
     [filteredCategories, scheme],
   );
@@ -181,6 +161,9 @@ export default function AddTransactionScreen() {
               paddingHorizontal: Spacing.lg,
               paddingBottom: Math.max(insets.bottom, Spacing.lg),
               maxHeight: screenHeight * 0.9,
+              width: "100%",
+              maxWidth: Platform.OS === "web" ? Math.min(panelMaxWidth, screenWidth - 24) : undefined,
+              alignSelf: Platform.OS === "web" ? "center" : undefined,
             }}
             testID="add-transaction-panel-surface"
           >
@@ -318,8 +301,8 @@ export default function AddTransactionScreen() {
                   categories={pickerCategories}
                   selectedId={selectedCategory}
                   onSelect={(id) => setSelectedCategory(id)}
-                  recentlyUsedIds={recentlyUsedIds}
-                  contentContainerStyle={{ paddingHorizontal: 0 }}
+                  transactions={transactions}
+                  recentLimit={5}
                 />
               ) : (
                 <EmptyState

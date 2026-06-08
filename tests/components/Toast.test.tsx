@@ -146,7 +146,7 @@ describe("Toast item", () => {
       <Toast id="ts" type="success" message="ok" onDismiss={vi.fn()} />,
     );
     const successIconName = findByTestId(successRoot, "toast-ts-icon")
-      .findAll((n) => n.type === "Ionicons")[0]?.props.name;
+      .findAll((n) => String(n.type) === "Ionicons")[0]?.props.name;
 
     // unmount and switch to error
     act(() => { renderer?.unmount(); });
@@ -156,7 +156,7 @@ describe("Toast item", () => {
       <Toast id="te" type="error" message="fail" onDismiss={vi.fn()} />,
     );
     const errorIconName = findByTestId(errorRoot, "toast-te-icon")
-      .findAll((n) => n.type === "Ionicons")[0]?.props.name;
+      .findAll((n) => String(n.type) === "Ionicons")[0]?.props.name;
 
     expect(successIconName).toBeDefined();
     expect(errorIconName).toBeDefined();

@@ -25,7 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useColors } from "@/hooks/use-colors";
-import { Elevation, Motion, Radius, Spacing, Typography } from "@/lib/_core/theme";
+import { ContentMaxWidth, Elevation, Motion, Radius, Spacing, Typography } from "@/lib/_core/theme";
 import { cn } from "@/lib/utils";
 
 const MIN_TOUCH_TARGET = 44;
@@ -212,6 +212,7 @@ export function Sheet({
       : {};
 
   const titleTypography = Typography.h3;
+  const panelMaxWidth = ContentMaxWidth.sheet;
 
   if (!mounted) {
     return null;
@@ -252,6 +253,8 @@ export function Sheet({
             paddingHorizontal: Spacing.lg,
             paddingBottom: Math.max(insets.bottom, Spacing.lg),
             width: "100%",
+            maxWidth: Platform.OS === "web" ? panelMaxWidth : undefined,
+            alignSelf: Platform.OS === "web" ? "center" : undefined,
             ...(Platform.OS === "web"
               ? { boxShadow: Elevation.lg }
               : {}),

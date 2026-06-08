@@ -17,6 +17,9 @@ describe("IndexScreen", () => {
       renderer = TestRenderer.create(<IndexScreen />);
     });
 
-    expect(renderer!.root.findByType("Redirect").props.href).toBe("/dashboard");
+    expect(
+      renderer!.root.findByType("Redirect" as unknown as React.ElementType).props
+        .href,
+    ).toBe("/dashboard");
   });
 });
