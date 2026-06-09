@@ -120,11 +120,13 @@ vi.mock("@/lib/expense-context", () => ({
   useExpense: vi.fn(),
 }));
 
+const mockConfirm = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+
 vi.mock("@/hooks/use-confirm", () => ({
   useConfirm: () => ({
     visible: false,
     options: {},
-    confirm: vi.fn().mockResolvedValue(true),
+    confirm: mockConfirm,
     onConfirm: vi.fn(),
     onCancel: vi.fn(),
   }),
@@ -205,6 +207,38 @@ function renderScreen(
     renderer = TestRenderer.create(<CardsScreen />);
   });
   return renderer.root;
+}
+
+function renderWithLiveCards(initialCards = [mockCard1, mockCard2]) {
+  let cards = initialCards.map((c) => ({ ...c }));
+  const liveUpdate = vi.fn(async (id: number, data: Partial<typeof mockCard1>) => {
+    cards = cards.map((c) =>
+      c.id === id
+        ? {
+            ...c,
+            ...data,
+            name: data.name ?? c.name,
+            color: data.color ?? c.color,
+            cardType: data.cardType ?? c.cardType,
+          }
+        : c,
+    );
+  });
+  (useExpense as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+    ...baseContext,
+    creditCards: cards,
+    updateCreditCard: liveUpdate,
+  }));
+  let renderer!: ReactTestRenderer;
+  act(() => {
+    renderer = TestRenderer.create(<CardsScreen />);
+  });
+  const rerender = () => {
+    act(() => {
+      renderer.update(<CardsScreen />);
+    });
+  };
+  return { root: renderer.root, liveUpdate, rerender, getCards: () => cards };
 }
 
 function findByTestId(root: ReactTestInstance, testID: string): ReactTestInstance {
@@ -442,6 +476,104 @@ describe("CardsScreen", () => {
       );
       expect(saveBtn).toBeDefined();
     });
+
+    it("AC5: closes sheet after save and list reflects updated card name", async () => {
+      const { root, liveUpdate, rerender } = renderWithLiveCards();
+      const editBtn = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "Edit My Visa",
+      );
+      await act(async () => {
+        editBtn.props.onPress?.();
+      });
+      const nameInput = root.find(
+        (n) => n.type === "TextInput" && n.props.value === "My Visa",
+      );
+      await act(async () => {
+        nameInput.props.onChangeText("Updated Visa");
+      });
+      const saveBtn = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "Save",
+      );
+      await act(async () => {
+        await saveBtn.props.onPress?.();
+      });
+      expect(liveUpdate).toHaveBeenCalledTimes(1);
+      rerender();
+      const sheet = findByTestId(root, "add-card-sheet");
+      expect(sheet.props.visible).toBe(false);
+      const updatedLabel = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "Edit Updated Visa",
+      );
+      expect(updatedLabel).toBeDefined();
+    });
+
+    it("persists color and card type changes on save", async () => {
+      const root = renderScreen();
+      const editBtn = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "Edit My Visa",
+      );
+      await act(async () => {
+        editBtn.props.onPress?.();
+      });
+      const debitBtn = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "debit card type",
+      );
+      await act(async () => {
+        debitBtn.props.onPress?.();
+      });
+      const colorBtn = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "Select color #10B981",
+      );
+      await act(async () => {
+        colorBtn.props.onPress?.();
+      });
+      const saveBtn = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "Save",
+      );
+      await act(async () => {
+        await saveBtn.props.onPress?.();
+      });
+      expect(mockUpdateCreditCard).toHaveBeenCalledWith(
+        mockCard1.id,
+        expect.objectContaining({
+          cardType: "debit",
+          color: "#10B981",
+        }),
+      );
+    });
+  });
+
+  describe("Delete card regression", () => {
+    it("long-press delete still calls deleteCreditCard after confirm", async () => {
+      mockConfirm.mockResolvedValueOnce(true);
+      const root = renderScreen();
+      const cardPressable = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "My Visa card ending in 3456",
+      );
+      await act(async () => {
+        await cardPressable.props.onLongPress?.();
+      });
+      expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Delete Card", destructive: true }),
+      );
+      expect(mockDeleteCreditCard).toHaveBeenCalledWith(mockCard1.id);
+    });
   });
 
   describe("Add card regression (FR-7)", () => {
@@ -462,6 +594,54 @@ describe("CardsScreen", () => {
           n.props.accessibilityState?.disabled === true,
       );
       expect(submitBtn).toBeDefined();
+    });
+
+    it("calls addCreditCard with valid form data on submit", async () => {
+      const root = renderScreen();
+      const addBtn = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "Add New Card",
+      );
+      await act(async () => {
+        addBtn.props.onPress?.();
+      });
+      const setField = (value: string, placeholder: string) => {
+        const input = root.find(
+          (n) => n.type === "TextInput" && n.props.placeholder === placeholder,
+        );
+        act(() => {
+          input.props.onChangeText(value);
+        });
+      };
+      setField("New Card", "e.g., My Visa");
+      setField("4111111111111111", "1234 5678 9012 3456");
+      setField("Alex Smith", "John Doe");
+      setField("6", "MM");
+      setField("2028", "YYYY");
+      setField("2500", "5000");
+      const submitBtn = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "Add Card" &&
+          !n.props.accessibilityState?.disabled,
+      );
+      await act(async () => {
+        await submitBtn.props.onPress?.();
+      });
+      expect(mockAddCreditCard).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "New Card",
+          cardNumber: "4111111111111111",
+          cardholderName: "Alex Smith",
+          expiryMonth: 6,
+          expiryYear: 2028,
+          creditLimit: "2500",
+          cardType: "credit",
+        }),
+      );
+      const sheet = findByTestId(root, "add-card-sheet");
+      expect(sheet.props.visible).toBe(false);
     });
   });
 
