@@ -17,6 +17,7 @@ import Animated from "react-native-reanimated";
 import { useColors } from "@/hooks/use-colors";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { readableTextOn } from "@/lib/_core/contrast";
+import { Radius } from "@/lib/_core/theme";
 import { cn } from "@/lib/utils";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -185,6 +186,10 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
           backgroundColor: bg,
           borderColor: border,
           borderWidth: border ? 1 : 0,
+          // Mirrors the rounded-md / rounded-lg classes below: className is
+          // remapped off on Pressable and silently drops on web, so the
+          // radius must also live on the style prop.
+          borderRadius: iconOnly ? Radius.lg : Radius.md,
           minHeight: Math.max(MIN_TOUCH_TARGET, SIZE_HEIGHT[size]),
           height: dim,
           width: dim,

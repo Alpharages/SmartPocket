@@ -26,7 +26,6 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useColors } from "@/hooks/use-colors";
 import { ContentMaxWidth, Elevation, Motion, Radius, Spacing, Typography } from "@/lib/_core/theme";
-import { cn } from "@/lib/utils";
 
 const MIN_TOUCH_TARGET = 44;
 const SHEET_MOTION = Motion.sheet;
@@ -243,9 +242,14 @@ export function Sheet({
       <Animated.View
         accessible={true}
         {...(title ? { accessibilityLabel: title } : {})}
-        className={cn("shadow-lg", !snapToContent && "max-h-[90%]")}
+        className="shadow-lg"
         style={[
           {
+            // Height cap lives in the style layer (not className) so it holds
+            // on web, where NativeWind classes are unreliable on animated
+            // hosts; flexShrink lets the content area compress to this cap so
+            // an inner ScrollView gets a bounded height and can scroll.
+            maxHeight: snapToContent ? undefined : "90%",
             backgroundColor: colors.surface,
             borderTopLeftRadius: Radius.lg,
             borderTopRightRadius: Radius.lg,
@@ -312,8 +316,11 @@ export function Sheet({
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           keyboardVerticalOffset={0}
+          style={{ flexShrink: 1 }}
         >
-          <View testID={`${testID}-content`}>{children}</View>
+          <View style={{ flexShrink: 1 }} testID={`${testID}-content`}>
+            {children}
+          </View>
         </KeyboardAvoidingView>
       </Animated.View>
     </GestureDetector>

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ScrollView,
   View,
@@ -256,6 +256,11 @@ export default function CardsScreen() {
   const [editingCard, setEditingCard] = useState<CreditCardRecord | null>(null);
   const [formValues, setFormValues] = useState<CardFormValues>(EMPTY_FORM);
   const [selectedColor, setSelectedColor] = useState(PREDEFINED_COLORS[0]);
+  const [saving, setSaving] = useState(false);
+  // Synchronous double-submit guard: rapid taps land before React re-renders
+  // the disabled/loading state, so the async `saving` state alone can't stop
+  // a same-tick second press.
+  const savingRef = useRef(false);
 
   const desktopActionStyle: ViewStyle | undefined =
     Platform.OS === "web" ? { alignSelf: "flex-start" } : undefined;
@@ -303,11 +308,14 @@ export default function CardsScreen() {
   }, [formValues, sheetMode]);
 
   const handleAddCard = async () => {
+    if (savingRef.current) return;
     if (!isCardFormValid(formValues, "add")) {
       toast.show({ type: "error", message: "Please fill in all fields correctly" });
       return;
     }
 
+    savingRef.current = true;
+    setSaving(true);
     try {
       await addCreditCard({
         name: formValues.cardName.trim(),
@@ -323,17 +331,23 @@ export default function CardsScreen() {
       } as any);
     } catch {
       return;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
 
     resetForm();
   };
 
   const handleUpdateCard = async () => {
+    if (savingRef.current) return;
     if (!editingCard || !isCardFormValid(formValues, "edit")) {
       toast.show({ type: "error", message: "Please fill in all fields correctly" });
       return;
     }
 
+    savingRef.current = true;
+    setSaving(true);
     try {
       await updateCreditCard(editingCard.id, {
         name: formValues.cardName.trim(),
@@ -347,6 +361,9 @@ export default function CardsScreen() {
       });
     } catch {
       return;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
 
     resetForm();
@@ -454,7 +471,14 @@ export default function CardsScreen() {
         title={sheetTitle}
         testID={sheetTestId}
       >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 24 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          // flexShrink lets the Sheet's 90% height cap bound this ScrollView
+          // so the form scrolls (instead of overflowing) on short viewports.
+          style={{ flexShrink: 1 }}
+          contentContainerStyle={{ gap: 16, paddingBottom: 24 }}
+          keyboardShouldPersistTaps="handled"
+        >
           {sheetMode && (
             <CardFormFields
               mode={sheetMode}
@@ -483,6 +507,7 @@ export default function CardsScreen() {
               label={sheetMode === "edit" ? "Save" : "Add Card"}
               onPress={sheetMode === "edit" ? handleUpdateCard : handleAddCard}
               disabled={!formValid}
+              loading={saving}
               className="flex-1"
               size="lg"
             />
