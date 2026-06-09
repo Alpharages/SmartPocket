@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ScrollView,
   View,
@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { ResponsiveContent } from "@/components/responsive-content";
 import { ScreenContainer } from "@/components/screen-container";
-import { useExpense } from "@/lib/expense-context";
+import { useExpense, type CreditCard as CreditCardRecord } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInUp } from "react-native-reanimated";
@@ -20,25 +20,243 @@ import { Button, ConfirmSheet, CreditCard, EmptyState, ScreenHeader, Sheet } fro
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ContentMaxWidth } from "@/lib/_core/theme";
+import {
+  isCardFormValid,
+  maskCardLastFour,
+  type CardFormValues,
+} from "@/lib/card-form-validation";
 
 const PREDEFINED_COLORS = [
   "#6366F1", "#EC4899", "#10B981", "#F59E0B",
   "#8B5CF6", "#EF4444", "#06B6D4", "#14B8A6",
 ];
 
+const CARD_TYPES = ["credit", "debit"] as const;
+
+type SheetMode = "add" | "edit" | null;
+
+const EMPTY_FORM: CardFormValues = {
+  cardName: "",
+  cardNumber: "",
+  cardholderName: "",
+  expiryMonth: "",
+  expiryYear: "",
+  creditLimit: "",
+  cardType: "credit",
+};
+
+function CardFormFields({
+  mode,
+  values,
+  selectedColor,
+  maskedCardNumber,
+  onChange,
+  onSelectColor,
+}: {
+  mode: "add" | "edit";
+  values: CardFormValues;
+  selectedColor: string;
+  maskedCardNumber?: string;
+  onChange: (patch: Partial<CardFormValues>) => void;
+  onSelectColor: (color: string) => void;
+}) {
+  const colors = useColors();
+
+  return (
+    <>
+      <View>
+        <Text className="text-sm font-semibold text-foreground mb-2">Card Name</Text>
+        <View
+          className="px-4 py-3.5 rounded-xl flex-row items-center"
+          style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+        >
+          <TextInput
+            placeholder="e.g., My Visa"
+            placeholderTextColor={colors.muted}
+            value={values.cardName}
+            onChangeText={(cardName) => onChange({ cardName })}
+            className="flex-1 text-foreground"
+            style={{ fontSize: 15 }}
+          />
+        </View>
+      </View>
+
+      {mode === "add" ? (
+        <View>
+          <Text className="text-sm font-semibold text-foreground mb-2">Card Number</Text>
+          <View
+            className="px-4 py-3.5 rounded-xl flex-row items-center"
+            style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+          >
+            <TextInput
+              placeholder="1234 5678 9012 3456"
+              placeholderTextColor={colors.muted}
+              value={values.cardNumber}
+              onChangeText={(cardNumber) => onChange({ cardNumber })}
+              className="flex-1 text-foreground"
+              keyboardType="numeric"
+              style={{ fontSize: 15 }}
+            />
+          </View>
+        </View>
+      ) : (
+        <View>
+          <Text className="text-sm font-semibold text-foreground mb-2">Card Number</Text>
+          <View
+            className="px-4 py-3.5 rounded-xl"
+            style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+            accessibilityLabel={`Card number masked, ending in ${maskedCardNumber?.slice(-4) ?? "unknown"}`}
+          >
+            <Text className="text-foreground font-semibold" style={{ fontSize: 15 }}>
+              {maskedCardNumber ?? "•••• •••• •••• ••••"}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      <View>
+        <Text className="text-sm font-semibold text-foreground mb-2">Cardholder Name</Text>
+        <View
+          className="px-4 py-3.5 rounded-xl flex-row items-center"
+          style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+        >
+          <TextInput
+            placeholder="John Doe"
+            placeholderTextColor={colors.muted}
+            value={values.cardholderName}
+            onChangeText={(cardholderName) => onChange({ cardholderName })}
+            className="flex-1 text-foreground"
+            style={{ fontSize: 15 }}
+          />
+        </View>
+      </View>
+
+      <View className="flex-row gap-3">
+        <View className="flex-1">
+          <Text className="text-sm font-semibold text-foreground mb-2">Expiry Month</Text>
+          <View
+            className="px-4 py-3.5 rounded-xl"
+            style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+          >
+            <TextInput
+              placeholder="MM"
+              placeholderTextColor={colors.muted}
+              value={values.expiryMonth}
+              onChangeText={(expiryMonth) => onChange({ expiryMonth })}
+              className="text-foreground"
+              keyboardType="numeric"
+              maxLength={2}
+              style={{ fontSize: 15 }}
+            />
+          </View>
+        </View>
+        <View className="flex-1">
+          <Text className="text-sm font-semibold text-foreground mb-2">Expiry Year</Text>
+          <View
+            className="px-4 py-3.5 rounded-xl"
+            style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+          >
+            <TextInput
+              placeholder="YYYY"
+              placeholderTextColor={colors.muted}
+              value={values.expiryYear}
+              onChangeText={(expiryYear) => onChange({ expiryYear })}
+              className="text-foreground"
+              keyboardType="numeric"
+              maxLength={4}
+              style={{ fontSize: 15 }}
+            />
+          </View>
+        </View>
+      </View>
+
+      <View>
+        <Text className="text-sm font-semibold text-foreground mb-2">Credit Limit</Text>
+        <View
+          className="px-4 py-3.5 rounded-xl flex-row items-center"
+          style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+        >
+          <Text className="text-foreground mr-2 font-semibold">$</Text>
+          <TextInput
+            placeholder="5000"
+            placeholderTextColor={colors.muted}
+            value={values.creditLimit}
+            onChangeText={(creditLimit) => onChange({ creditLimit })}
+            className="flex-1 text-foreground"
+            keyboardType="decimal-pad"
+            style={{ fontSize: 15 }}
+          />
+        </View>
+      </View>
+
+      <View>
+        <Text className="text-sm font-semibold text-foreground mb-2">Card Type</Text>
+        <View className="flex-row gap-3">
+          {CARD_TYPES.map((type) => (
+            <Pressable
+              key={type}
+              onPress={() => onChange({ cardType: type })}
+              className="flex-1 py-3 rounded-xl items-center capitalize"
+              style={{
+                backgroundColor: values.cardType === type ? colors.primary : colors.background,
+                borderWidth: values.cardType === type ? 0 : 0.5,
+                borderColor: colors.border,
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${type} card type`}
+              accessibilityState={{ selected: values.cardType === type }}
+            >
+              <Text
+                className="font-semibold capitalize"
+                style={{ color: values.cardType === type ? "white" : colors.foreground }}
+              >
+                {type}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View>
+        <Text className="text-sm font-semibold text-foreground mb-3">Choose Color</Text>
+        <View className="flex-row flex-wrap gap-3">
+          {PREDEFINED_COLORS.map((color) => (
+            <Pressable
+              key={color}
+              onPress={() => onSelectColor(color)}
+              accessibilityRole="button"
+              accessibilityLabel={`Select color ${color}`}
+              accessibilityState={{ selected: selectedColor === color }}
+              className="w-12 h-12 rounded-full items-center justify-center"
+              style={{
+                backgroundColor: color,
+                borderWidth: selectedColor === color ? 3 : 0,
+                borderColor: colors.foreground,
+              }}
+            >
+              {selectedColor === color && (
+                <Ionicons name="checkmark" size={20} color="white" />
+              )}
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </>
+  );
+}
+
 export default function CardsScreen() {
   const colors = useColors();
-  const { creditCards, loadingCards, addCreditCard, deleteCreditCard } = useExpense();
+  const { creditCards, loadingCards, addCreditCard, updateCreditCard, deleteCreditCard } =
+    useExpense();
   const toast = useToast();
-  const { visible: confirmVisible, options: confirmOptions, confirm, onConfirm, onCancel } = useConfirm();
-  const [showModal, setShowModal] = useState(false);
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardholderName, setCardholderName] = useState("");
-  const [expiryMonth, setExpiryMonth] = useState("");
-  const [expiryYear, setExpiryYear] = useState("");
-  const [creditLimit, setCreditLimit] = useState("");
+  const { visible: confirmVisible, options: confirmOptions, confirm, onConfirm, onCancel } =
+    useConfirm();
+  const [sheetMode, setSheetMode] = useState<SheetMode>(null);
+  const [editingCard, setEditingCard] = useState<CreditCardRecord | null>(null);
+  const [formValues, setFormValues] = useState<CardFormValues>(EMPTY_FORM);
   const [selectedColor, setSelectedColor] = useState(PREDEFINED_COLORS[0]);
+
   const desktopActionStyle: ViewStyle | undefined =
     Platform.OS === "web" ? { alignSelf: "flex-start" } : undefined;
   const cardPreviewStyle: ViewStyle | undefined =
@@ -46,42 +264,96 @@ export default function CardsScreen() {
       ? { width: "100%" as const, maxWidth: ContentMaxWidth.card, alignSelf: "flex-start" }
       : undefined;
 
+  const resetForm = useCallback(() => {
+    setFormValues(EMPTY_FORM);
+    setSelectedColor(PREDEFINED_COLORS[0]);
+    setEditingCard(null);
+    setSheetMode(null);
+  }, []);
+
+  const openAddSheet = useCallback(() => {
+    setFormValues(EMPTY_FORM);
+    setSelectedColor(PREDEFINED_COLORS[0]);
+    setEditingCard(null);
+    setSheetMode("add");
+  }, []);
+
+  const openEditSheet = useCallback((card: CreditCardRecord) => {
+    setEditingCard(card);
+    setFormValues({
+      cardName: card.name,
+      cardNumber: card.cardNumber,
+      cardholderName: card.cardholderName,
+      expiryMonth: String(card.expiryMonth),
+      expiryYear: String(card.expiryYear),
+      creditLimit: card.creditLimit,
+      cardType: card.cardType || "credit",
+    });
+    setSelectedColor(card.color || PREDEFINED_COLORS[0]);
+    setSheetMode("edit");
+  }, []);
+
+  const closeSheet = useCallback(() => {
+    resetForm();
+  }, [resetForm]);
+
+  const formValid = useMemo(() => {
+    if (!sheetMode) return false;
+    return isCardFormValid(formValues, sheetMode);
+  }, [formValues, sheetMode]);
+
   const handleAddCard = async () => {
-    if (!cardName.trim() || !cardNumber.trim() || !cardholderName.trim() || !expiryMonth || !expiryYear || !creditLimit) {
-      toast.show({ type: "error", message: "Please fill in all fields" });
+    if (!isCardFormValid(formValues, "add")) {
+      toast.show({ type: "error", message: "Please fill in all fields correctly" });
       return;
     }
 
     try {
       await addCreditCard({
-        name: cardName,
-        cardNumber,
-        cardholderName,
-        expiryMonth: parseInt(expiryMonth),
-        expiryYear: parseInt(expiryYear),
-        creditLimit,
+        name: formValues.cardName.trim(),
+        cardNumber: formValues.cardNumber.trim(),
+        cardholderName: formValues.cardholderName.trim(),
+        expiryMonth: parseInt(formValues.expiryMonth, 10),
+        expiryYear: parseInt(formValues.expiryYear, 10),
+        creditLimit: formValues.creditLimit.trim(),
         color: selectedColor,
-        cardType: "credit",
+        cardType: formValues.cardType,
         currentBalance: "0",
         isActive: true,
       } as any);
     } catch {
-      // addCreditCard already rolled back and showed an error toast before
-      // re-throwing; swallow so it isn't an unhandled rejection. Keep the
-      // sheet open so the user can retry.
       return;
     }
 
-    setCardName("");
-    setCardNumber("");
-    setCardholderName("");
-    setExpiryMonth("");
-    setExpiryYear("");
-    setCreditLimit("");
-    setSelectedColor(PREDEFINED_COLORS[0]);
-    setShowModal(false);
+    resetForm();
   };
 
+  const handleUpdateCard = async () => {
+    if (!editingCard || !isCardFormValid(formValues, "edit")) {
+      toast.show({ type: "error", message: "Please fill in all fields correctly" });
+      return;
+    }
+
+    try {
+      await updateCreditCard(editingCard.id, {
+        name: formValues.cardName.trim(),
+        cardNumber: editingCard.cardNumber,
+        cardholderName: formValues.cardholderName.trim(),
+        expiryMonth: parseInt(formValues.expiryMonth, 10),
+        expiryYear: parseInt(formValues.expiryYear, 10),
+        creditLimit: formValues.creditLimit.trim(),
+        color: selectedColor,
+        cardType: formValues.cardType,
+      });
+    } catch {
+      return;
+    }
+
+    resetForm();
+  };
+
+  const sheetTitle = sheetMode === "edit" ? "Edit Card" : "New Card";
+  const sheetTestId = sheetMode === "edit" ? "edit-card-sheet" : "add-card-sheet";
 
   return (
     <ScreenContainer className="flex-1 bg-background">
@@ -90,27 +362,24 @@ export default function CardsScreen() {
         contentContainerStyle={{ paddingBottom: 32 }}
       >
         <ResponsiveContent maxWidth={ContentMaxWidth.screen}>
-          {/* Header */}
           <ScreenHeader
             title="Cards"
             subtitle={`${creditCards.length} card${creditCards.length !== 1 ? "s" : ""}`}
             accessibilityLabel="Cards screen"
           />
 
-          {/* Add Card Button */}
           <Animated.View entering={FadeInUp.delay(100).duration(500)} className="px-6 mt-5">
             <Button
               variant="primary"
               label="Add New Card"
               leftIcon={<Ionicons name="add" size={18} color="white" />}
-              onPress={() => setShowModal(true)}
+              onPress={openAddSheet}
               style={desktopActionStyle}
               size="lg"
               testID="add-card-button"
             />
           </Animated.View>
 
-          {/* Cards List */}
           <View className="px-6 mt-6">
             {loadingCards ? (
               <View className="items-center justify-center py-20">
@@ -142,12 +411,11 @@ export default function CardsScreen() {
                             try {
                               await deleteCreditCard(item.id);
                             } catch {
-                              // deleteCreditCard rolled back + showed an error
-                              // toast before re-throwing; swallow to avoid an
-                              // unhandled rejection.
+                              // deleteCreditCard rolled back + showed error toast
                             }
                           }
                         }}
+                        onEdit={() => openEditSheet(item)}
                       />
                     </View>
                   )}
@@ -165,7 +433,7 @@ export default function CardsScreen() {
                   icon={<Ionicons name="card-outline" size={28} color={colors.muted} />}
                   title="No cards added yet"
                   description="Add your first card to get started"
-                  action={{ label: "Add Card", onPress: () => setShowModal(true) }}
+                  action={{ label: "Add Card", onPress: openAddSheet }}
                 />
               </Animated.View>
             )}
@@ -181,178 +449,44 @@ export default function CardsScreen() {
       />
 
       <Sheet
-        visible={showModal}
-        onClose={() => setShowModal(false)}
-        title="New Card"
-        testID="add-card-sheet"
+        visible={sheetMode !== null}
+        onClose={closeSheet}
+        title={sheetTitle}
+        testID={sheetTestId}
       >
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 24 }}>
-              {/* Card Name Input */}
-              <View>
-                <Text className="text-sm font-semibold text-foreground mb-2">Card Name</Text>
-                <View
-                  className="px-4 py-3.5 rounded-xl flex-row items-center"
-                  style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
-                >
-                  <TextInput
-                    placeholder="e.g., My Visa"
-                    placeholderTextColor={colors.muted}
-                    value={cardName}
-                    onChangeText={setCardName}
-                    className="flex-1 text-foreground"
-                    style={{ fontSize: 15 }}
-                  />
-                </View>
-              </View>
+          {sheetMode && (
+            <CardFormFields
+              mode={sheetMode}
+              values={formValues}
+              selectedColor={selectedColor}
+              maskedCardNumber={
+                sheetMode === "edit" && editingCard
+                  ? maskCardLastFour(editingCard.cardNumber)
+                  : undefined
+              }
+              onChange={(patch) => setFormValues((prev) => ({ ...prev, ...patch }))}
+              onSelectColor={setSelectedColor}
+            />
+          )}
 
-              {/* Card Number Input */}
-              <View>
-                <Text className="text-sm font-semibold text-foreground mb-2">Card Number</Text>
-                <View
-                  className="px-4 py-3.5 rounded-xl flex-row items-center"
-                  style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
-                >
-                  <TextInput
-                    placeholder="1234 5678 9012 3456"
-                    placeholderTextColor={colors.muted}
-                    value={cardNumber}
-                    onChangeText={setCardNumber}
-                    className="flex-1 text-foreground"
-                    keyboardType="numeric"
-                    style={{ fontSize: 15 }}
-                  />
-                </View>
-              </View>
-
-              {/* Cardholder Name Input */}
-              <View>
-                <Text className="text-sm font-semibold text-foreground mb-2">Cardholder Name</Text>
-                <View
-                  className="px-4 py-3.5 rounded-xl flex-row items-center"
-                  style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
-                >
-                  <TextInput
-                    placeholder="John Doe"
-                    placeholderTextColor={colors.muted}
-                    value={cardholderName}
-                    onChangeText={setCardholderName}
-                    className="flex-1 text-foreground"
-                    style={{ fontSize: 15 }}
-                  />
-                </View>
-              </View>
-
-              {/* Expiry and Limit Row */}
-              <View className="flex-row gap-3">
-                <View className="flex-1">
-                  <Text className="text-sm font-semibold text-foreground mb-2">Expiry Month</Text>
-                  <View
-                    className="px-4 py-3.5 rounded-xl"
-                    style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
-                  >
-                    <TextInput
-                      placeholder="MM"
-                      placeholderTextColor={colors.muted}
-                      value={expiryMonth}
-                      onChangeText={setExpiryMonth}
-                      className="text-foreground"
-                      keyboardType="numeric"
-                      maxLength={2}
-                      style={{ fontSize: 15 }}
-                    />
-                  </View>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-semibold text-foreground mb-2">Expiry Year</Text>
-                  <View
-                    className="px-4 py-3.5 rounded-xl"
-                    style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
-                  >
-                    <TextInput
-                      placeholder="YYYY"
-                      placeholderTextColor={colors.muted}
-                      value={expiryYear}
-                      onChangeText={setExpiryYear}
-                      className="text-foreground"
-                      keyboardType="numeric"
-                      maxLength={4}
-                      style={{ fontSize: 15 }}
-                    />
-                  </View>
-                </View>
-              </View>
-
-              {/* Credit Limit Input */}
-              <View>
-                <Text className="text-sm font-semibold text-foreground mb-2">Credit Limit</Text>
-                <View
-                  className="px-4 py-3.5 rounded-xl flex-row items-center"
-                  style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
-                >
-                  <Text className="text-foreground mr-2 font-semibold">$</Text>
-                  <TextInput
-                    placeholder="5000"
-                    placeholderTextColor={colors.muted}
-                    value={creditLimit}
-                    onChangeText={setCreditLimit}
-                    className="flex-1 text-foreground"
-                    keyboardType="decimal-pad"
-                    style={{ fontSize: 15 }}
-                  />
-                </View>
-              </View>
-
-              {/* Color Picker */}
-              <View>
-                <Text className="text-sm font-semibold text-foreground mb-3">Choose Color</Text>
-                <View className="flex-row flex-wrap gap-3">
-                  {PREDEFINED_COLORS.map((color) => (
-                    <Pressable
-                      key={color}
-                      onPress={() => setSelectedColor(color)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Select color ${color}`}
-                      accessibilityState={{ selected: selectedColor === color }}
-                      className="w-12 h-12 rounded-full items-center justify-center"
-                      style={{
-                        backgroundColor: color,
-                        borderWidth: selectedColor === color ? 3 : 0,
-                        borderColor: colors.foreground,
-                      }}
-                    >
-                      {selectedColor === color && (
-                        <Ionicons name="checkmark" size={20} color="white" />
-                      )}
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-
-              {/* Action Buttons */}
-              <View className="flex-row gap-3 mt-2">
-                <Button
-                  variant="secondary"
-                  label="Cancel"
-                  onPress={() => setShowModal(false)}
-                  className="flex-1"
-                  size="lg"
-                />
-                <Button
-                  variant="primary"
-                  label="Add Card"
-                  onPress={handleAddCard}
-                  disabled={
-                    !cardName.trim() ||
-                    !cardNumber.trim() ||
-                    !cardholderName.trim() ||
-                    !expiryMonth ||
-                    !expiryYear ||
-                    !creditLimit
-                  }
-                  className="flex-1"
-                  size="lg"
-                />
-              </View>
+          <View className="flex-row gap-3 mt-2">
+            <Button
+              variant="secondary"
+              label="Cancel"
+              onPress={closeSheet}
+              className="flex-1"
+              size="lg"
+            />
+            <Button
+              variant="primary"
+              label={sheetMode === "edit" ? "Save" : "Add Card"}
+              onPress={sheetMode === "edit" ? handleUpdateCard : handleAddCard}
+              disabled={!formValid}
+              className="flex-1"
+              size="lg"
+            />
+          </View>
         </ScrollView>
       </Sheet>
     </ScreenContainer>
