@@ -443,4 +443,48 @@ describe("CardsScreen", () => {
       expect(saveBtn).toBeDefined();
     });
   });
+
+  describe("Add card regression (FR-7)", () => {
+    it("Add Card button is disabled when fields are empty", () => {
+      const root = renderScreen();
+      const addBtn = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "Add New Card",
+      );
+      act(() => {
+        addBtn.props.onPress?.();
+      });
+      const submitBtn = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "Add Card" &&
+          n.props.accessibilityState?.disabled === true,
+      );
+      expect(submitBtn).toBeDefined();
+    });
+  });
+
+  describe("EmptyState", () => {
+    it("renders EmptyState when no cards exist and not loading", () => {
+      const root = renderScreen({ creditCards: [] });
+      const emptyState = findByTestId(root, "empty-state");
+      expect(emptyState).toBeDefined();
+    });
+
+    it("EmptyState action 'Add Card' opens the sheet", () => {
+      const root = renderScreen({ creditCards: [] });
+      const sheet = findByTestId(root, "add-card-sheet");
+      expect(sheet.props.visible).toBe(false);
+      const actionBtn = findByTestId(root, "empty-state-action");
+      const pressable = actionBtn.find(
+        (n) => n.props.accessibilityRole === "button",
+      );
+      act(() => {
+        pressable.props.onPress?.();
+      });
+      const sheetAfter = findByTestId(root, "add-card-sheet");
+      expect(sheetAfter.props.visible).toBe(true);
+    });
+  });
 });
