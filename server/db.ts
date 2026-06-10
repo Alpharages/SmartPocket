@@ -1,5 +1,6 @@
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { callDataApi } from "./_core/dataApi";
+import { decryptCardNumber, encryptCardNumber } from "./_core/crypto";
 import {
   CATEGORY_DEFAULT_COLOR,
   getCategoryColorForName,
@@ -173,6 +174,13 @@ export async function getCategoryById(id: number) {
 // CREDIT CARDS
 // ============================================================================
 
+function decryptCardRow<T extends { cardNumber?: string }>(row: T): T {
+  if (!row?.cardNumber) {
+    return row;
+  }
+  return { ...row, cardNumber: decryptCardNumber(row.cardNumber) };
+}
+
 export async function getUserCreditCards(userId: number) {
   try {
     const result = await callDataApi("Database/query", {
@@ -181,7 +189,8 @@ export async function getUserCreditCards(userId: number) {
         params: [userId],
       },
     });
-    return Array.isArray(result) ? result : [];
+    const rows = Array.isArray(result) ? result : [];
+    return rows.map((row) => decryptCardRow(row as CreditCard));
   } catch {
     return [];
   }
@@ -197,7 +206,7 @@ export async function createCreditCard(data: InsertCreditCard) {
       params: [
         data.userId,
         data.name,
-        data.cardNumber,
+        encryptCardNumber(data.cardNumber),
         data.cardholderName,
         data.expiryMonth,
         data.expiryYear,
@@ -216,10 +225,15 @@ export async function updateCreditCard(
   id: number,
   data: Partial<InsertCreditCard>,
 ) {
-  const updates = Object.entries(data)
+  const payload: Partial<InsertCreditCard> = { ...data };
+  if (payload.cardNumber !== undefined) {
+    payload.cardNumber = encryptCardNumber(payload.cardNumber);
+  }
+
+  const updates = Object.entries(payload)
     .map(([key]) => `${key} = ?`)
     .join(", ");
-  const values = Object.values(data);
+  const values = Object.values(payload);
 
   await callDataApi("Database/query", {
     body: {
@@ -246,7 +260,8 @@ export async function getCreditCardById(id: number) {
         params: [id],
       },
     });
-    return Array.isArray(result) ? result[0] : null;
+    const row = Array.isArray(result) ? result[0] : null;
+    return row ? decryptCardRow(row as CreditCard) : null;
   } catch {
     return null;
   }

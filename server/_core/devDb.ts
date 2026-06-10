@@ -1,3 +1,5 @@
+import { encryptCardNumber } from "./crypto";
+
 /**
  * Dev-only in-memory database shim.
  *
@@ -107,7 +109,7 @@ function seedOnce() {
   insertRow("creditCards", {
     userId: 1,
     name: "Everyday Visa",
-    cardNumber: "4111111111111234",
+    cardNumber: encryptCardNumber("4111111111111234"),
     cardholderName: "Dev User",
     expiryMonth: 8,
     expiryYear: 2028,

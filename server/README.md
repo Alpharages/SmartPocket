@@ -196,6 +196,16 @@ pnpm db:push
 
 This runs `drizzle-kit generate` and `drizzle-kit migrate`.
 
+### One-off: encrypt legacy card numbers
+
+After Story 3.1 (encrypt-on-write) is deployed and `CARD_ENCRYPTION_KEY` is set, run once to backfill plaintext `creditCards.cardNumber` rows:
+
+```bash
+pnpm db:migrate:encrypt-cards
+```
+
+The script is **idempotent** — rows already stored as `v1:…` ciphertext are skipped. Safe to re-run. Prints counts only (`total` / `encrypted` / `skipped` / `failed`); never logs card data. Exits non-zero if any row fails.
+
 ### Query Helpers
 
 Add database queries in `server/db.ts`:
@@ -579,6 +589,7 @@ Available environment variables:
 |----------|-------------|
 | `DATABASE_URL` | MySQL/TiDB connection string |
 | `JWT_SECRET` | Session signing secret |
+| `CARD_ENCRYPTION_KEY` | Server-only 32-byte AES key for encrypting card numbers at rest (64-char hex or base64). Generate: `openssl rand -hex 32` |
 | `VITE_APP_ID` | Manus OAuth app ID |
 | `OAUTH_SERVER_URL` | Manus OAuth backend URL |
 | `VITE_OAUTH_PORTAL_URL` | Manus login portal URL |

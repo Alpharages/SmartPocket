@@ -14,6 +14,10 @@
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
 
+// Fixed 32-byte test key for server crypto unit/integration tests.
+process.env.CARD_ENCRYPTION_KEY ??=
+  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
 const originalError = console.error.bind(console);
 console.error = (...args: unknown[]) => {
   if (

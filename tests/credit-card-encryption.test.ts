@@ -1,0 +1,123 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const TEST_KEY_HEX =
+  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+const callDataApi = vi.fn();
+
+vi.mock("@/server/_core/dataApi", () => ({
+  callDataApi: (...args: unknown[]) => callDataApi(...args),
+}));
+
+describe("credit card db encryption", () => {
+  beforeEach(() => {
+    process.env.CARD_ENCRYPTION_KEY = TEST_KEY_HEX;
+    callDataApi.mockReset();
+    vi.resetModules();
+  });
+
+  it("encrypts cardNumber on createCreditCard", async () => {
+    callDataApi.mockResolvedValue({ insertId: 42 });
+    const { createCreditCard } = await import("@/server/db");
+    const { isEncryptedCardNumber } = await import("@/server/_core/crypto");
+
+    await createCreditCard({
+      userId: 1,
+      name: "Test",
+      cardNumber: "4111111111111111",
+      cardholderName: "Tester",
+      expiryMonth: 12,
+      expiryYear: 2028,
+      creditLimit: "1000.00",
+      color: "#6366F1",
+      cardType: "credit",
+    });
+
+    const body = callDataApi.mock.calls[0][1].body as {
+      params: unknown[];
+    };
+    const stored = body.params[2] as string;
+    expect(stored).not.toBe("4111111111111111");
+    expect(isEncryptedCardNumber(stored)).toBe(true);
+  });
+
+  it("encrypts cardNumber on updateCreditCard when present", async () => {
+    callDataApi.mockResolvedValue(undefined);
+    const { updateCreditCard } = await import("@/server/db");
+    const { isEncryptedCardNumber } = await import("@/server/_core/crypto");
+
+    await updateCreditCard(1, { cardNumber: "5555555555554444" });
+
+    const body = callDataApi.mock.calls[0][1].body as {
+      params: unknown[];
+    };
+    const stored = body.params[0] as string;
+    expect(isEncryptedCardNumber(stored)).toBe(true);
+  });
+
+  it("does not encrypt on update when cardNumber is omitted", async () => {
+    callDataApi.mockResolvedValue(undefined);
+    const { updateCreditCard } = await import("@/server/db");
+
+    await updateCreditCard(1, { name: "Renamed" });
+
+    const body = callDataApi.mock.calls[0][1].body as {
+      query: string;
+      params: unknown[];
+    };
+    expect(body.query).not.toContain("cardNumber");
+    expect(body.params).toEqual(["Renamed", 1]);
+  });
+
+  it("decrypts cardNumber on getCreditCardById", async () => {
+    const { encryptCardNumber } = await import("@/server/_core/crypto");
+    const ciphertext = encryptCardNumber("4111111111111111");
+
+    callDataApi.mockResolvedValue([
+      {
+        id: 1,
+        userId: 1,
+        name: "Test",
+        cardNumber: ciphertext,
+        cardholderName: "Tester",
+        expiryMonth: 12,
+        expiryYear: 2028,
+        creditLimit: "1000.00",
+        color: "#6366F1",
+        cardType: "credit",
+      },
+    ]);
+
+    const { getCreditCardById } = await import("@/server/db");
+    const card = await getCreditCardById(1);
+    expect(card?.cardNumber).toBe("4111111111111111");
+  });
+
+  it("decrypts cardNumber on getUserCreditCards", async () => {
+    const { encryptCardNumber } = await import("@/server/_core/crypto");
+    const ciphertext = encryptCardNumber("4111111111111111");
+
+    callDataApi.mockResolvedValue([
+      {
+        id: 1,
+        userId: 1,
+        name: "Test",
+        cardNumber: ciphertext,
+      },
+    ]);
+
+    const { getUserCreditCards } = await import("@/server/db");
+    const cards = await getUserCreditCards(1);
+    expect(cards[0]?.cardNumber).toBe("4111111111111111");
+  });
+
+  it("returns legacy plaintext rows unchanged on read", async () => {
+    callDataApi.mockResolvedValue([
+      { id: 1, userId: 1, name: "Legacy", cardNumber: "4111111111111111" },
+    ]);
+
+    const { getUserCreditCards } = await import("@/server/db");
+    const cards = await getUserCreditCards(1);
+    expect(cards[0]?.cardNumber).toBe("4111111111111111");
+  });
+});

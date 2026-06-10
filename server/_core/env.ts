@@ -13,4 +13,6 @@ export const ENV = {
   isProduction,
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  /** 32-byte AES key (hex or base64). Server-only — never expose to client. */
+  cardEncryptionKey: process.env.CARD_ENCRYPTION_KEY ?? "",
 };
