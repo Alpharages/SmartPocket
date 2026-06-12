@@ -1,6 +1,7 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
 import type { Express, Request, Response } from "express";
 import { getUserByOpenId, upsertUser } from "../db";
+import { ensureUserSeeded } from "./user-seeding";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
@@ -21,6 +22,7 @@ async function syncUser(userInfo: {
   }
 
   const lastSignedIn = new Date();
+  const isNewUser = (await getUserByOpenId(userInfo.openId)) === null;
   await upsertUser({
     openId: userInfo.openId,
     name: userInfo.name || null,
@@ -29,6 +31,9 @@ async function syncUser(userInfo: {
     lastSignedIn,
   });
   const saved = await getUserByOpenId(userInfo.openId);
+  if (isNewUser && saved?.id) {
+    await ensureUserSeeded(saved.id);
+  }
   return (
     saved ?? {
       openId: userInfo.openId,

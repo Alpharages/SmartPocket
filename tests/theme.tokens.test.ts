@@ -154,5 +154,12 @@ describe("Theme Tokens", () => {
       expect(boxShadow.md).toBeDefined();
       expect(boxShadow.lg).toBeDefined();
     });
+
+    it("should use NativeWind-compatible boxShadow values (no color-mix)", async () => {
+      const themeConfig = await import("@/theme.config");
+      for (const shadow of Object.values(themeConfig.tailwindBoxShadow)) {
+        expect(shadow).not.toContain("color-mix(");
+      }
+    });
   });
 });

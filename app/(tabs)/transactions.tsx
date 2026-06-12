@@ -26,6 +26,10 @@ import {
 } from "@/components/ui";
 import type { ChipOption } from "@/components/ui";
 import { readableTextOn } from "@/lib/_core/contrast";
+import { useCurrency } from "@/lib/currency-provider";
+import { formatSignedCurrency } from "@/lib/currency";
+import { getStartOfWeek } from "@/lib/date-utils";
+import { useFirstDayOfWeek } from "@/lib/first-day-of-week-provider";
 import { Spacing, Typography, resolveCategoryColor } from "@/lib/_core/theme";
 
 // ---------------------------------------------------------------------------
@@ -125,6 +129,7 @@ function TransactionDetailPane({
   transaction: ExpenseTransaction;
 }) {
   const colors = useColors();
+  const { currency } = useCurrency();
   const { categories, deleteTransaction } = useExpense();
 
   const scheme = (useColorScheme() ?? "light") as "light" | "dark";
@@ -185,7 +190,7 @@ function TransactionDetailPane({
           />
         </View>
         <Text className="text-4xl font-bold" style={{ color: accent }}>
-          {isIncome ? "+" : "-"}${transaction.amount}
+          {formatSignedCurrency(transaction.amount, currency, transaction.type)}
         </Text>
         <Text className="mt-xs text-sm text-muted font-medium capitalize">
           {transaction.type}
@@ -267,6 +272,7 @@ export default function TransactionsScreen() {
   >(null);
   const colors = useColors();
   const { isLg } = useBreakpoints();
+  const { firstDayOfWeek } = useFirstDayOfWeek();
 
   const isSearchOrFilterActive = searchText.length > 0 || filterType !== "all";
 
@@ -292,8 +298,7 @@ export default function TransactionsScreen() {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       filtered = filtered.filter((t) => new Date(t.date) >= startOfMonth);
     } else if (filterType === "thisWeek") {
-      const now = new Date();
-      const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+      const startOfWeek = getStartOfWeek(new Date(), firstDayOfWeek);
       filtered = filtered.filter((t) => new Date(t.date) >= startOfWeek);
     }
 
@@ -308,7 +313,7 @@ export default function TransactionsScreen() {
     return filtered.sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
     );
-  }, [transactions, filterType, searchText]);
+  }, [transactions, filterType, searchText, firstDayOfWeek]);
 
   // Group into SectionList sections after filtering.
   const sections = useMemo(

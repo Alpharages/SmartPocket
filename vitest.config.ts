@@ -26,6 +26,14 @@ export default defineConfig({
         __dirname,
         "./__mocks__/react-native-gesture-handler.ts",
       ),
+      "expo-constants": path.resolve(
+        __dirname,
+        "./__mocks__/expo-constants.ts",
+      ),
+      "expo-localization": path.resolve(
+        __dirname,
+        "./__mocks__/expo-localization.ts",
+      ),
       "@shared/": path.resolve(__dirname, "./shared/") + "/",
     },
   },

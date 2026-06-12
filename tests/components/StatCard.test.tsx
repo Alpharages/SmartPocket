@@ -8,6 +8,10 @@ import TestRenderer, {
 import { Text } from "react-native";
 
 import { StatCard } from "@/components/ui/StatCard";
+import {
+  formatCurrency,
+  formatCurrencyAccessibilityLabel,
+} from "@/lib/currency";
 
 const mockColors = {
   primary: "#4F46E5",
@@ -28,8 +32,18 @@ const mockColors = {
   tabIconSelected: "#4F46E5",
 };
 
+const currencyMock = vi.hoisted(() => ({
+  currency: "USD" as const,
+  setCurrency: vi.fn(),
+  isReady: true,
+}));
+
 vi.mock("@/hooks/use-colors", () => ({
   useColors: () => mockColors,
+}));
+
+vi.mock("@/lib/currency-provider", () => ({
+  useCurrency: () => currencyMock,
 }));
 
 vi.mock("@expo/vector-icons", () => ({
@@ -63,6 +77,7 @@ afterEach(() => {
     renderer?.unmount();
   });
   renderer = null;
+  currencyMock.isReady = true;
 });
 
 /** Concatenate the visible text under a node. */
@@ -98,9 +113,9 @@ describe("StatCard", () => {
         <StatCard variant="hero" label="Total Balance" amount={1240.5} />,
       );
       expect(getByText(root, "Total Balance")).toBeTruthy();
-      expect(getByText(root, "$1240.50")).toBeTruthy();
+      expect(getByText(root, formatCurrency(1240.5, "USD", { sign: "absolute" }))).toBeTruthy();
       // Hero shows absolute value without sign prefix
-      expect(queryText(root, "+$1240.50")).toHaveLength(0);
+      expect(queryText(root, formatCurrency(1240.5, "USD", { sign: "positive" }))).toHaveLength(0);
     });
 
     it("renders compact variant with label and amount", () => {
@@ -108,7 +123,7 @@ describe("StatCard", () => {
         <StatCard variant="compact" label="Income" amount={500} />,
       );
       expect(getByText(root, "Income")).toBeTruthy();
-      expect(getByText(root, "+$500.00")).toBeTruthy();
+      expect(getByText(root, formatCurrency(500, "USD", { sign: "positive" }))).toBeTruthy();
     });
 
     it("renders negative sign for expenses", () => {
@@ -121,7 +136,7 @@ describe("StatCard", () => {
         />,
       );
       expect(getByText(root, "Expenses")).toBeTruthy();
-      expect(getByText(root, "-$250.00")).toBeTruthy();
+      expect(getByText(root, formatCurrency(250, "USD", { sign: "negative" }))).toBeTruthy();
     });
 
     it("renders neutral sign for zero amount", () => {
@@ -129,21 +144,21 @@ describe("StatCard", () => {
         <StatCard variant="compact" label="Balance" amount={0} />,
       );
       expect(getByText(root, "Balance")).toBeTruthy();
-      expect(getByText(root, "$0.00")).toBeTruthy();
+      expect(getByText(root, formatCurrency(0, "USD"))).toBeTruthy();
     });
 
     it("infers positive sign from positive amount", () => {
       const root = render(
         <StatCard variant="compact" label="Income" amount={100} />,
       );
-      expect(getByText(root, "+$100.00")).toBeTruthy();
+      expect(getByText(root, formatCurrency(100, "USD", { sign: "positive" }))).toBeTruthy();
     });
 
     it("infers negative sign from negative amount", () => {
       const root = render(
         <StatCard variant="compact" label="Expenses" amount={-75} />,
       );
-      expect(getByText(root, "-$75.00")).toBeTruthy();
+      expect(getByText(root, formatCurrency(75, "USD", { sign: "negative" }))).toBeTruthy();
     });
 
     it("uses explicit sign prop over inferred amount", () => {
@@ -155,7 +170,7 @@ describe("StatCard", () => {
           sign="neutral"
         />,
       );
-      expect(getByText(root, "$50.00")).toBeTruthy();
+      expect(getByText(root, formatCurrency(-50, "USD", { sign: "neutral" }))).toBeTruthy();
     });
   });
 
@@ -179,21 +194,7 @@ describe("StatCard", () => {
       expect(getStatCardNode(compact).props.accessible).toBe(true);
     });
 
-    it("pluralizes dollar/cent correctly for singular amounts", () => {
-      const root = render(
-        <StatCard
-          variant="compact"
-          label="Balance"
-          amount={1.01}
-          sign="neutral"
-        />,
-      );
-      expect(getStatCardNode(root).props.accessibilityLabel).toBe(
-        "Balance, 1 dollar, 1 cent",
-      );
-    });
-
-    it("composes accessibilityLabel from label, sign, and amount", () => {
+    it("uses currency-aware accessibility labels", () => {
       const root = render(
         <StatCard
           variant="compact"
@@ -203,7 +204,7 @@ describe("StatCard", () => {
         />,
       );
       expect(getStatCardNode(root).props.accessibilityLabel).toBe(
-        "Income, plus, 1240 dollars, 50 cents",
+        `Income, ${formatCurrencyAccessibilityLabel(1240.5, "USD", "positive")}`,
       );
     });
 
@@ -231,8 +232,16 @@ describe("StatCard", () => {
         />,
       );
       expect(getStatCardNode(root).props.accessibilityLabel).toBe(
-        "Expenses, minus, 99 dollars, 99 cents",
+        `Expenses, ${formatCurrencyAccessibilityLabel(99.99, "USD", "negative")}`,
       );
+    });
+
+    it("shows skeleton while currency preference is loading", () => {
+      currencyMock.isReady = false;
+      const root = render(
+        <StatCard variant="compact" label="Income" amount={100} />,
+      );
+      expect(queryText(root, formatCurrency(100, "USD", { sign: "positive" }))).toHaveLength(0);
     });
   });
 
@@ -243,7 +252,7 @@ describe("StatCard", () => {
       );
       // In loading state, the text nodes should not be present
       expect(queryText(root, "Total Balance")).toHaveLength(0);
-      expect(queryText(root, "$100.00")).toHaveLength(0);
+      expect(queryText(root, formatCurrency(100, "USD"))).toHaveLength(0);
     });
 
     it("renders skeleton placeholders in compact loading state", () => {
@@ -251,7 +260,7 @@ describe("StatCard", () => {
         <StatCard variant="compact" label="Income" amount={100} loading />,
       );
       expect(queryText(root, "Income")).toHaveLength(0);
-      expect(queryText(root, "+$100.00")).toHaveLength(0);
+      expect(queryText(root, formatCurrency(100, "USD", { sign: "positive" }))).toHaveLength(0);
     });
   });
 
@@ -260,7 +269,7 @@ describe("StatCard", () => {
       const root = render(
         <StatCard variant="hero" label="Total Balance" amount={100} />,
       );
-      const amountNode = getByText(root, "$100.00");
+      const amountNode = getByText(root, formatCurrency(100, "USD", { sign: "absolute" }));
       expect(amountNode.props.className).toContain("tabular-nums");
     });
 
@@ -268,17 +277,19 @@ describe("StatCard", () => {
       const root = render(
         <StatCard variant="compact" label="Income" amount={100} />,
       );
-      const amountNode = getByText(root, "+$100.00");
+      const amountNode = getByText(root, formatCurrency(100, "USD", { sign: "positive" }));
       expect(amountNode.props.className).toContain("tabular-nums");
     });
   });
 
   describe("currency formatting", () => {
-    it("formats large amounts without commas (toFixed only)", () => {
+    it("formats large amounts via Intl currency formatting", () => {
       const root = render(
         <StatCard variant="compact" label="Balance" amount={1234567.89} />,
       );
-      expect(getByText(root, "+$1234567.89")).toBeTruthy();
+      expect(
+        getByText(root, formatCurrency(1234567.89, "USD", { sign: "positive" })),
+      ).toBeTruthy();
     });
 
     it("handles negative large amounts", () => {
@@ -290,7 +301,9 @@ describe("StatCard", () => {
           sign="negative"
         />,
       );
-      expect(getByText(root, "-$500000.00")).toBeTruthy();
+      expect(
+        getByText(root, formatCurrency(500000, "USD", { sign: "negative" })),
+      ).toBeTruthy();
     });
   });
 });

@@ -38,3 +38,5 @@ export { ConfirmSheet } from "./ConfirmSheet";
 export type { ConfirmOptions, ConfirmSheetProps } from "./ConfirmSheet";
 export { TwoPaneLayout } from "./TwoPaneLayout";
 export type { TwoPaneLayoutProps } from "./TwoPaneLayout";
+export { SettingsRow } from "./SettingsRow";
+export type { SettingsRowProps } from "./SettingsRow";

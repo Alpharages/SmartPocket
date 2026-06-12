@@ -89,6 +89,20 @@ const elevation = {
   lg: "0 10px 15px -3px color-mix(in srgb, var(--color-foreground) 12%, transparent), 0 4px 6px -4px color-mix(in srgb, var(--color-foreground) 10%, transparent)",
 };
 
+/**
+ * Tailwind `boxShadow` tokens for NativeWind className utilities (`shadow-sm`, etc.).
+ * NativeWind's native CSS pipeline cannot parse `color-mix()` inside shadow values —
+ * it truncates at the comma and emits invalid CSS (`color-mix(in;`), which breaks Metro.
+ * Use fixed rgba approximations here; keep theme-aware `elevation` for StyleSheet/web.
+ * @type {const}
+ */
+const tailwindBoxShadow = {
+  none: "0 0 0 0 transparent",
+  sm: "0 1px 2px 0 rgba(17, 24, 39, 0.08)",
+  md: "0 4px 6px -1px rgba(17, 24, 39, 0.12), 0 2px 4px -2px rgba(17, 24, 39, 0.10)",
+  lg: "0 10px 15px -3px rgba(17, 24, 39, 0.12), 0 4px 6px -4px rgba(17, 24, 39, 0.10)",
+};
+
 /** Sheet / modal motion — ~250ms fade + slide (Story 1.9). */
 const motion = {
   sheet: {
@@ -107,5 +121,6 @@ module.exports = {
   radius,
   typography,
   elevation,
+  tailwindBoxShadow,
   motion,
 };

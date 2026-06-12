@@ -69,7 +69,7 @@ describe("credit card db encryption", () => {
     expect(body.params).toEqual(["Renamed", 1]);
   });
 
-  it("decrypts cardNumber on getCreditCardById", async () => {
+  it("decrypts cardNumber on getCreditCardById then masks the response", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
     const ciphertext = encryptCardNumber("4111111111111111");
 
@@ -90,10 +90,11 @@ describe("credit card db encryption", () => {
 
     const { getCreditCardById } = await import("@/server/db");
     const card = await getCreditCardById(1);
-    expect(card?.cardNumber).toBe("4111111111111111");
+    expect(card?.cardNumberLast4).toBe("1111");
+    expect(card && "cardNumber" in card).toBe(false);
   });
 
-  it("decrypts cardNumber on getUserCreditCards", async () => {
+  it("decrypts cardNumber on getUserCreditCards then masks each row", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
     const ciphertext = encryptCardNumber("4111111111111111");
 
@@ -108,16 +109,18 @@ describe("credit card db encryption", () => {
 
     const { getUserCreditCards } = await import("@/server/db");
     const cards = await getUserCreditCards(1);
-    expect(cards[0]?.cardNumber).toBe("4111111111111111");
+    expect(cards[0]?.cardNumberLast4).toBe("1111");
+    expect(cards[0] && "cardNumber" in cards[0]).toBe(false);
   });
 
-  it("returns legacy plaintext rows unchanged on read", async () => {
+  it("returns legacy plaintext rows masked on read", async () => {
     callDataApi.mockResolvedValue([
       { id: 1, userId: 1, name: "Legacy", cardNumber: "4111111111111111" },
     ]);
 
     const { getUserCreditCards } = await import("@/server/db");
     const cards = await getUserCreditCards(1);
-    expect(cards[0]?.cardNumber).toBe("4111111111111111");
+    expect(cards[0]?.cardNumberLast4).toBe("1111");
+    expect(cards[0] && "cardNumber" in cards[0]).toBe(false);
   });
 });

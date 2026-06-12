@@ -10,6 +10,12 @@ import Animated, {
 import { Ionicons } from "@expo/vector-icons";
 
 import { useColors } from "@/hooks/use-colors";
+import { useCurrency } from "@/lib/currency-provider";
+import {
+  formatCurrency,
+  formatCurrencyAccessibilityLabel,
+  type CurrencyCode,
+} from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
 export type StatCardVariant = "hero" | "compact";
@@ -25,12 +31,17 @@ export interface StatCardProps extends ViewProps {
   accessibilityLabel?: string;
 }
 
-/** Centralised currency formatter — $ prefix, toFixed(2), tabular figures. */
-function formatCurrency(value: number, sign: StatSign): string {
-  const absValue = Math.abs(value).toFixed(2);
-  if (sign === "negative") return `-$${absValue}`;
-  if (sign === "positive") return `+$${absValue}`;
-  return `$${absValue}`;
+/** Centralised currency formatter — delegates to lib/currency.ts. */
+function formatStatAmount(
+  value: number,
+  currency: ReturnType<typeof useCurrency>["currency"],
+  sign: StatSign,
+  variant: StatCardVariant,
+): string {
+  if (variant === "hero") {
+    return formatCurrency(value, currency, { sign: "absolute" });
+  }
+  return formatCurrency(value, currency, { sign });
 }
 
 /** Resolve sign from amount when not explicitly provided. */
@@ -40,25 +51,15 @@ function inferSign(amount: number): StatSign {
   return "neutral";
 }
 
-/** Build a screen-reader friendly announcement. */
+/** Build a screen-reader friendly announcement using the active currency. */
 function buildAccessibilityLabel(
   label: string,
   amount: number,
   sign: StatSign,
+  currency: CurrencyCode,
 ): string {
-  const absCents = Math.round(Math.abs(amount) * 100);
-  const dollars = Math.floor(absCents / 100);
-  const cents = absCents % 100;
-
-  const signWord =
-    sign === "positive" ? "plus" : sign === "negative" ? "minus" : "";
-
-  const parts: string[] = [label];
-  if (signWord) parts.push(signWord);
-  parts.push(`${dollars} ${dollars === 1 ? "dollar" : "dollars"}`);
-  if (cents > 0) parts.push(`${cents} ${cents === 1 ? "cent" : "cents"}`);
-
-  return parts.join(", ");
+  const amountLabel = formatCurrencyAccessibilityLabel(amount, currency, sign);
+  return `${label}, ${amountLabel}`;
 }
 
 /** Color mapping for semantic signs. */
@@ -148,18 +149,16 @@ export function StatCard({
   ...viewProps
 }: StatCardProps) {
   const colors = useColors();
+  const { currency, isReady } = useCurrency();
   const resolvedSign = signProp ?? inferSign(amount);
+  const showLoading = loading || !isReady;
   const resolvedAccessibilityLabel =
     accessibilityLabelProp ??
-    buildAccessibilityLabel(label, amount, resolvedSign);
+    buildAccessibilityLabel(label, amount, resolvedSign, currency);
 
   const displayValue = useMemo(() => {
-    if (variant === "hero") {
-      // Hero shows absolute balance without sign prefix (matches current dashboard)
-      return `$${Math.abs(amount).toFixed(2)}`;
-    }
-    return formatCurrency(amount, resolvedSign);
-  }, [variant, amount, resolvedSign]);
+    return formatStatAmount(amount, currency, resolvedSign, variant);
+  }, [variant, amount, resolvedSign, currency]);
 
   const semanticColor = signColor(resolvedSign, colors);
   const semanticIcon = icon ?? signIcon(resolvedSign);
@@ -191,7 +190,7 @@ export function StatCard({
         accessibilityLabel={resolvedAccessibilityLabel}
         {...viewProps}
       >
-        {loading ? (
+        {showLoading ? (
           <View className="gap-3">
             <SkeletonPulse className="h-4 w-1/3 rounded-md" />
             <SkeletonPulse className="h-12 w-2/3 rounded-lg" />
@@ -237,7 +236,7 @@ export function StatCard({
       accessibilityLabel={resolvedAccessibilityLabel}
       {...viewProps}
     >
-      {loading ? (
+      {showLoading ? (
         <>
           <SkeletonPulse className="h-8 w-8 rounded-full" />
           <SkeletonPulse className="h-3 w-16 rounded-md mt-xs" />

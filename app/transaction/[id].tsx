@@ -11,6 +11,8 @@ import { useColors } from "@/hooks/use-colors";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useExpense } from "@/lib/expense-context";
+import { useCurrency } from "@/lib/currency-provider";
+import { formatSignedCurrency } from "@/lib/currency";
 import Animated, { FadeInUp } from "react-native-reanimated";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -29,6 +31,7 @@ function formatDate(value: Date): string {
 export default function TransactionDetailScreen() {
   const router = useRouter();
   const colors = useColors();
+  const { currency } = useCurrency();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { transactions, categories, deleteTransaction, loadingTransactions } =
     useExpense();
@@ -148,7 +151,7 @@ export default function TransactionDetailScreen() {
             />
           </View>
           <Text className="text-4xl font-bold" style={{ color: accent }}>
-            {isIncome ? "+" : "-"}${transaction.amount}
+            {formatSignedCurrency(transaction.amount, currency, transaction.type)}
           </Text>
           <Text className="mt-xs text-sm text-muted font-medium capitalize">
             {transaction.type}

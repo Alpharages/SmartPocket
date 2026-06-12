@@ -42,6 +42,12 @@ const providers = vi.hoisted(() => ({
     React.createElement("ThemeProvider", {}, children),
   ToastProvider: ({ children }: { children: React.ReactNode }) =>
     React.createElement("ToastProvider", {}, children),
+  CurrencyProvider: ({ children }: { children: React.ReactNode }) =>
+    React.createElement("CurrencyProvider", {}, children),
+  FirstDayOfWeekProvider: ({ children }: { children: React.ReactNode }) =>
+    React.createElement("FirstDayOfWeekProvider", {}, children),
+  SettingsProvider: ({ children }: { children: React.ReactNode }) =>
+    React.createElement("SettingsProvider", {}, children),
   ExpenseProvider: ({ children }: { children: React.ReactNode }) =>
     React.createElement("ExpenseProvider", {}, children),
 }));
@@ -51,6 +57,9 @@ vi.mock("@/lib/_core/manus-runtime", () => runtime);
 vi.mock("@/constants/oauth", () => oauth);
 vi.mock("@/lib/trpc", () => trpc);
 vi.mock("@/lib/theme-provider", () => providers);
+vi.mock("@/lib/currency-provider", () => providers);
+vi.mock("@/lib/first-day-of-week-provider", () => providers);
+vi.mock("@/lib/settings-provider", () => providers);
 vi.mock("@/lib/expense-context", () => providers);
 vi.mock("@/components/ui/ToastProvider", () => providers);
 vi.mock("expo-router", () => ({

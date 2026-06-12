@@ -76,6 +76,13 @@ export const elevation: {
   lg: string;
 };
 
+export const tailwindBoxShadow: {
+  none: string;
+  sm: string;
+  md: string;
+  lg: string;
+};
+
 export const motion: {
   sheet: {
     durationMs: number;
@@ -92,6 +99,7 @@ declare const themeConfig: {
   radius: typeof radius;
   typography: typeof typography;
   elevation: typeof elevation;
+  tailwindBoxShadow: typeof tailwindBoxShadow;
   motion: typeof motion;
 };
 

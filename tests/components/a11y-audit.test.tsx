@@ -40,6 +40,14 @@ vi.mock("@/hooks/use-color-scheme", () => ({
   useColorScheme: () => "light",
 }));
 
+vi.mock("@/lib/currency-provider", () => ({
+  useCurrency: () => ({
+    currency: "USD",
+    setCurrency: vi.fn(),
+    isReady: true,
+  }),
+}));
+
 vi.mock("@expo/vector-icons", () => {
   const Ionicons = ({ name, testID }: { name: string; testID?: string }) =>
     React.createElement("Ionicons", { name, testID });

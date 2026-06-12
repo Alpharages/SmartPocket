@@ -28,6 +28,8 @@ import { useColors } from "@/hooks/use-colors";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Button, CategoryPickerGrid, EmptyState, Pill } from "@/components/ui";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useCurrency } from "@/lib/currency-provider";
+import { getCurrencySymbol } from "@/lib/currency";
 import { ContentMaxWidth, Radius, Spacing, Typography } from "@/lib/_core/theme";
 import { resolveCategoryColor } from "@/constants/theme";
 
@@ -51,6 +53,7 @@ export default function AddTransactionScreen() {
   const scheme = (useColorScheme() ?? "light") as "light" | "dark";
   const { categories, transactions, addTransaction } = useExpense();
   const toast = useToast();
+  const { currency } = useCurrency();
 
   const [type, setType] = useState<"income" | "expense">(
     (queryType as "income" | "expense") || "expense",
@@ -273,7 +276,7 @@ export default function AddTransactionScreen() {
                   className="text-foreground font-bold mr-sm"
                   style={{ fontSize: Typography.h2.fontSize }}
                 >
-                  $
+                  {getCurrencySymbol(currency)}
                 </Text>
                 <TextInput
                   autoFocus

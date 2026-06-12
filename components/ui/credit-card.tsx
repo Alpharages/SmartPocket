@@ -103,7 +103,7 @@ function CardBrandMark({ brand }: { brand: CardBrand }) {
 
 export type CreditCardProps = {
   name: string;
-  cardNumber: string;
+  cardNumberLast4: string;
   cardholderName: string;
   expiryMonth: number;
   expiryYear: number;
@@ -116,7 +116,7 @@ export type CreditCardProps = {
 
 export function CreditCard({
   name,
-  cardNumber,
+  cardNumberLast4,
   cardholderName,
   expiryMonth,
   expiryYear,
@@ -125,10 +125,9 @@ export function CreditCard({
   onLongPress,
   onEdit,
 }: CreditCardProps) {
-  const lastFour = cardNumber.slice(-4);
-  const maskedNumber = `•••• •••• •••• ${lastFour}`;
+  const maskedNumber = `•••• •••• •••• ${cardNumberLast4}`;
   const expiry = `${String(expiryMonth).padStart(2, "0")}/${String(expiryYear).slice(-2)}`;
-  const brand = detectBrand(cardNumber);
+  const brand = detectBrand(cardNumberLast4);
 
   const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
 
@@ -195,7 +194,7 @@ export function CreditCard({
           onPressIn={onPressIn}
           onPressOut={onPressOut}
           accessibilityRole="button"
-          accessibilityLabel={`${name} card ending in ${lastFour}`}
+          accessibilityLabel={`${name} card ending in ${cardNumberLast4}`}
           accessibilityHint="Long press to delete"
           style={[{ padding: Spacing.xl }, animatedStyle]}
         >

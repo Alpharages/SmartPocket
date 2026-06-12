@@ -140,7 +140,7 @@ const mockCard1 = {
   id: 1,
   userId: 1,
   name: "My Visa",
-  cardNumber: "1234567890123456",
+  cardNumberLast4: "3456",
   cardholderName: "John Doe",
   expiryMonth: 3,
   expiryYear: 2027,
@@ -157,7 +157,7 @@ const mockCard2 = {
   id: 2,
   userId: 1,
   name: "Mastercard",
-  cardNumber: "9876543210987654",
+  cardNumberLast4: "7654",
   cardholderName: "Jane Doe",
   expiryMonth: 11,
   expiryYear: 2029,
@@ -345,7 +345,7 @@ describe("CardsScreen", () => {
       expect(maskedNodes.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("calls updateCreditCard with original cardNumber unchanged on save", async () => {
+    it("calls updateCreditCard without cardNumber when unchanged on save", async () => {
       const root = renderScreen();
       const editBtn = root.find(
         (n) =>
@@ -373,7 +373,6 @@ describe("CardsScreen", () => {
         mockCard1.id,
         expect.objectContaining({
           name: "Updated Visa",
-          cardNumber: mockCard1.cardNumber,
           cardholderName: "John Doe",
           expiryMonth: 3,
           expiryYear: 2027,
@@ -381,6 +380,9 @@ describe("CardsScreen", () => {
           color: "#6366F1",
           cardType: "credit",
         }),
+      );
+      expect(mockUpdateCreditCard.mock.calls[0][1]).not.toHaveProperty(
+        "cardNumber",
       );
     });
 

@@ -11,6 +11,7 @@ import TestRenderer, {
 // placing them at the module-level (hoisted by Vitest's vi.mock transform).
 import { useExpense, type MonthlyStats } from "@/lib/expense-context";
 import DashboardScreen from "@/app/(tabs)/dashboard";
+import { formatCurrency } from "@/lib/currency";
 
 // ---------------------------------------------------------------------------
 // Module mocks — must appear before any imports that trigger the mocked modules
@@ -47,6 +48,8 @@ vi.mock("@expo/vector-icons", () => {
     "wallet-outline": 1,
     "arrow-down": 1,
     "arrow-up": 1,
+    "settings-outline": 1,
+    "chevron-back": 1,
   };
   return { Ionicons };
 });
@@ -72,6 +75,14 @@ const mockColors = {
 
 vi.mock("@/hooks/use-colors", () => ({
   useColors: () => mockColors,
+}));
+
+vi.mock("@/lib/currency-provider", () => ({
+  useCurrency: () => ({
+    currency: "USD",
+    setCurrency: vi.fn(),
+    isReady: true,
+  }),
 }));
 
 const mockStats = {
@@ -267,6 +278,22 @@ describe("DashboardScreen", () => {
       expect(header).toBeTruthy();
     });
 
+    it("navigates to settings when the settings icon is pressed", () => {
+      mockPush.mockClear();
+      const root = render(<DashboardScreen />);
+      const settingsBtn = root.find(
+        (n) =>
+          (n.props as { accessibilityRole?: string; accessibilityLabel?: string })
+            .accessibilityRole === "button" &&
+          (n.props as { accessibilityLabel?: string }).accessibilityLabel ===
+            "Open settings",
+      );
+      act(() => {
+        settingsBtn.props.onPress?.();
+      });
+      expect(mockPush).toHaveBeenCalledWith("/settings");
+    });
+
     it("renders two Button elements — one income, one destructive", () => {
       const root = render(<DashboardScreen />);
       const incomeButtons = queryAllByProp(root, "testID", "button-income").length
@@ -316,7 +343,9 @@ describe("DashboardScreen", () => {
       const root = render(<DashboardScreen />);
       // StatCard hero renders "$1800.00" — the abs value of netBalance
       const balanceText = root.findAll(
-        (n) => String(n.type) === "Text" && collectText(n) === "$1800.00",
+        (n) =>
+          String(n.type) === "Text" &&
+          collectText(n) === formatCurrency(1800, "USD", { sign: "absolute" }),
       );
       expect(balanceText.length).toBeGreaterThanOrEqual(1);
     });
@@ -325,7 +354,10 @@ describe("DashboardScreen", () => {
       const root = render(<DashboardScreen />);
       const incomeText = root.findAll(
         (n) =>
-          String(n.type) === "Text" && collectText(n).includes("3000.00"),
+          String(n.type) === "Text" &&
+          collectText(n).includes(
+            formatCurrency(3000, "USD", { sign: "positive" }).replace("+", ""),
+          ),
       );
       expect(incomeText.length).toBeGreaterThanOrEqual(1);
     });
@@ -334,7 +366,10 @@ describe("DashboardScreen", () => {
       const root = render(<DashboardScreen />);
       const expenseText = root.findAll(
         (n) =>
-          String(n.type) === "Text" && collectText(n).includes("1200.00"),
+          String(n.type) === "Text" &&
+          collectText(n).includes(
+            formatCurrency(1200, "USD", { sign: "negative" }).replace("-", ""),
+          ),
       );
       expect(expenseText.length).toBeGreaterThanOrEqual(1);
     });

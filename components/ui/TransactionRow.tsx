@@ -18,6 +18,8 @@ import { Swipeable } from "react-native-gesture-handler";
 import * as Haptics from "expo-haptics";
 
 import { useColors } from "@/hooks/use-colors";
+import { useCurrency } from "@/lib/currency-provider";
+import { formatSignedCurrency } from "@/lib/currency";
 import { Typography } from "@/lib/_core/theme";
 import { cn } from "@/lib/utils";
 import { CategoryToken } from "./CategoryToken";
@@ -67,9 +69,9 @@ function withAlpha(color: string, alphaHex: string): string {
 function formatSignedAmount(
   amount: string | number,
   type: "income" | "expense",
+  currency: ReturnType<typeof useCurrency>["currency"],
 ): string {
-  const absValue = Math.abs(toSafeNumber(amount)).toFixed(2);
-  return `${type === "income" ? "+" : "-"}$${absValue}`;
+  return formatSignedCurrency(amount, currency, type);
 }
 
 /** Build a screen-reader friendly summary label. */
@@ -78,16 +80,17 @@ function buildAccessibilityLabel(
   type: "income" | "expense",
   amount: string | number,
   date: string | Date,
+  currency: ReturnType<typeof useCurrency>["currency"],
   note?: string,
   cardLabel?: string,
 ): string {
-  const absValue = Math.abs(toSafeNumber(amount)).toFixed(2);
+  const formattedAmount = formatSignedAmount(amount, type, currency);
   const dateObj = toValidDate(date);
   const dateStr = dateObj
     ? dateObj.toLocaleDateString("en-US", { month: "long", day: "numeric" })
     : "";
 
-  const parts: string[] = [title, type, `$${absValue}`];
+  const parts: string[] = [title, type, formattedAmount];
   if (dateStr) parts.push(dateStr);
   if (cardLabel) parts.push(`via ${cardLabel}`);
   if (note) parts.push(note);
@@ -133,6 +136,7 @@ export function TransactionRow({
   style,
 }: TransactionRowProps) {
   const colors = useColors();
+  const { currency, isReady } = useCurrency();
   const reducedMotion = useReducedMotion();
   const scale = useSharedValue(1);
 
@@ -162,15 +166,25 @@ export function TransactionRow({
   }, [onPress]);
 
   const displayAmount = useMemo(
-    () => formatSignedAmount(amount, type),
-    [amount, type],
+    () =>
+      isReady ? formatSignedAmount(amount, type, currency) : "—",
+    [amount, type, currency, isReady],
   );
 
   const displayDate = useMemo(() => formatDate(date), [date]);
 
   const accessibilityLabel = useMemo(
-    () => buildAccessibilityLabel(title, type, amount, date, note, cardLabel),
-    [title, type, amount, date, note, cardLabel],
+    () =>
+      buildAccessibilityLabel(
+        title,
+        type,
+        amount,
+        date,
+        currency,
+        note,
+        cardLabel,
+      ),
+    [title, type, amount, date, currency, note, cardLabel],
   );
 
   // Edit/Delete are swipe-only for sighted touch users; expose the same actions

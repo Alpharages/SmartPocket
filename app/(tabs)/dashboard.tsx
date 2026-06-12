@@ -209,7 +209,25 @@ export default function DashboardScreen() {
         <ResponsiveContent maxWidth={ContentMaxWidth.dashboard}>
           {/* Header */}
           <Animated.View entering={FadeInDown.duration(500)}>
-            <ScreenHeader title="Home" subtitle={formattedDate} />
+            <ScreenHeader
+              title="Home"
+              subtitle={formattedDate}
+              accessibilityLabel="Home screen"
+              action={
+                <Button
+                  variant="icon-only"
+                  accessibilityLabel="Open settings"
+                  onPress={() => router.push("/settings")}
+                  leftIcon={
+                    <Ionicons
+                      name="settings-outline"
+                      size={22}
+                      color={colors.foreground}
+                    />
+                  }
+                />
+              }
+            />
           </Animated.View>
 
           {isLg ? (

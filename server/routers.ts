@@ -115,12 +115,25 @@ const creditCardsRouter = router({
     }),
 
   update: protectedProcedure
-    .input(z.object({ id: z.number(), ...creditCardSchema.shape }))
+    .input(
+      z.object({
+        id: z.number(),
+        name: creditCardSchema.shape.name,
+        cardNumber: creditCardSchema.shape.cardNumber.optional(),
+        cardholderName: creditCardSchema.shape.cardholderName,
+        expiryMonth: creditCardSchema.shape.expiryMonth,
+        expiryYear: creditCardSchema.shape.expiryYear,
+        creditLimit: creditCardSchema.shape.creditLimit,
+        color: creditCardSchema.shape.color,
+        cardType: creditCardSchema.shape.cardType,
+      }),
+    )
     .mutation(({ input }) => {
-      const { id, ...data } = input;
+      const { id, cardNumber, ...data } = input;
       return db.updateCreditCard(id, {
         ...data,
         creditLimit: data.creditLimit,
+        ...(cardNumber !== undefined ? { cardNumber } : {}),
       });
     }),
 
@@ -251,6 +264,33 @@ const summaryRouter = router({
 });
 
 // ============================================================================
+// SETTINGS ROUTER
+// ============================================================================
+
+const settingsRouter = router({
+  get: protectedProcedure.query(({ ctx }) => {
+    return db.getUserSettings(ctx.user.id);
+  }),
+
+  setAiEnabled: protectedProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await db.updateAiEnabled(ctx.user.id, input.enabled);
+      return { aiEnabled: input.enabled };
+    }),
+});
+
+// ============================================================================
+// DATA MANAGEMENT ROUTER
+// ============================================================================
+
+const dataRouter = router({
+  clearAll: protectedProcedure.mutation(({ ctx }) => {
+    return db.deleteAllUserData(ctx.user.id);
+  }),
+});
+
+// ============================================================================
 // APP ROUTER
 // ============================================================================
 
@@ -261,6 +301,8 @@ export const appRouter = router({
   creditCards: creditCardsRouter,
   transactions: transactionsRouter,
   summary: summaryRouter,
+  settings: settingsRouter,
+  data: dataRouter,
 });
 
 export type AppRouter = typeof appRouter;

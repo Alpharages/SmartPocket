@@ -19,7 +19,7 @@ export interface CreditCard {
   id: number;
   userId: number;
   name: string;
-  cardNumber: string;
+  cardNumberLast4: string;
   cardholderName: string;
   expiryMonth: number;
   expiryYear: number;
@@ -31,6 +31,11 @@ export interface CreditCard {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type CreateCreditCardInput = Omit<
+  CreditCard,
+  "id" | "userId" | "createdAt" | "updatedAt" | "cardNumberLast4"
+> & { cardNumber: string };
 
 export interface Transaction {
   id: number;
@@ -64,8 +69,8 @@ interface ExpenseContextType {
   creditCards: CreditCard[];
   loadingCards: boolean;
   refreshCreditCards: () => Promise<void>;
-  addCreditCard: (data: any) => Promise<void>;
-  updateCreditCard: (id: number, data: Partial<CreditCard>) => Promise<void>;
+  addCreditCard: (data: CreateCreditCardInput) => Promise<void>;
+  updateCreditCard: (id: number, data: Partial<CreditCard> & { cardNumber?: string }) => Promise<void>;
   deleteCreditCard: (id: number) => Promise<void>;
 
   // Transactions
@@ -75,6 +80,7 @@ interface ExpenseContextType {
   addTransaction: (data: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<void>;
   updateTransaction: (id: number, data: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: number) => Promise<void>;
+  clearAllData: () => Promise<void>;
 
   // Summary
   monthlyStats: MonthlyStats | null;
@@ -191,13 +197,30 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   }, [creditCardsQuery]);
 
   const addCreditCard = useCallback(
-    async (data: Omit<CreditCard, "id" | "userId" | "createdAt" | "updatedAt">) => {
+    async (data: CreateCreditCardInput) => {
       const now = new Date();
-      const optimistic: CreditCard = { ...data, id: -Date.now(), userId: 0, createdAt: now, updatedAt: now };
+      const { cardNumber, ...rest } = data;
+      const optimistic: CreditCard = {
+        ...rest,
+        cardNumberLast4: cardNumber.slice(-4),
+        id: -Date.now(),
+        userId: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
       const snapshot = snapshotList(creditCards);
       setCreditCards((prev) => applyOptimistic(prev, { type: "add", item: optimistic, position: "end" }));
       try {
-        await createCardMutation.mutateAsync(data);
+        await createCardMutation.mutateAsync({
+          name: data.name,
+          cardNumber: data.cardNumber,
+          cardholderName: data.cardholderName,
+          expiryMonth: data.expiryMonth,
+          expiryYear: data.expiryYear,
+          creditLimit: data.creditLimit,
+          color: data.color,
+          cardType: data.cardType,
+        });
         await refreshCreditCards();
         toast.show({ type: "success", message: "Card added" });
       } catch {
@@ -210,11 +233,16 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateCreditCard = useCallback(
-    async (id: number, data: Partial<CreditCard>) => {
+    async (id: number, data: Partial<CreditCard> & { cardNumber?: string }) => {
       const snapshot = snapshotList(creditCards);
-      setCreditCards((prev) => applyOptimistic(prev, { type: "update", id, data }));
+      const { cardNumber, ...rest } = data;
+      setCreditCards((prev) => applyOptimistic(prev, { type: "update", id, data: rest }));
       try {
-        await updateCardMutation.mutateAsync({ id, ...data } as any);
+        await updateCardMutation.mutateAsync({
+          id,
+          ...rest,
+          ...(cardNumber !== undefined ? { cardNumber } : {}),
+        } as Parameters<typeof updateCardMutation.mutateAsync>[0]);
         toast.show({ type: "success", message: "Card updated" });
       } catch {
         setCreditCards(snapshot);
@@ -246,6 +274,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const createTransactionMutation = trpc.transactions.create.useMutation();
   const updateTransactionMutation = trpc.transactions.update.useMutation();
   const deleteTransactionMutation = trpc.transactions.delete.useMutation();
+  const clearAllMutation = trpc.data.clearAll.useMutation();
 
   const refreshTransactions = useCallback(async () => {
     setLoadingTransactions(true);
@@ -311,7 +340,6 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     [deleteTransactionMutation, transactions, toast]
   );
 
-  // Monthly Stats
   const statsQuery = trpc.summary.monthlyStats.useQuery({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
@@ -331,6 +359,30 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     },
     [statsQuery]
   );
+
+  const clearAllData = useCallback(async () => {
+    const now = new Date();
+    try {
+      await clearAllMutation.mutateAsync();
+      await Promise.all([
+        refreshCategories(),
+        refreshCreditCards(),
+        refreshTransactions(),
+        refreshMonthlyStats(now.getFullYear(), now.getMonth() + 1),
+      ]);
+      toast.show({ type: "success", message: "All data cleared" });
+    } catch {
+      toast.show({ type: "error", message: "Failed to clear data" });
+      throw new Error("clearAllData failed");
+    }
+  }, [
+    clearAllMutation,
+    refreshCategories,
+    refreshCreditCards,
+    refreshTransactions,
+    refreshMonthlyStats,
+    toast,
+  ]);
 
   // Initialize data on mount
   useEffect(() => {
@@ -361,6 +413,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    clearAllData,
 
     monthlyStats,
     loadingStats,

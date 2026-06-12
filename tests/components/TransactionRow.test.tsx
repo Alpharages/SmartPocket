@@ -32,6 +32,14 @@ vi.mock("@/hooks/use-colors", () => ({
   useColors: () => mockColors,
 }));
 
+vi.mock("@/lib/currency-provider", () => ({
+  useCurrency: () => ({
+    currency: "USD",
+    setCurrency: vi.fn(),
+    isReady: true,
+  }),
+}));
+
 vi.mock("@/hooks/use-color-scheme", () => ({
   useColorScheme: () => "light",
 }));

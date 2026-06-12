@@ -56,6 +56,15 @@ export function encryptCardNumber(plain: string): string {
 /**
  * Decrypt a stored card number. Legacy plaintext rows (pre-migration) pass through.
  */
+/** Return only the last four digits of a plaintext PAN for API/UI responses. */
+export function maskCardNumber(plain: string): string {
+  const trimmed = plain.trim();
+  if (!trimmed) {
+    return "";
+  }
+  return trimmed.slice(-4);
+}
+
 export function decryptCardNumber(stored: string): string {
   if (!isEncryptedCardNumber(stored)) {
     return stored;

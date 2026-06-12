@@ -1,6 +1,11 @@
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { callDataApi } from "./_core/dataApi";
-import { decryptCardNumber, encryptCardNumber } from "./_core/crypto";
+import {
+  decryptCardNumber,
+  encryptCardNumber,
+  maskCardNumber,
+} from "./_core/crypto";
+import { DEFAULT_CATEGORIES } from "./_core/default-categories";
 import {
   CATEGORY_DEFAULT_COLOR,
   getCategoryColorForName,
@@ -84,6 +89,36 @@ export async function upsertUser(data: {
   });
 }
 
+/** Coerce MySQL tinyint (0/1) or boolean — never use Boolean() (string "0" is truthy). */
+function coerceDbBoolean(value: unknown): boolean {
+  return value === 1 || value === true;
+}
+
+export async function getUserSettings(userId: number): Promise<{ aiEnabled: boolean }> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query: "SELECT aiEnabled FROM users WHERE id = ?",
+      params: [userId],
+    },
+  });
+
+  const row = result && Array.isArray(result) ? result[0] : null;
+  if (!row) {
+    return { aiEnabled: false };
+  }
+
+  return { aiEnabled: coerceDbBoolean(row.aiEnabled) };
+}
+
+export async function updateAiEnabled(userId: number, enabled: boolean): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query: "UPDATE users SET aiEnabled = ? WHERE id = ?",
+      params: [enabled, userId],
+    },
+  });
+}
+
 // ============================================================================
 // CATEGORIES
 // ============================================================================
@@ -130,6 +165,37 @@ export async function createCategory(data: InsertCategory) {
     : 0;
 }
 
+/** Idempotent: seeds DEFAULT_CATEGORIES once per user when they have zero categories. */
+export async function seedDefaultCategories(userId: number): Promise<void> {
+  const countResult = await callDataApi("Database/query", {
+    body: {
+      query:
+        "SELECT COUNT(*) as categoryCount FROM categories WHERE userId = ?",
+      params: [userId],
+    },
+  });
+
+  const row =
+    Array.isArray(countResult) && countResult.length > 0
+      ? (countResult[0] as Record<string, unknown>)
+      : null;
+  const existingCount = Number(row?.categoryCount ?? 0);
+  if (existingCount > 0) {
+    return;
+  }
+
+  for (const def of DEFAULT_CATEGORIES) {
+    await createCategory({
+      userId,
+      name: def.name,
+      type: def.type,
+      color: def.color,
+      icon: def.icon,
+      isDefault: true,
+    });
+  }
+}
+
 export async function updateCategory(
   id: number,
   data: Partial<InsertCategory>,
@@ -174,14 +240,18 @@ export async function getCategoryById(id: number) {
 // CREDIT CARDS
 // ============================================================================
 
-function decryptCardRow<T extends { cardNumber?: string }>(row: T): T {
-  if (!row?.cardNumber) {
-    return row;
-  }
-  return { ...row, cardNumber: decryptCardNumber(row.cardNumber) };
+/** Client-safe credit card DTO — full PAN is never serialized. */
+export type SafeCreditCard = Omit<CreditCard, "cardNumber"> & {
+  cardNumberLast4: string;
+};
+
+function toSafeCreditCard(row: CreditCard): SafeCreditCard {
+  const plain = row.cardNumber ? decryptCardNumber(row.cardNumber) : "";
+  const { cardNumber: _removed, ...rest } = row;
+  return { ...rest, cardNumberLast4: maskCardNumber(plain) };
 }
 
-export async function getUserCreditCards(userId: number) {
+export async function getUserCreditCards(userId: number): Promise<SafeCreditCard[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
@@ -190,13 +260,15 @@ export async function getUserCreditCards(userId: number) {
       },
     });
     const rows = Array.isArray(result) ? result : [];
-    return rows.map((row) => decryptCardRow(row as CreditCard));
+    return rows.map((row) => toSafeCreditCard(row as CreditCard));
   } catch {
     return [];
   }
 }
 
-export async function createCreditCard(data: InsertCreditCard) {
+export async function createCreditCard(
+  data: InsertCreditCard,
+): Promise<SafeCreditCard | null> {
   const result = await callDataApi("Database/query", {
     body: {
       query: `
@@ -216,15 +288,20 @@ export async function createCreditCard(data: InsertCreditCard) {
       ],
     },
   });
-  return result && typeof result === "object" && "insertId" in result
-    ? (result as { insertId: number }).insertId
-    : 0;
+  const insertId =
+    result && typeof result === "object" && "insertId" in result
+      ? (result as { insertId: number }).insertId
+      : 0;
+  if (!insertId) {
+    return null;
+  }
+  return getCreditCardById(insertId);
 }
 
 export async function updateCreditCard(
   id: number,
   data: Partial<InsertCreditCard>,
-) {
+): Promise<SafeCreditCard | null> {
   const payload: Partial<InsertCreditCard> = { ...data };
   if (payload.cardNumber !== undefined) {
     payload.cardNumber = encryptCardNumber(payload.cardNumber);
@@ -235,12 +312,16 @@ export async function updateCreditCard(
     .join(", ");
   const values = Object.values(payload);
 
-  await callDataApi("Database/query", {
-    body: {
-      query: `UPDATE creditCards SET ${updates} WHERE id = ?`,
-      params: [...values, id],
-    },
-  });
+  if (updates.length > 0) {
+    await callDataApi("Database/query", {
+      body: {
+        query: `UPDATE creditCards SET ${updates} WHERE id = ?`,
+        params: [...values, id],
+      },
+    });
+  }
+
+  return getCreditCardById(id);
 }
 
 export async function deleteCreditCard(id: number) {
@@ -252,7 +333,9 @@ export async function deleteCreditCard(id: number) {
   });
 }
 
-export async function getCreditCardById(id: number) {
+export async function getCreditCardById(
+  id: number,
+): Promise<SafeCreditCard | null> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
@@ -261,7 +344,7 @@ export async function getCreditCardById(id: number) {
       },
     });
     const row = Array.isArray(result) ? result[0] : null;
-    return row ? decryptCardRow(row as CreditCard) : null;
+    return row ? toSafeCreditCard(row as CreditCard) : null;
   } catch {
     return null;
   }
@@ -399,6 +482,28 @@ export async function deleteTransaction(id: number) {
     body: {
       query: "DELETE FROM transactions WHERE id = ?",
       params: [id],
+    },
+  });
+}
+
+/** Wipes all user-owned rows. Three separate DELETEs (not transactional) — on partial failure, retry clears any remainder. */
+export async function deleteAllUserData(userId: number) {
+  await callDataApi("Database/query", {
+    body: {
+      query: "DELETE FROM transactions WHERE userId = ?",
+      params: [userId],
+    },
+  });
+  await callDataApi("Database/query", {
+    body: {
+      query: "DELETE FROM creditCards WHERE userId = ?",
+      params: [userId],
+    },
+  });
+  await callDataApi("Database/query", {
+    body: {
+      query: "DELETE FROM categories WHERE userId = ?",
+      params: [userId],
     },
   });
 }

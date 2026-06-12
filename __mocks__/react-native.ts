@@ -56,6 +56,9 @@ export const Pressable = React.forwardRef<any, any>(
 );
 (Pressable as any).displayName = "Pressable";
 
+export const Switch = hostComponent("Switch");
+(Switch as any).displayName = "Switch";
+
 export const TouchableOpacity = Pressable;
 export const TouchableHighlight = Pressable;
 

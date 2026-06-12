@@ -287,7 +287,7 @@ export default function CardsScreen() {
     setEditingCard(card);
     setFormValues({
       cardName: card.name,
-      cardNumber: card.cardNumber,
+      cardNumber: "",
       cardholderName: card.cardholderName,
       expiryMonth: String(card.expiryMonth),
       expiryYear: String(card.expiryYear),
@@ -349,16 +349,20 @@ export default function CardsScreen() {
     savingRef.current = true;
     setSaving(true);
     try {
-      await updateCreditCard(editingCard.id, {
+      const payload: Record<string, unknown> = {
         name: formValues.cardName.trim(),
-        cardNumber: editingCard.cardNumber,
         cardholderName: formValues.cardholderName.trim(),
         expiryMonth: parseInt(formValues.expiryMonth, 10),
         expiryYear: parseInt(formValues.expiryYear, 10),
         creditLimit: formValues.creditLimit.trim(),
         color: selectedColor,
         cardType: formValues.cardType,
-      });
+      };
+      const trimmedNumber = formValues.cardNumber.trim();
+      if (trimmedNumber) {
+        payload.cardNumber = trimmedNumber;
+      }
+      await updateCreditCard(editingCard.id, payload as Partial<CreditCardRecord>);
     } catch {
       return;
     } finally {
@@ -411,7 +415,7 @@ export default function CardsScreen() {
                     <View style={cardPreviewStyle} testID={`card-preview-${index}`}>
                       <CreditCard
                         name={item.name}
-                        cardNumber={item.cardNumber}
+                        cardNumberLast4={item.cardNumberLast4}
                         cardholderName={item.cardholderName}
                         expiryMonth={item.expiryMonth}
                         expiryYear={item.expiryYear}
@@ -486,7 +490,7 @@ export default function CardsScreen() {
               selectedColor={selectedColor}
               maskedCardNumber={
                 sheetMode === "edit" && editingCard
-                  ? maskCardLastFour(editingCard.cardNumber)
+                  ? maskCardLastFour(editingCard.cardNumberLast4)
                   : undefined
               }
               onChange={(patch) => setFormValues((prev) => ({ ...prev, ...patch }))}

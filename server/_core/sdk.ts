@@ -6,6 +6,7 @@ import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
+import { ensureUserSeeded } from "./user-seeding";
 import { ENV } from "./env";
 import type {
   ExchangeTokenRequest,
@@ -272,6 +273,9 @@ class SDKServer {
           lastSignedIn: signedInAt,
         });
         user = await db.getUserByOpenId("dev_local_user");
+        if (user?.id) {
+          await ensureUserSeeded(user.id);
+        }
       } catch {
         // ignore – falls through to OAuth sync attempt below
       }
@@ -289,6 +293,9 @@ class SDKServer {
           lastSignedIn: signedInAt,
         });
         user = await db.getUserByOpenId(userInfo.openId);
+        if (user?.id) {
+          await ensureUserSeeded(user.id);
+        }
       } catch (error) {
         console.error("[Auth] Failed to sync user from OAuth:", error);
         throw ForbiddenError("Failed to sync user info");

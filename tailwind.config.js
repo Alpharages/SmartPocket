@@ -3,7 +3,7 @@ const {
   spacing,
   radius,
   typography,
-  elevation,
+  tailwindBoxShadow,
 } = require("./theme.config");
 const plugin = require("tailwindcss/plugin");
 
@@ -62,7 +62,7 @@ module.exports = {
       spacing: tailwindSpacing,
       borderRadius: tailwindRadius,
       fontSize: tailwindFontSize,
-      boxShadow: elevation,
+      boxShadow: tailwindBoxShadow,
     },
   },
   plugins: [

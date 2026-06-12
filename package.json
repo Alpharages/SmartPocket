@@ -16,8 +16,8 @@
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:seed": "tsx drizzle/seed.ts",
     "db:migrate:encrypt-cards": "tsx scripts/migrate-encrypt-card-numbers.ts",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "qr": "node scripts/generate_qr.mjs"
   },
   "dependencies": {
@@ -44,6 +44,7 @@
     "expo-image": "~3.0.11",
     "expo-keep-awake": "~15.0.8",
     "expo-linking": "~8.0.10",
+    "expo-localization": "~17.0.9",
     "expo-notifications": "~0.32.15",
     "expo-router": "~6.0.19",
     "expo-secure-store": "~15.0.8",

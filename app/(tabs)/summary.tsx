@@ -1,4 +1,5 @@
 import { ScrollView, View, Text, Pressable, FlatList } from "react-native";
+import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
@@ -11,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState, useMemo } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import {
+  Button,
   CategoryToken,
   EmptyState,
   ScreenHeader,
@@ -22,9 +24,13 @@ import {
 import { useBreakpoints } from "@/hooks/use-breakpoint";
 import { Spacing, Typography } from "@/lib/_core/theme";
 import { readableTextOn } from "@/lib/_core/contrast";
+import { useCurrency } from "@/lib/currency-provider";
+import { formatCurrency } from "@/lib/currency";
 
 export default function SummaryScreen() {
+  const router = useRouter();
   const colors = useColors();
+  const { currency, isReady } = useCurrency();
   const scheme = (useColorScheme() ?? "light") as "light" | "dark";
   const {
     monthlyStats,
@@ -331,7 +337,7 @@ export default function SummaryScreen() {
                     </View>
                     <View className="items-end">
                       <Text className="text-foreground font-bold text-sm">
-                        ${item.total.toFixed(2)}
+                        {isReady ? formatCurrency(item.total, currency) : "—"}
                       </Text>
                       <Text className="text-xs text-muted">
                         {percentage.toFixed(1)}%
@@ -361,7 +367,7 @@ export default function SummaryScreen() {
                     <Pressable
                       onPress={() => handleCategoryPress(item.categoryId)}
                       accessibilityRole="button"
-                      accessibilityLabel={`${item.categoryName}, $${item.total.toFixed(2)}, ${percentage.toFixed(1)} percent`}
+                      accessibilityLabel={`${item.categoryName}, ${isReady ? formatCurrency(item.total, currency) : "loading"}, ${percentage.toFixed(1)} percent`}
                       accessibilityState={{ selected: isSelected }}
                       style={{
                         backgroundColor: isSelected
@@ -394,7 +400,25 @@ export default function SummaryScreen() {
 
   const header = (
     <Animated.View entering={FadeInDown.duration(500)}>
-      <ScreenHeader title="Insights" subtitle="Monthly breakdown" />
+      <ScreenHeader
+        title="Insights"
+        subtitle="Monthly breakdown"
+        accessibilityLabel="Insights screen"
+        action={
+          <Button
+            variant="icon-only"
+            accessibilityLabel="Open settings"
+            onPress={() => router.push("/settings")}
+            leftIcon={
+              <Ionicons
+                name="settings-outline"
+                size={22}
+                color={colors.foreground}
+              />
+            }
+          />
+        }
+      />
     </Animated.View>
   );
 

@@ -35,7 +35,7 @@ vi.mock("@/hooks/use-press-feedback", () => ({
 
 const baseCard = {
   name: "My Visa",
-  cardNumber: "1234567890123456",
+  cardNumberLast4: "3456",
   cardholderName: "John Doe",
   expiryMonth: 3,
   expiryYear: 2027,
@@ -76,8 +76,8 @@ describe("CreditCard", () => {
       expect(maskedText.props.children).toBe("•••• •••• •••• 3456");
     });
 
-    it("uses the last 4 chars even if cardNumber is exactly 4 chars", () => {
-      const root = renderCard({ cardNumber: "9999" });
+    it("renders last4 directly when cardNumberLast4 is exactly 4 chars", () => {
+      const root = renderCard({ cardNumberLast4: "9999" });
       const maskedText = root.find(
         (n) =>
           typeof n.props.children === "string" &&
@@ -190,7 +190,7 @@ describe("CreditCard", () => {
 
   describe("Accessibility", () => {
     it("has accessibilityLabel naming the card and last 4 digits", () => {
-      const root = renderCard({ name: "My Visa", cardNumber: "1234567890123456" });
+      const root = renderCard({ name: "My Visa", cardNumberLast4: "3456" });
       const pressable = root.find(
         (n) =>
           n.props.accessibilityRole === "button" &&
