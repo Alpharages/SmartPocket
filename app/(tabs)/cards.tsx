@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   ScrollView,
   View,
@@ -246,6 +247,7 @@ function CardFormFields({
 }
 
 export default function CardsScreen() {
+  const router = useRouter();
   const colors = useColors();
   const { creditCards, loadingCards, addCreditCard, updateCreditCard, deleteCreditCard } =
     useExpense();
@@ -421,6 +423,7 @@ export default function CardsScreen() {
                         expiryYear={item.expiryYear}
                         color={item.color}
                         index={index}
+                        onPress={() => router.push(`/card/${item.id}`)}
                         onLongPress={async () => {
                           const confirmed = await confirm({
                             title: "Delete Card",

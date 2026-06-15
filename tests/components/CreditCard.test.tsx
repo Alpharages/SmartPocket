@@ -137,6 +137,22 @@ describe("CreditCard", () => {
     });
   });
 
+  describe("Press interaction", () => {
+    it("calls onPress when the card body is tapped", () => {
+      const onPress = vi.fn();
+      const root = renderCard({ onPress });
+      const pressable = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel?.includes("ending in"),
+      );
+      act(() => {
+        pressable.props.onPress?.();
+      });
+      expect(onPress).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("Long press interaction", () => {
     it("calls onLongPress when the card is long-pressed", () => {
       const onLongPress = vi.fn();
@@ -203,6 +219,16 @@ describe("CreditCard", () => {
       const root = renderCard();
       const pressable = root.find(
         (n) => n.props.accessibilityHint === "Long press to delete",
+      );
+      expect(pressable).toBeDefined();
+    });
+
+    it("mentions card details in hint when onPress is provided", () => {
+      const root = renderCard({ onPress: vi.fn() });
+      const pressable = root.find(
+        (n) =>
+          n.props.accessibilityHint ===
+          "Opens card details. Long press to delete.",
       );
       expect(pressable).toBeDefined();
     });

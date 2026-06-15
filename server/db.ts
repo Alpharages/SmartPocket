@@ -632,6 +632,176 @@ export async function getMonthlyStats(
   }
 }
 
+export interface MonthlyTrendPoint {
+  year: number;
+  month: number;
+  totalIncome: number;
+  totalExpense: number;
+  netBalance: number;
+}
+
+/**
+ * Get income, expense, and net balance for the last N months ending at the anchor month.
+ */
+export async function getMonthlyTrend(
+  userId: number,
+  year: number,
+  month: number,
+  count = 6,
+): Promise<MonthlyTrendPoint[]> {
+  try {
+    const startDate = new Date(year, month - count, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    const result = await callDataApi("Database/query", {
+      body: {
+        query:
+          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ?",
+        params: [userId, startDate, endDate],
+      },
+    });
+
+    const txns = Array.isArray(result) ? result : [];
+    const monthMap = new Map<
+      string,
+      { year: number; month: number; totalIncome: number; totalExpense: number }
+    >();
+
+    for (let i = 0; i < count; i++) {
+      const d = new Date(year, month - count + i, 1);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      monthMap.set(`${y}-${m}`, {
+        year: y,
+        month: m,
+        totalIncome: 0,
+        totalExpense: 0,
+      });
+    }
+
+    txns.forEach((txn: Record<string, unknown>) => {
+      const txnDate = new Date(txn.date as string);
+      const key = `${txnDate.getFullYear()}-${txnDate.getMonth() + 1}`;
+      const bucket = monthMap.get(key);
+      if (!bucket) return;
+
+      const amount = parseFloat(txn.amount as string);
+      if (txn.type === "income") {
+        bucket.totalIncome += amount;
+      } else {
+        bucket.totalExpense += amount;
+      }
+    });
+
+    return Array.from(monthMap.values())
+      .sort((a, b) =>
+        a.year !== b.year ? a.year - b.year : a.month - b.month,
+      )
+      .map((item) => ({
+        ...item,
+        netBalance: item.totalIncome - item.totalExpense,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export interface CategoryAnomalyResult {
+  categoryId: number;
+  current: number;
+  mean: number;
+  deltaPct: number;
+  isAnomaly: boolean;
+}
+
+const DEFAULT_ANOMALY_THRESHOLD = 1.5;
+const MIN_PRIOR_MONTHS_WITH_SPEND = 2;
+
+function monthKeyFromDate(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth() + 1}`;
+}
+
+function monthKey(year: number, month: number): string {
+  return `${year}-${month}`;
+}
+
+/**
+ * Flag categories whose spend in the target month is significantly above
+ * their recent per-category mean (prior lookback window, months with spend only).
+ */
+export async function getCategoryAnomalies(
+  userId: number,
+  year: number,
+  month: number,
+  lookbackMonths = 3,
+  threshold = DEFAULT_ANOMALY_THRESHOLD,
+): Promise<CategoryAnomalyResult[]> {
+  try {
+    const startDate = new Date(year, month - 1 - lookbackMonths, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    const result = await callDataApi("Database/query", {
+      body: {
+        query:
+          "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ?",
+        params: [userId, startDate, endDate],
+      },
+    });
+
+    const txns = Array.isArray(result) ? result : [];
+    const monthSpend = new Map<string, Map<number, number>>();
+
+    txns.forEach((txn: Record<string, unknown>) => {
+      const txnDate = new Date(txn.date as string);
+      const key = monthKeyFromDate(txnDate);
+      const categoryId = txn.categoryId as number;
+      const amount = parseFloat(txn.amount as string);
+      const bucket = monthSpend.get(key) ?? new Map<number, number>();
+      bucket.set(categoryId, (bucket.get(categoryId) ?? 0) + amount);
+      monthSpend.set(key, bucket);
+    });
+
+    const targetKey = monthKey(year, month);
+    const targetSpend = monthSpend.get(targetKey) ?? new Map<number, number>();
+    const results: CategoryAnomalyResult[] = [];
+
+    for (const [categoryId, current] of targetSpend.entries()) {
+      const priorAmounts: number[] = [];
+
+      for (let i = 1; i <= lookbackMonths; i++) {
+        const d = new Date(year, month - 1 - i, 1);
+        const key = monthKey(d.getFullYear(), d.getMonth() + 1);
+        const prior = monthSpend.get(key)?.get(categoryId) ?? 0;
+        if (prior > 0) {
+          priorAmounts.push(prior);
+        }
+      }
+
+      const mean =
+        priorAmounts.length > 0
+          ? priorAmounts.reduce((sum, v) => sum + v, 0) / priorAmounts.length
+          : 0;
+      const hasEnoughHistory =
+        priorAmounts.length >= MIN_PRIOR_MONTHS_WITH_SPEND;
+      const isAnomaly =
+        hasEnoughHistory && mean > 0 && current > mean * threshold;
+      const deltaPct = mean > 0 ? ((current - mean) / mean) * 100 : 0;
+
+      results.push({
+        categoryId,
+        current,
+        mean,
+        deltaPct,
+        isAnomaly,
+      });
+    }
+
+    return results;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Get expense breakdown by category for a given month.
  */

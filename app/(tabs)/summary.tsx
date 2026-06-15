@@ -13,19 +13,30 @@ import { useEffect, useState, useMemo } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import {
   Button,
+  CategoryAnomalyBadge,
+  CategoryPieChart,
   CategoryToken,
   EmptyState,
+  MonthlyTrendChart,
+  MonthEndForecastCard,
   ScreenHeader,
   Skeleton,
   StatCard,
   TransactionRow,
   TwoPaneLayout,
 } from "@/components/ui";
+import { hasMonthlyTrendHistory } from "@/components/ui/MonthlyTrendChart";
 import { useBreakpoints } from "@/hooks/use-breakpoint";
 import { Spacing, Typography } from "@/lib/_core/theme";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { useCurrency } from "@/lib/currency-provider";
-import { formatCurrency } from "@/lib/currency";
+import {
+  formatCurrency,
+} from "@/lib/currency";
+import {
+  computeMonthEndForecastState,
+} from "@/lib/forecast";
+import { trpc } from "@/lib/trpc";
 
 export default function SummaryScreen() {
   const router = useRouter();
@@ -48,6 +59,34 @@ export default function SummaryScreen() {
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
+
+  const trendQuery = trpc.summary.monthlyTrend.useQuery({
+    year,
+    month,
+    count: 6,
+  });
+  const trendData = trendQuery.data ?? [];
+
+  const anomaliesQuery = trpc.summary.categoryAnomalies.useQuery({
+    year,
+    month,
+  });
+  const anomalyCategoryIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const row of anomaliesQuery.data ?? []) {
+      if (row.isAnomaly) {
+        ids.add(row.categoryId);
+      }
+    }
+    return ids;
+  }, [anomaliesQuery.data]);
+
+  const handleSelectMonth = (selectedYear: number, selectedMonth: number) => {
+    const newDate = new Date(selectedYear, selectedMonth - 1, 1);
+    setCurrentDate(newDate);
+    refreshMonthlyStats(selectedYear, selectedMonth);
+    setSelectedCategoryId(null);
+  };
 
   const handlePreviousMonth = () => {
     const newDate = new Date(currentDate);
@@ -73,6 +112,20 @@ export default function SummaryScreen() {
   const isCurrentMonth =
     currentDate.getMonth() === new Date().getMonth() &&
     currentDate.getFullYear() === new Date().getFullYear();
+
+  const today = new Date();
+  const calendarDayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+
+  const monthEndForecastState = useMemo(
+    () =>
+      computeMonthEndForecastState({
+        isCurrentMonth,
+        totalExpense: monthlyStats?.totalExpense ?? 0,
+        // Run-rate uses today's calendar day, not `currentDate` (often the 1st after nav).
+        anchorDate: new Date(),
+      }),
+    [isCurrentMonth, monthlyStats?.totalExpense, calendarDayKey],
+  );
 
   // Filter transactions to current month for the category detail pane.
   const monthTransactions = useMemo(() => {
@@ -218,6 +271,78 @@ export default function SummaryScreen() {
     </View>
   );
 
+  const forecastPane =
+    monthEndForecastState.visible && monthEndForecastState.forecast ? (
+      <Animated.View
+        entering={FadeInUp.delay(165).duration(500)}
+        className="px-2xl mt-2xl"
+      >
+        <MonthEndForecastCard
+          projected={monthEndForecastState.forecast.projected}
+          loading={loadingStats}
+        />
+      </Animated.View>
+    ) : null;
+
+  const trendsPane = (
+    <Animated.View
+      entering={FadeInUp.delay(175).duration(500)}
+      className="px-2xl mt-2xl"
+    >
+      <View className="flex-row items-center justify-between mb-lg">
+        <Text className="text-h3 font-bold text-foreground">Trends</Text>
+      </View>
+
+      {trendQuery.isLoading ? (
+        <View
+          className="rounded-3xl p-4"
+          style={{ backgroundColor: colors.surface }}
+          accessibilityLabel="Loading spending trend"
+        >
+          <Skeleton variant="line" width="100%" height={180} radius={12} />
+        </View>
+      ) : !hasMonthlyTrendHistory(trendData) ? (
+        <View
+          className="rounded-3xl p-8 items-center"
+          style={{ backgroundColor: colors.surface }}
+        >
+          <Ionicons name="analytics-outline" size={36} color={colors.muted} />
+          <Text className="text-muted font-medium mt-3 text-sm">
+            No spending history
+          </Text>
+          <Text className="text-xs text-muted mt-xs">
+            Add transactions across months to see trends
+          </Text>
+        </View>
+      ) : (
+        <View
+          className="rounded-3xl overflow-hidden"
+          style={{
+            backgroundColor: colors.surface,
+            shadowColor: colors.foreground,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 8,
+            elevation: 2,
+          }}
+        >
+          <MonthlyTrendChart
+            data={trendData}
+            incomeColor={colors.success}
+            expenseColor={colors.error}
+            netColor={colors.primary}
+            labelColor={colors.muted}
+            backgroundColor={colors.surface}
+            formatAmount={(amount) =>
+              isReady ? formatCurrency(amount, currency) : "—"
+            }
+            onSelectMonth={handleSelectMonth}
+          />
+        </View>
+      )}
+    </Animated.View>
+  );
+
   // Category list data derived from monthly expenses query.
   const categoryExpenses = useMemo(() => {
     const map = new Map<number, number>();
@@ -311,6 +436,15 @@ export default function SummaryScreen() {
             elevation: 2,
           }}
         >
+          <CategoryPieChart
+            slices={categoryExpenses.map((item) => ({
+              name: item.categoryName,
+              total: item.total,
+              color: item.categoryColor,
+            }))}
+            totalExpenses={totalExpenses}
+            legendFontColor={colors.muted}
+          />
           <FlatList
             data={categoryExpenses}
             keyExtractor={(item) => item.categoryId.toString()}
@@ -318,6 +452,13 @@ export default function SummaryScreen() {
               const percentage =
                 totalExpenses > 0 ? (item.total / totalExpenses) * 100 : 0;
               const isSelected = selectedCategoryId === item.categoryId;
+              const isAnomaly = anomalyCategoryIds.has(item.categoryId);
+              const amountLabel = isReady
+                ? formatCurrency(item.total, currency)
+                : "loading";
+              const rowAccessibilityLabel = isAnomaly
+                ? `${item.categoryName}, ${amountLabel}, ${percentage.toFixed(1)} percent, above usual spending this month`
+                : `${item.categoryName}, ${amountLabel}, ${percentage.toFixed(1)} percent`;
               const rowContent = (
                 <View className="py-4 px-4">
                   <View className="flex-row items-center justify-between mb-2">
@@ -328,12 +469,19 @@ export default function SummaryScreen() {
                         name={item.categoryName}
                         size="sm"
                       />
-                      <Text
-                        className="text-foreground font-semibold text-sm flex-1"
-                        numberOfLines={1}
-                      >
-                        {item.categoryName}
-                      </Text>
+                      <View className="flex-row items-center gap-2 flex-1">
+                        <Text
+                          className="text-foreground font-semibold text-sm flex-shrink"
+                          numberOfLines={1}
+                        >
+                          {item.categoryName}
+                        </Text>
+                        {isAnomaly ? (
+                          <CategoryAnomalyBadge
+                            categoryName={item.categoryName}
+                          />
+                        ) : null}
+                      </View>
                     </View>
                     <View className="items-end">
                       <Text className="text-foreground font-bold text-sm">
@@ -367,7 +515,7 @@ export default function SummaryScreen() {
                     <Pressable
                       onPress={() => handleCategoryPress(item.categoryId)}
                       accessibilityRole="button"
-                      accessibilityLabel={`${item.categoryName}, ${isReady ? formatCurrency(item.total, currency) : "loading"}, ${percentage.toFixed(1)} percent`}
+                      accessibilityLabel={rowAccessibilityLabel}
                       accessibilityState={{ selected: isSelected }}
                       style={{
                         backgroundColor: isSelected
@@ -378,7 +526,10 @@ export default function SummaryScreen() {
                       {rowContent}
                     </Pressable>
                   ) : (
-                    <View style={{ backgroundColor: colors.surface }}>
+                    <View
+                      style={{ backgroundColor: colors.surface }}
+                      accessibilityLabel={rowAccessibilityLabel}
+                    >
                       {rowContent}
                     </View>
                   )}
@@ -536,6 +687,8 @@ export default function SummaryScreen() {
             {header}
             {monthNav}
             {statsPane}
+            {forecastPane}
+            {trendsPane}
             {categoryPane}
           </ScrollView>
         }

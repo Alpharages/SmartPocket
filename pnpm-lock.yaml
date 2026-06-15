@@ -128,6 +128,9 @@ importers:
       react-native:
         specifier: 0.81.5
         version: 0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)
+      react-native-chart-kit:
+        specifier: ^6.12.3
+        version: 6.12.3(react-native-svg@15.12.1(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       react-native-gesture-handler:
         specifier: ~2.28.0
         version: 2.28.0(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -4996,6 +4999,10 @@ packages:
   pathe@1.1.2:
     resolution: {integrity: sha512-whLdWMYL2TwI08hn8/ZqAbrVemu0LNaNNJZX73O6qaIdCTfXutsLhMkjdENX0qhsQ9uIimo4/aQOmXkoon2nDQ==}
 
+  paths-js@0.4.11:
+    resolution: {integrity: sha512-3mqcLomDBXOo7Fo+UlaenG6f71bk1ZezPQy2JCmYHy2W2k5VKpP+Jbin9H0bjXynelTbglCqdFhSEkeIkKTYUA==}
+    engines: {node: '>=0.11.0'}
+
   pathval@2.0.1:
     resolution: {integrity: sha512-//nshmD55c46FuFw26xV/xFAaB5HF9Xdap7HJBBnrKdAd6/GxDBaNA1870O79+9ueg61cZLSVc+OaFlfmObYVQ==}
     engines: {node: '>= 14.16'}
@@ -5034,6 +5041,9 @@ packages:
   pngjs@5.0.0:
     resolution: {integrity: sha512-40QW5YalBNfQo5yRYmiw7Yz6TKKVr3h6970B2YE+3fQpsWcrbj1PzJgxeJ19DRQjhMbKPIuMY8rFaXc8moolVw==}
     engines: {node: '>=10.13.0'}
+
+  point-in-polygon@1.1.0:
+    resolution: {integrity: sha512-3ojrFwjnnw8Q9242TzgXuTD+eKiutbzyslcq1ydfu82Db2y+Ogbmyrkpv0Hgj31qwT3lbS9+QAAO/pIQM35XRw==}
 
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
@@ -5213,6 +5223,13 @@ packages:
 
   react-is@19.2.6:
     resolution: {integrity: sha512-XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw==}
+
+  react-native-chart-kit@6.12.3:
+    resolution: {integrity: sha512-Wc7akObFaa7wAF42JGSvmd25OUpngLy412aIgJIjkmOMy3jBoPEX/yu8OPiSV3F2bSliWqlAcaqOrxuKIJy5Iw==}
+    peerDependencies:
+      react: '> 16.7.0'
+      react-native: '>= 0.50.0'
+      react-native-svg: '> 6.4.1'
 
   react-native-css-interop@0.2.1:
     resolution: {integrity: sha512-B88f5rIymJXmy1sNC/MhTkb3xxBej1KkuAt7TiT9iM7oXz3RM8Bn+7GUrfR02TvSgKm4cg2XiSuLEKYfKwNsjA==}
@@ -11565,6 +11582,8 @@ snapshots:
 
   pathe@1.1.2: {}
 
+  paths-js@0.4.11: {}
+
   pathval@2.0.1: {}
 
   picocolors@1.1.1: {}
@@ -11588,6 +11607,8 @@ snapshots:
   pngjs@3.4.0: {}
 
   pngjs@5.0.0: {}
+
+  point-in-polygon@1.1.0: {}
 
   possible-typed-array-names@1.1.0: {}
 
@@ -11762,6 +11783,14 @@ snapshots:
   react-is@19.2.3: {}
 
   react-is@19.2.6: {}
+
+  react-native-chart-kit@6.12.3(react-native-svg@15.12.1(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
+    dependencies:
+      paths-js: 0.4.11
+      point-in-polygon: 1.1.0
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)
+      react-native-svg: 15.12.1(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
 
   react-native-css-interop@0.2.1(react-native-reanimated@4.1.6(@babel/core@7.28.5)(react-native-worklets@0.5.1(@babel/core@7.28.5)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-safe-area-context@5.6.2(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-svg@15.12.1(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(tailwindcss@3.4.19(tsx@4.21.0)(yaml@2.8.2)):
     dependencies:

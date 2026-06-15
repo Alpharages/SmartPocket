@@ -1,0 +1,197 @@
+import React, { useMemo } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  FlatList,
+  ActivityIndicator,
+} from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+
+import { ScreenContainer } from "@/components/screen-container";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { TransactionRow } from "@/components/ui/TransactionRow";
+import { useColors } from "@/hooks/use-colors";
+import {
+  parseCardRouteId,
+  sumCardTransactionTotal,
+} from "@/lib/card-transactions";
+import { maskCardLastFour } from "@/lib/card-form-validation";
+import { useCardTransactions, useExpense } from "@/lib/expense-context";
+import { useCurrency } from "@/lib/currency-provider";
+import { formatCurrency } from "@/lib/currency";
+
+function formatMoney(total: number, currency: ReturnType<typeof useCurrency>["currency"]): string {
+  return formatCurrency(total, currency);
+}
+
+export default function CardDetailScreen() {
+  const router = useRouter();
+  const colors = useColors();
+  const { currency } = useCurrency();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const cardId = parseCardRouteId(id);
+  const { creditCards, categories } = useExpense();
+  const { cardTransactions, loadingCardTransactions } =
+    useCardTransactions(cardId);
+
+  const card = useMemo(
+    () => creditCards.find((item) => item.id === cardId),
+    [creditCards, cardId],
+  );
+
+  const categoriesById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories],
+  );
+
+  const total = sumCardTransactionTotal(cardTransactions);
+
+  if (Number.isNaN(cardId) || !card) {
+    return (
+      <ScreenContainer
+        className="flex-1 bg-background"
+        edges={["top", "left", "right", "bottom"]}
+      >
+        <View className="flex-row items-center px-6 pt-6 pb-2">
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={8}
+            accessibilityLabel="Go back"
+            className="w-10 h-10 rounded-full items-center justify-center"
+            style={{ backgroundColor: colors.surface }}
+          >
+            <Ionicons name="chevron-back" size={22} color={colors.foreground} />
+          </Pressable>
+        </View>
+        <View className="flex-1 items-center justify-center px-6">
+          <Ionicons name="search-outline" size={32} color={colors.muted} />
+          <Text className="mt-3 text-muted font-medium text-sm">
+            Card not found
+          </Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  return (
+    <ScreenContainer
+      className="flex-1 bg-background"
+      edges={["top", "left", "right", "bottom"]}
+    >
+      <View className="flex-row items-center px-6 pt-6 pb-2">
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={8}
+          accessibilityLabel="Go back"
+          className="w-10 h-10 rounded-full items-center justify-center"
+          style={{ backgroundColor: colors.surface }}
+        >
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
+        </Pressable>
+        <Text className="flex-1 text-center text-h1 text-foreground mr-10">
+          {card.name}
+        </Text>
+      </View>
+
+      <Animated.View
+        entering={FadeInUp.delay(100).duration(400)}
+        className="mx-6 mt-4 rounded-2xl p-5"
+        style={{ backgroundColor: card.color }}
+        accessibilityLabel={`Card ending in ${card.cardNumberLast4}`}
+      >
+        <Text className="text-white/80 text-sm font-medium mb-1">
+          {maskCardLastFour(card.cardNumberLast4)}
+        </Text>
+        {loadingCardTransactions ? (
+          <ActivityIndicator
+            color="white"
+            size="small"
+            style={{ alignSelf: "flex-start", marginVertical: 8 }}
+            testID="card-detail-total-loading"
+          />
+        ) : (
+          <Text
+            className="text-white text-3xl font-bold"
+            style={{ fontVariant: ["tabular-nums"] }}
+            accessibilityRole="text"
+            accessibilityLabel={`Total ${formatMoney(total, currency)}`}
+          >
+            {formatMoney(total, currency)}
+          </Text>
+        )}
+        <Text className="text-white/70 text-xs font-medium mt-1 uppercase tracking-wide">
+          Total on this card
+        </Text>
+      </Animated.View>
+
+      <View className="flex-1 px-6 mt-6">
+        {loadingCardTransactions ? (
+          <View
+            className="flex-1 items-center justify-center"
+            testID="card-detail-loading"
+          >
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : cardTransactions.length > 0 ? (
+          <Animated.View
+            entering={FadeInDown.delay(150).duration(400)}
+            className="flex-1 rounded-3xl overflow-hidden"
+            style={{ backgroundColor: colors.surface }}
+          >
+            <FlatList
+              data={cardTransactions}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item, index }) => {
+                const category = categoriesById.get(item.categoryId);
+                const categoryIcon = (category?.icon ?? "pricetag-outline") as
+                  keyof typeof Ionicons.glyphMap;
+                return (
+                  <Animated.View
+                    entering={FadeInDown.delay(index * 40).duration(400)}
+                  >
+                    <TransactionRow
+                      title={category?.name ?? "Uncategorized"}
+                      date={item.date}
+                      amount={item.amount}
+                      type={item.type}
+                      categoryColor={category?.color ?? colors.muted}
+                      categoryIcon={categoryIcon}
+                      note={item.description ?? undefined}
+                      onPress={() => router.push(`/transaction/${item.id}`)}
+                      style={{ backgroundColor: colors.surface }}
+                    />
+                  </Animated.View>
+                );
+              }}
+              ItemSeparatorComponent={() => (
+                <View
+                  className="mx-lg"
+                  style={{ height: 0.5, backgroundColor: colors.border }}
+                />
+              )}
+              contentContainerStyle={{ paddingBottom: 32 }}
+            />
+          </Animated.View>
+        ) : (
+          <Animated.View
+            entering={FadeInDown.delay(150).duration(400)}
+            className="flex-1 rounded-3xl overflow-hidden"
+            style={{ backgroundColor: colors.surface }}
+          >
+            <EmptyState
+              variant="no-data"
+              icon={
+                <Ionicons name="receipt-outline" size={28} color={colors.muted} />
+              }
+              title="No transactions for this card yet"
+              description="Expenses linked to this card will appear here"
+            />
+          </Animated.View>
+        )}
+      </View>
+    </ScreenContainer>
+  );
+}

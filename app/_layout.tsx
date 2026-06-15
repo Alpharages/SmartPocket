@@ -178,6 +178,7 @@ export default function RootLayout() {
                   }}
                 />
                 <Stack.Screen name="oauth/callback" />
+                <Stack.Screen name="card/[id]" />
                 <Stack.Screen name="settings" />
               </Stack>
               <StatusBar style="auto" />

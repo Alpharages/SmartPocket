@@ -34,6 +34,10 @@ export default defineConfig({
         __dirname,
         "./__mocks__/expo-localization.ts",
       ),
+      "react-native-chart-kit": path.resolve(
+        __dirname,
+        "./__mocks__/react-native-chart-kit.ts",
+      ),
       "@shared/": path.resolve(__dirname, "./shared/") + "/",
     },
   },
@@ -45,6 +49,7 @@ export default defineConfig({
       "nativewind",
       "react-native-css-interop",
       "react-native-gesture-handler",
+      "react-native-chart-kit",
     ],
   },
   test: {

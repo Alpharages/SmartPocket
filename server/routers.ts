@@ -261,6 +261,40 @@ const summaryRouter = router({
     .query(({ ctx, input }) => {
       return db.getExpensesByCategory(ctx.user.id, input.year, input.month);
     }),
+
+  categoryAnomalies: protectedProcedure
+    .input(
+      z.object({
+        year: z.number(),
+        month: z.number().min(1).max(12),
+        lookbackMonths: z.number().min(1).max(12).optional(),
+      }),
+    )
+    .query(({ ctx, input }) => {
+      return db.getCategoryAnomalies(
+        ctx.user.id,
+        input.year,
+        input.month,
+        input.lookbackMonths ?? 3,
+      );
+    }),
+
+  monthlyTrend: protectedProcedure
+    .input(
+      z.object({
+        year: z.number(),
+        month: z.number().min(1).max(12),
+        count: z.number().min(1).max(24).optional(),
+      }),
+    )
+    .query(({ ctx, input }) => {
+      return db.getMonthlyTrend(
+        ctx.user.id,
+        input.year,
+        input.month,
+        input.count ?? 6,
+      );
+    }),
 });
 
 // ============================================================================

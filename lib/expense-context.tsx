@@ -430,3 +430,22 @@ export function useExpense() {
   }
   return context;
 }
+
+/** User-scoped transactions linked to a single credit card (Story 2.2). */
+export function useCardTransactions(creditCardId: number) {
+  const enabled = Number.isFinite(creditCardId) && creditCardId > 0;
+  const query = trpc.transactions.listByCreditCard.useQuery(
+    { creditCardId },
+    { enabled },
+  );
+
+  const refreshCardTransactions = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
+
+  return {
+    cardTransactions: (query.data ?? []) as Transaction[],
+    loadingCardTransactions: enabled && query.isLoading,
+    refreshCardTransactions,
+  };
+}

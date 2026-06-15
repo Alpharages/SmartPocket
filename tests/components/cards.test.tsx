@@ -10,8 +10,10 @@ import TestRenderer, {
 import { useExpense } from "@/lib/expense-context";
 import CardsScreen from "@/app/(tabs)/cards";
 
+const mockPush = vi.hoisted(() => vi.fn());
+
 vi.mock("expo-router", () => ({
-  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ push: mockPush, back: vi.fn() }),
 }));
 
 vi.mock("@/components/screen-container", () => ({
@@ -560,6 +562,20 @@ describe("CardsScreen", () => {
   });
 
   describe("Delete card regression", () => {
+    it("tap navigates to card detail", () => {
+      mockPush.mockClear();
+      const root = renderScreen();
+      const cardPressable = root.find(
+        (n) =>
+          n.props.accessibilityRole === "button" &&
+          n.props.accessibilityLabel === "My Visa card ending in 3456",
+      );
+      act(() => {
+        cardPressable.props.onPress?.();
+      });
+      expect(mockPush).toHaveBeenCalledWith("/card/1");
+    });
+
     it("long-press delete still calls deleteCreditCard after confirm", async () => {
       mockConfirm.mockResolvedValueOnce(true);
       const root = renderScreen();

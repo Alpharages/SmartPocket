@@ -40,3 +40,18 @@ export { TwoPaneLayout } from "./TwoPaneLayout";
 export type { TwoPaneLayoutProps } from "./TwoPaneLayout";
 export { SettingsRow } from "./SettingsRow";
 export type { SettingsRowProps } from "./SettingsRow";
+export { CategoryPieChart } from "./CategoryPieChart";
+export type {
+  CategoryPieChartProps,
+  CategoryPieSlice,
+} from "./CategoryPieChart";
+export { MonthlyTrendChart } from "./MonthlyTrendChart";
+export type {
+  MonthlyTrendChartProps,
+  MonthlyTrendPoint,
+} from "./MonthlyTrendChart";
+export { MonthEndForecastCard } from "./MonthEndForecastCard";
+export type { MonthEndForecastCardProps } from "./MonthEndForecastCard";
+export { buildMonthEndForecastAccessibilityLabel } from "./MonthEndForecastCard";
+export { CategoryAnomalyBadge, ANOMALY_LABEL } from "./CategoryAnomalyBadge";
+export type { CategoryAnomalyBadgeProps } from "./CategoryAnomalyBadge";

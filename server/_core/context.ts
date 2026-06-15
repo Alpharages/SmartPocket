@@ -23,5 +23,3 @@ export async function createContext(opts: CreateExpressContextOptions): Promise<
     user,
   };
 }
-
-

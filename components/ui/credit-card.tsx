@@ -110,6 +110,8 @@ export type CreditCardProps = {
   color: string;
   index: number;
   onLongPress?: () => void;
+  /** Opens card detail when the card body is tapped. */
+  onPress?: () => void;
   /** Called when the edit affordance is pressed. */
   onEdit?: () => void;
 };
@@ -123,6 +125,7 @@ export function CreditCard({
   color,
   index,
   onLongPress,
+  onPress,
   onEdit,
 }: CreditCardProps) {
   const maskedNumber = `•••• •••• •••• ${cardNumberLast4}`;
@@ -190,12 +193,17 @@ export function CreditCard({
           </Pressable>
         )}
         <AnimatedPressable
+          onPress={onPress}
           onLongPress={onLongPress}
           onPressIn={onPressIn}
           onPressOut={onPressOut}
           accessibilityRole="button"
           accessibilityLabel={`${name} card ending in ${cardNumberLast4}`}
-          accessibilityHint="Long press to delete"
+          accessibilityHint={
+            onPress
+              ? "Opens card details. Long press to delete."
+              : "Long press to delete"
+          }
           style={[{ padding: Spacing.xl }, animatedStyle]}
         >
           <View className="flex-row justify-between items-start mb-4">
