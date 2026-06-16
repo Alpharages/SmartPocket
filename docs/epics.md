@@ -49,9 +49,9 @@ already-built areas cover only the remaining gaps, not the completed functionali
 | FR-8 | Edit credit cards & view transactions associated with a card | 🟡 partial | `creditCards.update` + `listByCreditCard` exist server-side; **no edit UI, no per-card txn view** |
 | FR-9 | Monthly summary: income, expense, net; per-category breakdown | ✅ built | `summary.monthlyStats/expensesByCategory`, `summary.tsx`, dashboard |
 | FR-10 | Charts (pie/breakdown), trends, basic forecasting, anomaly highlights | 🟡 partial | per-category list w/ % built; **no chart lib, no trends/forecast** |
-| FR-11 | Smart categorization suggestions for new transactions | 🔲 planned | LLM gateway wired, unused |
+| FR-11 | Smart categorization suggestions for new transactions | 🔲 planned | self-hosted/local LLM, planned |
 | FR-12 | Natural-language Q&A ("Top expenses last month?") | 🔲 planned | — |
-| FR-13 | Server-side inference via Forge LLM gateway; data sent only after explicit consent | 🔲 planned | `server/_core/llm.ts` exists, unused |
+| FR-13 | Server-side inference via a self-hosted / local LLM (OpenAI-compatible, env-configured); data sent only after explicit consent | 🔲 planned | legacy Forge client `server/_core/llm.ts` unused, being retired |
 | FR-14 | Category budgets (monthly/weekly) with progress & threshold alerts | 🔲 planned | — |
 | FR-15 | Create loans (lend/borrow): principal, rate, schedule, due dates | 🔲 planned | — |
 | FR-16 | Track repayments & remaining balance; due/overdue reminders | 🔲 planned | — |
@@ -194,9 +194,11 @@ CSV and JSON export of transactions, and CSV import, for data portability and ba
 
 ### Epic 11: AI Assistant (opt-in)
 Opt-in, transparent AI: smart category suggestions while adding a transaction and a
-natural-language Q&A ask-bar on Insights, with server-side inference via the Forge gateway and
-explicit consent before any transaction data is sent.
-*Brownfield: `server/_core/llm.ts` gateway exists but is unused — this epic is its first consumer.*
+natural-language Q&A ask-bar on Insights, with server-side inference via a self-hosted / local LLM
+(OpenAI-compatible, env-configured — not the Manus Forge gateway) and explicit consent before any
+transaction data is sent.
+*Brownfield: a legacy Forge client (`server/_core/llm.ts`) exists but is unused and will be retired;
+this epic introduces a self-hosted/local OpenAI-compatible LLM client instead.*
 **Covers:** FR-11, FR-12, FR-13.
 
 ---
@@ -889,7 +891,7 @@ So that I can migrate existing data in.
 ## Epic 11: AI Assistant (opt-in)
 
 **Goal:** Opt-in smart categorization and natural-language Q&A.
-**Covers:** FR-11, FR-12, FR-13 · **Brownfield:** first consumer of the existing unused `server/_core/llm.ts` Forge gateway.
+**Covers:** FR-11, FR-12, FR-13 · **Brownfield:** introduces a self-hosted / local OpenAI-compatible LLM client; the legacy Forge client (`server/_core/llm.ts`) is unused and will be retired.
 
 ### Story 11.1: AI consent and opt-in flow
 
@@ -904,14 +906,14 @@ So that I stay in control of my data.
 
 ### Story 11.2: Server-side categorization endpoint
 
-As a developer, I want a categorization endpoint via the Forge gateway,
-So that suggestions are computed server-side without hardcoded keys.
+As a developer, I want a categorization endpoint backed by a self-hosted / local LLM,
+So that suggestions are computed server-side, on infrastructure we control, without third-party gateways or hardcoded keys.
 
 **Acceptance Criteria:**
 **Given** consent is granted
 **When** the client requests a category suggestion for a description/amount
-**Then** the server calls Forge (`gemini-2.5-flash`) via `invokeLLM`, returns a suggested category, and never runs without consent
-**And** keys stay in server env and a heuristic fallback is used on gateway failure.
+**Then** the server calls the configured self-hosted / local LLM (OpenAI-compatible `/v1/chat/completions`, model from env), returns a suggested category mapped to one of the user's categories, and never runs without consent
+**And** the LLM base URL / optional key / model stay in server env and a heuristic fallback is used on LLM failure or unavailability.
 
 ### Story 11.3: Inline category suggestion in add-transaction
 
@@ -932,5 +934,5 @@ So that I get answers without building reports.
 **Acceptance Criteria:**
 **Given** AI is enabled
 **When** I ask a question in the Insights ask-bar (e.g., "Top expenses last month?")
-**Then** the server answers using my data via the gateway and returns a focused answer card
+**Then** the server answers using my data via the self-hosted / local LLM and returns a focused answer card
 **And** the feature is absent/disabled when AI is off, and errors degrade to a friendly message.

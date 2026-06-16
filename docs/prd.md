@@ -1,6 +1,6 @@
 # SmartPocket – Product Requirements Document (PRD)
 
-Last updated: 2026-05-29
+Last updated: 2026-06-17
 Owner: Product (PM)
 Status: Draft for review
 
@@ -73,7 +73,7 @@ Status: **[built]** implemented today · **[planned]** roadmap (§12).
 - AI (optional / opt‑in)
   - **FR-11** Smart categorization suggestions for new transactions. **[planned]**
   - **FR-12** Natural‑language Q&A (e.g. "Top expenses last month?"). **[planned]**
-  - **FR-13** Inference runs server‑side via the Forge LLM gateway; transaction data is sent only after explicit user consent (no on‑device model). **[planned]**
+  - **FR-13** Inference runs server‑side via a self‑hosted / local LLM (OpenAI‑compatible endpoint, env‑configured — not a third‑party gateway); transaction data is sent only after explicit user consent, and only to that self‑hosted endpoint. **[planned]**
 - Budgets
   - **FR-14** Category budgets (monthly/weekly) with progress indicators and threshold alerts. **[planned]**
 - Loans
@@ -90,7 +90,7 @@ Status: **[built]** implemented today · **[planned]** roadmap (§12).
 
 ## 7. Non‑Functional Requirements
 Each has an ID (`NFR-#`) and a measurable target where applicable.
-- **NFR-1 Privacy:** user data is scoped to the authenticated user; transaction data is sent to the AI/LLM gateway only after explicit opt‑in. No third‑party analytics SDKs without disclosure.
+- **NFR-1 Privacy:** user data is scoped to the authenticated user; transaction data is sent for AI inference only after explicit opt‑in, and only to the self‑hosted / local LLM endpoint — never to a third‑party AI API. No third‑party analytics SDKs without disclosure.
 - **NFR-2 Performance:** cold start ≤ 3s on a mid‑range device; primary screens interactive ≤ 1s after data load; p95 API response < 500ms under normal load.
 - **NFR-3 Reliability:** durable server‑side persistence with parameterized writes; crash‑free session rate ≥ 99.5%; timezone‑aware date handling for summaries/reminders.
 - **NFR-4 Security:** secrets in server env only; auth session in secure storage (native) / HTTP‑only cookie (web); sensitive fields (card numbers) encrypted at rest before production (see §15, `ARCHITECTURE.md` §8).
@@ -130,8 +130,8 @@ Each has an ID (`NFR-#`) and a measurable target where applicable.
 - Notifications: `expo-notifications` (local reminders) — planned, not yet wired.
 - Charts: pie/breakdown charts planned for the Insights screen (no chart lib integrated yet).
 - AI integrations
-  - Server‑side LLM gateway via Manus Forge (`/v1/chat/completions`, model `gemini-2.5-flash`) in `server/_core/llm.ts`; not yet used by any feature. API keys live in server env, never hardcoded.
-  - On‑device/local model path is no longer part of the architecture (server‑backed model).
+  - Server‑side inference targets a **self‑hosted / local LLM** over an OpenAI‑compatible `/v1/chat/completions` API, configured via env (`LLM_BASE_URL`, optional `LLM_API_KEY`, `LLM_MODEL`); no third‑party gateway. Host/key/model live in server env, never hardcoded. *(A legacy Manus Forge client exists in `server/_core/llm.ts` but is unused and being retired.)*
+  - On‑device (user‑device) inference is not part of the architecture; the LLM runs server‑side on infrastructure we control.
 
 ## 11. Privacy, Security, and Compliance
 - Server‑backed model: user data lives in the managed MySQL database and is always scoped to the authenticated user. (The original "local‑only by default" stance no longer applies — see the Stack note and `ARCHITECTURE.md` §8.)
@@ -147,7 +147,7 @@ Each has an ID (`NFR-#`) and a measurable target where applicable.
   - Credit card management.
   - Monthly summary with income/expense/net and per‑category breakdown.
 - Phase 2 – Intelligence & UX
-  - AI categorization suggestions (via Forge LLM); budgeting and forecasts.
+  - AI categorization suggestions (via a self‑hosted/local LLM); budgeting and forecasts.
   - Natural‑language queries/insights; import/export basics; loans & recurring transactions.
 - Phase 3 – Scale & Polish
   - Multi‑language support (i18n); richer analytics and charts.
@@ -177,7 +177,8 @@ Each criterion maps to the requirement(s) it satisfies.
 
 ## 16. Dependencies and Assumptions
 - Node.js + pnpm; Expo SDK 54 / React Native 0.81 toolchain.
-- Manus platform services: OAuth server, Data API (MySQL), and Forge LLM gateway, configured via env vars.
+- Manus platform services: OAuth server and Data API (MySQL), configured via env vars.
+- A self‑hosted / local LLM (OpenAI‑compatible endpoint) for AI features, reachable from the API server and configured via env vars (`LLM_BASE_URL`, optional `LLM_API_KEY`, `LLM_MODEL`).
 - Notification permissions granted by user (for planned local reminders).
 - License: **open‑source under MIT is the intended direction but not yet committed** — no `LICENSE` file exists in the repo today. Community/open‑source references elsewhere in this PRD (§2, §4, §14) are contingent on this decision being finalized. **Decision owner: Product.**
 
@@ -189,7 +190,7 @@ Each criterion maps to the requirement(s) it satisfies.
 
 ## 18. Decisions and Clarifications
 - Persistence: **MySQL via the Manus Data API** (server‑backed). The original offline‑first SQLite plan was dropped in the React Native rebuild.
-- AI: server‑side LLM via Manus Forge; heuristic fallback still acceptable as a first step.
+- AI: server‑side inference via a self‑hosted / local LLM (OpenAI‑compatible, env‑configured) — **not** Manus Forge (decision 2026‑06‑17); heuristic fallback still acceptable as a first step.
 - Import/export: CSV (transactions) prioritized; JSON export supported — both still to be built.
 
 ## 19. Appendix and References

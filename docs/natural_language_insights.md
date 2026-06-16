@@ -6,9 +6,10 @@
 >
 > **Stack note:** The app is **Expo / React Native (TypeScript)**, not Flutter. The Dart code samples
 > below are illustrative of the original concept only; an actual implementation would use a tRPC
-> procedure calling `invokeLLM(...)` (`server/_core/llm.ts`, model `gemini-2.5-flash`) on the server and
-> a React Native chat UI on the client. Data analysis would reuse the existing `summary` router
-> aggregations. See [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+> procedure calling a self-hosted / local LLM (OpenAI-compatible endpoint, env-configured via
+> `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` — **not** the legacy Manus Forge client, which is unused and
+> being retired) on the server and a React Native chat UI on the client. Data analysis would reuse the
+> existing `summary` router aggregations. See [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 ## Overview
 
@@ -99,11 +100,11 @@ analysis, and a chat interface.
                   │
      ┌────────────▼─────────────┐
      │                          │
-┌────▼─────┐            ┌──────▼──────┐
-│Heuristic │            │ Forge LLM   │
-│Analysis  │            │ Analysis    │
-│(Offline) │            │ (Online)    │
-└──────────┘            └─────────────┘
+┌────▼─────┐            ┌──────▼──────────────┐
+│Heuristic │            │ Self-hosted / local │
+│Analysis  │            │ LLM analysis        │
+│(Fallback)│            │ (OpenAI-compatible) │
+└──────────┘            └─────────────────────┘
 ```
 
 ### Core Components
@@ -138,7 +139,7 @@ Structured response containing:
 
 #### **Intent Recognition**
 - **Heuristic Parsing**: Keyword-based analysis for offline use
-- **AI Parsing**: LLM-powered intent extraction (Forge gateway) for complex queries
+- **AI Parsing**: LLM-powered intent extraction (self-hosted / local LLM) for complex queries
 - **Fallback Strategy**: Graceful degradation from AI to heuristics
 
 #### **Data Analysis**
@@ -175,7 +176,7 @@ Structured response containing:
 ## Privacy & Security
 
 ### **Privacy-First Design**
-- Heuristic analysis is the default; the LLM gateway is used only when AI features are explicitly enabled
+- Heuristic analysis is the default; the self-hosted / local LLM is used only when AI features are explicitly enabled
 - No persistent storage of queries or responses
 - User controls over AI features (opt-in)
 
@@ -299,7 +300,7 @@ Actions: [View All Categories] [Create Budget]
 - **Advanced Analytics**: Forecasting and budgeting insights
 
 ### **Technical Improvements**
-- **Local AI Models**: On-device processing for privacy
+- **On-device Models**: client-device inference for even stronger privacy (the baseline is already self-hosted server-side)
 - **Query Caching**: Faster responses for repeated questions
 - **Real-time Data**: Live transaction updates in conversations
 - **Multi-language Support**: International user base
@@ -321,8 +322,8 @@ Actions: [View All Categories] [Create Budget]
 - Verify AI features are enabled
 
 **Slow Response Times**
-- Check that the server can reach the Forge gateway
-- Verify Forge gateway status
+- Check that the API server can reach the `LLM_BASE_URL` endpoint
+- Verify the local LLM server status / load
 - Fall back to heuristic responses for speed
 - Reduce query complexity
 
@@ -335,8 +336,9 @@ Actions: [View All Categories] [Create Budget]
 ## API Integration
 
 > The snippets below are **illustrative of the original Flutter concept** only. An actual
-> implementation would be TypeScript: a tRPC procedure on the server calling `invokeLLM(...)`
-> (`server/_core/llm.ts`), consumed by a React Native chat screen via a tRPC/TanStack Query hook.
+> implementation would be TypeScript: a tRPC procedure on the server calling the self-hosted / local LLM
+> client (a new env-driven OpenAI-compatible client under `server/ai/`, not the legacy Forge `invokeLLM`),
+> consumed by a React Native chat screen via a tRPC/TanStack Query hook.
 
 ### Query processing (intended shape — TypeScript)
 ```ts
@@ -345,7 +347,8 @@ nlQuery: protectedProcedure
   .input(z.object({ question: z.string() }))
   .mutation(async ({ ctx, input }) => {
     // gather data via existing summary aggregations, then:
-    const res = await invokeLLM({ messages: [...], responseFormat: { type: "json_object" } });
+    // self-hosted/local OpenAI-compatible client (server/ai/), not the legacy Forge invokeLLM
+    const res = await llm.chatCompletion({ messages: [...], responseFormat: { type: "json_object" } });
     return parseQueryResult(res); // { answer, summary, insights[], actions[], confidence }
   });
 ```
@@ -362,7 +365,8 @@ result.actions.forEach(registerAction);
 
 Once built, the Natural Language Financial Insights feature would transform SmartPocket from a basic
 expense tracker into an intelligent financial assistant, letting users gain insights through
-conversational interactions backed by the server-side LLM gateway and the existing summary aggregations.
+conversational interactions backed by the server-side self-hosted / local LLM and the existing summary
+aggregations.
 
 This document defines the scope for **Epic I: AI - Story I2**. It is a design/specification — the
 feature is not yet implemented (see the status banner at the top).

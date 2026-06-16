@@ -1,6 +1,6 @@
 # Architecture — Expense Tracker (SmartPocket)
 
-Last updated: 2026-05-29
+Last updated: 2026-06-17
 Status: Authoritative — describes what is actually implemented in this repository.
 
 > **History:** The product was originally scoped as a Flutter app (see `prd.md`, `concept note.md`).
@@ -27,7 +27,7 @@ Manus platform's Data API.
 | ORM / schema | Drizzle ORM (MySQL dialect) — schema-as-types; runtime queries use raw parameterized SQL |
 | Database | MySQL, reached via Manus Data API (`callDataApi`), not a direct connection |
 | Auth | Manus OAuth → JWT session (jose); bearer token on native, cookie on web |
-| AI gateway | Manus "Forge" `/v1/chat/completions` (`gemini-2.5-flash`) — wired but not yet used by features |
+| AI inference | Self-hosted / local LLM over an OpenAI-compatible `/v1/chat/completions` API, env-configured (`LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`) — **planned**. A legacy Manus Forge client (`server/_core/llm.ts`) exists but is unused and being retired. |
 | Tooling | pnpm, TypeScript strict, Vitest, ESLint (expo config), Prettier, drizzle-kit |
 
 ---
@@ -64,7 +64,7 @@ server/
   _core/sdk.ts               Manus OAuth SDK: token exchange, JWT sign/verify, request auth
   _core/oauth.ts             OAuth HTTP routes (login callback, session cookie issuance)
   _core/dataApi.ts           callDataApi() — gateway to Manus Data API (DB + external APIs)
-  _core/llm.ts               invokeLLM() — Forge chat-completions client (currently unused by features)
+  _core/llm.ts               invokeLLM() — legacy Forge chat-completions client (unused; AI features will use a self-hosted/local OpenAI-compatible client instead)
   _core/env.ts               Server env var surface
   routers.ts                 tRPC app router: categories / creditCards / transactions / summary
   db.ts                      Data-access functions (raw SQL via callDataApi)
@@ -116,10 +116,10 @@ docs/                        Product + technical docs (this file, PRD, concept n
    │ (MySQL queries)    │  │ (token / userinfo)  │
    └────────────────────┘  └────────────────────┘
               │
-              ▼ (available, not yet used by app features)
-   ┌────────────────────┐
-   │ Manus Forge LLM    │  gemini-2.5-flash via /v1/chat/completions
-   └────────────────────┘
+              ▼ (planned — AI features, opt-in)
+   ┌──────────────────────────┐
+   │ Self-hosted / local LLM  │  OpenAI-compatible /v1/chat/completions (env-configured)
+   └──────────────────────────┘
 ```
 
 Local dev: Metro/web on port **8081**, API server on port **3000** (`pnpm dev` runs both via
@@ -204,7 +204,7 @@ Aggregations (`monthlyStats`, `expensesByCategory`) fetch rows and reduce in JS 
    users (`isCron`, `taskUid`).
 
 Relevant env vars: server `VITE_APP_ID`, `JWT_SECRET`, `OAUTH_SERVER_URL`, `DATABASE_URL`,
-`BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY`; client `EXPO_PUBLIC_OAUTH_PORTAL_URL`,
+`LLM_BASE_URL`, `LLM_API_KEY` (optional), `LLM_MODEL`; client `EXPO_PUBLIC_OAUTH_PORTAL_URL`,
 `EXPO_PUBLIC_OAUTH_SERVER_URL`, `EXPO_PUBLIC_APP_ID`, `EXPO_PUBLIC_API_BASE_URL`.
 
 ---
@@ -219,9 +219,12 @@ Relevant env vars: server `VITE_APP_ID`, `JWT_SECRET`, `OAUTH_SERVER_URL`, `DATA
 - Unlike the original Flutter concept, this build is **online/server-backed**, not offline-first. The
   PRD's "no network calls unless explicitly enabled" privacy stance does not apply to the current
   architecture and should be re-evaluated.
-- The LLM gateway (`server/_core/llm.ts`) routes through Manus Forge. No feature currently sends
-  transaction data to it, so the AI-privacy commitments in `openai_integration.md` /
-  `natural_language_insights.md` are not yet relevant — but should be honored when those features land.
+- AI inference is planned to run against a **self-hosted / local LLM** (OpenAI-compatible, env-configured
+  via `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`), **not** a third-party gateway — so transaction data
+  sent for AI features stays on infrastructure we control. The legacy Forge client (`server/_core/llm.ts`,
+  routing to Manus Forge) is unused and being retired. No feature currently sends transaction data to any
+  model, so the AI-privacy commitments in `openai_integration.md` / `natural_language_insights.md` are not
+  yet relevant — but should be honored when those features land.
 
 ---
 
@@ -251,8 +254,10 @@ These features are described in the docs but **not implemented** in this reposit
 
 - **Budgets, loans, multiple accounts, recurring transactions, import/export** (`prd.md`,
   `concept note.md`) — none exist. The app does have **credit cards**, which the PRD does not mention.
-- **AI categorization** (`openai_integration.md`) — no categorization code; LLM gateway unused. Note
-  the doc says OpenAI/GPT-3.5, but the configured model is `gemini-2.5-flash`.
+- **AI categorization** (`openai_integration.md`) — no categorization code yet; the legacy Forge client
+  is unused. Planned implementation uses a self-hosted / local OpenAI-compatible LLM (env-configured model),
+  not Manus Forge and not a third-party API. The feature-design notes `openai_integration.md` /
+  `natural_language_insights.md` reflect this self-hosted approach.
 - **Natural-language insights / chat / voice** (`natural_language_insights.md`) — not present despite
   the doc's "shipped" wording.
 - **Localization / i18n** (`localization_implementation.md`) — no i18n; the doc describes a Flutter
