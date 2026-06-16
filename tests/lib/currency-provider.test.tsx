@@ -31,7 +31,12 @@ describe("loadCurrencyPreference", () => {
 
   it("seeds default locale currency when storage is empty", async () => {
     vi.mocked(getLocales).mockReturnValueOnce([
-      { currencyCode: "GBP", languageTag: "en-GB", languageCode: "en", regionCode: "GB" },
+      {
+        currencyCode: "GBP",
+        languageTag: "en-GB",
+        languageCode: "en",
+        regionCode: "GB",
+      },
     ]);
 
     await expect(loadCurrencyPreference()).resolves.toBe("GBP");
@@ -39,8 +44,9 @@ describe("loadCurrencyPreference", () => {
   });
 
   it("falls back to USD when storage read fails", async () => {
-    const AsyncStorage = (await import("@react-native-async-storage/async-storage"))
-      .default;
+    const AsyncStorage = (
+      await import("@react-native-async-storage/async-storage")
+    ).default;
     vi.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error("offline"));
 
     await expect(loadCurrencyPreference()).resolves.toBe("USD");

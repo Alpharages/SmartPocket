@@ -32,8 +32,20 @@ vi.mock("react-native-safe-area-context", () => ({
 }));
 
 vi.mock("@expo/vector-icons", () => ({
-  Ionicons: ({ name, size, color }: { name: string; size?: number; color?: string }) =>
-    React.createElement("span", { "data-icon": name, "data-size": size, "data-color": color }),
+  Ionicons: ({
+    name,
+    size,
+    color,
+  }: {
+    name: string;
+    size?: number;
+    color?: string;
+  }) =>
+    React.createElement("span", {
+      "data-icon": name,
+      "data-size": size,
+      "data-color": color,
+    }),
 }));
 
 let renderer: TestRenderer.ReactTestRenderer | null = null;
@@ -60,9 +72,7 @@ function textOf(node: ReactTestInstance | string): string {
 }
 
 function queryText(root: ReactTestInstance, text: string): ReactTestInstance[] {
-  return root.findAll(
-    (n) => String(n.type) === "Text" && textOf(n) === text,
-  );
+  return root.findAll((n) => String(n.type) === "Text" && textOf(n) === text);
 }
 
 function getByText(root: ReactTestInstance, text: string): ReactTestInstance {
@@ -84,14 +94,12 @@ function getButtons(root: ReactTestInstance): ReactTestInstance[] {
 describe("ConfirmSheet", () => {
   it("does not render when visible is false", () => {
     const root = render(
-      <ConfirmSheet
-        visible={false}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-      />,
+      <ConfirmSheet visible={false} onConfirm={vi.fn()} onCancel={vi.fn()} />,
     );
     // Sheet returns null when not mounted, so no panel should exist.
-    expect(root.findAll((n) => n.props.testID === "confirm-sheet-panel")).toHaveLength(0);
+    expect(
+      root.findAll((n) => n.props.testID === "confirm-sheet-panel"),
+    ).toHaveLength(0);
   });
 
   it("renders title and message when visible", () => {
@@ -110,11 +118,7 @@ describe("ConfirmSheet", () => {
 
   it("renders default labels when none provided", () => {
     const root = render(
-      <ConfirmSheet
-        visible={true}
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-      />,
+      <ConfirmSheet visible={true} onConfirm={vi.fn()} onCancel={vi.fn()} />,
     );
     expect(getByText(root, "Confirm")).toBeTruthy();
     expect(getByText(root, "Cancel")).toBeTruthy();
@@ -123,16 +127,10 @@ describe("ConfirmSheet", () => {
   it("calls onCancel when cancel button is pressed", () => {
     const onCancel = vi.fn();
     const root = render(
-      <ConfirmSheet
-        visible={true}
-        onConfirm={vi.fn()}
-        onCancel={onCancel}
-      />,
+      <ConfirmSheet visible={true} onConfirm={vi.fn()} onCancel={onCancel} />,
     );
     const buttons = getButtons(root);
-    const cancelButton = buttons.find((b) =>
-      textOf(b).includes("Cancel"),
-    );
+    const cancelButton = buttons.find((b) => textOf(b).includes("Cancel"));
     expect(cancelButton).toBeTruthy();
     act(() => {
       cancelButton!.props.onPress?.();
@@ -143,16 +141,10 @@ describe("ConfirmSheet", () => {
   it("calls onConfirm when confirm button is pressed", () => {
     const onConfirm = vi.fn();
     const root = render(
-      <ConfirmSheet
-        visible={true}
-        onConfirm={onConfirm}
-        onCancel={vi.fn()}
-      />,
+      <ConfirmSheet visible={true} onConfirm={onConfirm} onCancel={vi.fn()} />,
     );
     const buttons = getButtons(root);
-    const confirmButton = buttons.find((b) =>
-      textOf(b).includes("Confirm"),
-    );
+    const confirmButton = buttons.find((b) => textOf(b).includes("Confirm"));
     expect(confirmButton).toBeTruthy();
     act(() => {
       confirmButton!.props.onPress?.();

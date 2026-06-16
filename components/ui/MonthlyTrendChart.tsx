@@ -83,9 +83,7 @@ export function buildMonthlyTrendAccessibilityLabel(
 }
 
 export function hasMonthlyTrendHistory(data: MonthlyTrendPoint[]): boolean {
-  return data.some(
-    (point) => point.totalIncome > 0 || point.totalExpense > 0,
-  );
+  return data.some((point) => point.totalIncome > 0 || point.totalExpense > 0);
 }
 
 export function MonthlyTrendChart({

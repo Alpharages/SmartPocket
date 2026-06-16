@@ -40,6 +40,7 @@ as described in Epic L: Story L1.
 ### User Interface (intended)
 
 #### Language Selection (to build)
+
 1. Open the (planned) **Settings** screen
 2. Find the **Language** section
 3. Tap to see available languages
@@ -47,6 +48,7 @@ as described in Epic L: Story L1.
 5. UI updates immediately (i18next re-render)
 
 #### Strings to Localize (target)
+
 - Tab labels (Home / Activity / Categories / Insights / Cards)
 - Screen titles and headings
 - Common UI elements (Save, Cancel, OK, etc.)
@@ -65,6 +67,7 @@ To add a new language:
 4. Register the resource in `lib/i18n/index.ts` and add it to the available-languages list used by the Settings screen
 
 Example for French (`fr.json`):
+
 ```json
 {
   "appTitle": "Poche Intelligente",
@@ -75,6 +78,7 @@ Example for French (`fr.json`):
 ### Usage in Code
 
 Use the `useTranslation` hook from `react-i18next`:
+
 ```tsx
 import { useTranslation } from "react-i18next";
 
@@ -93,6 +97,7 @@ survives restarts.
 ## Testing
 
 Add a Vitest suite (e.g. `tests/i18n.test.ts`) verifying:
+
 - English and Spanish resources load correctly
 - Language switching updates the active locale
 - All supported locales expose the same set of keys (no missing translations)

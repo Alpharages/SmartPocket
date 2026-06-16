@@ -145,18 +145,22 @@ describe("Toast item", () => {
     const successRoot = render(
       <Toast id="ts" type="success" message="ok" onDismiss={vi.fn()} />,
     );
-    const successIconName = findByTestId(successRoot, "toast-ts-icon")
-      .findAll((n) => String(n.type) === "Ionicons")[0]?.props.name;
+    const successIconName = findByTestId(successRoot, "toast-ts-icon").findAll(
+      (n) => String(n.type) === "Ionicons",
+    )[0]?.props.name;
 
     // unmount and switch to error
-    act(() => { renderer?.unmount(); });
+    act(() => {
+      renderer?.unmount();
+    });
     renderer = null;
 
     const errorRoot = render(
       <Toast id="te" type="error" message="fail" onDismiss={vi.fn()} />,
     );
-    const errorIconName = findByTestId(errorRoot, "toast-te-icon")
-      .findAll((n) => String(n.type) === "Ionicons")[0]?.props.name;
+    const errorIconName = findByTestId(errorRoot, "toast-te-icon").findAll(
+      (n) => String(n.type) === "Ionicons",
+    )[0]?.props.name;
 
     expect(successIconName).toBeDefined();
     expect(errorIconName).toBeDefined();
@@ -187,7 +191,9 @@ describe("Toast item", () => {
     const root = render(
       <Toast id="t-c" type="success" message="check" onDismiss={vi.fn()} />,
     );
-    expect(flatStyle(findByTestId(root, "toast-t-c-message")).color).toBe(mockColors.foreground);
+    expect(flatStyle(findByTestId(root, "toast-t-c-message")).color).toBe(
+      mockColors.foreground,
+    );
   });
 
   it("AC1: icon container is hidden from accessibility tree (decorative)", () => {
@@ -196,14 +202,18 @@ describe("Toast item", () => {
     );
     const iconContainer = findByTestId(root, "toast-t-a11y-icon");
     expect(iconContainer.props.accessibilityElementsHidden).toBe(true);
-    expect(iconContainer.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(iconContainer.props.importantForAccessibility).toBe(
+      "no-hide-descendants",
+    );
   });
 
   it("AC4: toast is announced via accessibilityLiveRegion=polite", () => {
     const root = render(
       <Toast id="t-lr" type="info" message="info msg" onDismiss={vi.fn()} />,
     );
-    expect(findByTestId(root, "toast-t-lr").props.accessibilityLiveRegion).toBe("polite");
+    expect(findByTestId(root, "toast-t-lr").props.accessibilityLiveRegion).toBe(
+      "polite",
+    );
   });
 });
 
@@ -212,8 +222,12 @@ describe("Toast item", () => {
 // ---------------------------------------------------------------------------
 
 describe("Toast auto-dismiss", () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("AC4: auto-dismiss fires onDismiss after default duration", () => {
     const onDismiss = vi.fn();
@@ -224,7 +238,9 @@ describe("Toast auto-dismiss", () => {
     });
     expect(onDismiss).not.toHaveBeenCalled();
     // Advance past duration (3500) + exit animation (250)
-    act(() => { vi.advanceTimersByTime(3500 + 300); });
+    act(() => {
+      vi.advanceTimersByTime(3500 + 300);
+    });
     expect(onDismiss).toHaveBeenCalledWith("t-auto");
   });
 
@@ -232,12 +248,22 @@ describe("Toast auto-dismiss", () => {
     const onDismiss = vi.fn();
     act(() => {
       renderer = TestRenderer.create(
-        <Toast id="t-dur" type="info" message="custom" duration={1000} onDismiss={onDismiss} />,
+        <Toast
+          id="t-dur"
+          type="info"
+          message="custom"
+          duration={1000}
+          onDismiss={onDismiss}
+        />,
       );
     });
-    act(() => { vi.advanceTimersByTime(999); });
+    act(() => {
+      vi.advanceTimersByTime(999);
+    });
     expect(onDismiss).not.toHaveBeenCalled();
-    act(() => { vi.advanceTimersByTime(500); });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 });
@@ -248,17 +274,31 @@ describe("Toast auto-dismiss", () => {
 
 describe("ToastProvider", () => {
   it("renders overlay container", () => {
-    const root = render(<ToastProvider><></></ToastProvider>);
+    const root = render(
+      <ToastProvider>
+        <></>
+      </ToastProvider>,
+    );
     expect(findByTestId(root, "toast-container")).toBeDefined();
   });
 
   it("AC4: overlay has pointerEvents='box-none' so touches pass through", () => {
-    const root = render(<ToastProvider><></></ToastProvider>);
-    expect(findByTestId(root, "toast-container").props.pointerEvents).toBe("box-none");
+    const root = render(
+      <ToastProvider>
+        <></>
+      </ToastProvider>,
+    );
+    expect(findByTestId(root, "toast-container").props.pointerEvents).toBe(
+      "box-none",
+    );
   });
 
   it("AC4: overlay top is offset by safe-area insets (top > 0)", () => {
-    const root = render(<ToastProvider><></></ToastProvider>);
+    const root = render(
+      <ToastProvider>
+        <></>
+      </ToastProvider>,
+    );
     const flat = flatStyle(findByTestId(root, "toast-container"));
     // mock insets.top = 44, Spacing.sm = 8 → top = 52
     expect(flat.top).toBeGreaterThan(0);
@@ -266,19 +306,35 @@ describe("ToastProvider", () => {
 
   it("AC3: show() enqueues one toast", () => {
     let showFn!: ReturnType<typeof useToast>["show"];
-    function Harness() { showFn = useToast().show; return null; }
+    function Harness() {
+      showFn = useToast().show;
+      return null;
+    }
 
-    render(<ToastProvider><Harness /></ToastProvider>);
-    act(() => { showFn({ type: "success", message: "Created!" }); });
+    render(
+      <ToastProvider>
+        <Harness />
+      </ToastProvider>,
+    );
+    act(() => {
+      showFn({ type: "success", message: "Created!" });
+    });
 
     expect(toastCount()).toBe(1);
   });
 
   it("AC4: two show() calls produce two queued toasts", () => {
     let showFn!: ReturnType<typeof useToast>["show"];
-    function Harness() { showFn = useToast().show; return null; }
+    function Harness() {
+      showFn = useToast().show;
+      return null;
+    }
 
-    render(<ToastProvider><Harness /></ToastProvider>);
+    render(
+      <ToastProvider>
+        <Harness />
+      </ToastProvider>,
+    );
     // Batch both shows in a single act() to avoid React 18 cross-batch state issues
     act(() => {
       showFn({ type: "success", message: "First" });
@@ -290,10 +346,19 @@ describe("ToastProvider", () => {
 
   it("AC4: manually dismissing a toast removes it", () => {
     let showFn!: ReturnType<typeof useToast>["show"];
-    function Harness() { showFn = useToast().show; return null; }
+    function Harness() {
+      showFn = useToast().show;
+      return null;
+    }
 
-    const root = render(<ToastProvider><Harness /></ToastProvider>);
-    act(() => { showFn({ type: "info", message: "Bye" }); });
+    const root = render(
+      <ToastProvider>
+        <Harness />
+      </ToastProvider>,
+    );
+    act(() => {
+      showFn({ type: "info", message: "Bye" });
+    });
 
     expect(toastCount()).toBe(1);
 
@@ -308,9 +373,14 @@ describe("ToastProvider", () => {
   });
 
   it("useToast throws when called outside ToastProvider", () => {
-    function BadConsumer() { useToast(); return null; }
+    function BadConsumer() {
+      useToast();
+      return null;
+    }
     expect(() => {
-      act(() => { TestRenderer.create(<BadConsumer />); });
+      act(() => {
+        TestRenderer.create(<BadConsumer />);
+      });
     }).toThrow("useToast must be used within a <ToastProvider>");
   });
 });
@@ -320,22 +390,37 @@ describe("ToastProvider", () => {
 // ---------------------------------------------------------------------------
 
 describe("ToastProvider auto-dismiss", () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("AC4: toast auto-dismisses and is removed after duration", () => {
     let showFn!: ReturnType<typeof useToast>["show"];
-    function Harness() { showFn = useToast().show; return null; }
+    function Harness() {
+      showFn = useToast().show;
+      return null;
+    }
 
     // Access .root OUTSIDE act() to avoid "Can't access .root on unmounted renderer"
     act(() => {
-      renderer = TestRenderer.create(<ToastProvider><Harness /></ToastProvider>);
+      renderer = TestRenderer.create(
+        <ToastProvider>
+          <Harness />
+        </ToastProvider>,
+      );
     });
 
-    act(() => { showFn({ type: "info", message: "Bye", duration: 500 }); });
+    act(() => {
+      showFn({ type: "info", message: "Bye", duration: 500 });
+    });
     expect(toastCount()).toBe(1);
 
-    act(() => { vi.advanceTimersByTime(500 + 300); });
+    act(() => {
+      vi.advanceTimersByTime(500 + 300);
+    });
     expect(toastCount()).toBe(0);
   });
 });

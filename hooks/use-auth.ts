@@ -51,7 +51,9 @@ export function useAuth(options?: UseAuthOptions) {
       const sessionToken = await Auth.getSessionToken();
       console.log(
         "[useAuth] Session token:",
-        sessionToken ? `present (${sessionToken.substring(0, 20)}...)` : "missing",
+        sessionToken
+          ? `present (${sessionToken.substring(0, 20)}...)`
+          : "missing",
       );
       if (!sessionToken) {
         console.log("[useAuth] No session token, setting user to null");
@@ -70,7 +72,8 @@ export function useAuth(options?: UseAuthOptions) {
         setUser(null);
       }
     } catch (err) {
-      const error = err instanceof Error ? err : new Error("Failed to fetch user");
+      const error =
+        err instanceof Error ? err : new Error("Failed to fetch user");
       console.error("[useAuth] fetchUser error:", error);
       setError(error);
       setUser(null);
@@ -97,7 +100,12 @@ export function useAuth(options?: UseAuthOptions) {
   const isAuthenticated = useMemo(() => Boolean(user), [user]);
 
   useEffect(() => {
-    console.log("[useAuth] useEffect triggered, autoFetch:", autoFetch, "platform:", Platform.OS);
+    console.log(
+      "[useAuth] useEffect triggered, autoFetch:",
+      autoFetch,
+      "platform:",
+      Platform.OS,
+    );
     if (autoFetch) {
       if (Platform.OS === "web") {
         // Web: fetch user from API directly (user will login manually if needed)

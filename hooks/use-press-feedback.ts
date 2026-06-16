@@ -1,5 +1,10 @@
 import { useCallback } from "react";
-import { useSharedValue, useAnimatedStyle, withTiming, useReducedMotion } from "react-native-reanimated";
+import {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  useReducedMotion,
+} from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 
 const PRESS_SCALE = 0.97;
@@ -30,7 +35,9 @@ export type PressFeedbackResult = {
  * Honors reduced-motion: no scale animation when reduced-motion is enabled.
  * Haptics fire only on iOS (`process.env.EXPO_OS === 'ios'`).
  */
-export function usePressFeedback(options: PressFeedbackOptions = {}): PressFeedbackResult {
+export function usePressFeedback(
+  options: PressFeedbackOptions = {},
+): PressFeedbackResult {
   const {
     scale = PRESS_SCALE,
     pressInDuration = PRESS_IN_DURATION,
@@ -50,7 +57,11 @@ export function usePressFeedback(options: PressFeedbackOptions = {}): PressFeedb
     if (!reducedMotion) {
       pressed.value = withTiming(1, { duration: pressInDuration });
     }
-    if (!disableHaptic && hapticStyle !== null && process.env.EXPO_OS === "ios") {
+    if (
+      !disableHaptic &&
+      hapticStyle !== null &&
+      process.env.EXPO_OS === "ios"
+    ) {
       Haptics.impactAsync(hapticStyle);
     }
   }, [reducedMotion, pressed, pressInDuration, disableHaptic, hapticStyle]);

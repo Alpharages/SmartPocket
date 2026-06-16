@@ -1,7 +1,16 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+} from "react";
 import { trpc } from "./trpc";
 import { useToast } from "@/components/ui/ToastProvider";
 import { applyOptimistic, snapshotList } from "./optimistic";
+import { getMonthBoundaries, getWeekBoundaries } from "./budget-period";
+import { useFirstDayOfWeek } from "./first-day-of-week-provider";
 
 export interface Category {
   id: number;
@@ -50,6 +59,32 @@ export interface Transaction {
   updatedAt: Date;
 }
 
+export interface Budget {
+  id: number;
+  userId: number;
+  categoryId: number;
+  period: "monthly" | "weekly";
+  amount: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CreateBudgetInput = {
+  categoryId: number;
+  period: "monthly" | "weekly";
+  amount: string;
+  startDate?: Date;
+  endDate?: Date;
+};
+
+export interface BudgetProgress {
+  budgetId: number;
+  spent: string;
+  limit: string;
+}
+
 export interface MonthlyStats {
   totalIncome: number;
   totalExpense: number;
@@ -61,7 +96,9 @@ interface ExpenseContextType {
   categories: Category[];
   loadingCategories: boolean;
   refreshCategories: () => Promise<void>;
-  addCategory: (data: Omit<Category, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<void>;
+  addCategory: (
+    data: Omit<Category, "id" | "userId" | "createdAt" | "updatedAt">,
+  ) => Promise<void>;
   updateCategory: (id: number, data: Partial<Category>) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
 
@@ -70,17 +107,34 @@ interface ExpenseContextType {
   loadingCards: boolean;
   refreshCreditCards: () => Promise<void>;
   addCreditCard: (data: CreateCreditCardInput) => Promise<void>;
-  updateCreditCard: (id: number, data: Partial<CreditCard> & { cardNumber?: string }) => Promise<void>;
+  updateCreditCard: (
+    id: number,
+    data: Partial<CreditCard> & { cardNumber?: string },
+  ) => Promise<void>;
   deleteCreditCard: (id: number) => Promise<void>;
 
   // Transactions
   transactions: Transaction[];
   loadingTransactions: boolean;
   refreshTransactions: () => Promise<void>;
-  addTransaction: (data: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<void>;
+  addTransaction: (
+    data: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">,
+  ) => Promise<void>;
   updateTransaction: (id: number, data: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: number) => Promise<void>;
   clearAllData: () => Promise<void>;
+
+  // Budgets
+  budgets: Budget[];
+  loadingBudgets: boolean;
+  refreshBudgets: () => Promise<void>;
+  addBudget: (data: CreateBudgetInput) => Promise<void>;
+  updateBudget: (id: number, data: CreateBudgetInput) => Promise<void>;
+  deleteBudget: (id: number) => Promise<void>;
+  budgetProgress: BudgetProgress[];
+  progressByBudgetId: Map<number, BudgetProgress>;
+  loadingBudgetProgress: boolean;
+  refreshBudgetProgress: () => Promise<void>;
 
   // Summary
   monthlyStats: MonthlyStats | null;
@@ -90,8 +144,28 @@ interface ExpenseContextType {
 
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
 
+function getMutationErrorMessage(err: unknown, fallback: string): string {
+  if (
+    err &&
+    typeof err === "object" &&
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string"
+  ) {
+    return (err as { message: string }).message;
+  }
+  return fallback;
+}
+
 export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const toast = useToast();
+  const { firstDayOfWeek } = useFirstDayOfWeek();
+
+  const periodBoundaries = useMemo(() => {
+    const now = new Date();
+    const { monthStart, monthEnd } = getMonthBoundaries(now);
+    const { weekStart, weekEnd } = getWeekBoundaries(now, firstDayOfWeek);
+    return { monthStart, monthEnd, weekStart, weekEnd };
+  }, [firstDayOfWeek]);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -104,6 +178,9 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
+
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [loadingBudgets, setLoadingBudgets] = useState(false);
 
   // Categories
   const categoriesQuery = trpc.categories.list.useQuery();
@@ -127,11 +204,25 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   }, [categoriesQuery]);
 
   const addCategory = useCallback(
-    async (data: Omit<Category, "id" | "userId" | "createdAt" | "updatedAt">) => {
+    async (
+      data: Omit<Category, "id" | "userId" | "createdAt" | "updatedAt">,
+    ) => {
       const now = new Date();
-      const optimistic: Category = { ...data, id: -Date.now(), userId: 0, createdAt: now, updatedAt: now };
+      const optimistic: Category = {
+        ...data,
+        id: -Date.now(),
+        userId: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
       const snapshot = snapshotList(categories);
-      setCategories((prev) => applyOptimistic(prev, { type: "add", item: optimistic, position: "end" }));
+      setCategories((prev) =>
+        applyOptimistic(prev, {
+          type: "add",
+          item: optimistic,
+          position: "end",
+        }),
+      );
       try {
         await createCategoryMutation.mutateAsync(data);
         await refreshCategories();
@@ -142,13 +233,15 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("addCategory failed");
       }
     },
-    [createCategoryMutation, refreshCategories, categories, toast]
+    [createCategoryMutation, refreshCategories, categories, toast],
   );
 
   const updateCategory = useCallback(
     async (id: number, data: Partial<Category>) => {
       const snapshot = snapshotList(categories);
-      setCategories((prev) => applyOptimistic(prev, { type: "update", id, data }));
+      setCategories((prev) =>
+        applyOptimistic(prev, { type: "update", id, data }),
+      );
       try {
         await updateCategoryMutation.mutateAsync({ id, ...data } as any);
         toast.show({ type: "success", message: "Category updated" });
@@ -158,7 +251,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("updateCategory failed");
       }
     },
-    [updateCategoryMutation, categories, toast]
+    [updateCategoryMutation, categories, toast],
   );
 
   const deleteCategory = useCallback(
@@ -174,7 +267,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("deleteCategory failed");
       }
     },
-    [deleteCategoryMutation, categories, toast]
+    [deleteCategoryMutation, categories, toast],
   );
 
   // Credit Cards
@@ -209,7 +302,13 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       };
       const snapshot = snapshotList(creditCards);
-      setCreditCards((prev) => applyOptimistic(prev, { type: "add", item: optimistic, position: "end" }));
+      setCreditCards((prev) =>
+        applyOptimistic(prev, {
+          type: "add",
+          item: optimistic,
+          position: "end",
+        }),
+      );
       try {
         await createCardMutation.mutateAsync({
           name: data.name,
@@ -229,14 +328,16 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("addCreditCard failed");
       }
     },
-    [createCardMutation, refreshCreditCards, creditCards, toast]
+    [createCardMutation, refreshCreditCards, creditCards, toast],
   );
 
   const updateCreditCard = useCallback(
     async (id: number, data: Partial<CreditCard> & { cardNumber?: string }) => {
       const snapshot = snapshotList(creditCards);
       const { cardNumber, ...rest } = data;
-      setCreditCards((prev) => applyOptimistic(prev, { type: "update", id, data: rest }));
+      setCreditCards((prev) =>
+        applyOptimistic(prev, { type: "update", id, data: rest }),
+      );
       try {
         await updateCardMutation.mutateAsync({
           id,
@@ -250,7 +351,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("updateCreditCard failed");
       }
     },
-    [updateCardMutation, creditCards, toast]
+    [updateCardMutation, creditCards, toast],
   );
 
   const deleteCreditCard = useCallback(
@@ -266,7 +367,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("deleteCreditCard failed");
       }
     },
-    [deleteCardMutation, creditCards, toast]
+    [deleteCardMutation, creditCards, toast],
   );
 
   // Transactions
@@ -275,6 +376,123 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const updateTransactionMutation = trpc.transactions.update.useMutation();
   const deleteTransactionMutation = trpc.transactions.delete.useMutation();
   const clearAllMutation = trpc.data.clearAll.useMutation();
+
+  const budgetsQuery = trpc.budgets.list.useQuery();
+  const createBudgetMutation = trpc.budgets.create.useMutation();
+  const updateBudgetMutation = trpc.budgets.update.useMutation();
+  const deleteBudgetMutation = trpc.budgets.delete.useMutation();
+  const budgetProgressQuery = trpc.budgets.progress.useQuery(periodBoundaries);
+
+  const progressByBudgetId = useMemo(
+    () =>
+      new Map(
+        (budgetProgressQuery.data ?? []).map((row) => [row.budgetId, row]),
+      ),
+    [budgetProgressQuery.data],
+  );
+
+  const refreshBudgetProgress = useCallback(async () => {
+    await budgetProgressQuery.refetch();
+  }, [budgetProgressQuery]);
+
+  const refreshBudgets = useCallback(async () => {
+    setLoadingBudgets(true);
+    try {
+      const { data } = await budgetsQuery.refetch();
+      if (data) {
+        setBudgets(data);
+      }
+    } finally {
+      setLoadingBudgets(false);
+    }
+  }, [budgetsQuery]);
+
+  const addBudget = useCallback(
+    async (data: CreateBudgetInput) => {
+      const now = new Date();
+      const optimistic: Budget = {
+        ...data,
+        id: -Date.now(),
+        userId: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const snapshot = snapshotList(budgets);
+      setBudgets((prev) =>
+        applyOptimistic(prev, {
+          type: "add",
+          item: optimistic,
+          position: "end",
+        }),
+      );
+      try {
+        await createBudgetMutation.mutateAsync(data);
+        await refreshBudgets();
+        await refreshBudgetProgress();
+        toast.show({ type: "success", message: "Budget added" });
+      } catch (err) {
+        setBudgets(snapshot);
+        throw new Error(getMutationErrorMessage(err, "Failed to add budget"));
+      }
+    },
+    [
+      createBudgetMutation,
+      refreshBudgets,
+      refreshBudgetProgress,
+      budgets,
+      toast,
+    ],
+  );
+
+  const updateBudget = useCallback(
+    async (id: number, data: CreateBudgetInput) => {
+      const snapshot = snapshotList(budgets);
+      setBudgets((prev) => applyOptimistic(prev, { type: "update", id, data }));
+      try {
+        await updateBudgetMutation.mutateAsync({ id, ...data });
+        await refreshBudgets();
+        await refreshBudgetProgress();
+        toast.show({ type: "success", message: "Budget updated" });
+      } catch (err) {
+        setBudgets(snapshot);
+        throw new Error(
+          getMutationErrorMessage(err, "Failed to update budget"),
+        );
+      }
+    },
+    [
+      updateBudgetMutation,
+      refreshBudgets,
+      refreshBudgetProgress,
+      budgets,
+      toast,
+    ],
+  );
+
+  const deleteBudget = useCallback(
+    async (id: number) => {
+      const snapshot = snapshotList(budgets);
+      setBudgets((prev) => applyOptimistic(prev, { type: "delete", id }));
+      try {
+        await deleteBudgetMutation.mutateAsync({ id });
+        await refreshBudgets();
+        await refreshBudgetProgress();
+        toast.show({ type: "success", message: "Budget deleted" });
+      } catch (err) {
+        setBudgets(snapshot);
+        throw new Error(
+          getMutationErrorMessage(err, "Failed to delete budget"),
+        );
+      }
+    },
+    [
+      deleteBudgetMutation,
+      refreshBudgets,
+      refreshBudgetProgress,
+      budgets,
+      toast,
+    ],
+  );
 
   const refreshTransactions = useCallback(async () => {
     setLoadingTransactions(true);
@@ -290,14 +508,25 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   }, [transactionsQuery]);
 
   const addTransaction = useCallback(
-    async (data: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">) => {
+    async (
+      data: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">,
+    ) => {
       const now = new Date();
-      const optimistic: Transaction = { ...data, id: -Date.now(), userId: 0, createdAt: now, updatedAt: now };
+      const optimistic: Transaction = {
+        ...data,
+        id: -Date.now(),
+        userId: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
       const snapshot = snapshotList(transactions);
-      setTransactions((prev) => applyOptimistic(prev, { type: "add", item: optimistic }));
+      setTransactions((prev) =>
+        applyOptimistic(prev, { type: "add", item: optimistic }),
+      );
       try {
         await createTransactionMutation.mutateAsync(data);
         await refreshTransactions();
+        await refreshBudgetProgress();
         toast.show({ type: "success", message: "Transaction added" });
       } catch {
         setTransactions(snapshot);
@@ -305,15 +534,33 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("addTransaction failed");
       }
     },
-    [createTransactionMutation, refreshTransactions, transactions, toast]
+    [
+      createTransactionMutation,
+      refreshTransactions,
+      refreshBudgetProgress,
+      transactions,
+      toast,
+    ],
   );
 
   const updateTransaction = useCallback(
-    async (id: number, data: Partial<Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">>) => {
+    async (
+      id: number,
+      data: Partial<
+        Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">
+      >,
+    ) => {
       const snapshot = snapshotList(transactions);
-      setTransactions((prev) => applyOptimistic(prev, { type: "update", id, data: data as Partial<Transaction> }));
+      setTransactions((prev) =>
+        applyOptimistic(prev, {
+          type: "update",
+          id,
+          data: data as Partial<Transaction>,
+        }),
+      );
       try {
         await updateTransactionMutation.mutateAsync({ id, ...data } as any);
+        await refreshBudgetProgress();
         toast.show({ type: "success", message: "Transaction updated" });
       } catch {
         setTransactions(snapshot);
@@ -321,7 +568,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("updateTransaction failed");
       }
     },
-    [updateTransactionMutation, transactions, toast]
+    [updateTransactionMutation, refreshBudgetProgress, transactions, toast],
   );
 
   const deleteTransaction = useCallback(
@@ -330,6 +577,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       setTransactions((prev) => applyOptimistic(prev, { type: "delete", id }));
       try {
         await deleteTransactionMutation.mutateAsync({ id });
+        await refreshBudgetProgress();
         toast.show({ type: "success", message: "Transaction deleted" });
       } catch {
         setTransactions(snapshot);
@@ -337,7 +585,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("deleteTransaction failed");
       }
     },
-    [deleteTransactionMutation, transactions, toast]
+    [deleteTransactionMutation, refreshBudgetProgress, transactions, toast],
   );
 
   const statsQuery = trpc.summary.monthlyStats.useQuery({
@@ -357,7 +605,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         setLoadingStats(false);
       }
     },
-    [statsQuery]
+    [statsQuery],
   );
 
   const clearAllData = useCallback(async () => {
@@ -368,6 +616,8 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         refreshCategories(),
         refreshCreditCards(),
         refreshTransactions(),
+        refreshBudgets(),
+        refreshBudgetProgress(),
         refreshMonthlyStats(now.getFullYear(), now.getMonth() + 1),
       ]);
       toast.show({ type: "success", message: "All data cleared" });
@@ -380,6 +630,8 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     refreshCategories,
     refreshCreditCards,
     refreshTransactions,
+    refreshBudgets,
+    refreshBudgetProgress,
     refreshMonthlyStats,
     toast,
   ]);
@@ -389,6 +641,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     refreshCategories();
     refreshCreditCards();
     refreshTransactions();
+    refreshBudgets();
     refreshMonthlyStats(new Date().getFullYear(), new Date().getMonth() + 1);
   }, []);
 
@@ -415,12 +668,25 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     deleteTransaction,
     clearAllData,
 
+    budgets,
+    loadingBudgets,
+    refreshBudgets,
+    addBudget,
+    updateBudget,
+    deleteBudget,
+    budgetProgress: budgetProgressQuery.data ?? [],
+    progressByBudgetId,
+    loadingBudgetProgress: budgetProgressQuery.isLoading,
+    refreshBudgetProgress,
+
     monthlyStats,
     loadingStats,
     refreshMonthlyStats,
   };
 
-  return <ExpenseContext.Provider value={value}>{children}</ExpenseContext.Provider>;
+  return (
+    <ExpenseContext.Provider value={value}>{children}</ExpenseContext.Provider>
+  );
 }
 
 export function useExpense() {

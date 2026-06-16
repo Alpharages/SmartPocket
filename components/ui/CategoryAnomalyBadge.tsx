@@ -11,7 +11,9 @@ export type CategoryAnomalyBadgeProps = {
   categoryName: string;
 };
 
-export function CategoryAnomalyBadge({ categoryName }: CategoryAnomalyBadgeProps) {
+export function CategoryAnomalyBadge({
+  categoryName,
+}: CategoryAnomalyBadgeProps) {
   const colors = useColors();
   const badgeTextColor = readableTextOn(colors.warning);
 

@@ -169,7 +169,10 @@ const mockTransactions = [
   },
 ];
 
-interface MockExpense extends Omit<ReturnType<typeof defaultExpense>, "monthlyStats"> {
+interface MockExpense extends Omit<
+  ReturnType<typeof defaultExpense>,
+  "monthlyStats"
+> {
   monthlyStats: MonthlyStats | null;
 }
 
@@ -231,7 +234,10 @@ function render(ui: React.ReactElement): ReactTestInstance {
   return renderer!.root;
 }
 
-function queryAllByType(root: ReactTestInstance, typeName: string): ReactTestInstance[] {
+function queryAllByType(
+  root: ReactTestInstance,
+  typeName: string,
+): ReactTestInstance[] {
   return root.findAll((n) => String(n.type) === typeName);
 }
 
@@ -283,8 +289,12 @@ describe("DashboardScreen", () => {
       const root = render(<DashboardScreen />);
       const settingsBtn = root.find(
         (n) =>
-          (n.props as { accessibilityRole?: string; accessibilityLabel?: string })
-            .accessibilityRole === "button" &&
+          (
+            n.props as {
+              accessibilityRole?: string;
+              accessibilityLabel?: string;
+            }
+          ).accessibilityRole === "button" &&
           (n.props as { accessibilityLabel?: string }).accessibilityLabel ===
             "Open settings",
       );
@@ -296,12 +306,13 @@ describe("DashboardScreen", () => {
 
     it("renders two Button elements — one income, one destructive", () => {
       const root = render(<DashboardScreen />);
-      const incomeButtons = queryAllByProp(root, "testID", "button-income").length
+      const incomeButtons = queryAllByProp(root, "testID", "button-income")
+        .length
         ? queryAllByProp(root, "testID", "button-income")
         : root.findAll(
             (n) =>
               (n.props as any).accessibilityRole === "button" &&
-              (collectText(n) === "Add Income"),
+              collectText(n) === "Add Income",
           );
       const expenseButtons = root.findAll(
         (n) =>
@@ -326,12 +337,10 @@ describe("DashboardScreen", () => {
       // TransactionRow renders an AnimatedPressable with accessibilityRole="button"
       // The category name comes from our mock categories
       const salaryRows = root.findAll(
-        (n) =>
-          String(n.type) === "Text" && collectText(n) === "Salary",
+        (n) => String(n.type) === "Text" && collectText(n) === "Salary",
       );
       const foodRows = root.findAll(
-        (n) =>
-          String(n.type) === "Text" && collectText(n) === "Food",
+        (n) => String(n.type) === "Text" && collectText(n) === "Food",
       );
       expect(salaryRows.length).toBeGreaterThanOrEqual(1);
       expect(foodRows.length).toBeGreaterThanOrEqual(1);
@@ -403,8 +412,7 @@ describe("DashboardScreen", () => {
     it("View All navigates to /transactions on press", () => {
       const root = render(<DashboardScreen />);
       const viewAll = root.find(
-        (n) =>
-          String(n.type) === "Text" && collectText(n) === "View All",
+        (n) => String(n.type) === "Text" && collectText(n) === "View All",
       );
       // Walk up to find the Pressable parent
       // The Text is inside a Pressable; onPress lives on the ancestor View (Pressable renders as View)
@@ -509,8 +517,7 @@ describe("DashboardScreen", () => {
       );
       const root = render(<DashboardScreen />);
       const fallbackTitle = root.findAll(
-        (n) =>
-          String(n.type) === "Text" && collectText(n) === "Category 999",
+        (n) => String(n.type) === "Text" && collectText(n) === "Category 999",
       );
       expect(fallbackTitle.length).toBeGreaterThanOrEqual(1);
     });

@@ -91,7 +91,9 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>
+    <CurrencyContext.Provider value={value}>
+      {children}
+    </CurrencyContext.Provider>
   );
 }
 

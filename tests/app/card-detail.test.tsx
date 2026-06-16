@@ -139,7 +139,10 @@ const mockTransactions = [
   },
 ];
 
-function findByTestId(root: ReactTestInstance, testId: string): ReactTestInstance {
+function findByTestId(
+  root: ReactTestInstance,
+  testId: string,
+): ReactTestInstance {
   const match = root.find((n) => n.props.testID === testId);
   if (!match) throw new Error(`testID ${testId} not found`);
   return match;

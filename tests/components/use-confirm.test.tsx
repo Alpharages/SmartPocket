@@ -20,7 +20,11 @@ afterEach(() => {
   renderer = null;
 });
 
-function Capture({ sink }: { sink: (c: ReturnType<typeof useConfirm>) => void }) {
+function Capture({
+  sink,
+}: {
+  sink: (c: ReturnType<typeof useConfirm>) => void;
+}) {
   sink(useConfirm());
   return React.createElement("div");
 }

@@ -23,7 +23,10 @@ import { useCardTransactions, useExpense } from "@/lib/expense-context";
 import { useCurrency } from "@/lib/currency-provider";
 import { formatCurrency } from "@/lib/currency";
 
-function formatMoney(total: number, currency: ReturnType<typeof useCurrency>["currency"]): string {
+function formatMoney(
+  total: number,
+  currency: ReturnType<typeof useCurrency>["currency"],
+): string {
   return formatCurrency(total, currency);
 }
 
@@ -146,8 +149,8 @@ export default function CardDetailScreen() {
               keyExtractor={(item) => item.id.toString()}
               renderItem={({ item, index }) => {
                 const category = categoriesById.get(item.categoryId);
-                const categoryIcon = (category?.icon ?? "pricetag-outline") as
-                  keyof typeof Ionicons.glyphMap;
+                const categoryIcon = (category?.icon ??
+                  "pricetag-outline") as keyof typeof Ionicons.glyphMap;
                 return (
                   <Animated.View
                     entering={FadeInDown.delay(index * 40).duration(400)}
@@ -184,7 +187,11 @@ export default function CardDetailScreen() {
             <EmptyState
               variant="no-data"
               icon={
-                <Ionicons name="receipt-outline" size={28} color={colors.muted} />
+                <Ionicons
+                  name="receipt-outline"
+                  size={28}
+                  color={colors.muted}
+                />
               }
               title="No transactions for this card yet"
               description="Expenses linked to this card will appear here"

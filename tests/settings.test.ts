@@ -57,13 +57,13 @@ describe("getUserSettings", () => {
     await expect(getUserSettings(7)).resolves.toEqual({ aiEnabled: true });
   });
 
-  it("treats string \"0\" as false (not Boolean coercion)", async () => {
+  it('treats string "0" as false (not Boolean coercion)', async () => {
     callDataApi.mockResolvedValueOnce([{ aiEnabled: "0" }]);
 
     await expect(getUserSettings(8)).resolves.toEqual({ aiEnabled: false });
   });
 
-  it("treats string \"1\" as false for default-off safety", async () => {
+  it('treats string "1" as false for default-off safety', async () => {
     callDataApi.mockResolvedValueOnce([{ aiEnabled: "1" }]);
 
     await expect(getUserSettings(8)).resolves.toEqual({ aiEnabled: false });
@@ -116,29 +116,32 @@ describe("settings router", () => {
 
     const caller = appRouter.createCaller(createUserContext(10));
 
-    await expect(caller.settings.setAiEnabled({ enabled: true })).resolves.toEqual({
+    await expect(
+      caller.settings.setAiEnabled({ enabled: true }),
+    ).resolves.toEqual({
       aiEnabled: true,
     });
     await expect(caller.settings.get()).resolves.toEqual({ aiEnabled: true });
 
-    await expect(caller.settings.setAiEnabled({ enabled: false })).resolves.toEqual({
+    await expect(
+      caller.settings.setAiEnabled({ enabled: false }),
+    ).resolves.toEqual({
       aiEnabled: false,
     });
     await expect(caller.settings.get()).resolves.toEqual({ aiEnabled: false });
 
-    const updateCalls = callDataApi.mock.calls.filter(
-      (call) =>
-        (call[1] as { body: { query: string } }).body.query.includes("UPDATE users SET aiEnabled"),
+    const updateCalls = callDataApi.mock.calls.filter((call) =>
+      (call[1] as { body: { query: string } }).body.query.includes(
+        "UPDATE users SET aiEnabled",
+      ),
     );
     expect(updateCalls).toHaveLength(2);
-    expect((updateCalls[0][1] as { body: { params: unknown[] } }).body.params).toEqual([
-      true,
-      10,
-    ]);
-    expect((updateCalls[1][1] as { body: { params: unknown[] } }).body.params).toEqual([
-      false,
-      10,
-    ]);
+    expect(
+      (updateCalls[0][1] as { body: { params: unknown[] } }).body.params,
+    ).toEqual([true, 10]);
+    expect(
+      (updateCalls[1][1] as { body: { params: unknown[] } }).body.params,
+    ).toEqual([false, 10]);
   });
 
   it("scopes settings.get to ctx.user.id", async () => {
@@ -174,7 +177,9 @@ describe("settings router", () => {
       res: {} as TrpcContext["res"],
     });
 
-    await expect(caller.settings.setAiEnabled({ enabled: true })).rejects.toMatchObject({
+    await expect(
+      caller.settings.setAiEnabled({ enabled: true }),
+    ).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
   });

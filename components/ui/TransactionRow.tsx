@@ -166,8 +166,7 @@ export function TransactionRow({
   }, [onPress]);
 
   const displayAmount = useMemo(
-    () =>
-      isReady ? formatSignedAmount(amount, type, currency) : "—",
+    () => (isReady ? formatSignedAmount(amount, type, currency) : "—"),
     [amount, type, currency, isReady],
   );
 

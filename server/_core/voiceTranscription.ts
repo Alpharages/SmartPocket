@@ -133,7 +133,9 @@ export async function transcribeAudio(
 
     // Create a Blob from the buffer and append to form
     const filename = `audio.${getFileExtension(mimeType)}`;
-    const audioBlob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
+    const audioBlob = new Blob([new Uint8Array(audioBuffer)], {
+      type: mimeType,
+    });
     formData.append("file", audioBlob, filename);
 
     formData.append("model", "whisper-1");
@@ -148,7 +150,9 @@ export async function transcribeAudio(
     formData.append("prompt", prompt);
 
     // Step 4: Call the transcription service
-    const baseUrl = ENV.forgeApiUrl.endsWith("/") ? ENV.forgeApiUrl : `${ENV.forgeApiUrl}/`;
+    const baseUrl = ENV.forgeApiUrl.endsWith("/")
+      ? ENV.forgeApiUrl
+      : `${ENV.forgeApiUrl}/`;
 
     const fullUrl = new URL("v1/audio/transcriptions", baseUrl).toString();
 
@@ -188,7 +192,8 @@ export async function transcribeAudio(
     return {
       error: "Voice transcription failed",
       code: "SERVICE_ERROR",
-      details: error instanceof Error ? error.message : "An unexpected error occurred",
+      details:
+        error instanceof Error ? error.message : "An unexpected error occurred",
     };
   }
 }

@@ -135,8 +135,7 @@ export const Pill = forwardRef<PillRef, PillProps>(
       [role, selected, disabled],
     );
 
-    const resolvedAccessibilityLabel =
-      accessibilityLabel ?? label;
+    const resolvedAccessibilityLabel = accessibilityLabel ?? label;
 
     // count={0} is treated as "hide badge" — only show for positive counts
     const showCount = typeof count === "number" && count > 0;
@@ -159,9 +158,7 @@ export const Pill = forwardRef<PillRef, PillProps>(
         style={[containerStyle, animatedStyle, style]}
         {...pressableProps}
       >
-        {leftIcon && (
-          <View className="mr-1.5">{leftIcon}</View>
-        )}
+        {leftIcon && <View className="mr-1.5">{leftIcon}</View>}
         <Text
           className="text-sm font-semibold"
           style={{ color: textColor }}
@@ -174,10 +171,7 @@ export const Pill = forwardRef<PillRef, PillProps>(
             className="ml-1.5 min-w-[20px] items-center justify-center rounded-full px-1 py-0.5"
             style={badgeStyle}
           >
-            <Text
-              className="text-xs font-bold"
-              style={{ color: textColor }}
-            >
+            <Text className="text-xs font-bold" style={{ color: textColor }}>
               {count}
             </Text>
           </View>

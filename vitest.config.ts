@@ -13,10 +13,7 @@ export default defineConfig({
         __dirname,
         "./__mocks__/react-native-reanimated.ts",
       ),
-      "expo-haptics": path.resolve(
-        __dirname,
-        "./__mocks__/expo-haptics.ts",
-      ),
+      "expo-haptics": path.resolve(__dirname, "./__mocks__/expo-haptics.ts"),
       nativewind: path.resolve(__dirname, "./__mocks__/nativewind.ts"),
       "react-native-css-interop": path.resolve(
         __dirname,

@@ -101,9 +101,7 @@ export const SectionList = React.forwardRef<any, any>(
     }: any,
     ref: any,
   ) => {
-    const isEmpty =
-      !sections ||
-      sections.every((s: any) => !s.data?.length);
+    const isEmpty = !sections || sections.every((s: any) => !s.data?.length);
 
     const emptyNode = isEmpty
       ? typeof ListEmptyComponent === "function"
@@ -120,7 +118,7 @@ export const SectionList = React.forwardRef<any, any>(
               {
                 key: keyExtractor
                   ? keyExtractor(item, index)
-                  : item?.id ?? `${si}-${index}`,
+                  : (item?.id ?? `${si}-${index}`),
               },
               renderItem?.({ item, index, section, separators: {} as any }),
             ),

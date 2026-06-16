@@ -108,7 +108,12 @@ async function ensureCreditCard(db: Db, userId: number): Promise<number> {
   const [existing] = await db
     .select({ id: creditCards.id })
     .from(creditCards)
-    .where(and(eq(creditCards.userId, userId), eq(creditCards.name, "Everyday Visa")))
+    .where(
+      and(
+        eq(creditCards.userId, userId),
+        eq(creditCards.name, "Everyday Visa"),
+      ),
+    )
     .limit(1);
 
   if (existing) return existing.id;
@@ -180,7 +185,14 @@ async function main() {
 
   try {
     const userId = await ensureUser(db);
-    const groceries = await ensureCategory(db, userId, "Groceries", "expense", "#10B981", "cart");
+    const groceries = await ensureCategory(
+      db,
+      userId,
+      "Groceries",
+      "expense",
+      "#10B981",
+      "cart",
+    );
     const dining = await ensureCategory(
       db,
       userId,
@@ -190,13 +202,52 @@ async function main() {
       "restaurant",
     );
     await ensureCategory(db, userId, "Transport", "expense", "#06B6D4", "car");
-    const salary = await ensureCategory(db, userId, "Salary", "income", "#6366F1", "cash");
+    const salary = await ensureCategory(
+      db,
+      userId,
+      "Salary",
+      "income",
+      "#6366F1",
+      "cash",
+    );
 
     await ensureCreditCard(db, userId);
-    await ensureTransaction(db, userId, salary, "income", "3200.00", "Monthly salary", 5);
-    await ensureTransaction(db, userId, groceries, "expense", "84.50", "Weekly groceries", 3);
-    await ensureTransaction(db, userId, dining, "expense", "42.00", "Dinner out", 2);
-    await ensureTransaction(db, userId, groceries, "expense", "23.75", "Snacks", 1);
+    await ensureTransaction(
+      db,
+      userId,
+      salary,
+      "income",
+      "3200.00",
+      "Monthly salary",
+      5,
+    );
+    await ensureTransaction(
+      db,
+      userId,
+      groceries,
+      "expense",
+      "84.50",
+      "Weekly groceries",
+      3,
+    );
+    await ensureTransaction(
+      db,
+      userId,
+      dining,
+      "expense",
+      "42.00",
+      "Dinner out",
+      2,
+    );
+    await ensureTransaction(
+      db,
+      userId,
+      groceries,
+      "expense",
+      "23.75",
+      "Snacks",
+      1,
+    );
 
     console.log(`Seeded database for ${DEV_OPEN_ID} (userId=${userId})`);
   } catch (error) {
@@ -206,7 +257,9 @@ async function main() {
       "code" in error &&
       error.code === "ER_NO_SUCH_TABLE"
     ) {
-      throw new Error("Database tables are missing. Run `pnpm db:push` before `pnpm db:seed`.");
+      throw new Error(
+        "Database tables are missing. Run `pnpm db:push` before `pnpm db:seed`.",
+      );
     }
     throw error;
   } finally {

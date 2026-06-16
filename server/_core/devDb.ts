@@ -22,6 +22,7 @@ type TableName =
   | "categories"
   | "creditCards"
   | "transactions"
+  | "budgets"
   | "monthlySummaries";
 
 const DATE_COLUMNS = new Set([
@@ -29,6 +30,8 @@ const DATE_COLUMNS = new Set([
   "updatedAt",
   "lastSignedIn",
   "date",
+  "startDate",
+  "endDate",
 ]);
 const NUMERIC_COLUMNS = new Set([
   "id",
@@ -46,6 +49,7 @@ const store: Record<TableName, Row[]> = {
   categories: [],
   creditCards: [],
   transactions: [],
+  budgets: [],
   monthlySummaries: [],
 };
 
@@ -54,6 +58,7 @@ const nextId: Record<TableName, number> = {
   categories: 1,
   creditCards: 1,
   transactions: 1,
+  budgets: 1,
   monthlySummaries: 1,
 };
 
@@ -164,10 +169,21 @@ function coerce(column: string, value: unknown): unknown {
   return value;
 }
 
-function compare(column: string, left: unknown, op: string, right: unknown): boolean {
+function compare(
+  column: string,
+  left: unknown,
+  op: string,
+  right: unknown,
+): boolean {
   if (DATE_COLUMNS.has(column)) {
-    const l = left instanceof Date ? left.getTime() : new Date(left as string).getTime();
-    const r = right instanceof Date ? right.getTime() : new Date(right as string).getTime();
+    const l =
+      left instanceof Date
+        ? left.getTime()
+        : new Date(left as string).getTime();
+    const r =
+      right instanceof Date
+        ? right.getTime()
+        : new Date(right as string).getTime();
     if (op === "=") return l === r;
     if (op === ">=") return l >= r;
     if (op === "<=") return l <= r;
@@ -186,7 +202,12 @@ function compare(column: string, left: unknown, op: string, right: unknown): boo
   return false;
 }
 
-type Condition = { column: string; op: string; literal?: unknown; isParam: boolean };
+type Condition = {
+  column: string;
+  op: string;
+  literal?: unknown;
+  isParam: boolean;
+};
 
 /** Parse the WHERE body (already AND-split) into structured conditions. */
 function parseConditions(whereBody: string): Condition[] {
@@ -202,19 +223,27 @@ function parseConditions(whereBody: string): Condition[] {
       if (rhs === "?") return { column, op, isParam: true };
       // literal: quoted string or number
       const unquoted = rhs.replace(/^'(.*)'$/, "$1");
-      const literal = unquoted === rhs && !Number.isNaN(Number(rhs)) ? Number(rhs) : unquoted;
+      const literal =
+        unquoted === rhs && !Number.isNaN(Number(rhs)) ? Number(rhs) : unquoted;
       return { column, op, literal, isParam: false };
     });
 }
 
-function applyWhere(rows: Row[], conditions: Condition[], params: unknown[], cursor: { i: number }): Row[] {
+function applyWhere(
+  rows: Row[],
+  conditions: Condition[],
+  params: unknown[],
+  cursor: { i: number },
+): Row[] {
   // Bind params to conditions in order
   const bound = conditions.map((c) => ({
     ...c,
     value: c.isParam ? params[cursor.i++] : c.literal,
   }));
   return rows.filter((row) =>
-    bound.every((c) => compare(c.column, row[c.column], c.op, coerce(c.column, c.value))),
+    bound.every((c) =>
+      compare(c.column, row[c.column], c.op, coerce(c.column, c.value)),
+    ),
   );
 }
 
@@ -225,7 +254,10 @@ function clone(row: Row): Row {
 // ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
-export async function devQuery(sqlRaw: string, params: unknown[] = []): Promise<unknown> {
+export async function devQuery(
+  sqlRaw: string,
+  params: unknown[] = [],
+): Promise<unknown> {
   seedOnce();
   const sql = sqlRaw.trim().replace(/\s+/g, " ");
 
@@ -235,7 +267,9 @@ export async function devQuery(sqlRaw: string, params: unknown[] = []): Promise<
   }
 
   // ---- INSERT ----
-  let m = sql.match(/^INSERT\s+INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]*)\)(.*)$/i);
+  let m = sql.match(
+    /^INSERT\s+INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]*)\)(.*)$/i,
+  );
   if (m) {
     const table = m[1] as TableName;
     const columns = m[2].split(",").map((c) => c.trim());
@@ -271,7 +305,9 @@ export async function devQuery(sqlRaw: string, params: unknown[] = []): Promise<
     const table = m[1] as TableName;
     const setClause = m[2];
     const whereBody = m[3];
-    const setCols = setClause.split(",").map((s) => s.trim().replace(/\s*=\s*\?$/, ""));
+    const setCols = setClause
+      .split(",")
+      .map((s) => s.trim().replace(/\s*=\s*\?$/, ""));
     const cursor = { i: 0 };
     const setValues = setCols.map((col) => coerce(col, params[cursor.i++]));
     const conditions = parseConditions(whereBody);
@@ -291,14 +327,18 @@ export async function devQuery(sqlRaw: string, params: unknown[] = []): Promise<
     const table = m[1] as TableName;
     const conditions = parseConditions(m[2]);
     const cursor = { i: 0 };
-    const doomed = new Set(applyWhere(store[table], conditions, params, cursor));
+    const doomed = new Set(
+      applyWhere(store[table], conditions, params, cursor),
+    );
     const before = store[table].length;
     store[table] = store[table].filter((row) => !doomed.has(row));
     return { affectedRows: before - store[table].length };
   }
 
   // ---- SELECT ----
-  m = sql.match(/^SELECT\s+\*\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+\?)?(?:\s+OFFSET\s+\?)?\s*$/i);
+  m = sql.match(
+    /^SELECT\s+\*\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+\?)?(?:\s+OFFSET\s+\?)?\s*$/i,
+  );
   if (m && /^SELECT/i.test(sql)) {
     const table = m[1] as TableName;
     const whereBody = m[2];
@@ -318,7 +358,11 @@ export async function devQuery(sqlRaw: string, params: unknown[] = []): Promise<
         const av = a[col];
         const bv = b[col];
         if (DATE_COLUMNS.has(col)) {
-          return (new Date(av as string).getTime() - new Date(bv as string).getTime()) * dir;
+          return (
+            (new Date(av as string).getTime() -
+              new Date(bv as string).getTime()) *
+            dir
+          );
         }
         if (NUMERIC_COLUMNS.has(col)) {
           return (Number(av) - Number(bv)) * dir;

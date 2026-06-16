@@ -40,7 +40,10 @@ async function startServer() {
     if (origin) {
       res.header("Access-Control-Allow-Origin", origin);
     }
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.header(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, OPTIONS",
+    );
     res.header(
       "Access-Control-Allow-Headers",
       "Origin, X-Requested-With, Content-Type, Accept, Authorization",
@@ -78,7 +81,9 @@ async function startServer() {
           loginMethod: "dev",
           lastSignedIn: new Date(),
         });
-        const token = await sdk.createSessionToken(DEV_OPEN_ID, { name: "Dev User" });
+        const token = await sdk.createSessionToken(DEV_OPEN_ID, {
+          name: "Dev User",
+        });
         res.json({ token });
       } catch (err) {
         console.error("[dev/login] failed:", err);

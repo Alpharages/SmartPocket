@@ -28,12 +28,15 @@ export async function callDataApi(
   options: DataApiCallOptions = {},
 ): Promise<unknown> {
   if (apiId !== "Database/query") {
-    throw new Error(`API "${apiId}" is not configured without Forge credentials`);
+    throw new Error(
+      `API "${apiId}" is not configured without Forge credentials`,
+    );
   }
 
   const sql = options.body?.query as string | undefined;
   const params = (options.body?.params as unknown[]) ?? [];
-  if (!sql) throw new Error("Database/query requires a SQL query in body.query");
+  if (!sql)
+    throw new Error("Database/query requires a SQL query in body.query");
 
   const db = getPool();
   if (!db) {

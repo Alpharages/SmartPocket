@@ -1,6 +1,13 @@
 import { getLocales } from "expo-localization";
 
-export type CurrencyCode = "USD" | "EUR" | "GBP" | "JPY" | "PKR" | "CAD" | "AUD";
+export type CurrencyCode =
+  | "USD"
+  | "EUR"
+  | "GBP"
+  | "JPY"
+  | "PKR"
+  | "CAD"
+  | "AUD";
 
 export type CurrencySign = "positive" | "negative" | "neutral" | "absolute";
 

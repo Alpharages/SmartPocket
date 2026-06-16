@@ -62,12 +62,8 @@ import { Text, View } from "react-native";
 export function MyComponent() {
   return (
     <View className="flex-1 items-center justify-center p-4">
-      <Text className="text-2xl font-bold text-foreground">
-        Hello World
-      </Text>
-      <Text className="mt-2 text-muted">
-        Subtitle text
-      </Text>
+      <Text className="text-2xl font-bold text-foreground">Hello World</Text>
+      <Text className="mt-2 text-muted">Subtitle text</Text>
     </View>
   );
 }
@@ -77,21 +73,22 @@ export function MyComponent() {
 
 Tokens are defined once in `theme.config.js` and shared by Tailwind + runtime (`useColors()`):
 
-| Token | Usage |
-|-------|-------|
-| `background` | Screen/page background |
-| `foreground` | Primary text |
-| `muted` | Secondary text |
-| `primary` | Accent/tint color |
-| `surface` | Cards/elevated surfaces |
-| `border` | Borders/dividers |
-| `success` | Success states |
-| `warning` | Warning states |
-| `error` | Error states |
+| Token        | Usage                   |
+| ------------ | ----------------------- |
+| `background` | Screen/page background  |
+| `foreground` | Primary text            |
+| `muted`      | Secondary text          |
+| `primary`    | Accent/tint color       |
+| `surface`    | Cards/elevated surfaces |
+| `border`     | Borders/dividers        |
+| `success`    | Success states          |
+| `warning`    | Warning states          |
+| `error`      | Error states            |
 
 **Dark mode:** Use color tokens directly (e.g., `text-foreground`, `bg-background`); ThemeProvider + CSS variables switch schemes automatically, no `dark:` prefix needed.
 
 ### Layout Tips
+
 - If content may overflow, wrap the whole page in a `ScrollView`; short lists inside can use `.map()`.
 - When multiple texts/icons must be inline, set parent `flex-row` (Pressable/TouchableOpacity default to column).
 - Pressable className is globally disabled; pass interaction styles via `style`.
@@ -104,11 +101,13 @@ Use the `cn()` utility from `@/lib/utils`:
 ```tsx
 import { cn } from "@/lib/utils";
 
-<View className={cn(
-  "p-4 rounded-lg",
-  isActive && "bg-primary",
-  disabled && "opacity-50"
-)} />
+<View
+  className={cn(
+    "p-4 rounded-lg",
+    isActive && "bg-primary",
+    disabled && "opacity-50",
+  )}
+/>;
 ```
 
 ---
@@ -129,13 +128,14 @@ import { cn } from "@/lib/utils";
 - Keep data flow consistent: define shared types/schemas and ensure sender/receiver param names match (e.g., route params, API payloads).
 - No mock/placeholder numbers in UI; if data is unavailable, show loading/unknown, not hardcoded values.
 - Platform-specific file handling: on iOS, `MediaLibrary.getAssetsAsync()` URIs (ph://) are not readable—use `MediaLibrary.getAssetInfoAsync()` to get `localUri` before reading/uploading.
-- Validate end-to-end: API → data transform → navigation params → UI render. Avoid stopping halfway. 
+- Validate end-to-end: API → data transform → navigation params → UI render. Avoid stopping halfway.
 
 ## Screen Layout
 
 ### The Problem
 
 React Native screens need to handle:
+
 - Status bar area (notch on iPhone X+)
 - Home indicator area (bottom of iPhone X+)
 - Tab bar overlap
@@ -151,26 +151,25 @@ import { ScreenContainer } from "@/components/screen-container";
 export default function MyScreen() {
   return (
     <ScreenContainer className="p-4">
-      <Text className="text-2xl font-bold text-foreground">
-        Welcome
-      </Text>
+      <Text className="text-2xl font-bold text-foreground">Welcome</Text>
     </ScreenContainer>
   );
 }
 ```
 
 `ScreenContainer` handles:
+
 - Background color extends behind status bar
 - Content stays within safe bounds
 - Tab bar area handled correctly
 
 ### ScreenContainer Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `className` | string | - | Tailwind classes for content area |
-| `edges` | Edge[] | `["top", "left", "right"]` | SafeArea edges to apply |
-| `containerClassName` | string | - | Classes for outer background container |
+| Prop                 | Type   | Default                    | Description                            |
+| -------------------- | ------ | -------------------------- | -------------------------------------- |
+| `className`          | string | -                          | Tailwind classes for content area      |
+| `edges`              | Edge[] | `["top", "left", "right"]` | SafeArea edges to apply                |
+| `containerClassName` | string | -                          | Classes for outer background container |
 
 ```tsx
 // Full-screen modal (needs all edges)
@@ -194,11 +193,11 @@ Build in this order — don't skip to polish before functionality works:
 
 ### Press Feedback
 
-| Element | Feedback | Implementation |
-|---------|----------|----------------|
-| Primary buttons | Scale + haptic | `scale: 0.97` + `Haptics.impactAsync(Light)` |
-| List items / cards | Opacity | `opacity: 0.7` on press |
-| Icons / minor actions | Opacity only | `opacity: 0.6` on press |
+| Element               | Feedback       | Implementation                               |
+| --------------------- | -------------- | -------------------------------------------- |
+| Primary buttons       | Scale + haptic | `scale: 0.97` + `Haptics.impactAsync(Light)` |
+| List items / cards    | Opacity        | `opacity: 0.7` on press                      |
+| Icons / minor actions | Opacity only   | `opacity: 0.6` on press                      |
 
 ```tsx
 <Pressable
@@ -214,12 +213,12 @@ Build in this order — don't skip to polish before functionality works:
 
 Use `expo-haptics` sparingly — overuse diminishes impact:
 
-| Context | Type |
-|---------|------|
-| Button tap (primary actions) | `impactAsync(ImpactFeedbackStyle.Light)` |
-| Toggle / switch | `impactAsync(ImpactFeedbackStyle.Medium)` |
-| Success / completion | `notificationAsync(NotificationFeedbackType.Success)` |
-| Error / failure | `notificationAsync(NotificationFeedbackType.Error)` |
+| Context                      | Type                                                  |
+| ---------------------------- | ----------------------------------------------------- |
+| Button tap (primary actions) | `impactAsync(ImpactFeedbackStyle.Light)`              |
+| Toggle / switch              | `impactAsync(ImpactFeedbackStyle.Medium)`             |
+| Success / completion         | `notificationAsync(NotificationFeedbackType.Success)` |
+| Error / failure              | `notificationAsync(NotificationFeedbackType.Error)`   |
 
 ### Animation (Optional Polish)
 
@@ -227,19 +226,20 @@ Only add animations after core functionality works. Keep them subtle:
 
 ```tsx
 // ✅ Good: Subtle fade in
-withTiming(1, { duration: 250 })
+withTiming(1, { duration: 250 });
 
 // ✅ Good: Gentle press feedback
-withTiming(0.97, { duration: 80 })
+withTiming(0.97, { duration: 80 });
 
 // ❌ Bad: Bouncy spring
-withSpring(1, { damping: 5 })  // Too bouncy
+withSpring(1, { damping: 5 }); // Too bouncy
 
 // ❌ Bad: Dramatic scale
-withTiming(0.8, { duration: 200 })  // Too much
+withTiming(0.8, { duration: 200 }); // Too much
 ```
 
 **Guidelines:**
+
 - Duration: 80-300ms for interactions, up to 400ms for transitions
 - Scale changes: 0.95-0.98 range (never below 0.9)
 - Prefer `withTiming` with easing over `withSpring`
@@ -270,10 +270,14 @@ useEffect(() => {
 ```
 
 **Getting Free Audio:** Use browser console on [pixabay.com/sound-effects](https://pixabay.com/sound-effects/):
+
 ```javascript
 // 1) Open a sound page (or search results) on pixabay.com/sound-effects
 // 2) Paste this in browser DevTools console to list direct mp3 links
-const urls = document.documentElement.innerHTML.match(/https?:\/\/[^"'\s]+\.mp3[^"'\s]*/g) || [];
+const urls =
+  document.documentElement.innerHTML.match(
+    /https?:\/\/[^"'\s]+\.mp3[^"'\s]*/g,
+  ) || [];
 console.log(urls);
 ```
 
@@ -304,36 +308,40 @@ if (Platform.OS !== "web") {
 ## Project Conventions
 
 ### Tab Icons
+
 Add mapping in `icon-symbol.tsx` BEFORE using in tabs — otherwise app crashes.
 
 ### Data Storage
+
 Prefer `AsyncStorage` for local persistence. Only add backend for cross-device sync.
 
 ### Lists
+
 Always use `FlatList` — never `ScrollView` with `.map()`.
 
 ### Styles
+
 Use `StyleSheet.create()` outside component, or Tailwind classes. Never inline style objects.
 
 ---
 
 ## Common Pitfalls
 
-| Pitfall | Solution |
-|---------|----------|
-| Broken user flows / dead ends | Verify all flows end-to-end before delivery. Every `onPress` must work. |
-| Missing icon mapping | Add to `icon-symbol.tsx` BEFORE using in tabs |
-| Text clipped at top/bottom | Ensure `lineHeight > fontSize` (1.2-1.5×) |
-| Background gap in dark mode | Use `ScreenContainer` |
-| Content under notch | Use `ScreenContainer` |
-| Slow list scrolling | Use `FlatList`, never `ScrollView` with `.map()` |
-| Styles recreated every render | Use `StyleSheet.create()` outside component |
-| iOS crash in gesture callbacks | Gesture handlers run as worklets. Use `.runOnJS(true)` on the gesture, or wrap JS calls with `runOnJS()` |
-| Web crash with AnimatedSvg | Don't use `Animated.createAnimatedComponent(Svg)`. Wrap `<Svg>` with `<Animated.View>` instead |
-| Gesture not responding | Ensure `GestureHandlerRootView` wraps the app |
-| State changes not persisted | Call `saveSettings()` or `AsyncStorage.setItem()` after `setState()` |
-| Bottom elements hidden by Tab Bar | Use `useSafeAreaInsets().bottom` or increase `bottom` value |
-| **Pressable onPress not firing** | **Never use `className` on Pressable** — always use `style` prop |
+| Pitfall                           | Solution                                                                                                 |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Broken user flows / dead ends     | Verify all flows end-to-end before delivery. Every `onPress` must work.                                  |
+| Missing icon mapping              | Add to `icon-symbol.tsx` BEFORE using in tabs                                                            |
+| Text clipped at top/bottom        | Ensure `lineHeight > fontSize` (1.2-1.5×)                                                                |
+| Background gap in dark mode       | Use `ScreenContainer`                                                                                    |
+| Content under notch               | Use `ScreenContainer`                                                                                    |
+| Slow list scrolling               | Use `FlatList`, never `ScrollView` with `.map()`                                                         |
+| Styles recreated every render     | Use `StyleSheet.create()` outside component                                                              |
+| iOS crash in gesture callbacks    | Gesture handlers run as worklets. Use `.runOnJS(true)` on the gesture, or wrap JS calls with `runOnJS()` |
+| Web crash with AnimatedSvg        | Don't use `Animated.createAnimatedComponent(Svg)`. Wrap `<Svg>` with `<Animated.View>` instead           |
+| Gesture not responding            | Ensure `GestureHandlerRootView` wraps the app                                                            |
+| State changes not persisted       | Call `saveSettings()` or `AsyncStorage.setItem()` after `setState()`                                     |
+| Bottom elements hidden by Tab Bar | Use `useSafeAreaInsets().bottom` or increase `bottom` value                                              |
+| **Pressable onPress not firing**  | **Never use `className` on Pressable** — always use `style` prop                                         |
 
 ### Common Crash Patterns
 
@@ -347,13 +355,13 @@ Use `StyleSheet.create()` outside component, or Tailwind classes. Never inline s
 
 The server provides these **built-in** capabilities (no external API keys required):
 
-| Feature | What It Provides | When To Use |
-|---------|------------------|-------------|
-| **LLM/AI** | Multimodal AI (text, image, audio) | Image recognition, chat, content generation |
-| **User Auth** | OAuth login, session management | User accounts |
-| **Database** | PostgreSQL + Drizzle ORM | Cross-device data sync |
-| **File Storage** | S3-compatible storage | User-uploaded files |
-| **Push Notifications** | Server-side delivery | Notify users of events |
+| Feature                | What It Provides                   | When To Use                                 |
+| ---------------------- | ---------------------------------- | ------------------------------------------- |
+| **LLM/AI**             | Multimodal AI (text, image, audio) | Image recognition, chat, content generation |
+| **User Auth**          | OAuth login, session management    | User accounts                               |
+| **Database**           | PostgreSQL + Drizzle ORM           | Cross-device data sync                      |
+| **File Storage**       | S3-compatible storage              | User-uploaded files                         |
+| **Push Notifications** | Server-side delivery               | Notify users of events                      |
 
 > **Important**: For AI features, use the server's built-in LLM — do NOT ask users for API keys.
 
@@ -380,7 +388,8 @@ Before delivering:
 Note: All TODO comments are remarks for the agent (you), not for the user.
 
 `components/screen-container.tsx`
-```tsx
+
+````tsx
 import { View, type ViewProps } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 
@@ -432,11 +441,7 @@ export function ScreenContainer({
 }: ScreenContainerProps) {
   return (
     <View
-      className={cn(
-        "flex-1",
-        "bg-background",
-        containerClassName
-      )}
+      className={cn("flex-1", "bg-background", containerClassName)}
       {...props}
     >
       <SafeAreaView
@@ -449,9 +454,10 @@ export function ScreenContainer({
     </View>
   );
 }
-```
+````
 
 `app/(tabs)/_layout.tsx`
+
 ```tsx
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -487,7 +493,9 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="house.fill" color={color} />
+          ),
         }}
       />
     </Tabs>
@@ -496,6 +504,7 @@ export default function TabLayout() {
 ```
 
 `app/(tabs)/index.tsx`
+
 ```tsx
 import { ScrollView, Text, View, TouchableOpacity } from "react-native";
 
@@ -528,7 +537,9 @@ export default function HomeScreen() {
 
           {/* Example Card */}
           <View className="w-full max-w-sm self-center bg-surface rounded-2xl p-6 shadow-sm border border-border">
-            <Text className="text-lg font-semibold text-foreground mb-2">NativeWind Ready</Text>
+            <Text className="text-lg font-semibold text-foreground mb-2">
+              NativeWind Ready
+            </Text>
             <Text className="text-sm text-muted leading-relaxed">
               Use Tailwind CSS classes directly in your React Native components.
             </Text>
@@ -548,7 +559,8 @@ export default function HomeScreen() {
 ```
 
 `lib/utils.ts`
-```ts
+
+````ts
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -564,18 +576,25 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-```
+````
 
 `hooks/use-colors.ts`
+
 ```tsx
-import { Colors, type ColorScheme, type ThemeColorPalette } from "@/constants/theme";
+import {
+  Colors,
+  type ColorScheme,
+  type ThemeColorPalette,
+} from "@/constants/theme";
 import { useColorScheme } from "./use-color-scheme";
 
 /**
  * Returns the current theme's color palette.
  * Usage: const colors = useColors(); then colors.text, colors.background, etc.
  */
-export function useColors(colorSchemeOverride?: ColorScheme): ThemeColorPalette {
+export function useColors(
+  colorSchemeOverride?: ColorScheme,
+): ThemeColorPalette {
   const colorSchema = useColorScheme();
   const scheme = (colorSchemeOverride ?? colorSchema ?? "light") as ColorScheme;
   return Colors[scheme];
@@ -583,6 +602,7 @@ export function useColors(colorSchemeOverride?: ColorScheme): ThemeColorPalette 
 ```
 
 `components/ui/icon-symbol.tsx`
+
 ```tsx
 // Fallback for using MaterialIcons on Android and web.
 
@@ -591,7 +611,10 @@ import { SymbolWeight, SymbolViewProps } from "expo-symbols";
 import { ComponentProps } from "react";
 import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 
-type IconMapping = Record<SymbolViewProps["name"], ComponentProps<typeof MaterialIcons>["name"]>;
+type IconMapping = Record<
+  SymbolViewProps["name"],
+  ComponentProps<typeof MaterialIcons>["name"]
+>;
 type IconSymbolName = keyof typeof MAPPING;
 
 /**
@@ -623,11 +646,19 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
+  return (
+    <MaterialIcons
+      color={color}
+      size={size}
+      name={MAPPING[name]}
+      style={style}
+    />
+  );
 }
 ```
 
 `tailwind.config.js`
+
 ```js
 const { themeColors } = require("./theme.config");
 const plugin = require("tailwindcss/plugin");
@@ -647,7 +678,12 @@ const tailwindColors = Object.fromEntries(
 module.exports = {
   darkMode: "class",
   // Scan all component and app files for Tailwind classes
-  content: ["./app/**/*.{js,ts,tsx}", "./components/**/*.{js,ts,tsx}", "./lib/**/*.{js,ts,tsx}", "./hooks/**/*.{js,ts,tsx}"],
+  content: [
+    "./app/**/*.{js,ts,tsx}",
+    "./components/**/*.{js,ts,tsx}",
+    "./lib/**/*.{js,ts,tsx}",
+    "./hooks/**/*.{js,ts,tsx}",
+  ],
 
   presets: [require("nativewind/preset")],
   theme: {
@@ -665,24 +701,26 @@ module.exports = {
 ```
 
 `theme.config.js`
+
 ```js
 /** @type {const} */
 const themeColors = {
-  primary: { light: '#4F46E5', dark: '#818CF8' },
-  background: { light: '#ffffff', dark: '#151718' },
-  surface: { light: '#f5f5f5', dark: '#1e2022' },
-  foreground: { light: '#11181C', dark: '#ECEDEE' },
-  muted: { light: '#687076', dark: '#9BA1A6' },
-  border: { light: '#E5E7EB', dark: '#334155' },
-  success: { light: '#22C55E', dark: '#4ADE80' },
-  warning: { light: '#F59E0B', dark: '#FBBF24' },
-  error: { light: '#EF4444', dark: '#F87171' },
+  primary: { light: "#4F46E5", dark: "#818CF8" },
+  background: { light: "#ffffff", dark: "#151718" },
+  surface: { light: "#f5f5f5", dark: "#1e2022" },
+  foreground: { light: "#11181C", dark: "#ECEDEE" },
+  muted: { light: "#687076", dark: "#9BA1A6" },
+  border: { light: "#E5E7EB", dark: "#334155" },
+  success: { light: "#22C55E", dark: "#4ADE80" },
+  warning: { light: "#F59E0B", dark: "#FBBF24" },
+  error: { light: "#EF4444", dark: "#F87171" },
 };
 
 module.exports = { themeColors };
 ```
 
 `app.config.ts`
+
 ```ts
 // Load environment variables with proper priority (system > .env)
 import "./scripts/load-env.js";
@@ -736,9 +774,9 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
-    "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+    },
   },
   android: {
     adaptiveIcon: {
@@ -775,7 +813,8 @@ const config: ExpoConfig = {
     [
       "expo-audio",
       {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
+        microphonePermission:
+          "Allow $(PRODUCT_NAME) to access your microphone.",
       },
     ],
     [
@@ -817,6 +856,7 @@ export default config;
 ```
 
 `package.json`
+
 ```json
 {
   "name": "app-template",

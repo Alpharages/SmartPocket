@@ -37,8 +37,12 @@ describe("formatCurrency", () => {
   });
 
   it("uses absolute value for hero-style display", () => {
-    expect(formatCurrency(-1800, "USD", { sign: "absolute" })).not.toMatch(/^-/);
-    expect(formatCurrency(-1800, "USD", { sign: "absolute" })).toMatch(/1,800\.00|1800\.00/);
+    expect(formatCurrency(-1800, "USD", { sign: "absolute" })).not.toMatch(
+      /^-/,
+    );
+    expect(formatCurrency(-1800, "USD", { sign: "absolute" })).toMatch(
+      /1,800\.00|1800\.00/,
+    );
   });
 
   it("falls back to symbol + fixed decimals when Intl rejects the code", () => {
@@ -61,13 +65,20 @@ describe("formatCurrency", () => {
 describe("getDefaultCurrencyFromLocale", () => {
   it("returns USD when locale currency is unsupported", () => {
     vi.mocked(getLocales).mockReturnValueOnce([
-      { currencyCode: "XYZ", languageTag: "en-US", languageCode: "en", regionCode: "US" },
+      {
+        currencyCode: "XYZ",
+        languageTag: "en-US",
+        languageCode: "en",
+        regionCode: "US",
+      },
     ]);
 
-    const spy = vi.spyOn(Intl.NumberFormat.prototype, "resolvedOptions").mockReturnValue({
-      locale: "en-US",
-      currency: "XYZ",
-    } as Intl.ResolvedNumberFormatOptions);
+    const spy = vi
+      .spyOn(Intl.NumberFormat.prototype, "resolvedOptions")
+      .mockReturnValue({
+        locale: "en-US",
+        currency: "XYZ",
+      } as Intl.ResolvedNumberFormatOptions);
 
     expect(getDefaultCurrencyFromLocale()).toBe("USD");
     spy.mockRestore();
@@ -75,7 +86,12 @@ describe("getDefaultCurrencyFromLocale", () => {
 
   it("returns supported locale currency from expo-localization", () => {
     vi.mocked(getLocales).mockReturnValueOnce([
-      { currencyCode: "GBP", languageTag: "en-GB", languageCode: "en", regionCode: "GB" },
+      {
+        currencyCode: "GBP",
+        languageTag: "en-GB",
+        languageCode: "en",
+        regionCode: "GB",
+      },
     ]);
 
     expect(getDefaultCurrencyFromLocale()).toBe("GBP");
@@ -86,10 +102,12 @@ describe("getDefaultCurrencyFromLocale", () => {
       { languageTag: "en-GB", languageCode: "en", regionCode: "GB" },
     ]);
 
-    const spy = vi.spyOn(Intl.NumberFormat.prototype, "resolvedOptions").mockReturnValue({
-      locale: "en-GB",
-      currency: "GBP",
-    } as Intl.ResolvedNumberFormatOptions);
+    const spy = vi
+      .spyOn(Intl.NumberFormat.prototype, "resolvedOptions")
+      .mockReturnValue({
+        locale: "en-GB",
+        currency: "GBP",
+      } as Intl.ResolvedNumberFormatOptions);
 
     expect(getDefaultCurrencyFromLocale()).toBe("GBP");
     spy.mockRestore();
@@ -121,7 +139,13 @@ describe("currency catalog", () => {
   it("includes expected major currencies", () => {
     const codes = CURRENCIES.map((c) => c.code);
     expect(codes).toEqual(
-      expect.arrayContaining(["USD", "EUR", "GBP", "JPY", "PKR"] satisfies CurrencyCode[]),
+      expect.arrayContaining([
+        "USD",
+        "EUR",
+        "GBP",
+        "JPY",
+        "PKR",
+      ] satisfies CurrencyCode[]),
     );
   });
 

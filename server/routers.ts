@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "./_core/trpc";
 import * as db from "./db";
@@ -41,6 +42,19 @@ const transactionSchema = z.object({
   description: z.string().max(500).optional(),
   date: z.date(),
   creditCardId: z.number().optional(),
+});
+
+const budgetSchema = z.object({
+  categoryId: z.number(),
+  period: z.enum(["monthly", "weekly"]),
+  amount: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/)
+    .refine((v) => Number(v) > 0, {
+      message: "Amount must be greater than zero",
+    }),
+  startDate: z.date().optional(),
+  endDate: z.date().optional(),
 });
 
 // ============================================================================
@@ -298,6 +312,88 @@ const summaryRouter = router({
 });
 
 // ============================================================================
+// BUDGETS ROUTER
+// ============================================================================
+
+const budgetsRouter = router({
+  list: protectedProcedure.query(({ ctx }) => {
+    return db.getUserBudgets(ctx.user.id);
+  }),
+
+  create: protectedProcedure
+    .input(budgetSchema)
+    .mutation(async ({ ctx, input }) => {
+      const existing = await db.findActiveBudget(
+        ctx.user.id,
+        input.categoryId,
+        input.period,
+      );
+      if (existing) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "An active budget already exists for this category and period.",
+        });
+      }
+      return db.createBudget({
+        userId: ctx.user.id,
+        ...input,
+      });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({ id: z.number(), ...budgetSchema.shape }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      const existing = await db.findActiveBudget(
+        ctx.user.id,
+        data.categoryId,
+        data.period,
+        { excludeId: id },
+      );
+      if (existing) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "An active budget already exists for this category and period.",
+        });
+      }
+      return db.updateBudget(id, ctx.user.id, data);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(({ ctx, input }) => {
+      return db.deleteBudget(input.id, ctx.user.id);
+    }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(({ ctx, input }) => {
+      return db.getBudgetById(input.id, ctx.user.id);
+    }),
+
+  progress: protectedProcedure
+    .input(
+      z.object({
+        monthStart: z.date(),
+        monthEnd: z.date(),
+        weekStart: z.date(),
+        weekEnd: z.date(),
+      }),
+    )
+    .query(({ ctx, input }) =>
+      db.getBudgetProgress(
+        ctx.user.id,
+        input.monthStart,
+        input.monthEnd,
+        input.weekStart,
+        input.weekEnd,
+      ),
+    ),
+});
+
+// ============================================================================
 // SETTINGS ROUTER
 // ============================================================================
 
@@ -335,6 +431,7 @@ export const appRouter = router({
   creditCards: creditCardsRouter,
   transactions: transactionsRouter,
   summary: summaryRouter,
+  budgets: budgetsRouter,
   settings: settingsRouter,
   data: dataRouter,
 });

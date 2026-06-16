@@ -5,7 +5,10 @@ import {
   CATEGORY_DEFAULT_COLOR,
   Colors,
 } from "@/lib/_core/theme";
-import { readableTextOn, contrastRatio as ratioFromHelper } from "@/lib/_core/contrast";
+import {
+  readableTextOn,
+  contrastRatio as ratioFromHelper,
+} from "@/lib/_core/contrast";
 
 /**
  * Parse a hex color string to RGB values.
@@ -77,7 +80,7 @@ describe("Theme Tokens", () => {
         const ratio = contrastRatio(token.light, lightBg);
         expect(
           ratio,
-          `${token.name} light (${token.light}) vs ${lightBg} = ${ratio.toFixed(2)}:1`
+          `${token.name} light (${token.light}) vs ${lightBg} = ${ratio.toFixed(2)}:1`,
         ).toBeGreaterThanOrEqual(3);
       }
     });
@@ -87,7 +90,7 @@ describe("Theme Tokens", () => {
         const ratio = contrastRatio(token.dark, darkBg);
         expect(
           ratio,
-          `${token.name} dark (${token.dark}) vs ${darkBg} = ${ratio.toFixed(2)}:1`
+          `${token.name} dark (${token.dark}) vs ${darkBg} = ${ratio.toFixed(2)}:1`,
         ).toBeGreaterThanOrEqual(3);
       }
     });
@@ -97,7 +100,7 @@ describe("Theme Tokens", () => {
         const ratio = contrastRatio(token.light, whiteText);
         expect(
           ratio,
-          `white text on ${token.name} light (${token.light}) = ${ratio.toFixed(2)}:1`
+          `white text on ${token.name} light (${token.light}) = ${ratio.toFixed(2)}:1`,
         ).toBeGreaterThanOrEqual(4.5);
       }
     });
@@ -200,7 +203,10 @@ describe("Theme Tokens", () => {
     // *resolved* ink from readableTextOn() — the exact helper the primitives
     // use — clears AA against every fill on both themes.
     const fills: { control: string; key: "primary" | "success" | "error" }[] = [
-      { control: "Button primary / icon-only · active Pill/segment", key: "primary" },
+      {
+        control: "Button primary / icon-only · active Pill/segment",
+        key: "primary",
+      },
       { control: "Button income", key: "success" },
       { control: "Button destructive", key: "error" },
     ];

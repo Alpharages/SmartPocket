@@ -22,7 +22,11 @@ export const withTiming = (
   return toValue;
 };
 export const withSpring = (toValue: any, _config?: any) => toValue;
-export const withRepeat = (animation: any, _numberOfReps?: number, _reverse?: boolean) => animation;
+export const withRepeat = (
+  animation: any,
+  _numberOfReps?: number,
+  _reverse?: boolean,
+) => animation;
 // The real reanimated hook returns a boolean, not a SharedValue.
 export const useReducedMotion = () => false;
 
@@ -54,8 +58,16 @@ export const createAnimatedPropAdapter = () => ({});
 function makeLayoutAnimation() {
   const obj: Record<string, () => typeof obj> = {};
   const methods = [
-    "duration", "delay", "springify", "damping", "stiffness", "mass",
-    "withCallback", "withInitialValues", "randomDelay", "easing",
+    "duration",
+    "delay",
+    "springify",
+    "damping",
+    "stiffness",
+    "mass",
+    "withCallback",
+    "withInitialValues",
+    "randomDelay",
+    "easing",
   ];
   for (const m of methods) {
     obj[m] = () => obj;
@@ -75,12 +87,18 @@ export const Layout = makeLayoutAnimation();
 export const ZoomIn = makeLayoutAnimation();
 export const ZoomOut = makeLayoutAnimation();
 
-const AnimatedView = React.forwardRef<any, any>(function AnimatedViewFn({ children, ...props }, ref) {
+const AnimatedView = React.forwardRef<any, any>(function AnimatedViewFn(
+  { children, ...props },
+  ref,
+) {
   return React.createElement("div", { ref, ...props }, children);
 });
 (AnimatedView as any).displayName = "Animated.View";
 
-const AnimatedText = React.forwardRef<any, any>(function AnimatedTextFn({ children, ...props }, ref) {
+const AnimatedText = React.forwardRef<any, any>(function AnimatedTextFn(
+  { children, ...props },
+  ref,
+) {
   return React.createElement("span", { ref, ...props }, children);
 });
 (AnimatedText as any).displayName = "Animated.Text";

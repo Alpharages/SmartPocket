@@ -53,9 +53,7 @@ function renderCard(
 ): ReactTestInstance {
   let renderer!: ReactTestRenderer;
   act(() => {
-    renderer = TestRenderer.create(
-      <CreditCard {...baseCard} {...props} />,
-    );
+    renderer = TestRenderer.create(<CreditCard {...baseCard} {...props} />);
   });
   return renderer.root;
 }
@@ -122,17 +120,13 @@ describe("CreditCard", () => {
   describe("User-facing signals preserved", () => {
     it("renders the card name", () => {
       const root = renderCard({ name: "My Visa" });
-      const nameNode = root.find(
-        (n) => n.props.children === "My Visa",
-      );
+      const nameNode = root.find((n) => n.props.children === "My Visa");
       expect(nameNode).toBeDefined();
     });
 
     it("renders the cardholder name", () => {
       const root = renderCard({ cardholderName: "Jane Smith" });
-      const holderNode = root.find(
-        (n) => n.props.children === "Jane Smith",
-      );
+      const holderNode = root.find((n) => n.props.children === "Jane Smith");
       expect(holderNode).toBeDefined();
     });
   });
@@ -157,9 +151,7 @@ describe("CreditCard", () => {
     it("calls onLongPress when the card is long-pressed", () => {
       const onLongPress = vi.fn();
       const root = renderCard({ onLongPress });
-      const pressable = root.find(
-        (n) => n.props.onLongPress != null,
-      );
+      const pressable = root.find((n) => n.props.onLongPress != null);
       act(() => {
         pressable.props.onLongPress();
       });
@@ -168,7 +160,9 @@ describe("CreditCard", () => {
 
     it("does not throw when onLongPress is not provided", () => {
       const root = renderCard();
-      const pressable = root.find((n) => n.props.accessibilityRole === "button");
+      const pressable = root.find(
+        (n) => n.props.accessibilityRole === "button",
+      );
       expect(() => {
         act(() => {
           pressable.props.onLongPress?.();

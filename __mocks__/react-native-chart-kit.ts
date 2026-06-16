@@ -34,7 +34,8 @@ export const LineChart = ({
     height,
     onDataPointClick,
   });
-export const BarChart = () => React.createElement("View", { testID: "bar-chart" });
+export const BarChart = () =>
+  React.createElement("View", { testID: "bar-chart" });
 export const ProgressChart = () =>
   React.createElement("View", { testID: "progress-chart" });
 export const ContributionGraph = () =>

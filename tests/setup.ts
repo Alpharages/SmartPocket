@@ -11,8 +11,9 @@
  *     deliberate trade-off here — while letting every other console.error
  *     (including real React warnings) through untouched.
  */
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 // Fixed 32-byte test key for server crypto unit/integration tests.
 process.env.CARD_ENCRYPTION_KEY ??=

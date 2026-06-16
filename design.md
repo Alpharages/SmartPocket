@@ -19,72 +19,82 @@ credit cards — with Budgets, Loans, Accounts, an opt-in AI assistant, and Sett
 ## Screen List
 
 ### 1. **Dashboard (Home Screen)**
-   - Primary screen showing financial overview
-   - Gradient **balance hero** (indigo → violet): total balance + month-to-date income/expenses
-   - Recent transactions list (last 5–7 transactions)
-   - Quick actions: Add Income, Add Expense, View All (real buttons, in-flow — must not overlap the hero)
-   - Credit card summary badge (if cards exist)
+
+- Primary screen showing financial overview
+- Gradient **balance hero** (indigo → violet): total balance + month-to-date income/expenses
+- Recent transactions list (last 5–7 transactions)
+- Quick actions: Add Income, Add Expense, View All (real buttons, in-flow — must not overlap the hero)
+- Credit card summary badge (if cards exist)
 
 ### 2. **Add Transaction Screen**
-   - Bottom-sheet modal for adding income or expense
-   - Transaction type selector (Income / Expense segmented control)
-   - Large, focused amount input
-   - Category picker (color+icon grid; recently used float first)
-   - Date picker (defaults to today)
-   - Optional description/notes field
-   - Credit card selector (expenses only)
-   - Optional inline AI category suggestion (planned — non-blocking, opt-in)
-   - Save/Cancel
+
+- Bottom-sheet modal for adding income or expense
+- Transaction type selector (Income / Expense segmented control)
+- Large, focused amount input
+- Category picker (color+icon grid; recently used float first)
+- Date picker (defaults to today)
+- Optional description/notes field
+- Credit card selector (expenses only)
+- Optional inline AI category suggestion (planned — non-blocking, opt-in)
+- Save/Cancel
 
 ### 3. **Transactions List Screen (Activity)**
-   - Full list with filtering; grouped by date (Today, Yesterday, This Week…)
-   - Filter **pills** (single-tap, multi-select, clearable): All, Income, Expense, This Month, This Week
-   - Each row: category color+icon avatar, description + date, signed amount
-   - Swipe-to-edit / swipe-to-delete (destructive confirmed)
-   - Search by description
-   - Designed empty state
+
+- Full list with filtering; grouped by date (Today, Yesterday, This Week…)
+- Filter **pills** (single-tap, multi-select, clearable): All, Income, Expense, This Month, This Week
+- Each row: category color+icon avatar, description + date, signed amount
+- Swipe-to-edit / swipe-to-delete (destructive confirmed)
+- Search by description
+- Designed empty state
 
 ### 4. **Categories Screen**
-   - Predefined + custom categories, split into Expense and Income groups
-   - "Add New Category" is a real **Button** (not a full-width banner)
-   - Edit/delete categories; color + icon picker
-   - View spending by category
+
+- Predefined + custom categories, split into Expense and Income groups
+- "Add New Category" is a real **Button** (not a full-width banner)
+- Edit/delete categories; color + icon picker
+- View spending by category
 
 ### 5. **Insights Screen (Monthly Summary)**
-   - Month stepper (`‹ May 2026 ›`) + horizontal swipe between months
-   - Total income, total expenses, net balance (StatCards)
-   - Pie/bar chart of expense breakdown by category
-   - Category-wise spending list with percentages
-   - Tap a category → filtered transactions
-   - Natural-language ask-bar (planned)
-   - Export/share summary
+
+- Month stepper (`‹ May 2026 ›`) + horizontal swipe between months
+- Total income, total expenses, net balance (StatCards)
+- Pie/bar chart of expense breakdown by category
+- Category-wise spending list with percentages
+- Tap a category → filtered transactions
+- Natural-language ask-bar (planned)
+- Export/share summary
 
 ### 6. **Credit Cards Screen**
-   - List of saved cards: name, last 4 digits, type, balance/limit
-   - Add card button; edit/delete; view transactions per card
-   - Card color/theme selector
+
+- List of saved cards: name, last 4 digits, type, balance/limit
+- Add card button; edit/delete; view transactions per card
+- Card color/theme selector
 
 ### 7. **Add/Edit Credit Card Screen**
-   - Card name, masked number, cardholder, expiry, credit limit
-   - Card color/icon picker
-   - Save/Cancel
+
+- Card name, masked number, cardholder, expiry, credit limit
+- Card color/icon picker
+- Save/Cancel
 
 ### 8. **Settings Screen** (planned)
-   - Currency, theme (system/light/dark), notification preferences
-   - Data export/backup, AI toggles (opt-in, with clear data disclosure)
-   - About app
+
+- Currency, theme (system/light/dark), notification preferences
+- Data export/backup, AI toggles (opt-in, with clear data disclosure)
+- About app
 
 ---
 
 ## Key User Flows
 
 ### Flow 1: Add an Expense
+
 1. Tap "Add Expense" on Dashboard → sheet opens with Expense preselected
 2. Enter amount → pick category → (optional) link card → (optional) note/date
 3. Tap Save → optimistic update + haptic; sheet closes; balance & Recent Activity update
 4. On network error → non-blocking toast + rollback; sheet stays open
 
 ### Flow 2: Review Monthly Summary
+
 1. Open Insights → current month shown by default
 2. See income / expenses / net + expense-breakdown chart
 3. Tap a category → filter transactions for it
@@ -92,14 +102,17 @@ credit cards — with Budgets, Loans, Accounts, an opt-in AI assistant, and Sett
 5. Export/share
 
 ### Flow 3: Manage Credit Card
+
 1. Cards screen → Add Card → enter details → pick color → Save
 2. Tap a card to view its transactions; swipe to delete / menu to edit
 
 ### Flow 4: Filter Transactions
+
 1. Activity screen → tap a filter pill (e.g. "Food")
 2. List updates; add more pills (e.g. "This Month"); clear all to reset
 
 ### Flow 5: Enable AI Categorization (planned)
+
 1. First use shows an opt-in card: what's sent, why, and that it's reversible
 2. On enable, a suggested category chip appears in Add-Transaction; one tap accepts, ignore to pick manually
 
@@ -111,23 +124,24 @@ Tokens are defined in `theme.config.js` and consumed via NativeWind. **Disciplin
 `success`/`error` are reserved for money & destructive actions; `accent`/`secondary` are
 rare (AI/insight highlights, hero gradient end-stop). Indigo is the single brand/action color.
 
-| Token | Light | Dark | Role |
-|---|---|---|---|
-| `primary` | `#4F46E5` | `#818CF8` | Brand, primary actions, active states |
-| `background` | `#F8FAFC` | `#0B0F19` | App background |
-| `surface` | `#FFFFFF` | `#151B2B` | Cards, sheets, elevated surfaces |
-| `foreground` | `#111827` | `#F1F5F9` | Primary text |
-| `muted` | `#6B7280` | `#9CA3AF` | Secondary text, inactive icons |
-| `border` | `#E5E7EB` | `#2D3748` | Dividers, outlines |
-| `success` | `#059669` | `#34D399` | **Income / positive (semantic only)** |
-| `error` | `#DC2626` | `#FCA5A5` | **Expense / negative / destructive (semantic only)** |
-| `warning` | `#D97706` | `#FBBF24` | Alerts, over-budget, due-soon |
-| `accent` | `#DB2777` | `#F472B6` | Rare small accents (AI/insight) |
-| `secondary` | `#7C3AED` | `#A78BFA` | Hero gradient end-stop, rare accents |
+| Token        | Light     | Dark      | Role                                                 |
+| ------------ | --------- | --------- | ---------------------------------------------------- |
+| `primary`    | `#4F46E5` | `#818CF8` | Brand, primary actions, active states                |
+| `background` | `#F8FAFC` | `#0B0F19` | App background                                       |
+| `surface`    | `#FFFFFF` | `#151B2B` | Cards, sheets, elevated surfaces                     |
+| `foreground` | `#111827` | `#F1F5F9` | Primary text                                         |
+| `muted`      | `#6B7280` | `#9CA3AF` | Secondary text, inactive icons                       |
+| `border`     | `#E5E7EB` | `#2D3748` | Dividers, outlines                                   |
+| `success`    | `#059669` | `#34D399` | **Income / positive (semantic only)**                |
+| `error`      | `#DC2626` | `#FCA5A5` | **Expense / negative / destructive (semantic only)** |
+| `warning`    | `#D97706` | `#FBBF24` | Alerts, over-budget, due-soon                        |
+| `accent`     | `#DB2777` | `#F472B6` | Rare small accents (AI/insight)                      |
+| `secondary`  | `#7C3AED` | `#A78BFA` | Hero gradient end-stop, rare accents                 |
 
 **Balance hero gradient:** `primary → secondary` (indigo → violet), used only on the dashboard.
 
 ### Category Colors (data-driven; defaults)
+
 - **Food** `#FF6B6B` · **Transport** `#4ECDC4` · **Entertainment** `#FFE66D` ·
   **Utilities** `#95E1D3` · **Shopping** `#FF85A2` · **Healthcare** `#A8E6CF`
 - **Salary** `#059669` · **Freelance** `#3B82F6` · **Investment** `#8B5CF6` · **Other** `#6B7280`
@@ -139,20 +153,22 @@ rare (AI/insight highlights, hero gradient end-stop). Indigo is the single brand
 ## Typography & Spacing
 
 ### Type Scale (system font stack: SF Pro / Roboto / system-ui)
-| Token | Size / Line | Weight | Use |
-|---|---|---|---|
-| `display` | 32 / 38 | 700 | Balance hero amount |
-| `h1` | 28 / 34 | 700 | Screen titles |
-| `h2` | 22 / 28 | 600 | Section titles |
-| `h3` | 18 / 24 | 600 | Card titles |
-| `body` | 16 / 24 | 400 | Default text |
-| `label` | 14 / 20 | 500 | Field labels, chips |
-| `caption` | 12 / 16 | 400 | Timestamps, hints |
-| `number` | tabular | 600 | All monetary figures (tabular-nums) |
+
+| Token     | Size / Line | Weight | Use                                 |
+| --------- | ----------- | ------ | ----------------------------------- |
+| `display` | 32 / 38     | 700    | Balance hero amount                 |
+| `h1`      | 28 / 34     | 700    | Screen titles                       |
+| `h2`      | 22 / 28     | 600    | Section titles                      |
+| `h3`      | 18 / 24     | 600    | Card titles                         |
+| `body`    | 16 / 24     | 400    | Default text                        |
+| `label`   | 14 / 20     | 500    | Field labels, chips                 |
+| `caption` | 12 / 16     | 400    | Timestamps, hints                   |
+| `number`  | tabular     | 600    | All monetary figures (tabular-nums) |
 
 Monetary values use tabular figures; support Dynamic Type up to 200%.
 
 ### Spacing (4-pt base)
+
 - `xs 4` · `sm 8` · `md 12` (default) · `lg 16` (screen/card padding) · `xl 20` · `2xl 24`
 - **Radius:** `sm 8` · `md 12` (default) · `lg 16` (cards) · `full` (pills/chips)
 - **Elevation:** subtle, low-opacity shadows; dark mode relies on `surface` lightness over heavy shadows
@@ -162,6 +178,7 @@ Monetary values use tabular figures; support Dynamic Type up to 200%.
 ## Interaction Patterns
 
 ### Feedback
+
 - **Button press:** scale 0.97 + light haptic
 - **List item tap:** opacity 0.7 + navigation
 - **Save success:** toast + success haptic; affected number animates to its new value
@@ -169,6 +186,7 @@ Monetary values use tabular figures; support Dynamic Type up to 200%.
 - **Swipe delete:** confirm with haptic; destructive actions always confirmable
 
 ### Animations
+
 - Screen transitions: subtle slide (150ms)
 - Sheet entry: fade + slide up (250ms)
 - List item deletion: fade out (200ms)

@@ -68,8 +68,9 @@ export async function loadThemePreference(): Promise<ThemePreference> {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useSystemColorScheme() ?? "light";
-  const [themePreference, setThemePreferenceState] =
-    useState<ThemePreference>(DEFAULT_THEME_PREFERENCE);
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(
+    DEFAULT_THEME_PREFERENCE,
+  );
   const [isReady, setIsReady] = useState(false);
   const userChangedPreferenceRef = useRef(false);
 

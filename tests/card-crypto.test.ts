@@ -40,12 +40,13 @@ describe("card crypto", () => {
   });
 
   it("throws when auth tag is tampered", async () => {
-    const { decryptCardNumber, encryptCardNumber } = await import(
-      "@/server/_core/crypto"
-    );
+    const { decryptCardNumber, encryptCardNumber } =
+      await import("@/server/_core/crypto");
     const stored = encryptCardNumber("4111111111111111");
     const [, iv, tag, cipher] = stored.split(":");
-    const flippedTag = tag.startsWith("A") ? `B${tag.slice(1)}` : `A${tag.slice(1)}`;
+    const flippedTag = tag.startsWith("A")
+      ? `B${tag.slice(1)}`
+      : `A${tag.slice(1)}`;
     const tampered = `v1:${iv}:${flippedTag}:${cipher}`;
     expect(() => decryptCardNumber(tampered)).toThrow();
   });
@@ -63,15 +64,12 @@ describe("card crypto", () => {
     process.env.CARD_ENCRYPTION_KEY = "tooshort";
     vi.resetModules();
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    expect(() => encryptCardNumber("4111111111111111")).toThrow(
-      /32 bytes/,
-    );
+    expect(() => encryptCardNumber("4111111111111111")).toThrow(/32 bytes/);
   });
 
   it("round-trips min(13) and max(19) length PANs", async () => {
-    const { decryptCardNumber, encryptCardNumber } = await import(
-      "@/server/_core/crypto"
-    );
+    const { decryptCardNumber, encryptCardNumber } =
+      await import("@/server/_core/crypto");
     const minPan = "4111111111111";
     const maxPan = "4111111111111111111";
     expect(minPan).toHaveLength(13);
@@ -81,18 +79,16 @@ describe("card crypto", () => {
   });
 
   it("round-trips empty and non-numeric input", async () => {
-    const { decryptCardNumber, encryptCardNumber } = await import(
-      "@/server/_core/crypto"
-    );
+    const { decryptCardNumber, encryptCardNumber } =
+      await import("@/server/_core/crypto");
     expect(decryptCardNumber(encryptCardNumber(""))).toBe("");
     const nonNumeric = "abcd-efgh-ijkl";
     expect(decryptCardNumber(encryptCardNumber(nonNumeric))).toBe(nonNumeric);
   });
 
   it("round-trips unicode input", async () => {
-    const { decryptCardNumber, encryptCardNumber } = await import(
-      "@/server/_core/crypto"
-    );
+    const { decryptCardNumber, encryptCardNumber } =
+      await import("@/server/_core/crypto");
     const unicode = "カード番号テスト";
     expect(decryptCardNumber(encryptCardNumber(unicode))).toBe(unicode);
   });
@@ -102,9 +98,8 @@ describe("card crypto", () => {
       "base64",
     );
     vi.resetModules();
-    const { decryptCardNumber, encryptCardNumber } = await import(
-      "@/server/_core/crypto"
-    );
+    const { decryptCardNumber, encryptCardNumber } =
+      await import("@/server/_core/crypto");
     const plain = "4111111111111111";
     expect(decryptCardNumber(encryptCardNumber(plain))).toBe(plain);
   });

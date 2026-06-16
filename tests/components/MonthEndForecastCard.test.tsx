@@ -39,14 +39,17 @@ function textOf(node: { children?: unknown[] } | string): string {
   if (typeof node === "string") return node;
   return (node.children ?? [])
     .map((child) =>
-      typeof child === "string" ? child : textOf(child as { children?: unknown[] }),
+      typeof child === "string"
+        ? child
+        : textOf(child as { children?: unknown[] }),
     )
     .join("");
 }
 
-function findAccessibilityLabel(
-  node: { props?: { accessibilityLabel?: string }; children?: unknown[] },
-): string | undefined {
+function findAccessibilityLabel(node: {
+  props?: { accessibilityLabel?: string };
+  children?: unknown[];
+}): string | undefined {
   if (node.props?.accessibilityLabel) {
     return node.props.accessibilityLabel;
   }
@@ -54,7 +57,10 @@ function findAccessibilityLabel(
   for (const child of node.children ?? []) {
     if (typeof child !== "string" && child && typeof child === "object") {
       const label = findAccessibilityLabel(
-        child as { props?: { accessibilityLabel?: string }; children?: unknown[] },
+        child as {
+          props?: { accessibilityLabel?: string };
+          children?: unknown[];
+        },
       );
       if (label) return label;
     }

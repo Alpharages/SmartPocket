@@ -19,7 +19,11 @@ const lineChartMock = vi.hoisted(() =>
       height,
       onDataPointClick,
     }: {
-      data: { labels: string[]; datasets: { data: number[] }[]; legend?: string[] };
+      data: {
+        labels: string[];
+        datasets: { data: number[] }[];
+        legend?: string[];
+      };
       width: number;
       height: number;
       onDataPointClick?: (payload: { index: number }) => void;
@@ -40,7 +44,11 @@ const lineChartMock = vi.hoisted(() =>
 
 vi.mock("react-native-chart-kit", () => ({
   LineChart: (props: {
-    data: { labels: string[]; datasets: { data: number[] }[]; legend?: string[] };
+    data: {
+      labels: string[];
+      datasets: { data: number[] }[];
+      legend?: string[];
+    };
     width: number;
     height: number;
     onDataPointClick?: (payload: { index: number }) => void;

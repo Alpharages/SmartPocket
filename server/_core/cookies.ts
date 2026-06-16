@@ -14,7 +14,9 @@ function isSecureRequest(req: Request) {
   const forwardedProto = req.headers["x-forwarded-proto"];
   if (!forwardedProto) return false;
 
-  const protoList = Array.isArray(forwardedProto) ? forwardedProto : forwardedProto.split(",");
+  const protoList = Array.isArray(forwardedProto)
+    ? forwardedProto
+    : forwardedProto.split(",");
 
   return protoList.some((proto) => proto.trim().toLowerCase() === "https");
 }

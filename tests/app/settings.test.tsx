@@ -224,7 +224,9 @@ describe("SettingsScreen", () => {
       findPressableByLabel(root, "First day of week, Sunday").props.onPress();
     });
 
-    const sheet = root.find((n) => n.props?.testID === "first-day-picker-sheet");
+    const sheet = root.find(
+      (n) => n.props?.testID === "first-day-picker-sheet",
+    );
     expect(sheet).toBeTruthy();
 
     act(() => {
@@ -255,9 +257,7 @@ describe("SettingsScreen", () => {
   it("does not mark theme as coming soon", () => {
     const root = render(<SettingsScreen />);
     expect(
-      root.findAll(
-        (n) => n.props?.accessibilityLabel === "Theme, coming soon",
-      ),
+      root.findAll((n) => n.props?.accessibilityLabel === "Theme, coming soon"),
     ).toHaveLength(0);
   });
 

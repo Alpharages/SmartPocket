@@ -8,19 +8,16 @@ export function useConfirm() {
   const [options, setOptions] = useState<ConfirmOptions>({});
   const resolverRef = useRef<ConfirmResolver | null>(null);
 
-  const confirm = useCallback(
-    (opts: ConfirmOptions = {}): Promise<boolean> => {
-      // Settle any outstanding request before starting a new one so its
-      // awaiting caller never hangs if confirm() is re-entered.
-      resolverRef.current?.(false);
-      setOptions(opts);
-      setVisible(true);
-      return new Promise<boolean>((resolve) => {
-        resolverRef.current = resolve;
-      });
-    },
-    [],
-  );
+  const confirm = useCallback((opts: ConfirmOptions = {}): Promise<boolean> => {
+    // Settle any outstanding request before starting a new one so its
+    // awaiting caller never hangs if confirm() is re-entered.
+    resolverRef.current?.(false);
+    setOptions(opts);
+    setVisible(true);
+    return new Promise<boolean>((resolve) => {
+      resolverRef.current = resolve;
+    });
+  }, []);
 
   // Resolve a pending prompt on unmount so the awaiting caller never leaks.
   useEffect(

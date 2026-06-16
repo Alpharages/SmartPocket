@@ -23,7 +23,11 @@ afterEach(() => {
   renderer = null;
 });
 
-function TestComponent({ opts }: { opts?: Parameters<typeof usePressFeedback>[0] }) {
+function TestComponent({
+  opts,
+}: {
+  opts?: Parameters<typeof usePressFeedback>[0];
+}) {
   const result = usePressFeedback(opts);
   return React.createElement("div", {
     "data-animated-style": JSON.stringify(result.animatedStyle),
@@ -43,7 +47,9 @@ describe("usePressFeedback", () => {
   });
 
   it("accepts custom scale option", () => {
-    const root = render(React.createElement(TestComponent, { opts: { scale: 0.95 } }));
+    const root = render(
+      React.createElement(TestComponent, { opts: { scale: 0.95 } }),
+    );
     const node = root.find((n) => n.type === "div");
     expect(node).toBeTruthy();
   });

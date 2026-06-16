@@ -151,7 +151,11 @@ export default function TransactionDetailScreen() {
             />
           </View>
           <Text className="text-4xl font-bold" style={{ color: accent }}>
-            {formatSignedCurrency(transaction.amount, currency, transaction.type)}
+            {formatSignedCurrency(
+              transaction.amount,
+              currency,
+              transaction.type,
+            )}
           </Text>
           <Text className="mt-xs text-sm text-muted font-medium capitalize">
             {transaction.type}

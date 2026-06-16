@@ -146,17 +146,17 @@ effortless.
 
 ### Emotional Journey Mapping
 
-| Stage | User feeling (before) | Target feeling (with SmartPocket) |
-|---|---|---|
-| Onboarding | Skeptical, "another finance app" | Quickly oriented, low commitment |
-| First capture | "Will this be tedious?" | "That was fast." |
-| Daily logging | Chore | Habit / quick win |
-| Reviewing month | Anxious | Clear-eyed, in control |
-| Enabling AI | Wary of privacy | Reassured by transparency |
+| Stage           | User feeling (before)            | Target feeling (with SmartPocket) |
+| --------------- | -------------------------------- | --------------------------------- |
+| Onboarding      | Skeptical, "another finance app" | Quickly oriented, low commitment  |
+| First capture   | "Will this be tedious?"          | "That was fast."                  |
+| Daily logging   | Chore                            | Habit / quick win                 |
+| Reviewing month | Anxious                          | Clear-eyed, in control            |
+| Enabling AI     | Wary of privacy                  | Reassured by transparency         |
 
 ### Micro-Emotions
 
-- The satisfying *snap* of a saved transaction (scale + haptic + balance tick).
+- The satisfying _snap_ of a saved transaction (scale + haptic + balance tick).
 - The relief of an **empty state** that tells you what to do next, not a dead end.
 - The reassurance of a **destructive action** that asks before it bites.
 
@@ -209,8 +209,8 @@ effortless.
 
 ### Design Inspiration Strategy
 
-Adopt the premium-fintech *confidence* (typography, indigo, gradient hero) while staying
-*calmer than competitors* — fewer colors, more whitespace, semantic color discipline.
+Adopt the premium-fintech _confidence_ (typography, indigo, gradient hero) while staying
+_calmer than competitors_ — fewer colors, more whitespace, semantic color discipline.
 
 ---
 
@@ -287,19 +287,19 @@ Transactions (the ledger), Categories (the buckets), Insights (the summary), Car
 
 Tokens (light / dark) — formalized from `theme.config.js`:
 
-| Token | Light | Dark | Role |
-|---|---|---|---|
-| `primary` | `#4F46E5` | `#818CF8` | Brand, primary actions, active states |
-| `background` | `#F8FAFC` | `#0B0F19` | App background |
-| `surface` | `#FFFFFF` | `#151B2B` | Cards, sheets, elevated surfaces |
-| `foreground` | `#111827` | `#F1F5F9` | Primary text |
-| `muted` | `#6B7280` | `#9CA3AF` | Secondary text, inactive icons |
-| `border` | `#E5E7EB` | `#2D3748` | Dividers, outlines |
-| `success` | `#059669` | `#34D399` | **Income / positive (semantic only)** |
-| `error` | `#DC2626` | `#FCA5A5` | **Expense / negative / destructive (semantic only)** |
-| `warning` | `#D97706` | `#FBBF24` | Alerts, over-budget, due-soon |
-| `accent` | `#DB2777` | `#F472B6` | Rare small accents (AI/insight highlights) |
-| `secondary` | `#7C3AED` | `#A78BFA` | Hero gradient end-stop, rare accents |
+| Token        | Light     | Dark      | Role                                                 |
+| ------------ | --------- | --------- | ---------------------------------------------------- |
+| `primary`    | `#4F46E5` | `#818CF8` | Brand, primary actions, active states                |
+| `background` | `#F8FAFC` | `#0B0F19` | App background                                       |
+| `surface`    | `#FFFFFF` | `#151B2B` | Cards, sheets, elevated surfaces                     |
+| `foreground` | `#111827` | `#F1F5F9` | Primary text                                         |
+| `muted`      | `#6B7280` | `#9CA3AF` | Secondary text, inactive icons                       |
+| `border`     | `#E5E7EB` | `#2D3748` | Dividers, outlines                                   |
+| `success`    | `#059669` | `#34D399` | **Income / positive (semantic only)**                |
+| `error`      | `#DC2626` | `#FCA5A5` | **Expense / negative / destructive (semantic only)** |
+| `warning`    | `#D97706` | `#FBBF24` | Alerts, over-budget, due-soon                        |
+| `accent`     | `#DB2777` | `#F472B6` | Rare small accents (AI/insight highlights)           |
+| `secondary`  | `#7C3AED` | `#A78BFA` | Hero gradient end-stop, rare accents                 |
 
 - **Hero gradient:** `primary → secondary` (indigo → violet), used only on the dashboard balance card.
 - **Semantic discipline:** `success`/`error` are reserved for money & destructive actions; never decorative.
@@ -311,16 +311,16 @@ Tokens (light / dark) — formalized from `theme.config.js`:
 System font stack (already defined in `lib/_core/theme.ts` `Fonts`): `system-ui` / SF Pro on iOS,
 Roboto on Android, system stack on web. A type scale:
 
-| Token | Size / Line | Weight | Use |
-|---|---|---|---|
-| `display` | 32 / 38 | 700 | Balance hero amount |
-| `h1` | 28 / 34 | 700 | Screen titles |
-| `h2` | 22 / 28 | 600 | Section titles |
-| `h3` | 18 / 24 | 600 | Card titles |
-| `body` | 16 / 24 | 400 | Default text |
-| `label` | 14 / 20 | 500 | Field labels, chips |
-| `caption` | 12 / 16 | 400 | Timestamps, hints |
-| `number` | tabular | 600 | All monetary figures (tabular-nums for alignment) |
+| Token     | Size / Line | Weight | Use                                               |
+| --------- | ----------- | ------ | ------------------------------------------------- |
+| `display` | 32 / 38     | 700    | Balance hero amount                               |
+| `h1`      | 28 / 34     | 700    | Screen titles                                     |
+| `h2`      | 22 / 28     | 600    | Section titles                                    |
+| `h3`      | 18 / 24     | 600    | Card titles                                       |
+| `body`    | 16 / 24     | 400    | Default text                                      |
+| `label`   | 14 / 20     | 500    | Field labels, chips                               |
+| `caption` | 12 / 16     | 400    | Timestamps, hints                                 |
+| `number`  | tabular     | 600    | All monetary figures (tabular-nums for alignment) |
 
 - Monetary values use **tabular figures** so columns of money align.
 - Support Dynamic Type / font scaling up to 200% (NFR-5).
@@ -329,14 +329,14 @@ Roboto on Android, system stack on web. A type scale:
 
 4-pt base scale (to be added as tokens):
 
-| Token | px | Use |
-|---|---|---|
-| `xs` | 4 | icon/text gaps |
-| `sm` | 8 | tight gaps |
-| `md` | 12 | default gap |
-| `lg` | 16 | screen padding, card padding |
-| `xl` | 20 | generous section spacing |
-| `2xl` | 24 | screen-level separation |
+| Token | px  | Use                          |
+| ----- | --- | ---------------------------- |
+| `xs`  | 4   | icon/text gaps               |
+| `sm`  | 8   | tight gaps                   |
+| `md`  | 12  | default gap                  |
+| `lg`  | 16  | screen padding, card padding |
+| `xl`  | 20  | generous section spacing     |
+| `2xl` | 24  | screen-level separation      |
 
 Radius: `sm 8` · `md 12` (default) · `lg 16` (cards) · `full` (pills/chips).
 Elevation: subtle, low-opacity shadows (matching the tab bar's `shadowOpacity 0.04`); dark mode
@@ -447,6 +447,7 @@ Built on NativeWind primitives + existing `components/` (`ScreenContainer`, `Hap
 ### Custom Components
 
 #### ScreenHeader
+
 **Purpose:** Consistent screen title + subtitle + optional trailing action.
 **Usage:** Top of every tab/screen, replacing per-screen header markup.
 **Anatomy:** Title (`h1`), optional subtitle/count (`caption`/`muted`), optional right-aligned action.
@@ -455,6 +456,7 @@ Built on NativeWind primitives + existing `components/` (`ScreenContainer`, `Hap
 **Content Guidelines:** Title = noun ("Transactions"); subtitle = count/context ("12 this month").
 
 #### StatCard
+
 **Purpose:** Display a single financial figure with label and trend.
 **Usage:** Dashboard summary, Insights totals.
 **Anatomy:** Label (`label`), value (`number`/`display`), optional delta + icon.
@@ -463,6 +465,7 @@ Built on NativeWind primitives + existing `components/` (`ScreenContainer`, `Hap
 **Accessibility:** Value announced with sign + currency; color never the sole signal.
 
 #### TransactionRow
+
 **Purpose:** One ledger entry in a list.
 **Anatomy:** Leading category color+icon avatar, title + date, trailing signed amount.
 **States:** default, pressed (opacity 0.7), swipe-revealed (edit/delete), selected.
@@ -471,12 +474,14 @@ Built on NativeWind primitives + existing `components/` (`ScreenContainer`, `Hap
 **Accessibility:** Single focusable element summarizing "Expense, Food, May 16, minus $25.50."
 
 #### CategoryToken / CategoryPickerGrid
+
 **Purpose:** Reusable color+icon category chip and its selection grid.
 **Usage:** Category screen, add-transaction picker, chart legends, filters.
 **States:** default, selected (ring in `primary`), disabled.
 **Accessibility:** Labeled by category name; selected state announced.
 
 #### Pill / FilterChip
+
 **Purpose:** Single-tap filter/segment.
 **Anatomy:** Label, optional count, optional leading icon; pill radius (`full`).
 **States:** default, active (`primary` fill, on-primary text), disabled.
@@ -484,6 +489,7 @@ Built on NativeWind primitives + existing `components/` (`ScreenContainer`, `Hap
 **Fixes:** replaces the inconsistent Activity filter chips and the misused "Add New Category" banner.
 
 #### Button
+
 **Purpose:** The one button primitive.
 **Variants:** primary (indigo fill), secondary (surface + border), ghost (text), destructive (error),
 income (success — only for the income quick action), icon-only.
@@ -491,16 +497,19 @@ income (success — only for the income quick action), icon-only.
 **Accessibility:** ≥44pt height; label or accessibilityLabel required.
 
 #### Sheet (BottomSheetModal)
+
 **Purpose:** Container for all create/edit flows.
 **States:** entering (fade+slide-up 250ms), open, dismissing; handles keyboard avoidance + safe area.
 **Accessibility:** Focus trap, dismiss affordance, announced as modal.
 
 #### EmptyState
+
 **Purpose:** Designed zero-data state.
 **Anatomy:** Icon, title, supportive line, primary action.
 **Usage:** Empty transactions, categories, cards, search results (already present — standardize).
 
 #### Skeleton / Loader & Toast
+
 **Purpose:** Network-state feedback for a server-backed app (NFR-3).
 **Usage:** Skeletons on first load; toast for success/error after mutations.
 
@@ -574,11 +583,11 @@ income (success — only for the income quick action), icon-only.
 
 ### Breakpoint Strategy
 
-| Breakpoint | Width | Layout |
-|---|---|---|
-| `base` | < 640 | Single column, bottom tab bar (mobile) |
-| `md` | ≥ 768 | Wider padding, optional two-column cards |
-| `lg` | ≥ 1024 | Two-pane (master/detail) on web for lists + detail; side nav optional |
+| Breakpoint | Width  | Layout                                                                |
+| ---------- | ------ | --------------------------------------------------------------------- |
+| `base`     | < 640  | Single column, bottom tab bar (mobile)                                |
+| `md`       | ≥ 768  | Wider padding, optional two-column cards                              |
+| `lg`       | ≥ 1024 | Two-pane (master/detail) on web for lists + detail; side nav optional |
 
 ### Accessibility Strategy
 

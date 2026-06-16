@@ -1,85 +1,85 @@
 - generic [ref=e64]:
-  - generic [ref=e65]:
-    - generic [ref=e73]:
-      - generic [ref=e74]:
-        - generic [ref=e75]: Expense Tracker
-        - generic [ref=e76]: Saturday, May 16
-      - generic [ref=e79]:
-        - generic [ref=e80]: Total Balance
-        - generic [ref=e81]: $0.00
-        - generic [ref=e82]:
-          - generic [ref=e83]:
-            - generic [ref=e84]:
-              - generic [ref=e86]: 
-              - generic [ref=e87]: Income
-            - generic [ref=e88]: +$0.00
-          - generic [ref=e89]:
-            - generic [ref=e90]:
-              - generic [ref=e92]: 
-              - generic [ref=e93]: Expenses
-            - generic [ref=e94]: "-$0.00"
-      - generic [ref=e96]:
-        - generic [ref=e97] [cursor=pointer]:
-          - generic [ref=e99]: 
-          - generic [ref=e100]: Add Income
-        - generic [ref=e101] [cursor=pointer]:
-          - generic [ref=e103]: 
-          - generic [ref=e104]: Add Expense
-      - generic [ref=e105]:
-        - generic [ref=e106]:
-          - generic [ref=e107]: Recent Activity
-          - generic [ref=e108] [cursor=pointer]:
-            - generic [ref=e109]: View All
-            - generic [ref=e110]: 
-        - generic [ref=e111]:
-          - generic [ref=e113]: 
-          - generic [ref=e114]: No transactions yet
-          - generic [ref=e115]: Start by adding your first transaction
-    - generic [ref=e176]:
-      - generic [ref=e177]:
-        - generic [ref=e178]: Transactions
-        - generic [ref=e179]: 0 transactions
-      - generic [ref=e181]:
-        - generic [ref=e182]: 
-        - textbox "Search transactions..." [ref=e183]
-      - generic [ref=e186]:
-        - generic [ref=e189] [cursor=pointer]: All
-        - generic [ref=e192] [cursor=pointer]: Income
-        - generic [ref=e195] [cursor=pointer]: Expense
-        - generic [ref=e198] [cursor=pointer]: This Month
-        - generic [ref=e201] [cursor=pointer]: This Week
-      - generic [ref=e203]:
-        - generic [ref=e205]: 
-        - generic [ref=e206]: No transactions found
-        - generic [ref=e207]: Try adjusting your filters or search
-  - tablist [ref=e120]:
-    - tab "  Home" [ref=e122] [cursor=pointer]:
-      - generic [ref=e123]:
-        - generic [ref=e125]: 
-        - generic [ref=e127]: 
-      - generic [ref=e128]: Home
-    - tab "  Activity" [active] [selected] [ref=e130] [cursor=pointer]:
-      - generic [ref=e131]:
-        - generic [ref=e133]: 
-        - generic [ref=e135]: 
-      - generic [ref=e136]: Activity
-    - tab "  Categories" [ref=e138] [cursor=pointer]:
-      - generic [ref=e139]:
-        - generic [ref=e141]: 
-        - generic [ref=e143]: 
-      - generic [ref=e144]: Categories
-    - tab "  Insights" [ref=e146] [cursor=pointer]:
-      - generic [ref=e147]:
-        - generic [ref=e149]: 
-        - generic [ref=e151]: 
-      - generic [ref=e152]: Insights
-    - tab "  Cards" [ref=e154] [cursor=pointer]:
-      - generic [ref=e155]:
-        - generic [ref=e157]: 
-        - generic [ref=e159]: 
-      - generic [ref=e160]: Cards
-    - tab "⏷ ⏷ index" [ref=e162] [cursor=pointer]:
-      - generic [ref=e163]:
-        - generic [ref=e165]: ⏷
-        - generic [ref=e167]: ⏷
-      - generic [ref=e168]: index
+    - generic [ref=e65]:
+        - generic [ref=e73]:
+            - generic [ref=e74]:
+                - generic [ref=e75]: Expense Tracker
+                - generic [ref=e76]: Saturday, May 16
+            - generic [ref=e79]:
+                - generic [ref=e80]: Total Balance
+                - generic [ref=e81]: $0.00
+                - generic [ref=e82]:
+                    - generic [ref=e83]:
+                        - generic [ref=e84]:
+                            - generic [ref=e86]: 
+                            - generic [ref=e87]: Income
+                        - generic [ref=e88]: +$0.00
+                    - generic [ref=e89]:
+                        - generic [ref=e90]:
+                            - generic [ref=e92]: 
+                            - generic [ref=e93]: Expenses
+                        - generic [ref=e94]: "-$0.00"
+            - generic [ref=e96]:
+                - generic [ref=e97] [cursor=pointer]:
+                    - generic [ref=e99]: 
+                    - generic [ref=e100]: Add Income
+                - generic [ref=e101] [cursor=pointer]:
+                    - generic [ref=e103]: 
+                    - generic [ref=e104]: Add Expense
+            - generic [ref=e105]:
+                - generic [ref=e106]:
+                    - generic [ref=e107]: Recent Activity
+                    - generic [ref=e108] [cursor=pointer]:
+                        - generic [ref=e109]: View All
+                        - generic [ref=e110]: 
+                - generic [ref=e111]:
+                    - generic [ref=e113]: 
+                    - generic [ref=e114]: No transactions yet
+                    - generic [ref=e115]: Start by adding your first transaction
+        - generic [ref=e176]:
+            - generic [ref=e177]:
+                - generic [ref=e178]: Transactions
+                - generic [ref=e179]: 0 transactions
+            - generic [ref=e181]:
+                - generic [ref=e182]: 
+                - textbox "Search transactions..." [ref=e183]
+            - generic [ref=e186]:
+                - generic [ref=e189] [cursor=pointer]: All
+                - generic [ref=e192] [cursor=pointer]: Income
+                - generic [ref=e195] [cursor=pointer]: Expense
+                - generic [ref=e198] [cursor=pointer]: This Month
+                - generic [ref=e201] [cursor=pointer]: This Week
+            - generic [ref=e203]:
+                - generic [ref=e205]: 
+                - generic [ref=e206]: No transactions found
+                - generic [ref=e207]: Try adjusting your filters or search
+    - tablist [ref=e120]:
+        - tab "  Home" [ref=e122] [cursor=pointer]:
+            - generic [ref=e123]:
+                - generic [ref=e125]: 
+                - generic [ref=e127]: 
+            - generic [ref=e128]: Home
+        - tab "  Activity" [active] [selected] [ref=e130] [cursor=pointer]:
+            - generic [ref=e131]:
+                - generic [ref=e133]: 
+                - generic [ref=e135]: 
+            - generic [ref=e136]: Activity
+        - tab "  Categories" [ref=e138] [cursor=pointer]:
+            - generic [ref=e139]:
+                - generic [ref=e141]: 
+                - generic [ref=e143]: 
+            - generic [ref=e144]: Categories
+        - tab "  Insights" [ref=e146] [cursor=pointer]:
+            - generic [ref=e147]:
+                - generic [ref=e149]: 
+                - generic [ref=e151]: 
+            - generic [ref=e152]: Insights
+        - tab "  Cards" [ref=e154] [cursor=pointer]:
+            - generic [ref=e155]:
+                - generic [ref=e157]: 
+                - generic [ref=e159]: 
+            - generic [ref=e160]: Cards
+        - tab "⏷ ⏷ index" [ref=e162] [cursor=pointer]:
+            - generic [ref=e163]:
+                - generic [ref=e165]: ⏷
+                - generic [ref=e167]: ⏷
+            - generic [ref=e168]: index

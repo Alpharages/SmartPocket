@@ -29,9 +29,8 @@ vi.mock("nativewind", () => ({
 }));
 
 vi.mock("react-native", async () => {
-  const actual = await vi.importActual<typeof import("react-native")>(
-    "react-native",
-  );
+  const actual =
+    await vi.importActual<typeof import("react-native")>("react-native");
   return {
     ...actual,
     useColorScheme: vi.fn(() => "light"),

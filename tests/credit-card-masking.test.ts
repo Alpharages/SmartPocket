@@ -61,7 +61,9 @@ describe("credit card response masking", () => {
   it("returns masked card from createCreditCard", async () => {
     callDataApi
       .mockResolvedValueOnce({ insertId: 42 })
-      .mockResolvedValueOnce([{ ...baseRow, id: 42, cardNumber: "4111111111111111" }]);
+      .mockResolvedValueOnce([
+        { ...baseRow, id: 42, cardNumber: "4111111111111111" },
+      ]);
 
     const { createCreditCard } = await import("@/server/db");
     const created = await createCreditCard({

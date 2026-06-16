@@ -13,7 +13,9 @@ async function main(): Promise<void> {
     }
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Card encryption migration aborted";
+      error instanceof Error
+        ? error.message
+        : "Card encryption migration aborted";
     console.error(message);
     process.exit(1);
   }

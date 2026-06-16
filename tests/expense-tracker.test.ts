@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 
 /**
  * Expense Tracker API Tests
- * 
+ *
  * These tests verify the core functionality of the expense tracker app:
  * - Transaction creation and retrieval
  * - Category management

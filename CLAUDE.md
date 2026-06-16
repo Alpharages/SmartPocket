@@ -1,29 +1,37 @@
 <!-- lore:start -->
+
 # Lore — Agent Context ## Project Identity - **Name:**
+
 SmartPocket
+
 - **Slug:**
-smartpocket
+  smartpocket
 - **Lore Server:**
-https://lore.smartsolutionspro.com
+  https://lore.smartsolutionspro.com
 - **Lore MCP Server Name:** `lore-memory-smartpocket` ## Repositories
 
   ###
+
   SmartPocket
   (`smartpocket`) - **Path:** `.` - **Stack:**
   Expo, React Native, TypeScript, React 19, Expo Router, NativeWind, Reanimated, tRPC v11, TanStack Query, Zod, Drizzle ORM, MySQL, Manus Data API, Express, jose (JWT), Manus OAuth, Manus Forge LLM (gemini-2.5-flash),expo-secure-store, pnpm, Vitest, ESLint, Prettier, drizzle-kit
 
 ## Agent Standards - All code must follow the project's established conventions. -
+
 Follow the project's established code style.
+
 - Before every commit:
-lint, format, and test commands for this stack.
+  lint, format, and test commands for this stack.
 
   ## Methodology - **Type:**
+
   bmad
   - **Version:**
   ^6.0.0
-<!-- lore:end -->
+  <!-- lore:end -->
 
 <!-- gitnexus:start -->
+
 # GitNexus — Code Intelligence
 
 This project is indexed by GitNexus as **SmartPocket** (2206 symbols, 3402 relationships, 92 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
@@ -47,22 +55,22 @@ This project is indexed by GitNexus as **SmartPocket** (2206 symbols, 3402 relat
 
 ## Resources
 
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/SmartPocket/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/SmartPocket/clusters` | All functional areas |
-| `gitnexus://repo/SmartPocket/processes` | All execution flows |
-| `gitnexus://repo/SmartPocket/process/{name}` | Step-by-step execution trace |
+| Resource                                     | Use for                                  |
+| -------------------------------------------- | ---------------------------------------- |
+| `gitnexus://repo/SmartPocket/context`        | Codebase overview, check index freshness |
+| `gitnexus://repo/SmartPocket/clusters`       | All functional areas                     |
+| `gitnexus://repo/SmartPocket/processes`      | All execution flows                      |
+| `gitnexus://repo/SmartPocket/process/{name}` | Step-by-step execution trace             |
 
 ## CLI
 
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+| Task                                         | Read this skill file                                        |
+| -------------------------------------------- | ----------------------------------------------------------- |
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md`       |
+| Blast radius / "What breaks if I change X?"  | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?"             | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md`       |
+| Rename / extract / split / refactor          | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md`     |
+| Tools, resources, schema reference           | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md`           |
+| Index, status, clean, wiki CLI commands      | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md`             |
 
 <!-- gitnexus:end -->

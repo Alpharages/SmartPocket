@@ -9,14 +9,14 @@ This folder holds the product and technical documentation for the **Expense Trac
 
 ## Documents
 
-| Doc | Type | Status | What it covers |
-|---|---|---|---|
-| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Technical | ✅ Authoritative | What is actually implemented: stack, layout, runtime topology, data model, API surface, auth, security, build/run/test |
-| [`prd.md`](./prd.md) | Product | 📝 Vision + partial build | Requirements, personas, roadmap, acceptance criteria. Technical sections summarize `ARCHITECTURE.md`; feature scope (loans, budgets, accounts) is largely roadmap |
-| [`concept note.md`](./concept%20note.md) | Product | 💡 Vision | High-level pitch, goals, target users, and feature vision |
-| [`openai_integration.md`](./openai_integration.md) | Feature design | 🔵 Planned (not built) | AI transaction categorization via the server-side Forge LLM gateway (`gemini-2.5-flash`) |
-| [`natural_language_insights.md`](./natural_language_insights.md) | Feature design | 🔵 Planned (not built) | Natural-language financial queries / chat insights (Epic I, Story I2) |
-| [`localization_implementation.md`](./localization_implementation.md) | Feature design | 🔵 Planned (not built) | i18n via `i18next` + `expo-localization` (Epic L, Story L1) |
+| Doc                                                                  | Type           | Status                    | What it covers                                                                                                                                                    |
+| -------------------------------------------------------------------- | -------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`ARCHITECTURE.md`](./ARCHITECTURE.md)                               | Technical      | ✅ Authoritative          | What is actually implemented: stack, layout, runtime topology, data model, API surface, auth, security, build/run/test                                            |
+| [`prd.md`](./prd.md)                                                 | Product        | 📝 Vision + partial build | Requirements, personas, roadmap, acceptance criteria. Technical sections summarize `ARCHITECTURE.md`; feature scope (loans, budgets, accounts) is largely roadmap |
+| [`concept note.md`](./concept%20note.md)                             | Product        | 💡 Vision                 | High-level pitch, goals, target users, and feature vision                                                                                                         |
+| [`openai_integration.md`](./openai_integration.md)                   | Feature design | 🔵 Planned (not built)    | AI transaction categorization via the server-side Forge LLM gateway (`gemini-2.5-flash`)                                                                          |
+| [`natural_language_insights.md`](./natural_language_insights.md)     | Feature design | 🔵 Planned (not built)    | Natural-language financial queries / chat insights (Epic I, Story I2)                                                                                             |
+| [`localization_implementation.md`](./localization_implementation.md) | Feature design | 🔵 Planned (not built)    | i18n via `i18next` + `expo-localization` (Epic L, Story L1)                                                                                                       |
 
 Status legend: ✅ matches the code · 📝 mixed vision + partial implementation · 💡 vision only ·
 🔵 design/spec for a feature that does not exist yet.
