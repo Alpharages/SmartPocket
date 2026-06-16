@@ -30,12 +30,8 @@ import { useBreakpoints } from "@/hooks/use-breakpoint";
 import { Spacing, Typography } from "@/lib/_core/theme";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { useCurrency } from "@/lib/currency-provider";
-import {
-  formatCurrency,
-} from "@/lib/currency";
-import {
-  computeMonthEndForecastState,
-} from "@/lib/forecast";
+import { formatCurrency } from "@/lib/currency";
+import { computeMonthEndForecastState } from "@/lib/forecast";
 import { trpc } from "@/lib/trpc";
 
 export default function SummaryScreen() {

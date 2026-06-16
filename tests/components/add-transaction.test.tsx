@@ -38,7 +38,9 @@ vi.mock("react-native-gesture-handler", () => ({
     React.createElement("View", {}, children),
   Gesture: {
     Pan: () => ({
-      activeOffsetY: () => ({ failOffsetX: () => ({ onUpdate: () => ({ onEnd: () => ({}) }) }) }),
+      activeOffsetY: () => ({
+        failOffsetX: () => ({ onUpdate: () => ({ onEnd: () => ({}) }) }),
+      }),
     }),
   },
 }));
@@ -126,8 +128,13 @@ vi.mock("@/constants/theme", () => ({
 }));
 
 vi.mock("react-native/Libraries/Modal/Modal", () => ({
-  default: ({ children, visible }: { children: React.ReactNode; visible: boolean }) =>
-    visible ? React.createElement("Modal", {}, children) : null,
+  default: ({
+    children,
+    visible,
+  }: {
+    children: React.ReactNode;
+    visible: boolean;
+  }) => (visible ? React.createElement("Modal", {}, children) : null),
 }));
 
 // ---------------------------------------------------------------------------
@@ -148,7 +155,10 @@ function collectText(node: ReactTestInstance | string): string {
   return (node.children ?? []).map((c) => collectText(c as any)).join("");
 }
 
-function findByText(root: ReactTestInstance, text: string): ReactTestInstance | null {
+function findByText(
+  root: ReactTestInstance,
+  text: string,
+): ReactTestInstance | null {
   try {
     return root.find(
       (n) => String(n.type) === "Text" && collectText(n) === text,
@@ -158,7 +168,10 @@ function findByText(root: ReactTestInstance, text: string): ReactTestInstance | 
   }
 }
 
-function findAllByRole(root: ReactTestInstance, role: string): ReactTestInstance[] {
+function findAllByRole(
+  root: ReactTestInstance,
+  role: string,
+): ReactTestInstance[] {
   return root.findAll((n) => (n.props as any).accessibilityRole === role);
 }
 
@@ -231,7 +244,9 @@ describe("AddTransactionScreen", () => {
         addTransaction: mockAddTransaction,
       });
       const root = render(<AddTransactionScreen />);
-      const empty = root.findAll((n) => (n.props as any).testID === "empty-state");
+      const empty = root.findAll(
+        (n) => (n.props as any).testID === "empty-state",
+      );
       expect(empty.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -274,28 +289,38 @@ describe("AddTransactionScreen", () => {
 
   describe("AC4 — Behavior unchanged (FR-1)", () => {
     it("preselects 'expense' type when query param is 'expense'", () => {
-      (useLocalSearchParams as ReturnType<typeof vi.fn>).mockReturnValue({ type: "expense" });
+      (useLocalSearchParams as ReturnType<typeof vi.fn>).mockReturnValue({
+        type: "expense",
+      });
       const root = render(<AddTransactionScreen />);
       // Expense pill should be selected (accessibilityState.selected=true)
       const buttons = findAllByRole(root, "button");
       const expenseBtn = buttons.find(
-        (b) => collectText(b) === "Expense" && (b.props as any).accessibilityState?.selected === true,
+        (b) =>
+          collectText(b) === "Expense" &&
+          (b.props as any).accessibilityState?.selected === true,
       );
       expect(expenseBtn).toBeTruthy();
     });
 
     it("preselects 'income' type when query param is 'income'", () => {
-      (useLocalSearchParams as ReturnType<typeof vi.fn>).mockReturnValue({ type: "income" });
+      (useLocalSearchParams as ReturnType<typeof vi.fn>).mockReturnValue({
+        type: "income",
+      });
       const root = render(<AddTransactionScreen />);
       const buttons = findAllByRole(root, "button");
       const incomeBtn = buttons.find(
-        (b) => collectText(b) === "Income" && (b.props as any).accessibilityState?.selected === true,
+        (b) =>
+          collectText(b) === "Income" &&
+          (b.props as any).accessibilityState?.selected === true,
       );
       expect(incomeBtn).toBeTruthy();
     });
 
     it("switching type resets selectedCategory and shows correct category chips", () => {
-      (useLocalSearchParams as ReturnType<typeof vi.fn>).mockReturnValue({ type: "expense" });
+      (useLocalSearchParams as ReturnType<typeof vi.fn>).mockReturnValue({
+        type: "expense",
+      });
       const root = render(<AddTransactionScreen />);
 
       // Find Income pill and press it
@@ -345,20 +370,26 @@ describe("AddTransactionScreen", () => {
 
       // Fill amount
       const amountInput = root.findAllByType("TextInput" as any)[0];
-      act(() => { amountInput.props.onChangeText("99.99"); });
+      act(() => {
+        amountInput.props.onChangeText("99.99");
+      });
 
       // Select a category chip (Food, id=2, type=expense)
       const foodChip = findAllByRole(root, "button").find(
         (b) => collectText(b) === "Food",
       );
       expect(foodChip).toBeTruthy();
-      act(() => { foodChip!.props.onPress(); });
+      act(() => {
+        foodChip!.props.onPress();
+      });
 
       // Press Save
       const saveBtn = findAllByRole(root, "button").find(
         (b) => collectText(b) === "Save",
       );
-      await act(async () => { saveBtn!.props.onPress(); });
+      await act(async () => {
+        saveBtn!.props.onPress();
+      });
 
       expect(mockAddTransaction).toHaveBeenCalledOnce();
       const payload = mockAddTransaction.mock.calls[0][0];
@@ -378,7 +409,9 @@ describe("AddTransactionScreen", () => {
       const cancelBtn = findAllByRole(root, "button").find(
         (b) => collectText(b) === "Cancel",
       );
-      act(() => { cancelBtn!.props.onPress(); });
+      act(() => {
+        cancelBtn!.props.onPress();
+      });
       // withTiming mock calls callback synchronously → router.back() is immediate.
       expect(mockBack).toHaveBeenCalledOnce();
     });
@@ -390,18 +423,32 @@ describe("AddTransactionScreen", () => {
       const root = render(<AddTransactionScreen />);
 
       const amountInput = root.findAllByType("TextInput" as any)[0];
-      act(() => { amountInput.props.onChangeText("20"); });
+      act(() => {
+        amountInput.props.onChangeText("20");
+      });
 
-      const foodChip = findAllByRole(root, "button").find((b) => collectText(b) === "Food");
-      act(() => { foodChip!.props.onPress(); });
+      const foodChip = findAllByRole(root, "button").find(
+        (b) => collectText(b) === "Food",
+      );
+      act(() => {
+        foodChip!.props.onPress();
+      });
 
       const descInput = root.findAllByType("TextInput" as any)[1];
-      act(() => { descInput.props.onChangeText("Lunch at work"); });
+      act(() => {
+        descInput.props.onChangeText("Lunch at work");
+      });
 
-      const saveBtn = findAllByRole(root, "button").find((b) => collectText(b) === "Save");
-      await act(async () => { saveBtn!.props.onPress(); });
+      const saveBtn = findAllByRole(root, "button").find(
+        (b) => collectText(b) === "Save",
+      );
+      await act(async () => {
+        saveBtn!.props.onPress();
+      });
 
-      expect(mockAddTransaction.mock.calls[0][0].description).toBe("Lunch at work");
+      expect(mockAddTransaction.mock.calls[0][0].description).toBe(
+        "Lunch at work",
+      );
     });
   });
 
@@ -420,7 +467,8 @@ describe("AddTransactionScreen", () => {
       const root = render(<AddTransactionScreen />);
       // The Expense Pill has a leftIcon (Ionicons arrow-up)
       const icons = root.findAll(
-        (n) => String(n.type) === "Ionicons" && (n.props as any).name === "arrow-up",
+        (n) =>
+          String(n.type) === "Ionicons" && (n.props as any).name === "arrow-up",
       );
       expect(icons.length).toBeGreaterThanOrEqual(1);
     });
@@ -428,7 +476,9 @@ describe("AddTransactionScreen", () => {
     it("type selection never relies on color alone — Income pill has an icon", () => {
       const root = render(<AddTransactionScreen />);
       const icons = root.findAll(
-        (n) => String(n.type) === "Ionicons" && (n.props as any).name === "arrow-down",
+        (n) =>
+          String(n.type) === "Ionicons" &&
+          (n.props as any).name === "arrow-down",
       );
       expect(icons.length).toBeGreaterThanOrEqual(1);
     });
@@ -453,11 +503,15 @@ describe("AddTransactionScreen", () => {
         transactions: [],
         addTransaction: mockAddTransaction,
       });
-      (useLocalSearchParams as ReturnType<typeof vi.fn>).mockReturnValue({ type: "income" });
+      (useLocalSearchParams as ReturnType<typeof vi.fn>).mockReturnValue({
+        type: "income",
+      });
 
       const root = render(<AddTransactionScreen />);
       // Income type selected but no income categories → EmptyState
-      const empty = root.findAll((n) => (n.props as any).testID === "empty-state");
+      const empty = root.findAll(
+        (n) => (n.props as any).testID === "empty-state",
+      );
       expect(empty.length).toBeGreaterThanOrEqual(1);
     });
   });

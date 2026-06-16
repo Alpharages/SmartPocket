@@ -29,6 +29,13 @@
       "when": 1781279914125,
       "tag": "0003_add_user_ai_enabled",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1781600209866,
+      "tag": "0004_melodic_ben_grimm",
+      "breakpoints": true
     }
   ]
 }

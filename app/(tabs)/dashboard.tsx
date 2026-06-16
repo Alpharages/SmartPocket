@@ -1,5 +1,12 @@
 import React, { useMemo } from "react";
-import { ScrollView, View, Text, Pressable, ActivityIndicator, FlatList } from "react-native";
+import {
+  ScrollView,
+  View,
+  Text,
+  Pressable,
+  ActivityIndicator,
+  FlatList,
+} from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { ResponsiveContent } from "@/components/responsive-content";
 import { useExpense } from "@/lib/expense-context";
@@ -29,7 +36,10 @@ export default function DashboardScreen() {
     loadingStats,
   } = useExpense();
 
-  const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions]);
+  const recentTransactions = useMemo(
+    () => transactions.slice(0, 5),
+    [transactions],
+  );
 
   const categoriesById = useMemo(
     () => Object.fromEntries(categories.map((c) => [c.id, c])),
@@ -49,7 +59,11 @@ export default function DashboardScreen() {
   const recentActivityPane = (
     <Animated.View
       entering={FadeInUp.delay(300).duration(500)}
-      style={isLg ? { flex: 1 } : { marginTop: Spacing["2xl"], paddingHorizontal: Spacing["2xl"] }}
+      style={
+        isLg
+          ? { flex: 1 }
+          : { marginTop: Spacing["2xl"], paddingHorizontal: Spacing["2xl"] }
+      }
     >
       <View className="flex-row items-center justify-between mb-lg">
         <Text className="text-h3 font-bold text-foreground">
@@ -66,11 +80,7 @@ export default function DashboardScreen() {
           <Text className="text-primary font-semibold text-label">
             View All
           </Text>
-          <Ionicons
-            name="chevron-forward"
-            size={14}
-            color={colors.primary}
-          />
+          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -195,6 +205,24 @@ export default function DashboardScreen() {
           onPress={() => router.push("/add-transaction?type=expense")}
           className="flex-1"
           size="lg"
+        />
+      </Animated.View>
+
+      <Animated.View entering={FadeInUp.delay(250).duration(500)}>
+        <Button
+          variant="secondary"
+          label="Budgets"
+          onPress={() => router.push("/budgets")}
+          className="mt-md"
+          size="lg"
+          leftIcon={
+            <Ionicons
+              name="pie-chart-outline"
+              size={18}
+              color={colors.foreground}
+            />
+          }
+          testID="dashboard-budgets-button"
         />
       </Animated.View>
     </Animated.View>

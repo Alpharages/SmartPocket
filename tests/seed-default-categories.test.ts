@@ -8,14 +8,20 @@ vi.mock("@/server/_core/dataApi", () => ({
 }));
 
 function countQueryBody(callIndex: number) {
-  return (callDataApi.mock.calls[callIndex][1] as { body: { query: string; params: unknown[] } })
-    .body;
+  return (
+    callDataApi.mock.calls[callIndex][1] as {
+      body: { query: string; params: unknown[] };
+    }
+  ).body;
 }
 
 function insertQueryBodies() {
   return callDataApi.mock.calls
     .slice(1)
-    .map((call) => (call[1] as { body: { query: string; params: unknown[] } }).body)
+    .map(
+      (call) =>
+        (call[1] as { body: { query: string; params: unknown[] } }).body,
+    )
     .filter((body) => body.query.includes("INSERT INTO categories"));
 }
 
@@ -77,7 +83,9 @@ describe("seedDefaultCategories", () => {
     await seedDefaultCategories(99);
     const callsAfterFirst = callDataApi.mock.calls.length;
 
-    callDataApi.mockResolvedValueOnce([{ categoryCount: DEFAULT_CATEGORIES.length }]);
+    callDataApi.mockResolvedValueOnce([
+      { categoryCount: DEFAULT_CATEGORIES.length },
+    ]);
     await seedDefaultCategories(99);
 
     expect(insertQueryBodies()).toHaveLength(DEFAULT_CATEGORIES.length);
@@ -92,7 +100,9 @@ describe("ensureUserSeeded", () => {
   });
 
   it("logs and does not throw when seeding fails", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     callDataApi.mockRejectedValueOnce(new Error("db down"));
 
     const { ensureUserSeeded } = await import("@/server/_core/user-seeding");

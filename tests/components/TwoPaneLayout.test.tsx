@@ -178,6 +178,12 @@ describe("TwoPaneLayout", () => {
 });
 
 // Re-export Text for use in tests above
-function Text({ testID, children }: { testID?: string; children: React.ReactNode }) {
+function Text({
+  testID,
+  children,
+}: {
+  testID?: string;
+  children: React.ReactNode;
+}) {
   return React.createElement("Text", { testID }, children);
 }

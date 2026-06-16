@@ -18,9 +18,9 @@ const validBase: CardFormValues = {
 describe("isCardFormValid", () => {
   describe("required fields", () => {
     it("returns false when cardName is empty", () => {
-      expect(
-        isCardFormValid({ ...validBase, cardName: "" }, "add"),
-      ).toBe(false);
+      expect(isCardFormValid({ ...validBase, cardName: "" }, "add")).toBe(
+        false,
+      );
     });
 
     it("returns false when cardholderName is empty", () => {
@@ -30,73 +30,73 @@ describe("isCardFormValid", () => {
     });
 
     it("returns false when cardType is empty", () => {
-      expect(
-        isCardFormValid({ ...validBase, cardType: "" }, "add"),
-      ).toBe(false);
+      expect(isCardFormValid({ ...validBase, cardType: "" }, "add")).toBe(
+        false,
+      );
     });
 
     it("returns false in add mode when cardNumber is empty", () => {
-      expect(
-        isCardFormValid({ ...validBase, cardNumber: "" }, "add"),
-      ).toBe(false);
+      expect(isCardFormValid({ ...validBase, cardNumber: "" }, "add")).toBe(
+        false,
+      );
     });
 
     it("returns true in edit mode without cardNumber in values", () => {
-      expect(
-        isCardFormValid({ ...validBase, cardNumber: "" }, "edit"),
-      ).toBe(true);
+      expect(isCardFormValid({ ...validBase, cardNumber: "" }, "edit")).toBe(
+        true,
+      );
     });
   });
 
   describe("expiry month boundaries", () => {
     it("accepts month 1", () => {
-      expect(
-        isCardFormValid({ ...validBase, expiryMonth: "1" }, "add"),
-      ).toBe(true);
+      expect(isCardFormValid({ ...validBase, expiryMonth: "1" }, "add")).toBe(
+        true,
+      );
     });
 
     it("accepts month 12", () => {
-      expect(
-        isCardFormValid({ ...validBase, expiryMonth: "12" }, "add"),
-      ).toBe(true);
+      expect(isCardFormValid({ ...validBase, expiryMonth: "12" }, "add")).toBe(
+        true,
+      );
     });
 
     it("rejects month 0", () => {
-      expect(
-        isCardFormValid({ ...validBase, expiryMonth: "0" }, "add"),
-      ).toBe(false);
+      expect(isCardFormValid({ ...validBase, expiryMonth: "0" }, "add")).toBe(
+        false,
+      );
     });
 
     it("rejects month 13", () => {
-      expect(
-        isCardFormValid({ ...validBase, expiryMonth: "13" }, "add"),
-      ).toBe(false);
+      expect(isCardFormValid({ ...validBase, expiryMonth: "13" }, "add")).toBe(
+        false,
+      );
     });
   });
 
   describe("expiry year boundaries", () => {
     it("accepts year 2024", () => {
-      expect(
-        isCardFormValid({ ...validBase, expiryYear: "2024" }, "add"),
-      ).toBe(true);
+      expect(isCardFormValid({ ...validBase, expiryYear: "2024" }, "add")).toBe(
+        true,
+      );
     });
 
     it("accepts year 2099", () => {
-      expect(
-        isCardFormValid({ ...validBase, expiryYear: "2099" }, "add"),
-      ).toBe(true);
+      expect(isCardFormValid({ ...validBase, expiryYear: "2099" }, "add")).toBe(
+        true,
+      );
     });
 
     it("rejects year 2023", () => {
-      expect(
-        isCardFormValid({ ...validBase, expiryYear: "2023" }, "add"),
-      ).toBe(false);
+      expect(isCardFormValid({ ...validBase, expiryYear: "2023" }, "add")).toBe(
+        false,
+      );
     });
 
     it("rejects year 2100", () => {
-      expect(
-        isCardFormValid({ ...validBase, expiryYear: "2100" }, "add"),
-      ).toBe(false);
+      expect(isCardFormValid({ ...validBase, expiryYear: "2100" }, "add")).toBe(
+        false,
+      );
     });
   });
 
@@ -120,9 +120,9 @@ describe("isCardFormValid", () => {
     });
 
     it('rejects non-numeric "abc"', () => {
-      expect(
-        isCardFormValid({ ...validBase, creditLimit: "abc" }, "add"),
-      ).toBe(false);
+      expect(isCardFormValid({ ...validBase, creditLimit: "abc" }, "add")).toBe(
+        false,
+      );
     });
   });
 });

@@ -29,12 +29,15 @@ export function ConfirmSheet({
   onCancel,
 }: ConfirmSheetProps) {
   return (
-    <Sheet visible={visible} onClose={onCancel} title={title} testID="confirm-sheet">
+    <Sheet
+      visible={visible}
+      onClose={onCancel}
+      title={title}
+      testID="confirm-sheet"
+    >
       <View className="gap-4 pb-2">
         {message ? (
-          <Text className="text-muted text-sm leading-relaxed">
-            {message}
-          </Text>
+          <Text className="text-muted text-sm leading-relaxed">{message}</Text>
         ) : null}
 
         <View className="flex-row gap-3 mt-2">

@@ -108,8 +108,16 @@ vi.mock("@/lib/_core/theme", () => ({
     sheet: { durationMs: 300, closeDurationMs: 250 },
     fade: { durationMs: 200 },
   },
-  Elevation: { card: { shadowColor: "#000", shadowOpacity: 0.1, elevation: 2 } },
-  ContentMaxWidth: { dashboard: 1120, screen: 960, sheet: 560, modal: 640, card: 420 },
+  Elevation: {
+    card: { shadowColor: "#000", shadowOpacity: 0.1, elevation: 2 },
+  },
+  ContentMaxWidth: {
+    dashboard: 1120,
+    screen: 960,
+    sheet: 560,
+    modal: 640,
+    card: 420,
+  },
 }));
 
 vi.mock("@/lib/expense-context", () => ({
@@ -180,7 +188,9 @@ const baseExpenseContext = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function renderScreen(contextOverride: Partial<typeof baseExpenseContext> = {}): ReactTestInstance {
+function renderScreen(
+  contextOverride: Partial<typeof baseExpenseContext> = {},
+): ReactTestInstance {
   (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
     ...baseExpenseContext,
     ...contextOverride,
@@ -192,11 +202,17 @@ function renderScreen(contextOverride: Partial<typeof baseExpenseContext> = {}):
   return renderer.root;
 }
 
-function findAllByType(root: ReactTestInstance, type: string | React.ElementType): ReactTestInstance[] {
+function findAllByType(
+  root: ReactTestInstance,
+  type: string | React.ElementType,
+): ReactTestInstance[] {
   return root.findAll((n) => n.type === type);
 }
 
-function findByTestId(root: ReactTestInstance, testID: string): ReactTestInstance {
+function findByTestId(
+  root: ReactTestInstance,
+  testID: string,
+): ReactTestInstance {
   return root.find((n) => n.props.testID === testID);
 }
 
@@ -228,7 +244,10 @@ describe("CategoriesScreen", () => {
   it("AC: add button label is 'Add New Category'", () => {
     const root = renderScreen();
     const btn = findByTestId(root, "add-category-button");
-    const label = btn.find((n) => String(n.type) === "Text" && n.props.children === "Add New Category");
+    const label = btn.find(
+      (n) =>
+        String(n.type) === "Text" && n.props.children === "Add New Category",
+    );
     expect(label).toBeDefined();
   });
 
@@ -238,7 +257,9 @@ describe("CategoriesScreen", () => {
     const btn = findByTestId(root, "add-category-button");
     const pressable = btn.find((n) => n.props.accessibilityRole === "button");
     expect(pressable.props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ alignSelf: "flex-start" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ alignSelf: "flex-start" }),
+      ]),
     );
   });
 
@@ -250,7 +271,9 @@ describe("CategoriesScreen", () => {
     // It should NOT have raw style.backgroundColor === colors.primary with className containing "rounded-2xl"
     // (i.e., it should not be the old Pressable banner)
     // We verify the Button primitive is used by checking its accessibilityRole
-    const accessibleBtn = btn.find((n) => n.props.accessibilityRole === "button");
+    const accessibleBtn = btn.find(
+      (n) => n.props.accessibilityRole === "button",
+    );
     expect(accessibleBtn).toBeDefined();
   });
 

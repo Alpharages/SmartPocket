@@ -6,10 +6,7 @@ import {
   maskCardNumber,
 } from "./_core/crypto";
 import { DEFAULT_CATEGORIES } from "./_core/default-categories";
-import {
-  CATEGORY_DEFAULT_COLOR,
-  getCategoryColorForName,
-} from "@shared/theme";
+import { CATEGORY_DEFAULT_COLOR, getCategoryColorForName } from "@shared/theme";
 import {
   categories,
   creditCards,
@@ -19,10 +16,12 @@ import {
   InsertCategory,
   InsertCreditCard,
   InsertTransaction,
+  InsertBudget,
   InsertMonthlySummary,
   Category,
   CreditCard,
   Transaction,
+  Budget,
   MonthlySummary,
   User,
 } from "@/drizzle/schema";
@@ -94,7 +93,9 @@ function coerceDbBoolean(value: unknown): boolean {
   return value === 1 || value === true;
 }
 
-export async function getUserSettings(userId: number): Promise<{ aiEnabled: boolean }> {
+export async function getUserSettings(
+  userId: number,
+): Promise<{ aiEnabled: boolean }> {
   const result = await callDataApi("Database/query", {
     body: {
       query: "SELECT aiEnabled FROM users WHERE id = ?",
@@ -110,7 +111,10 @@ export async function getUserSettings(userId: number): Promise<{ aiEnabled: bool
   return { aiEnabled: coerceDbBoolean(row.aiEnabled) };
 }
 
-export async function updateAiEnabled(userId: number, enabled: boolean): Promise<void> {
+export async function updateAiEnabled(
+  userId: number,
+  enabled: boolean,
+): Promise<void> {
   await callDataApi("Database/query", {
     body: {
       query: "UPDATE users SET aiEnabled = ? WHERE id = ?",
@@ -251,7 +255,9 @@ function toSafeCreditCard(row: CreditCard): SafeCreditCard {
   return { ...rest, cardNumberLast4: maskCardNumber(plain) };
 }
 
-export async function getUserCreditCards(userId: number): Promise<SafeCreditCard[]> {
+export async function getUserCreditCards(
+  userId: number,
+): Promise<SafeCreditCard[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
@@ -523,6 +529,195 @@ export async function getTransactionById(id: number) {
 }
 
 // ============================================================================
+// BUDGETS
+// ============================================================================
+
+export async function getUserBudgets(userId: number): Promise<Budget[]> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query: "SELECT * FROM budgets WHERE userId = ? ORDER BY createdAt DESC",
+        params: [userId],
+      },
+    });
+    return Array.isArray(result) ? (result as Budget[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createBudget(data: InsertBudget): Promise<number> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query: `
+        INSERT INTO budgets (userId, categoryId, period, amount, startDate, endDate)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      params: [
+        data.userId,
+        data.categoryId,
+        data.period,
+        data.amount,
+        data.startDate ?? null,
+        data.endDate ?? null,
+      ],
+    },
+  });
+  return result && typeof result === "object" && "insertId" in result
+    ? (result as { insertId: number }).insertId
+    : 0;
+}
+
+export async function updateBudget(
+  id: number,
+  userId: number,
+  data: Partial<InsertBudget>,
+): Promise<void> {
+  const updates = Object.entries(data)
+    .map(([key]) => `${key} = ?`)
+    .join(", ");
+  const values = Object.values(data);
+
+  if (updates.length === 0) {
+    return;
+  }
+
+  await callDataApi("Database/query", {
+    body: {
+      query: `UPDATE budgets SET ${updates} WHERE id = ? AND userId = ?`,
+      params: [...values, id, userId],
+    },
+  });
+}
+
+export async function deleteBudget(id: number, userId: number): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query: "DELETE FROM budgets WHERE id = ? AND userId = ?",
+      params: [id, userId],
+    },
+  });
+}
+
+export async function getBudgetById(
+  id: number,
+  userId: number,
+): Promise<Budget | null> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query: "SELECT * FROM budgets WHERE id = ? AND userId = ?",
+        params: [id, userId],
+      },
+    });
+    const row = Array.isArray(result) ? result[0] : null;
+    return row ? (row as Budget) : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface BudgetProgressRow {
+  budgetId: number;
+  spent: string;
+  limit: string;
+}
+
+function toDate(value: Date | string | null | undefined): Date | null {
+  if (value == null) {
+    return null;
+  }
+  return value instanceof Date ? value : new Date(value);
+}
+
+export async function getBudgetProgress(
+  userId: number,
+  monthStart: Date,
+  monthEnd: Date,
+  weekStart: Date,
+  weekEnd: Date,
+): Promise<BudgetProgressRow[]> {
+  const budgets = await getUserBudgets(userId);
+
+  return Promise.all(
+    budgets.map(async (budget) => {
+      const [periodStart, periodEnd] =
+        budget.period === "weekly"
+          ? [weekStart, weekEnd]
+          : [monthStart, monthEnd];
+
+      const budgetStart = toDate(budget.startDate);
+      const budgetEnd = toDate(budget.endDate);
+
+      const start =
+        budgetStart && budgetStart > periodStart ? budgetStart : periodStart;
+      const end = budgetEnd && budgetEnd < periodEnd ? budgetEnd : periodEnd;
+
+      if (start > end) {
+        return { budgetId: budget.id, spent: "0.00", limit: budget.amount };
+      }
+
+      try {
+        const result = await callDataApi("Database/query", {
+          body: {
+            query:
+              "SELECT amount FROM transactions WHERE userId = ? AND type = 'expense' AND categoryId = ? AND date >= ? AND date <= ?",
+            params: [userId, budget.categoryId, start, end],
+          },
+        });
+
+        const spent = (Array.isArray(result) ? result : []).reduce(
+          (sum, row: Record<string, unknown>) =>
+            sum + parseFloat(row.amount as string),
+          0,
+        );
+
+        return {
+          budgetId: budget.id,
+          spent: spent.toFixed(2),
+          limit: budget.amount,
+        };
+      } catch {
+        return { budgetId: budget.id, spent: "0.00", limit: budget.amount };
+      }
+    }),
+  );
+}
+
+export async function findActiveBudget(
+  userId: number,
+  categoryId: number,
+  period: "monthly" | "weekly",
+  options?: { excludeId?: number },
+): Promise<Budget | null> {
+  try {
+    const excludeClause = options?.excludeId != null ? " AND id <> ?" : "";
+    const params: (number | string)[] = [userId, categoryId, period];
+    if (options?.excludeId != null) {
+      params.push(options.excludeId);
+    }
+
+    const result = await callDataApi("Database/query", {
+      body: {
+        query: `
+          SELECT * FROM budgets
+          WHERE userId = ? AND categoryId = ? AND period = ?
+            AND (startDate IS NULL OR startDate <= NOW())
+            AND (endDate IS NULL OR endDate >= NOW())
+            ${excludeClause}
+          LIMIT 1
+        `,
+        params,
+      },
+    });
+    const row = Array.isArray(result) ? result[0] : null;
+    return row ? (row as Budget) : null;
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================================
 // MONTHLY SUMMARIES
 // ============================================================================
 
@@ -694,9 +889,7 @@ export async function getMonthlyTrend(
     });
 
     return Array.from(monthMap.values())
-      .sort((a, b) =>
-        a.year !== b.year ? a.year - b.year : a.month - b.month,
-      )
+      .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month))
       .map((item) => ({
         ...item,
         netBalance: item.totalIncome - item.totalExpense,

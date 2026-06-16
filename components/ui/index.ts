@@ -55,3 +55,5 @@ export type { MonthEndForecastCardProps } from "./MonthEndForecastCard";
 export { buildMonthEndForecastAccessibilityLabel } from "./MonthEndForecastCard";
 export { CategoryAnomalyBadge, ANOMALY_LABEL } from "./CategoryAnomalyBadge";
 export type { CategoryAnomalyBadgeProps } from "./CategoryAnomalyBadge";
+export { ProgressBar } from "./ProgressBar";
+export type { ProgressBarProps } from "./ProgressBar";

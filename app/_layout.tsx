@@ -166,24 +166,32 @@ export default function RootLayout() {
           <ToastProvider>
             <CurrencyProvider>
               <FirstDayOfWeekProvider>
-              <SettingsProvider>
-              <ExpenseProvider>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen
-                  name="add-transaction"
-                  options={{
-                    presentation: "transparentModal",
-                    animation: "none",
-                  }}
-                />
-                <Stack.Screen name="oauth/callback" />
-                <Stack.Screen name="card/[id]" />
-                <Stack.Screen name="settings" />
-              </Stack>
-              <StatusBar style="auto" />
-              </ExpenseProvider>
-              </SettingsProvider>
+                <SettingsProvider>
+                  <ExpenseProvider>
+                    <Stack screenOptions={{ headerShown: false }}>
+                      <Stack.Screen name="(tabs)" />
+                      <Stack.Screen
+                        name="add-transaction"
+                        options={{
+                          presentation: "transparentModal",
+                          animation: "none",
+                        }}
+                      />
+                      <Stack.Screen name="budgets" />
+                      <Stack.Screen
+                        name="budget-form"
+                        options={{
+                          presentation: "transparentModal",
+                          animation: "none",
+                        }}
+                      />
+                      <Stack.Screen name="oauth/callback" />
+                      <Stack.Screen name="card/[id]" />
+                      <Stack.Screen name="settings" />
+                    </Stack>
+                    <StatusBar style="auto" />
+                  </ExpenseProvider>
+                </SettingsProvider>
               </FirstDayOfWeekProvider>
             </CurrencyProvider>
           </ToastProvider>

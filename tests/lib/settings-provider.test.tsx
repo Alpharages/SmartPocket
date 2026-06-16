@@ -3,11 +3,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import TestRenderer, { act, type ReactTestRenderer } from "react-test-renderer";
 
 const mocks = vi.hoisted(() => {
-  const settingsRefetch = vi.fn().mockResolvedValue({ data: { aiEnabled: false } });
-  const setAiMutateAsync = vi.fn().mockImplementation(async ({ enabled }: { enabled: boolean }) => {
-    mocks.settingsData.aiEnabled = enabled;
-    return { aiEnabled: enabled };
-  });
+  const settingsRefetch = vi
+    .fn()
+    .mockResolvedValue({ data: { aiEnabled: false } });
+  const setAiMutateAsync = vi
+    .fn()
+    .mockImplementation(async ({ enabled }: { enabled: boolean }) => {
+      mocks.settingsData.aiEnabled = enabled;
+      return { aiEnabled: enabled };
+    });
   const toastShow = vi.fn();
 
   return {
@@ -75,7 +79,11 @@ describe("SettingsProvider", () => {
     await act(async () => {
       renderer = TestRenderer.create(
         <SettingsProvider>
-          <SettingsHarness onReady={(value) => { api = value; }} />
+          <SettingsHarness
+            onReady={(value) => {
+              api = value;
+            }}
+          />
         </SettingsProvider>,
       );
     });
@@ -89,7 +97,11 @@ describe("SettingsProvider", () => {
     await act(async () => {
       renderer = TestRenderer.create(
         <SettingsProvider>
-          <SettingsHarness onReady={(value) => { api = value; }} />
+          <SettingsHarness
+            onReady={(value) => {
+              api = value;
+            }}
+          />
         </SettingsProvider>,
       );
     });
@@ -110,7 +122,11 @@ describe("SettingsProvider", () => {
     await act(async () => {
       renderer = TestRenderer.create(
         <SettingsProvider>
-          <SettingsHarness onReady={(value) => { api = value; }} />
+          <SettingsHarness
+            onReady={(value) => {
+              api = value;
+            }}
+          />
         </SettingsProvider>,
       );
     });
@@ -141,7 +157,11 @@ describe("SettingsProvider", () => {
     await act(async () => {
       renderer = TestRenderer.create(
         <SettingsProvider>
-          <SettingsHarness onReady={(value) => { api = value; }} />
+          <SettingsHarness
+            onReady={(value) => {
+              api = value;
+            }}
+          />
         </SettingsProvider>,
       );
     });

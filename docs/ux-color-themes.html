@@ -1,132 +1,363 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SmartPocket — Color Themes</title>
-<style>
-  :root{
-    --p:#4F46E5; --p-d:#818CF8;
-    --bg:#F8FAFC; --bg-d:#0B0F19;
-    --surf:#FFFFFF; --surf-d:#151B2B;
-    --fg:#111827; --fg-d:#F1F5F9;
-    --mut:#6B7280; --mut-d:#9CA3AF;
-    --bd:#E5E7EB; --bd-d:#2D3748;
-    --suc:#059669; --suc-d:#34D399;
-    --err:#DC2626; --err-d:#FCA5A5;
-    --warn:#D97706; --warn-d:#FBBF24;
-    --acc:#DB2777; --acc-d:#F472B6;
-    --sec:#7C3AED; --sec-d:#A78BFA;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0b0f19;color:#f1f5f9;padding:32px;line-height:1.5}
-  h1{font-size:28px;font-weight:700;margin-bottom:4px}
-  .sub{color:#9CA3AF;margin-bottom:28px}
-  h2{font-size:18px;margin:28px 0 12px;font-weight:600}
-  .panels{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-  @media(max-width:760px){.panels{grid-template-columns:1fr}}
-  .panel{border-radius:16px;padding:20px;border:1px solid}
-  .light{background:var(--bg);color:var(--fg);border-color:var(--bd)}
-  .dark{background:var(--bg-d);color:var(--fg-d);border-color:var(--bd-d)}
-  .tag{font-size:12px;text-transform:uppercase;letter-spacing:.08em;opacity:.6;margin-bottom:12px}
-  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
-  .sw{border-radius:12px;overflow:hidden;border:1px solid rgba(125,125,125,.2)}
-  .chip{height:56px}
-  .meta{padding:8px 10px;font-size:12px}
-  .meta b{display:block;font-size:13px}
-  .meta span{opacity:.6;font-family:ui-monospace,Menlo,monospace}
-  .hero{border-radius:16px;padding:20px;color:#fff;background:linear-gradient(135deg,var(--p),var(--sec));margin:10px 0 18px}
-  .hero .lbl{opacity:.85;font-size:13px}
-  .hero .amt{font-size:34px;font-weight:700;letter-spacing:-.02em}
-  .pair{display:flex;gap:10px;margin-top:14px}
-  .mini{flex:1;background:rgba(255,255,255,.14);border-radius:12px;padding:10px}
-  .mini b{font-size:16px}
-  .row{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;margin-top:8px}
-  .light .row{background:var(--surf)} .dark .row{background:var(--surf-d)}
-  .av{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px}
-  .row .t{flex:1}.row .t small{display:block;opacity:.6}
-  .inc{color:var(--suc)} .dark .inc{color:var(--suc-d)}
-  .exp{color:var(--err)} .dark .exp{color:var(--err-d)}
-  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-  .btn{padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;border:1px solid transparent}
-  .b-pri{background:var(--p);color:#fff}.dark .b-pri{background:var(--p-d);color:#0b0f19}
-  .b-sec{background:transparent;border-color:var(--bd)} .dark .b-sec{border-color:var(--bd-d)}
-  .b-inc{background:var(--suc);color:#fff}.dark .b-inc{background:var(--suc-d);color:#06281d}
-  .b-del{background:var(--err);color:#fff}.dark .b-del{background:var(--err-d);color:#3a0d0d}
-  .note{margin-top:24px;padding:14px 16px;border-left:3px solid var(--p);background:#151b2b;border-radius:8px;font-size:14px;color:#cbd5e1}
-</style>
-</head>
-<body>
-  <h1>SmartPocket — Refined Indigo</h1>
-  <div class="sub">Chosen color system · semantic green/red reserved for money · light + dark</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SmartPocket — Color Themes</title>
+    <style>
+      :root {
+        --p: #4f46e5;
+        --p-d: #818cf8;
+        --bg: #f8fafc;
+        --bg-d: #0b0f19;
+        --surf: #ffffff;
+        --surf-d: #151b2b;
+        --fg: #111827;
+        --fg-d: #f1f5f9;
+        --mut: #6b7280;
+        --mut-d: #9ca3af;
+        --bd: #e5e7eb;
+        --bd-d: #2d3748;
+        --suc: #059669;
+        --suc-d: #34d399;
+        --err: #dc2626;
+        --err-d: #fca5a5;
+        --warn: #d97706;
+        --warn-d: #fbbf24;
+        --acc: #db2777;
+        --acc-d: #f472b6;
+        --sec: #7c3aed;
+        --sec-d: #a78bfa;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          sans-serif;
+        background: #0b0f19;
+        color: #f1f5f9;
+        padding: 32px;
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .sub {
+        color: #9ca3af;
+        margin-bottom: 28px;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 28px 0 12px;
+        font-weight: 600;
+      }
+      .panels {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+      @media (max-width: 760px) {
+        .panels {
+          grid-template-columns: 1fr;
+        }
+      }
+      .panel {
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid;
+      }
+      .light {
+        background: var(--bg);
+        color: var(--fg);
+        border-color: var(--bd);
+      }
+      .dark {
+        background: var(--bg-d);
+        color: var(--fg-d);
+        border-color: var(--bd-d);
+      }
+      .tag {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        opacity: 0.6;
+        margin-bottom: 12px;
+      }
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 10px;
+      }
+      .sw {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(125, 125, 125, 0.2);
+      }
+      .chip {
+        height: 56px;
+      }
+      .meta {
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+      .meta b {
+        display: block;
+        font-size: 13px;
+      }
+      .meta span {
+        opacity: 0.6;
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      .hero {
+        border-radius: 16px;
+        padding: 20px;
+        color: #fff;
+        background: linear-gradient(135deg, var(--p), var(--sec));
+        margin: 10px 0 18px;
+      }
+      .hero .lbl {
+        opacity: 0.85;
+        font-size: 13px;
+      }
+      .hero .amt {
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .pair {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .mini {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.14);
+        border-radius: 12px;
+        padding: 10px;
+      }
+      .mini b {
+        font-size: 16px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 12px;
+        margin-top: 8px;
+      }
+      .light .row {
+        background: var(--surf);
+      }
+      .dark .row {
+        background: var(--surf-d);
+      }
+      .av {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 18px;
+      }
+      .row .t {
+        flex: 1;
+      }
+      .row .t small {
+        display: block;
+        opacity: 0.6;
+      }
+      .inc {
+        color: var(--suc);
+      }
+      .dark .inc {
+        color: var(--suc-d);
+      }
+      .exp {
+        color: var(--err);
+      }
+      .dark .exp {
+        color: var(--err-d);
+      }
+      .btns {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+      .btn {
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 14px;
+        border: 1px solid transparent;
+      }
+      .b-pri {
+        background: var(--p);
+        color: #fff;
+      }
+      .dark .b-pri {
+        background: var(--p-d);
+        color: #0b0f19;
+      }
+      .b-sec {
+        background: transparent;
+        border-color: var(--bd);
+      }
+      .dark .b-sec {
+        border-color: var(--bd-d);
+      }
+      .b-inc {
+        background: var(--suc);
+        color: #fff;
+      }
+      .dark .b-inc {
+        background: var(--suc-d);
+        color: #06281d;
+      }
+      .b-del {
+        background: var(--err);
+        color: #fff;
+      }
+      .dark .b-del {
+        background: var(--err-d);
+        color: #3a0d0d;
+      }
+      .note {
+        margin-top: 24px;
+        padding: 14px 16px;
+        border-left: 3px solid var(--p);
+        background: #151b2b;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #cbd5e1;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>SmartPocket — Refined Indigo</h1>
+    <div class="sub">
+      Chosen color system · semantic green/red reserved for money · light + dark
+    </div>
 
-  <div class="panels">
-    <!-- LIGHT -->
-    <div class="panel light">
-      <div class="tag">Light theme</div>
-      <div class="hero">
-        <div class="lbl">Total Balance</div>
-        <div class="amt">$2,480.00</div>
-        <div class="pair">
-          <div class="mini"><div class="lbl">↓ Income</div><b>+$3,200</b></div>
-          <div class="mini"><div class="lbl">↑ Expenses</div><b>−$720</b></div>
+    <div class="panels">
+      <!-- LIGHT -->
+      <div class="panel light">
+        <div class="tag">Light theme</div>
+        <div class="hero">
+          <div class="lbl">Total Balance</div>
+          <div class="amt">$2,480.00</div>
+          <div class="pair">
+            <div class="mini">
+              <div class="lbl">↓ Income</div>
+              <b>+$3,200</b>
+            </div>
+            <div class="mini">
+              <div class="lbl">↑ Expenses</div>
+              <b>−$720</b>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="av" style="background: #ff6b6b">🍔</div>
+          <div class="t">Lunch at cafe<small>Food · May 16</small></div>
+          <b class="exp">−$25.50</b>
+        </div>
+        <div class="row">
+          <div class="av" style="background: #059669">💼</div>
+          <div class="t">Salary<small>Income · May 1</small></div>
+          <b class="inc">+$3,200</b>
+        </div>
+        <div class="btns">
+          <span class="btn b-pri">Save</span>
+          <span class="btn b-sec">Cancel</span>
+          <span class="btn b-inc">Add Income</span>
+          <span class="btn b-del">Delete</span>
         </div>
       </div>
-      <div class="row"><div class="av" style="background:#FF6B6B">🍔</div><div class="t">Lunch at cafe<small>Food · May 16</small></div><b class="exp">−$25.50</b></div>
-      <div class="row"><div class="av" style="background:#059669">💼</div><div class="t">Salary<small>Income · May 1</small></div><b class="inc">+$3,200</b></div>
-      <div class="btns">
-        <span class="btn b-pri">Save</span>
-        <span class="btn b-sec">Cancel</span>
-        <span class="btn b-inc">Add Income</span>
-        <span class="btn b-del">Delete</span>
+
+      <!-- DARK -->
+      <div class="panel dark">
+        <div class="tag">Dark theme</div>
+        <div class="hero">
+          <div class="lbl">Total Balance</div>
+          <div class="amt">$2,480.00</div>
+          <div class="pair">
+            <div class="mini">
+              <div class="lbl">↓ Income</div>
+              <b>+$3,200</b>
+            </div>
+            <div class="mini">
+              <div class="lbl">↑ Expenses</div>
+              <b>−$720</b>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="av" style="background: #ff6b6b">🍔</div>
+          <div class="t">Lunch at cafe<small>Food · May 16</small></div>
+          <b class="exp">−$25.50</b>
+        </div>
+        <div class="row">
+          <div class="av" style="background: #34d399">💼</div>
+          <div class="t">Salary<small>Income · May 1</small></div>
+          <b class="inc">+$3,200</b>
+        </div>
+        <div class="btns">
+          <span class="btn b-pri">Save</span>
+          <span class="btn b-sec">Cancel</span>
+          <span class="btn b-inc">Add Income</span>
+          <span class="btn b-del">Delete</span>
+        </div>
       </div>
     </div>
 
-    <!-- DARK -->
-    <div class="panel dark">
-      <div class="tag">Dark theme</div>
-      <div class="hero">
-        <div class="lbl">Total Balance</div>
-        <div class="amt">$2,480.00</div>
-        <div class="pair">
-          <div class="mini"><div class="lbl">↓ Income</div><b>+$3,200</b></div>
-          <div class="mini"><div class="lbl">↑ Expenses</div><b>−$720</b></div>
-        </div>
-      </div>
-      <div class="row"><div class="av" style="background:#FF6B6B">🍔</div><div class="t">Lunch at cafe<small>Food · May 16</small></div><b class="exp">−$25.50</b></div>
-      <div class="row"><div class="av" style="background:#34D399">💼</div><div class="t">Salary<small>Income · May 1</small></div><b class="inc">+$3,200</b></div>
-      <div class="btns">
-        <span class="btn b-pri">Save</span>
-        <span class="btn b-sec">Cancel</span>
-        <span class="btn b-inc">Add Income</span>
-        <span class="btn b-del">Delete</span>
-      </div>
+    <h2>Token swatches</h2>
+    <div class="swatches" id="sw"></div>
+
+    <div class="note">
+      <b>Discipline:</b> <code>success</code>/<code>error</code> appear only on
+      money &amp; destructive actions. <code>accent</code>/<code
+        >secondary</code
+      >
+      are rare (AI/insight highlights, hero gradient end-stop). Indigo is the
+      single brand/action color.
     </div>
-  </div>
 
-  <h2>Token swatches</h2>
-  <div class="swatches" id="sw"></div>
-
-  <div class="note">
-    <b>Discipline:</b> <code>success</code>/<code>error</code> appear only on money &amp; destructive actions.
-    <code>accent</code>/<code>secondary</code> are rare (AI/insight highlights, hero gradient end-stop).
-    Indigo is the single brand/action color.
-  </div>
-
-<script>
-  const tokens=[
-    ["primary","#4F46E5","#818CF8"],["background","#F8FAFC","#0B0F19"],
-    ["surface","#FFFFFF","#151B2B"],["foreground","#111827","#F1F5F9"],
-    ["muted","#6B7280","#9CA3AF"],["border","#E5E7EB","#2D3748"],
-    ["success","#059669","#34D399"],["error","#DC2626","#FCA5A5"],
-    ["warning","#D97706","#FBBF24"],["accent","#DB2777","#F472B6"],
-    ["secondary","#7C3AED","#A78BFA"],
-  ];
-  document.getElementById('sw').innerHTML=tokens.map(([n,l,d])=>`
+    <script>
+      const tokens = [
+        ["primary", "#4F46E5", "#818CF8"],
+        ["background", "#F8FAFC", "#0B0F19"],
+        ["surface", "#FFFFFF", "#151B2B"],
+        ["foreground", "#111827", "#F1F5F9"],
+        ["muted", "#6B7280", "#9CA3AF"],
+        ["border", "#E5E7EB", "#2D3748"],
+        ["success", "#059669", "#34D399"],
+        ["error", "#DC2626", "#FCA5A5"],
+        ["warning", "#D97706", "#FBBF24"],
+        ["accent", "#DB2777", "#F472B6"],
+        ["secondary", "#7C3AED", "#A78BFA"],
+      ];
+      document.getElementById("sw").innerHTML = tokens
+        .map(
+          ([n, l, d]) => `
     <div class="sw">
       <div class="chip" style="background:linear-gradient(90deg,${l} 50%,${d} 50%)"></div>
       <div class="meta"><b>${n}</b><span>${l} / ${d}</span></div>
-    </div>`).join('');
-</script>
-</body>
+    </div>`,
+        )
+        .join("");
+    </script>
+  </body>
 </html>

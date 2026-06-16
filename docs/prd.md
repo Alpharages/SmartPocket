@@ -13,15 +13,18 @@ Status: Draft for review
 > Flutter/SQLite/offline-first appear only as labelled historical context.
 
 ## 1. Executive Summary
+
 SmartPocket is a privacy‑conscious, AI‑assisted personal finance app built with **Expo / React Native**, running on iOS, Android, and web from one codebase. It targets users who want modern conveniences like categorization, budgeting, reminders, analytics, and an optional chat assistant. (The original vision was offline‑first and open‑source; the current build is server‑backed via the Manus platform — see the Stack note above.)
 
 ## 2. Problem Statement & Opportunity
+
 - Current apps are often paid and closed‑source.
 - Loan tracking is fragmented or missing in many PFMs.
 - AI insights are typically paywalled; users want privacy and transparency around how their data is used.
-Opportunity: Deliver a free (open‑source intended — see §16), cross‑platform app that unifies transactions, budgeting, loans, and insights with optional, opt‑in AI—suitable for privacy‑conscious users who want clear control over how their data and any AI features are used.
+  Opportunity: Deliver a free (open‑source intended — see §16), cross‑platform app that unifies transactions, budgeting, loans, and insights with optional, opt‑in AI—suitable for privacy‑conscious users who want clear control over how their data and any AI features are used.
 
 ## 3. Goals and Non‑Goals
+
 - Goals
   - Provide core personal finance tracking (transactions, categories, credit cards) and, on the roadmap, budgets, accounts, and personal loan management.
   - Reliable server‑backed persistence with explicit import/export.
@@ -33,13 +36,16 @@ Opportunity: Deliver a free (open‑source intended — see §16), cross‑platf
   - Offline‑first operation (the app is server‑backed; offline caching is a possible later enhancement — see §15).
 
 ## 4. Target Users and Personas
+
 - Everyday individuals managing personal finances.
 - Informal lenders/borrowers tracking personal loans.
 - Privacy‑conscious users who want clear control over their data and any AI features.
-- Contributors (developers, designers, translators) improving the project — *if released open‑source (§16).*
+- Contributors (developers, designers, translators) improving the project — _if released open‑source (§16)._
 
 ## 5. Key Use Cases
+
 Tag legend: **[built]** = implemented today · **[planned]** = roadmap (§12).
+
 - Track daily income/expenses and categorize them. **[built]**
 - Organize spending with custom income/expense categories. **[built]**
 - Manage credit cards and link expenses to a card. **[built]**
@@ -53,6 +59,7 @@ Tag legend: **[built]** = implemented today · **[planned]** = roadmap (§12).
 - Ask questions in natural language via an optional chat assistant. **[planned]**
 
 ## 6. Functional Requirements
+
 Each requirement has a stable ID (`FR-#`) for traceability to §13 acceptance criteria and epics.
 Status: **[built]** implemented today · **[planned]** roadmap (§12).
 
@@ -89,8 +96,10 @@ Status: **[built]** implemented today · **[planned]** roadmap (§12).
   - **FR-20** Currency, first day of week, theme, data management (backup/restore), AI toggles. **[planned]**
 
 ## 7. Non‑Functional Requirements
+
 Each has an ID (`NFR-#`) and a measurable target where applicable.
 - **NFR-1 Privacy:** user data is scoped to the authenticated user; transaction data is sent for AI inference only after explicit opt‑in, and only to the self‑hosted / local LLM endpoint — never to a third‑party AI API. No third‑party analytics SDKs without disclosure.
+
 - **NFR-2 Performance:** cold start ≤ 3s on a mid‑range device; primary screens interactive ≤ 1s after data load; p95 API response < 500ms under normal load.
 - **NFR-3 Reliability:** durable server‑side persistence with parameterized writes; crash‑free session rate ≥ 99.5%; timezone‑aware date handling for summaries/reminders.
 - **NFR-4 Security:** secrets in server env only; auth session in secure storage (native) / HTTP‑only cookie (web); sensitive fields (card numbers) encrypted at rest before production (see §15, `ARCHITECTURE.md` §8).
@@ -98,11 +107,13 @@ Each has an ID (`NFR-#`) and a measurable target where applicable.
 - **NFR-6 Portability:** single Expo / React Native codebase targeting Android, iOS, and web.
 
 ## 8. Information Architecture & UX Notes
+
 - **Current tabs (built):** Home (Dashboard), Activity (Transactions), Categories, Insights (monthly summary), Cards (credit cards).
 - Quick‑add Income/Expense actions on the dashboard route to the add‑transaction screen; consistent category pickers.
 - **Planned IA additions:** a Settings screen (currency/theme/notifications/AI toggles), and—if/when those features land—Budgets, Loans (with a loan‑detail page: schedule, history, next due), and richer Analytics (charts, trend lines).
 
 ## 9. Data Model (Conceptual)
+
 > The **implemented** schema is the source of truth — see `drizzle/schema.ts` and `ARCHITECTURE.md` §4
 > (tables: `users`, `categories`, `creditCards`, `transactions`, `monthlySummaries`). The entities below
 > marked **[built]** match it; **[planned]** entities are future vision and not yet in the schema.
@@ -110,7 +121,7 @@ Each has an ID (`NFR-#`) and a measurable target where applicable.
 - **Transaction [built]** { id, userId, type (income|expense), amount, date, categoryId, creditCardId?, description?, createdAt, updatedAt }
 - **Category [built]** { id, userId, name, type (income|expense), color, icon, isDefault, createdAt, updatedAt }
 - **CreditCard [built]** { id, userId, name, cardNumber, cardholderName, expiryMonth, expiryYear, creditLimit, currentBalance, color, cardType, isActive, createdAt, updatedAt }
-- **MonthlySummary [built]** { id, userId, year, month, totalIncome, totalExpense, netBalance } *(cache table; currently computed on demand)*
+- **MonthlySummary [built]** { id, userId, year, month, totalIncome, totalExpense, netBalance } _(cache table; currently computed on demand)_
 - **Account [planned]** { id, name, type (cash|bank|wallet), balanceDerived, currency }
 - **Budget [planned]** { id, categoryId, period (monthly|weekly), amount, startDate?, endDate? }
 - **Loan [planned]** { id, direction (lend|borrow), counterparty?, principal, rate?, schedule (periodicity, count|endDate), nextDueDate, createdAt }
@@ -120,7 +131,9 @@ Each has an ID (`NFR-#`) and a measurable target where applicable.
 > no `accountId` (single implicit account today). Currency is a §12 Phase‑3 item.
 
 ## 10. Technical Architecture
+
 > Authoritative detail lives in [`ARCHITECTURE.md`](./ARCHITECTURE.md); this is a summary.
+
 - Framework: **Expo / React Native (TypeScript)**, React 19, Expo Router (file‑based routing); single codebase for iOS, Android, web.
 - Styling/animation: NativeWind (Tailwind for RN) + Reanimated.
 - Client data layer: tRPC v11 client + TanStack Query, wrapped by an app‑wide `ExpenseProvider` context.
@@ -134,6 +147,7 @@ Each has an ID (`NFR-#`) and a measurable target where applicable.
   - On‑device (user‑device) inference is not part of the architecture; the LLM runs server‑side on infrastructure we control.
 
 ## 11. Privacy, Security, and Compliance
+
 - Server‑backed model: user data lives in the managed MySQL database and is always scoped to the authenticated user. (The original "local‑only by default" stance no longer applies — see the Stack note and `ARCHITECTURE.md` §8.)
 - Secrets (API keys, JWT secret) live in server env vars; the auth session token is held in secure storage on native / HTTP‑only cookie on web; redact sensitive logs.
 - Sensitive fields (e.g. credit card numbers) must be encrypted at rest — currently a known gap (see `ARCHITECTURE.md` §8).
@@ -141,6 +155,7 @@ Each has an ID (`NFR-#`) and a measurable target where applicable.
 - Clear disclosure of data practices in README and in‑app.
 
 ## 12. Roadmap and Release Plan
+
 - Phase 1 – MVP (largely built; see `todo.md`)
   - Manual add/edit/delete transactions.
   - Category management (income/expense, color, icon); dashboard with balance + recent activity.
@@ -154,28 +169,33 @@ Each has an ID (`NFR-#`) and a measurable target where applicable.
   - Settings (currency, theme, notifications); enhanced import/export (CSV, JSON export).
 
 ## 13. Acceptance Criteria (MVP)
+
 Each criterion maps to the requirement(s) it satisfies.
-- Users can add/edit/delete transactions, synced to the server and scoped to their account. *(FR‑1, FR‑3)*
-- Categories can be created/edited/deleted and used to tag transactions. *(FR‑5)*
-- Credit cards can be created/deleted and optionally linked to expenses. *(FR‑7, FR‑2)*
-- The Insights screen shows monthly income, expense, net, and a per‑category breakdown. *(FR‑9)*
-- The dashboard shows current‑month balance and recent activity. *(FR‑9)*
-- Auth via Manus OAuth works on iOS, Android, and web. *(NFR‑6)*
-- Cold start and primary‑screen interactivity meet the §7 targets. *(NFR‑2)*
+
+- Users can add/edit/delete transactions, synced to the server and scoped to their account. _(FR‑1, FR‑3)_
+- Categories can be created/edited/deleted and used to tag transactions. _(FR‑5)_
+- Credit cards can be created/deleted and optionally linked to expenses. _(FR‑7, FR‑2)_
+- The Insights screen shows monthly income, expense, net, and a per‑category breakdown. _(FR‑9)_
+- The dashboard shows current‑month balance and recent activity. _(FR‑9)_
+- Auth via Manus OAuth works on iOS, Android, and web. _(NFR‑6)_
+- Cold start and primary‑screen interactivity meet the §7 targets. _(NFR‑2)_
 
 ## 14. Metrics and Success Criteria
+
 - Product: weekly active users; feature‑usage rates (transactions, categories, cards); D30 retention ≥ 25% (target).
 - Quality: crash‑free sessions ≥ 99.5%; cold start ≤ 3s (p90); API error rate < 1%.
 - AI (once shipped): suggestion opt‑in rate; suggestion acceptance rate ≥ 60% (target).
 - Community: GitHub stars, issues closed, PR throughput (if released open‑source — see §16).
 
 ## 15. Risks and Mitigations
+
 - Scope creep (AI/features) → MVP discipline; phased roadmap.
 - Sensitive data at rest (e.g. card numbers stored unencrypted) → add encryption / store only last 4 digits before production (see `ARCHITECTURE.md` §8).
 - Server/network dependency (no offline mode) → graceful loading/error states; consider local caching later.
 - LLM cost/latency/quality → debounce + cache; heuristic fallback for categorization.
 
 ## 16. Dependencies and Assumptions
+
 - Node.js + pnpm; Expo SDK 54 / React Native 0.81 toolchain.
 - Manus platform services: OAuth server and Data API (MySQL), configured via env vars.
 - A self‑hosted / local LLM (OpenAI‑compatible endpoint) for AI features, reachable from the API server and configured via env vars (`LLM_BASE_URL`, optional `LLM_API_KEY`, `LLM_MODEL`).
@@ -183,17 +203,20 @@ Each criterion maps to the requirement(s) it satisfies.
 - License: **open‑source under MIT is the intended direction but not yet committed** — no `LICENSE` file exists in the repo today. Community/open‑source references elsewhere in this PRD (§2, §4, §14) are contingent on this decision being finalized. **Decision owner: Product.**
 
 ## 17. Testing, CI/CD, and Quality
+
 - Unit tests (Vitest): server data‑access and aggregation logic (monthly stats, category breakdowns), validation schemas.
 - Component tests: screens with mocked tRPC/React Query.
 - Integration tests: add/edit transaction flows; auth/session handling.
 - Static checks: `pnpm check` (tsc), `pnpm lint` (expo lint), `pnpm test` (vitest).
 
 ## 18. Decisions and Clarifications
+
 - Persistence: **MySQL via the Manus Data API** (server‑backed). The original offline‑first SQLite plan was dropped in the React Native rebuild.
 - AI: server‑side inference via a self‑hosted / local LLM (OpenAI‑compatible, env‑configured) — **not** Manus Forge (decision 2026‑06‑17); heuristic fallback still acceptable as a first step.
 - Import/export: CSV (transactions) prioritized; JSON export supported — both still to be built.
 
 ## 19. Appendix and References
+
 - Authoritative architecture: [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md).
 - Source code: `app/` (screens/routes), `server/` (tRPC API + data access), `drizzle/` (schema), `lib/` (client state/providers), `components/`, `constants/`, `hooks/`, `shared/`.
 - Other docs: `docs/concept note.md`, `docs/openai_integration.md`, `docs/natural_language_insights.md`, `docs/localization_implementation.md`, `todo.md`.

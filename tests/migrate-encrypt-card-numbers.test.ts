@@ -10,7 +10,9 @@ vi.mock("@/server/_core/dataApi", () => ({
 }));
 
 describe("migrateEncryptCardNumbers", () => {
-  const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  const consoleErrorSpy = vi
+    .spyOn(console, "error")
+    .mockImplementation(() => {});
 
   beforeEach(() => {
     process.env.CARD_ENCRYPTION_KEY = TEST_KEY_HEX;
@@ -28,12 +30,10 @@ describe("migrateEncryptCardNumbers", () => {
       .mockResolvedValueOnce([{ id: 1, cardNumber: "4111111111111111" }])
       .mockResolvedValueOnce(undefined);
 
-    const { migrateEncryptCardNumbers } = await import(
-      "@/server/migrate-encrypt-card-numbers"
-    );
-    const { decryptCardNumber, isEncryptedCardNumber } = await import(
-      "@/server/_core/crypto"
-    );
+    const { migrateEncryptCardNumbers } =
+      await import("@/server/migrate-encrypt-card-numbers");
+    const { decryptCardNumber, isEncryptedCardNumber } =
+      await import("@/server/_core/crypto");
 
     const summary = await migrateEncryptCardNumbers();
 
@@ -59,9 +59,8 @@ describe("migrateEncryptCardNumbers", () => {
 
     callDataApi.mockResolvedValueOnce([{ id: 2, cardNumber: encrypted }]);
 
-    const { migrateEncryptCardNumbers } = await import(
-      "@/server/migrate-encrypt-card-numbers"
-    );
+    const { migrateEncryptCardNumbers } =
+      await import("@/server/migrate-encrypt-card-numbers");
     const summary = await migrateEncryptCardNumbers();
 
     expect(summary).toEqual({
@@ -86,9 +85,8 @@ describe("migrateEncryptCardNumbers", () => {
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined);
 
-    const { migrateEncryptCardNumbers } = await import(
-      "@/server/migrate-encrypt-card-numbers"
-    );
+    const { migrateEncryptCardNumbers } =
+      await import("@/server/migrate-encrypt-card-numbers");
     const summary = await migrateEncryptCardNumbers();
 
     expect(summary).toEqual({
@@ -103,9 +101,8 @@ describe("migrateEncryptCardNumbers", () => {
   it("returns a clean summary on an empty table", async () => {
     callDataApi.mockResolvedValueOnce([]);
 
-    const { migrateEncryptCardNumbers } = await import(
-      "@/server/migrate-encrypt-card-numbers"
-    );
+    const { migrateEncryptCardNumbers } =
+      await import("@/server/migrate-encrypt-card-numbers");
     const summary = await migrateEncryptCardNumbers();
 
     expect(summary).toEqual({
@@ -119,9 +116,8 @@ describe("migrateEncryptCardNumbers", () => {
   it("treats a non-array SELECT response as an empty table", async () => {
     callDataApi.mockResolvedValueOnce(null);
 
-    const { migrateEncryptCardNumbers } = await import(
-      "@/server/migrate-encrypt-card-numbers"
-    );
+    const { migrateEncryptCardNumbers } =
+      await import("@/server/migrate-encrypt-card-numbers");
     const summary = await migrateEncryptCardNumbers();
 
     expect(summary).toEqual({
@@ -170,9 +166,8 @@ describe("migrateEncryptCardNumbers", () => {
       .mockRejectedValueOnce(new Error("update failed"))
       .mockResolvedValueOnce(undefined);
 
-    const { migrateEncryptCardNumbers } = await import(
-      "@/server/migrate-encrypt-card-numbers"
-    );
+    const { migrateEncryptCardNumbers } =
+      await import("@/server/migrate-encrypt-card-numbers");
     const summary = await migrateEncryptCardNumbers();
 
     expect(summary).toEqual({
@@ -193,9 +188,8 @@ describe("migrateEncryptCardNumbers", () => {
     delete process.env.CARD_ENCRYPTION_KEY;
     vi.resetModules();
 
-    const { migrateEncryptCardNumbers } = await import(
-      "@/server/migrate-encrypt-card-numbers"
-    );
+    const { migrateEncryptCardNumbers } =
+      await import("@/server/migrate-encrypt-card-numbers");
 
     await expect(migrateEncryptCardNumbers()).rejects.toThrow(
       /CARD_ENCRYPTION_KEY/,
@@ -207,9 +201,8 @@ describe("migrateEncryptCardNumbers", () => {
     process.env.CARD_ENCRYPTION_KEY = "tooshort";
     vi.resetModules();
 
-    const { migrateEncryptCardNumbers } = await import(
-      "@/server/migrate-encrypt-card-numbers"
-    );
+    const { migrateEncryptCardNumbers } =
+      await import("@/server/migrate-encrypt-card-numbers");
 
     await expect(migrateEncryptCardNumbers()).rejects.toThrow(/32 bytes/);
     expect(callDataApi).not.toHaveBeenCalled();

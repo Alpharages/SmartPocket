@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => {
   const monthlyStatsRefetch = vi.fn().mockResolvedValue({
     data: { totalIncome: 0, totalExpense: 0, netBalance: 0 },
   });
+  const budgetsRefetch = vi.fn().mockResolvedValue({ data: [] });
+  const budgetProgressRefetch = vi.fn().mockResolvedValue({ data: [] });
   const toastShow = vi.fn();
 
   const useQuery = () => ({
@@ -27,11 +29,21 @@ const mocks = vi.hoisted(() => {
     creditCardsRefetch,
     transactionsRefetch,
     monthlyStatsRefetch,
+    budgetsRefetch,
+    budgetProgressRefetch,
     toastShow,
     useQuery,
     useMutation,
   };
 });
+
+vi.mock("@/lib/first-day-of-week-provider", () => ({
+  useFirstDayOfWeek: () => ({
+    firstDayOfWeek: 0,
+    setFirstDayOfWeek: vi.fn(),
+    isReady: true,
+  }),
+}));
 
 vi.mock("@/components/ui/ToastProvider", () => ({
   useToast: () => ({ show: mocks.toastShow }),
@@ -40,19 +52,25 @@ vi.mock("@/components/ui/ToastProvider", () => ({
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     categories: {
-      list: { useQuery: () => ({ refetch: mocks.categoriesRefetch, data: [] }) },
+      list: {
+        useQuery: () => ({ refetch: mocks.categoriesRefetch, data: [] }),
+      },
       create: { useMutation: mocks.useMutation },
       update: { useMutation: mocks.useMutation },
       delete: { useMutation: mocks.useMutation },
     },
     creditCards: {
-      list: { useQuery: () => ({ refetch: mocks.creditCardsRefetch, data: [] }) },
+      list: {
+        useQuery: () => ({ refetch: mocks.creditCardsRefetch, data: [] }),
+      },
       create: { useMutation: mocks.useMutation },
       update: { useMutation: mocks.useMutation },
       delete: { useMutation: mocks.useMutation },
     },
     transactions: {
-      list: { useQuery: () => ({ refetch: mocks.transactionsRefetch, data: [] }) },
+      list: {
+        useQuery: () => ({ refetch: mocks.transactionsRefetch, data: [] }),
+      },
       create: { useMutation: mocks.useMutation },
       update: { useMutation: mocks.useMutation },
       delete: { useMutation: mocks.useMutation },
@@ -67,12 +85,29 @@ vi.mock("@/lib/trpc", () => ({
         useQuery: () => ({ refetch: mocks.monthlyStatsRefetch, data: null }),
       },
     },
+    budgets: {
+      list: { useQuery: () => ({ refetch: mocks.budgetsRefetch, data: [] }) },
+      create: { useMutation: mocks.useMutation },
+      update: { useMutation: mocks.useMutation },
+      delete: { useMutation: mocks.useMutation },
+      progress: {
+        useQuery: () => ({
+          refetch: mocks.budgetProgressRefetch,
+          data: [],
+          isLoading: false,
+        }),
+      },
+    },
   },
 }));
 
 import { ExpenseProvider, useExpense } from "@/lib/expense-context";
 
-function ClearAllHarness({ onReady }: { onReady: (clear: () => Promise<void>) => void }) {
+function ClearAllHarness({
+  onReady,
+}: {
+  onReady: (clear: () => Promise<void>) => void;
+}) {
   const { clearAllData } = useExpense();
   useEffect(() => {
     onReady(clearAllData);
@@ -91,7 +126,7 @@ afterEach(() => {
 });
 
 describe("ExpenseProvider clearAllData", () => {
-  it("refreshes categories, cards, transactions, and monthly stats after success", async () => {
+  it("refreshes categories, cards, transactions, budgets, and monthly stats after success", async () => {
     let clearAllData: (() => Promise<void>) | null = null;
 
     act(() => {
@@ -114,6 +149,8 @@ describe("ExpenseProvider clearAllData", () => {
     expect(mocks.categoriesRefetch).toHaveBeenCalled();
     expect(mocks.creditCardsRefetch).toHaveBeenCalled();
     expect(mocks.transactionsRefetch).toHaveBeenCalled();
+    expect(mocks.budgetsRefetch).toHaveBeenCalled();
+    expect(mocks.budgetProgressRefetch).toHaveBeenCalled();
     expect(mocks.monthlyStatsRefetch).toHaveBeenCalled();
     expect(mocks.toastShow).toHaveBeenCalledWith({
       type: "success",
@@ -147,6 +184,8 @@ describe("ExpenseProvider clearAllData", () => {
       type: "error",
       message: "Failed to clear data",
     });
-    expect(mocks.monthlyStatsRefetch.mock.calls.length).toBe(refetchCallsBefore);
+    expect(mocks.monthlyStatsRefetch.mock.calls.length).toBe(
+      refetchCallsBefore,
+    );
   });
 });

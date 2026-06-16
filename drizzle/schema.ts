@@ -1,4 +1,13 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean } from "drizzle-orm/mysql-core";
+import {
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+  decimal,
+  boolean,
+} from "drizzle-orm/mysql-core";
 import { CATEGORY_DEFAULT_COLOR } from "../shared/theme";
 
 /**
@@ -37,7 +46,9 @@ export const categories = mysqlTable("categories", {
   userId: int("userId").notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   type: mysqlEnum("type", ["income", "expense"]).notNull(),
-  color: varchar("color", { length: 7 }).default(CATEGORY_DEFAULT_COLOR).notNull(), // Hex color
+  color: varchar("color", { length: 7 })
+    .default(CATEGORY_DEFAULT_COLOR)
+    .notNull(), // Hex color
   icon: varchar("icon", { length: 50 }).default("tag").notNull(),
   isDefault: boolean("isDefault").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -59,8 +70,12 @@ export const creditCards = mysqlTable("creditCards", {
   expiryMonth: int("expiryMonth").notNull(),
   expiryYear: int("expiryYear").notNull(),
   creditLimit: decimal("creditLimit", { precision: 12, scale: 2 }).notNull(),
-  currentBalance: decimal("currentBalance", { precision: 12, scale: 2 }).default("0").notNull(),
-  color: varchar("color", { length: 7 }).default(CATEGORY_DEFAULT_COLOR).notNull(),
+  currentBalance: decimal("currentBalance", { precision: 12, scale: 2 })
+    .default("0")
+    .notNull(),
+  color: varchar("color", { length: 7 })
+    .default(CATEGORY_DEFAULT_COLOR)
+    .notNull(),
   cardType: varchar("cardType", { length: 50 }).default("credit").notNull(), // credit, debit, etc.
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -90,6 +105,25 @@ export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = typeof transactions.$inferInsert;
 
 /**
+ * Budgets table: per-category spending caps for a period.
+ * Progress (spent vs. limit) is computed at read-time in Story 6.3 — not stored here.
+ */
+export const budgets = mysqlTable("budgets", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  categoryId: int("categoryId").notNull(),
+  period: mysqlEnum("period", ["monthly", "weekly"]).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Budget = typeof budgets.$inferSelect;
+export type InsertBudget = typeof budgets.$inferInsert;
+
+/**
  * Monthly summaries table for caching monthly statistics.
  * Helps optimize dashboard and summary queries.
  */
@@ -98,9 +132,15 @@ export const monthlySummaries = mysqlTable("monthlySummaries", {
   userId: int("userId").notNull(),
   year: int("year").notNull(),
   month: int("month").notNull(), // 1-12
-  totalIncome: decimal("totalIncome", { precision: 12, scale: 2 }).default("0").notNull(),
-  totalExpense: decimal("totalExpense", { precision: 12, scale: 2 }).default("0").notNull(),
-  netBalance: decimal("netBalance", { precision: 12, scale: 2 }).default("0").notNull(),
+  totalIncome: decimal("totalIncome", { precision: 12, scale: 2 })
+    .default("0")
+    .notNull(),
+  totalExpense: decimal("totalExpense", { precision: 12, scale: 2 })
+    .default("0")
+    .notNull(),
+  netBalance: decimal("netBalance", { precision: 12, scale: 2 })
+    .default("0")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

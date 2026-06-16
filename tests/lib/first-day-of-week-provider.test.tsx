@@ -33,8 +33,9 @@ describe("loadFirstDayOfWeekPreference", () => {
   });
 
   it("defaults to Sunday when storage read fails", async () => {
-    const AsyncStorage = (await import("@react-native-async-storage/async-storage"))
-      .default;
+    const AsyncStorage = (
+      await import("@react-native-async-storage/async-storage")
+    ).default;
     vi.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error("offline"));
 
     await expect(loadFirstDayOfWeekPreference()).resolves.toBe(0);

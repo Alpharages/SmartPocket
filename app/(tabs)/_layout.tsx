@@ -45,7 +45,11 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={22} color={color} />
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />
@@ -54,7 +58,11 @@ export default function TabLayout() {
         options={{
           title: "Activity",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "receipt" : "receipt-outline"} size={22} color={color} />
+            <Ionicons
+              name={focused ? "receipt" : "receipt-outline"}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />
@@ -63,7 +71,11 @@ export default function TabLayout() {
         options={{
           title: "Categories",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "grid" : "grid-outline"} size={22} color={color} />
+            <Ionicons
+              name={focused ? "grid" : "grid-outline"}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />
@@ -72,7 +84,11 @@ export default function TabLayout() {
         options={{
           title: "Insights",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "pie-chart" : "pie-chart-outline"} size={22} color={color} />
+            <Ionicons
+              name={focused ? "pie-chart" : "pie-chart-outline"}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />
@@ -81,7 +97,11 @@ export default function TabLayout() {
         options={{
           title: "Cards",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "card" : "card-outline"} size={22} color={color} />
+            <Ionicons
+              name={focused ? "card" : "card-outline"}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />

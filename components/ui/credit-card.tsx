@@ -220,11 +220,17 @@ export function CreditCard({
           </Text>
           <View className="flex-row justify-between items-end">
             <View>
-              <Text className="text-white/60 text-xs uppercase mb-1">Cardholder</Text>
-              <Text className="text-white font-medium text-sm">{cardholderName}</Text>
+              <Text className="text-white/60 text-xs uppercase mb-1">
+                Cardholder
+              </Text>
+              <Text className="text-white font-medium text-sm">
+                {cardholderName}
+              </Text>
             </View>
             <View>
-              <Text className="text-white/60 text-xs uppercase mb-1">Expires</Text>
+              <Text className="text-white/60 text-xs uppercase mb-1">
+                Expires
+              </Text>
               <Text className="text-white font-medium text-sm">{expiry}</Text>
             </View>
             <CardBrandMark brand={brand} />

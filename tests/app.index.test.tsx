@@ -18,8 +18,8 @@ describe("IndexScreen", () => {
     });
 
     expect(
-      renderer!.root.findByType("Redirect" as unknown as React.ElementType).props
-        .href,
+      renderer!.root.findByType("Redirect" as unknown as React.ElementType)
+        .props.href,
     ).toBe("/dashboard");
   });
 });

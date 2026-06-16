@@ -82,9 +82,7 @@ function textOf(node: ReactTestInstance | string): string {
 }
 
 function queryText(root: ReactTestInstance, text: string): ReactTestInstance[] {
-  return root.findAll(
-    (n) => String(n.type) === "Text" && textOf(n) === text,
-  );
+  return root.findAll((n) => String(n.type) === "Text" && textOf(n) === text);
 }
 
 function getByText(root: ReactTestInstance, text: string): ReactTestInstance {
@@ -178,7 +176,9 @@ describe("Button", () => {
           );
           const style = StyleSheet.flatten(getButton(root).props.style);
           if (style.minHeight < 44) {
-            throw new Error(`${variant}/${size}: minHeight ${style.minHeight} < 44`);
+            throw new Error(
+              `${variant}/${size}: minHeight ${style.minHeight} < 44`,
+            );
           }
           expect(style.minHeight).toBeGreaterThanOrEqual(44);
           act(() => renderer?.unmount());
@@ -248,9 +248,7 @@ describe("Button", () => {
 
   describe("loading state", () => {
     it("shows a spinner and hides the label when loading", () => {
-      const root = render(
-        <Button variant="primary" label="Loading" loading />,
-      );
+      const root = render(<Button variant="primary" label="Loading" loading />);
       expect(
         root.find((n) => n.props.testID === "activity-indicator"),
       ).toBeTruthy();
@@ -267,9 +265,7 @@ describe("Button", () => {
     });
 
     it("reports accessibilityState.busy when loading (and not disabled)", () => {
-      const root = render(
-        <Button variant="primary" label="Loading" loading />,
-      );
+      const root = render(<Button variant="primary" label="Loading" loading />);
       expect(getButton(root).props.accessibilityState).toMatchObject({
         busy: true,
         disabled: false,

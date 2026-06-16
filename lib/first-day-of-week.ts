@@ -16,9 +16,13 @@ export const FIRST_DAY_OF_WEEK_OPTIONS: readonly FirstDayOfWeekOption[] = [
   { value: 6, label: "Saturday" },
 ] as const;
 
-const SUPPORTED_VALUES = new Set<number>(FIRST_DAY_OF_WEEK_OPTIONS.map((o) => o.value));
+const SUPPORTED_VALUES = new Set<number>(
+  FIRST_DAY_OF_WEEK_OPTIONS.map((o) => o.value),
+);
 
-export function isSupportedFirstDayOfWeek(value: number): value is FirstDayOfWeek {
+export function isSupportedFirstDayOfWeek(
+  value: number,
+): value is FirstDayOfWeek {
   return SUPPORTED_VALUES.has(value);
 }
 

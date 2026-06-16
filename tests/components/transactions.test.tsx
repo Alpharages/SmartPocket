@@ -43,13 +43,8 @@ vi.mock("react-native-safe-area-context", () => ({
 }));
 
 vi.mock("@expo/vector-icons", () => {
-  const Ionicons = ({
-    name,
-    testID,
-  }: {
-    name: string;
-    testID?: string;
-  }) => React.createElement("Ionicons", { name, testID });
+  const Ionicons = ({ name, testID }: { name: string; testID?: string }) =>
+    React.createElement("Ionicons", { name, testID });
   (Ionicons as any).glyphMap = {
     search: 1,
     "close-circle": 1,
@@ -331,10 +326,7 @@ describe("TransactionsScreen", () => {
 
     it("shows 'N transactions' (plural) for multiple", () => {
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
-        transactions: [
-          makeTransaction({ id: 1 }),
-          makeTransaction({ id: 2 }),
-        ],
+        transactions: [makeTransaction({ id: 1 }), makeTransaction({ id: 2 })],
         categories: mockCategories,
         loadingTransactions: false,
         deleteTransaction: mockDeleteTransaction,
@@ -404,7 +396,9 @@ describe("TransactionsScreen", () => {
 
       const root = render(<TransactionsScreen />);
       const searchInput = findAllByType(root, "TextInput")[0];
-      act(() => { searchInput.props.onChangeText("123"); });
+      act(() => {
+        searchInput.props.onChangeText("123");
+      });
 
       // t1 should show (amount matches), t2 should not
       // TransactionRow renders the amount — verify t2's amount is absent
@@ -416,7 +410,9 @@ describe("TransactionsScreen", () => {
       const root = render(<TransactionsScreen />);
       const searchInput = findAllByType(root, "TextInput")[0];
 
-      act(() => { searchInput.props.onChangeText("abc"); });
+      act(() => {
+        searchInput.props.onChangeText("abc");
+      });
 
       const clearBtn = root.find(
         (n) =>
@@ -429,12 +425,16 @@ describe("TransactionsScreen", () => {
     it("clear button resets search text", () => {
       const root = render(<TransactionsScreen />);
       const searchInput = findAllByType(root, "TextInput")[0];
-      act(() => { searchInput.props.onChangeText("abc"); });
+      act(() => {
+        searchInput.props.onChangeText("abc");
+      });
 
       const clearBtn = root.find(
         (n) => (n.props as any).accessibilityLabel === "Clear search",
       );
-      act(() => { clearBtn.props.onPress(); });
+      act(() => {
+        clearBtn.props.onPress();
+      });
 
       const updatedInput = findAllByType(root, "TextInput")[0];
       expect(updatedInput.props.value).toBe("");
@@ -476,7 +476,13 @@ describe("TransactionsScreen", () => {
 
     it("renders all five filter chip labels", () => {
       const root = render(<TransactionsScreen />);
-      for (const label of ["All", "Income", "Expense", "This Month", "This Week"]) {
+      for (const label of [
+        "All",
+        "Income",
+        "Expense",
+        "This Month",
+        "This Week",
+      ]) {
         expect(findByText(root, label)).toBeTruthy();
       }
     });
@@ -505,7 +511,9 @@ describe("TransactionsScreen", () => {
         (n) => collectText(n) === "Income",
       );
       expect(incomeBtn).toBeTruthy();
-      act(() => { incomeBtn!.props.onPress(); });
+      act(() => {
+        incomeBtn!.props.onPress();
+      });
 
       // Salary (income) should appear; Food (expense) should not
       expect(findByText(root, "Salary")).toBeTruthy();
@@ -525,7 +533,9 @@ describe("TransactionsScreen", () => {
         (n) => collectText(n) === "Expense",
       );
       expect(expenseBtn).toBeTruthy();
-      act(() => { expenseBtn!.props.onPress(); });
+      act(() => {
+        expenseBtn!.props.onPress();
+      });
 
       expect(findByText(root, "Food")).toBeTruthy();
       expect(findByText(root, "Salary")).toBeNull();
@@ -663,7 +673,9 @@ describe("TransactionsScreen", () => {
           (n.props as any).accessibilityLabel === "Delete Food" &&
           (n.props as any).accessibilityRole === "button",
       );
-      act(() => { deleteBtn.props.onPress(); });
+      act(() => {
+        deleteBtn.props.onPress();
+      });
       expect(alertSpy).toHaveBeenCalledOnce();
       expect(alertSpy.mock.calls[0][0]).toBe("Delete Transaction");
     });
@@ -673,12 +685,16 @@ describe("TransactionsScreen", () => {
       const deleteBtn = root.find(
         (n) => (n.props as any).accessibilityLabel === "Delete Food",
       );
-      act(() => { deleteBtn.props.onPress(); });
+      act(() => {
+        deleteBtn.props.onPress();
+      });
 
       // Grab the destructive button from the Alert call and invoke it
       const buttons: any[] = alertSpy.mock.calls[0][2];
       const destructiveBtn = buttons.find((b) => b.style === "destructive");
-      act(() => { destructiveBtn.onPress(); });
+      act(() => {
+        destructiveBtn.onPress();
+      });
 
       expect(mockDeleteTransaction).toHaveBeenCalledOnce();
       expect(mockDeleteTransaction).toHaveBeenCalledWith(42);
@@ -689,7 +705,9 @@ describe("TransactionsScreen", () => {
       const deleteBtn = root.find(
         (n) => (n.props as any).accessibilityLabel === "Delete Food",
       );
-      act(() => { deleteBtn.props.onPress(); });
+      act(() => {
+        deleteBtn.props.onPress();
+      });
 
       const buttons: any[] = alertSpy.mock.calls[0][2];
       const cancelBtn = buttons.find((b) => b.style === "cancel");
@@ -722,7 +740,9 @@ describe("TransactionsScreen", () => {
         (n) => collectText(n) === "Expense",
       );
       expect(expenseBtn).toBeTruthy();
-      act(() => { expenseBtn!.props.onPress(); });
+      act(() => {
+        expenseBtn!.props.onPress();
+      });
 
       expect(findByText(root, "No results found")).toBeTruthy();
     });
@@ -740,7 +760,9 @@ describe("TransactionsScreen", () => {
         (n) => collectText(n) === "Expense",
       );
       expect(expenseBtn).toBeTruthy();
-      act(() => { expenseBtn!.props.onPress(); });
+      act(() => {
+        expenseBtn!.props.onPress();
+      });
 
       const addBtn = findByText(root, "Add Transaction");
       expect(addBtn).toBeNull();
@@ -752,7 +774,9 @@ describe("TransactionsScreen", () => {
         (n) => collectText(n) === "Add Transaction",
       );
       expect(addBtn).toBeTruthy();
-      act(() => { addBtn!.props.onPress(); });
+      act(() => {
+        addBtn!.props.onPress();
+      });
       expect(mockPush).toHaveBeenCalledWith("/add-transaction");
     });
 
@@ -795,7 +819,9 @@ describe("TransactionsScreen", () => {
       );
 
       if (rows.length > 0) {
-        act(() => { rows[0].props.onPress?.(); });
+        act(() => {
+          rows[0].props.onPress?.();
+        });
       }
 
       // Should never push the old dead route

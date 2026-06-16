@@ -115,7 +115,9 @@ vi.mock("@/lib/_core/theme", () => ({
     sheet: { durationMs: 300, closeDurationMs: 250 },
     fade: { durationMs: 200 },
   },
-  Elevation: { card: { shadowColor: "#000", shadowOpacity: 0.1, elevation: 2 } },
+  Elevation: {
+    card: { shadowColor: "#000", shadowOpacity: 0.1, elevation: 2 },
+  },
 }));
 
 vi.mock("@/lib/expense-context", () => ({
@@ -213,19 +215,21 @@ function renderScreen(
 
 function renderWithLiveCards(initialCards = [mockCard1, mockCard2]) {
   let cards = initialCards.map((c) => ({ ...c }));
-  const liveUpdate = vi.fn(async (id: number, data: Partial<typeof mockCard1>) => {
-    cards = cards.map((c) =>
-      c.id === id
-        ? {
-            ...c,
-            ...data,
-            name: data.name ?? c.name,
-            color: data.color ?? c.color,
-            cardType: data.cardType ?? c.cardType,
-          }
-        : c,
-    );
-  });
+  const liveUpdate = vi.fn(
+    async (id: number, data: Partial<typeof mockCard1>) => {
+      cards = cards.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              ...data,
+              name: data.name ?? c.name,
+              color: data.color ?? c.color,
+              cardType: data.cardType ?? c.cardType,
+            }
+          : c,
+      );
+    },
+  );
   (useExpense as ReturnType<typeof vi.fn>).mockImplementation(() => ({
     ...baseContext,
     creditCards: cards,
@@ -243,7 +247,10 @@ function renderWithLiveCards(initialCards = [mockCard1, mockCard2]) {
   return { root: renderer.root, liveUpdate, rerender, getCards: () => cards };
 }
 
-function findByTestId(root: ReactTestInstance, testID: string): ReactTestInstance {
+function findByTestId(
+  root: ReactTestInstance,
+  testID: string,
+): ReactTestInstance {
   return root.find((n) => n.props.testID === testID);
 }
 

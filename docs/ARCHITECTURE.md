@@ -142,8 +142,8 @@ Defined in `drizzle/schema.ts` (MySQL). All money fields are `decimal(12,2)` sto
 - **transactions** — `id`, `userId`, `categoryId`, optional `creditCardId`, `type`
   (`income` | `expense`), `amount`, `description`, `date`, timestamps.
 - **monthlySummaries** — `id`, `userId`, `year`, `month`, `totalIncome`, `totalExpense`,
-  `netBalance`, timestamps. *(Cache table; defined but not currently populated — monthly stats are
-  computed on demand in `db.getMonthlyStats`.)*
+  `netBalance`, timestamps. _(Cache table; defined but not currently populated — monthly stats are
+  computed on demand in `db.getMonthlyStats`.)_
 
 Relationships are by `userId` / `categoryId` / `creditCardId` foreign-key columns; ownership scoping
 (`WHERE userId = ?`) is enforced in the data-access layer, not by DB constraints.
@@ -155,19 +155,19 @@ Relationships are by `userId` / `categoryId` / `creditCardId` foreign-key column
 All procedures except `health` are `protectedProcedure` (require an authenticated user). Defined in
 `server/routers.ts`; input validated with Zod.
 
-| Router | Procedure | Type | Purpose |
-|---|---|---|---|
-| — | `health` | query | Liveness (`{ status: "ok" }`), public |
-| `categories` | `list` / `getById` | query | List (optionally by type) / fetch one |
-| | `create` / `update` / `delete` | mutation | CRUD |
-| `creditCards` | `list` / `getById` | query | List user cards / fetch one |
-| | `create` / `update` / `delete` | mutation | CRUD |
-| `transactions` | `list` | query | Paged list (`limit`/`offset`) |
-| | `listByDateRange` / `listByCategory` / `listByCreditCard` | query | Filtered lists |
-| | `recent` | query | Latest N (default 7) for dashboard |
-| | `create` / `update` / `delete` / `getById` | — | CRUD + fetch one |
-| `summary` | `monthlyStats` | query | Income / expense / net for a month |
-| | `expensesByCategory` | query | Per-category expense totals for a month |
+| Router         | Procedure                                                 | Type     | Purpose                                 |
+| -------------- | --------------------------------------------------------- | -------- | --------------------------------------- |
+| —              | `health`                                                  | query    | Liveness (`{ status: "ok" }`), public   |
+| `categories`   | `list` / `getById`                                        | query    | List (optionally by type) / fetch one   |
+|                | `create` / `update` / `delete`                            | mutation | CRUD                                    |
+| `creditCards`  | `list` / `getById`                                        | query    | List user cards / fetch one             |
+|                | `create` / `update` / `delete`                            | mutation | CRUD                                    |
+| `transactions` | `list`                                                    | query    | Paged list (`limit`/`offset`)           |
+|                | `listByDateRange` / `listByCategory` / `listByCreditCard` | query    | Filtered lists                          |
+|                | `recent`                                                  | query    | Latest N (default 7) for dashboard      |
+|                | `create` / `update` / `delete` / `getById`                | —        | CRUD + fetch one                        |
+| `summary`      | `monthlyStats`                                            | query    | Income / expense / net for a month      |
+|                | `expensesByCategory`                                      | query    | Per-category expense totals for a month |
 
 `db.ts` implements each call as raw parameterized SQL through `callDataApi("Database/query", …)`.
 Aggregations (`monthlyStats`, `expensesByCategory`) fetch rows and reduce in JS rather than using SQL
@@ -183,8 +183,8 @@ Aggregations (`monthlyStats`, `expensesByCategory`) fetch rows and reduce in JS 
 - `lib/expense-context.tsx` (`ExpenseProvider`) wraps the tRPC hooks for categories, credit cards,
   transactions, and monthly stats, exposing a single `useExpense()` API with `refresh*` / `add*` /
   `update*` / `delete*` helpers. It mirrors query results into local `useState` and refetches after
-  mutations. *(Note: this duplicates some of TanStack Query's own caching — a known simplification
-  target, not a correctness issue.)*
+  mutations. _(Note: this duplicates some of TanStack Query's own caching — a known simplification
+  target, not a correctness issue.)_
 - Screens consume `useExpense()` and never call the API directly.
 
 ---

@@ -62,14 +62,14 @@ already-built areas cover only the remaining gaps, not the completed functionali
 
 ### Non-Functional Requirements
 
-| ID | Requirement | Status |
-|---|---|---|
-| NFR-1 | Privacy: user-scoped data; AI data only after opt-in; no undisclosed analytics | 🟡 partial (scoping ✅; AI consent N/A until AI ships) |
-| NFR-2 | Performance: cold start ≤3s; primary screens ≤1s; p95 API <500ms | 🟡 partial (untested vs targets) |
-| NFR-3 | Reliability: durable parameterized writes; crash-free ≥99.5%; timezone-aware dates | 🟡 partial (writes ✅; loading/error states gap) |
+| ID    | Requirement                                                                                         | Status                                                       |
+| ----- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| NFR-1 | Privacy: user-scoped data; AI data only after opt-in; no undisclosed analytics                      | 🟡 partial (scoping ✅; AI consent N/A until AI ships)       |
+| NFR-2 | Performance: cold start ≤3s; primary screens ≤1s; p95 API <500ms                                    | 🟡 partial (untested vs targets)                             |
+| NFR-3 | Reliability: durable parameterized writes; crash-free ≥99.5%; timezone-aware dates                  | 🟡 partial (writes ✅; loading/error states gap)             |
 | NFR-4 | Security: secrets server-only; session in secure storage/cookie; **card numbers encrypted at rest** | 🟡 partial (**card encryption is a known gap — stored raw**) |
-| NFR-5 | Usability & Accessibility: WCAG 2.1 AA (contrast, ≥44px targets, SR labels, dynamic type) | 🔲 planned (not audited) |
-| NFR-6 | Portability: single Expo/RN codebase for Android, iOS, web | ✅ built |
+| NFR-5 | Usability & Accessibility: WCAG 2.1 AA (contrast, ≥44px targets, SR labels, dynamic type)           | 🔲 planned (not audited)                                     |
+| NFR-6 | Portability: single Expo/RN codebase for Android, iOS, web                                          | ✅ built                                                     |
 
 ### Additional Requirements (from Architecture)
 
@@ -86,113 +86,124 @@ already-built areas cover only the remaining gaps, not the completed functionali
 > The work is to tokenize, build a `components/ui/` primitive library, then retrofit built
 > screens and extend to planned features.
 
-| ID | Requirement | Status |
-|---|---|---|
-| UX-DR1 | Extend `theme.config.js` with spacing, radius, typography, elevation tokens (today only colors) | 🔲 planned |
-| UX-DR2 | Data-driven category color token map, WCAG-AA-tuned defaults | 🔲 planned |
-| UX-DR3 | Resolve color source-of-truth conflict: reconcile `design.md` (teal) to **Refined Indigo**; retire teal | 🔲 planned |
-| UX-DR4 | `Button` primitive — variants: primary, secondary, ghost, destructive, income, icon-only | 🔲 planned |
-| UX-DR5 | `Pill` / `FilterChip` primitive (multi-select filter + single-select segment) | 🔲 planned |
-| UX-DR6 | `ScreenHeader` primitive (title + subtitle/count + trailing action) | 🔲 planned |
-| UX-DR7 | `StatCard` primitive (hero gradient + compact variants, loading skeleton) | 🔲 planned |
-| UX-DR8 | `TransactionRow` primitive (category avatar, signed amount, swipe edit/delete, badges) | 🔲 planned |
-| UX-DR9 | `CategoryToken` / `CategoryPickerGrid` primitive (reused in screen, picker, charts, filters) | 🟡 partial (picker exists ad-hoc; not a shared primitive) |
-| UX-DR10 | `Sheet` (BottomSheetModal) primitive for all create/edit flows | 🔲 planned |
-| UX-DR11 | `EmptyState` primitive (standardize existing ad-hoc empty states) | 🟡 partial (ad-hoc empty states exist) |
-| UX-DR12 | `Skeleton`/`Loader` + `Toast` primitives for server network states | 🔲 planned |
-| UX-DR13 | Retrofit built screens to primitives (Dashboard → Add-Txn → Activity → Categories → Insights → Cards) | 🔲 planned |
-| UX-DR14 | Remove stray `index` tab; fix dashboard quick-action chip overlap; fix "Add New Category" banner-as-button | 🔲 planned |
-| UX-DR15 | Accessibility pass: AA contrast (incl. category colors), ≥44pt targets, SR labels, dynamic type 200%, reduced-motion, color independence (sign+icon) | 🔲 planned (realizes NFR-5) |
-| UX-DR16 | Responsive: two-pane master/detail on web/tablet (`lg`) for Activity & Insights; fluid layout | 🔲 planned |
-| UX-DR17 | Feedback patterns: optimistic UI + rollback + toast; press scale 0.97 + haptic; destructive confirm sheets | 🟡 partial (haptics ✅ via HapticTab; optimistic/toast/confirm gap) |
+| ID      | Requirement                                                                                                                                          | Status                                                              |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| UX-DR1  | Extend `theme.config.js` with spacing, radius, typography, elevation tokens (today only colors)                                                      | 🔲 planned                                                          |
+| UX-DR2  | Data-driven category color token map, WCAG-AA-tuned defaults                                                                                         | 🔲 planned                                                          |
+| UX-DR3  | Resolve color source-of-truth conflict: reconcile `design.md` (teal) to **Refined Indigo**; retire teal                                              | 🔲 planned                                                          |
+| UX-DR4  | `Button` primitive — variants: primary, secondary, ghost, destructive, income, icon-only                                                             | 🔲 planned                                                          |
+| UX-DR5  | `Pill` / `FilterChip` primitive (multi-select filter + single-select segment)                                                                        | 🔲 planned                                                          |
+| UX-DR6  | `ScreenHeader` primitive (title + subtitle/count + trailing action)                                                                                  | 🔲 planned                                                          |
+| UX-DR7  | `StatCard` primitive (hero gradient + compact variants, loading skeleton)                                                                            | 🔲 planned                                                          |
+| UX-DR8  | `TransactionRow` primitive (category avatar, signed amount, swipe edit/delete, badges)                                                               | 🔲 planned                                                          |
+| UX-DR9  | `CategoryToken` / `CategoryPickerGrid` primitive (reused in screen, picker, charts, filters)                                                         | 🟡 partial (picker exists ad-hoc; not a shared primitive)           |
+| UX-DR10 | `Sheet` (BottomSheetModal) primitive for all create/edit flows                                                                                       | 🔲 planned                                                          |
+| UX-DR11 | `EmptyState` primitive (standardize existing ad-hoc empty states)                                                                                    | 🟡 partial (ad-hoc empty states exist)                              |
+| UX-DR12 | `Skeleton`/`Loader` + `Toast` primitives for server network states                                                                                   | 🔲 planned                                                          |
+| UX-DR13 | Retrofit built screens to primitives (Dashboard → Add-Txn → Activity → Categories → Insights → Cards)                                                | 🔲 planned                                                          |
+| UX-DR14 | Remove stray `index` tab; fix dashboard quick-action chip overlap; fix "Add New Category" banner-as-button                                           | 🔲 planned                                                          |
+| UX-DR15 | Accessibility pass: AA contrast (incl. category colors), ≥44pt targets, SR labels, dynamic type 200%, reduced-motion, color independence (sign+icon) | 🔲 planned (realizes NFR-5)                                         |
+| UX-DR16 | Responsive: two-pane master/detail on web/tablet (`lg`) for Activity & Insights; fluid layout                                                        | 🔲 planned                                                          |
+| UX-DR17 | Feedback patterns: optimistic UI + rollback + toast; press scale 0.97 + haptic; destructive confirm sheets                                           | 🟡 partial (haptics ✅ via HapticTab; optimistic/toast/confirm gap) |
 
 ## FR Coverage Map
 
 > Built FRs are already satisfied by shipped code; they appear here for traceability and are
 > re-touched (visually only) by the Epic 1 retrofit — no behavioral re-spec.
 
-| Req | Epic | Note |
-|---|---|---|
-| FR-1 | ✅ built (Epic 1 retrofit only) | transactions CRUD |
-| FR-2 | ✅ built (Epic 1 retrofit only) | expense→card link |
-| FR-3 | ✅ built (Epic 1 retrofit only) | list/filter/search |
-| FR-4 | Epic 7 | recurring transactions |
-| FR-5 | ✅ built (Epic 1 retrofit only) | categories CRUD |
-| FR-6 | Epic 4 | seed default categories |
-| FR-7 | ✅ built (Epic 1 retrofit only) | card create/delete |
-| FR-8 | Epic 2 | card edit UI + per-card txns |
-| FR-9 | ✅ built (Epic 1 retrofit only) | monthly summary |
-| FR-10 | Epic 5 | charts/trends/forecast |
-| FR-11 | Epic 11 | AI categorization |
-| FR-12 | Epic 11 | NL Q&A |
-| FR-13 | Epic 11 | server inference + consent |
-| FR-14 | Epic 6 | budgets |
-| FR-15 | Epic 8 | loans |
-| FR-16 | Epic 8 | repayments + reminders |
-| FR-17 | Epic 9 | accounts |
-| FR-18 | Epic 10 | import/export |
-| FR-19 | Epic 7 | local reminders (expo-notifications) |
-| FR-20 | Epic 4 | settings |
-| NFR-4 / AR-1 | Epic 3 | card encryption at rest |
-| NFR-5 | Epic 1 | accessibility |
-| UX-DR1–17 | Epic 1 | design system + retrofit |
-| AR-4 | Epic 5 | chart library |
-| AR-5 | Epic 7 | wire expo-notifications |
+| Req          | Epic                            | Note                                 |
+| ------------ | ------------------------------- | ------------------------------------ |
+| FR-1         | ✅ built (Epic 1 retrofit only) | transactions CRUD                    |
+| FR-2         | ✅ built (Epic 1 retrofit only) | expense→card link                    |
+| FR-3         | ✅ built (Epic 1 retrofit only) | list/filter/search                   |
+| FR-4         | Epic 7                          | recurring transactions               |
+| FR-5         | ✅ built (Epic 1 retrofit only) | categories CRUD                      |
+| FR-6         | Epic 4                          | seed default categories              |
+| FR-7         | ✅ built (Epic 1 retrofit only) | card create/delete                   |
+| FR-8         | Epic 2                          | card edit UI + per-card txns         |
+| FR-9         | ✅ built (Epic 1 retrofit only) | monthly summary                      |
+| FR-10        | Epic 5                          | charts/trends/forecast               |
+| FR-11        | Epic 11                         | AI categorization                    |
+| FR-12        | Epic 11                         | NL Q&A                               |
+| FR-13        | Epic 11                         | server inference + consent           |
+| FR-14        | Epic 6                          | budgets                              |
+| FR-15        | Epic 8                          | loans                                |
+| FR-16        | Epic 8                          | repayments + reminders               |
+| FR-17        | Epic 9                          | accounts                             |
+| FR-18        | Epic 10                         | import/export                        |
+| FR-19        | Epic 7                          | local reminders (expo-notifications) |
+| FR-20        | Epic 4                          | settings                             |
+| NFR-4 / AR-1 | Epic 3                          | card encryption at rest              |
+| NFR-5        | Epic 1                          | accessibility                        |
+| UX-DR1–17    | Epic 1                          | design system + retrofit             |
+| AR-4         | Epic 5                          | chart library                        |
+| AR-5         | Epic 7                          | wire expo-notifications              |
 
 ## Epic List
 
 ### Epic 1: Design System Foundation & Built-Screen Retrofit
+
 Establish one tokenized design system (`theme.config.js`) and a `components/ui/` primitive
 library, resolve the indigo-vs-teal color conflict, then retrofit all five built screens +
 add-transaction so the app is visually consistent, accessible (WCAG 2.1 AA), and responsive.
-*Brownfield: re-skins built screens to shared primitives — no behavioral changes to FR-1/2/3/5/7/9.*
+_Brownfield: re-skins built screens to shared primitives — no behavioral changes to FR-1/2/3/5/7/9._
 **Covers:** UX-DR1–17, NFR-5. **Touches:** FR-1, FR-2, FR-3, FR-5, FR-7, FR-9 (visual only).
 
 ### Epic 2: Credit Card Management Completion
+
 Let users edit an existing credit card and view the transactions linked to a specific card.
-*Brownfield: server methods `creditCards.update` and `transactions.listByCreditCard` already
-exist — this epic builds only the missing UI.*
+_Brownfield: server methods `creditCards.update` and `transactions.listByCreditCard` already
+exist — this epic builds only the missing UI._
 **Covers:** FR-8.
 
 ### Epic 3: Security Hardening — Sensitive Data at Rest
+
 Encrypt credit-card numbers at rest (or store last-4 only), closing the known production
 security gap, with safe migration of any existing rows.
 **Covers:** NFR-4, AR-1.
 
 ### Epic 4: Settings & Personalization
+
 A Settings screen giving users control over currency, first day of week, theme (light/dark/system),
 and data management — plus seeding sensible default categories for new users.
 **Covers:** FR-20, FR-6.
 
 ### Epic 5: Analytics & Charts
+
 Integrate a chart library and enrich Insights with a pie/breakdown chart, month-over-month trends,
 basic forecasting, and anomaly highlights.
-*Brownfield: builds on the existing `summary.expensesByCategory` data and Insights screen.*
+_Brownfield: builds on the existing `summary.expensesByCategory` data and Insights screen._
 **Covers:** FR-10, AR-4.
 
 ### Epic 6: Budgets
+
 Let users set per-category monthly/weekly budgets and track progress with threshold alerts.
 **Covers:** FR-14.
 
 ### Epic 7: Recurring Transactions & Reminders
+
 Recurring income/expense with custom frequency and end conditions, plus local notifications
 for upcoming recurring payments (wiring `expo-notifications`).
 **Covers:** FR-4, FR-19, AR-5.
 
 ### Epic 8: Loans & Repayments
+
 Track money lent/borrowed: principal, optional rate, schedule, due dates; record repayments,
 see remaining balance, and get due/overdue reminders.
 **Covers:** FR-15, FR-16.
 
 ### Epic 9: Accounts
+
 Track balances across multiple accounts (cash/bank/wallet) and move money between them.
 **Covers:** FR-17.
 
 ### Epic 10: Import / Export
+
 CSV and JSON export of transactions, and CSV import, for data portability and backup.
 **Covers:** FR-18.
 
 ### Epic 11: AI Assistant (opt-in)
+
 Opt-in, transparent AI: smart category suggestions while adding a transaction and a
 natural-language Q&A ask-bar on Insights, with server-side inference via a self-hosted / local LLM
 (OpenAI-compatible, env-configured — not the Manus Forge gateway) and explicit consent before any

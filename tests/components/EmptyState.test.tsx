@@ -43,7 +43,10 @@ function render(ui: React.ReactElement): ReactTestInstance {
   return renderer.root;
 }
 
-function findByTestId(root: ReactTestInstance, testID: string): ReactTestInstance {
+function findByTestId(
+  root: ReactTestInstance,
+  testID: string,
+): ReactTestInstance {
   return root.find((n) => n.props.testID === testID);
 }
 
@@ -175,9 +178,7 @@ describe("EmptyState", () => {
   });
 
   it("icon container is hidden from accessibility tree", () => {
-    const root = render(
-      <EmptyState icon={icon} title="T" description="D" />,
-    );
+    const root = render(<EmptyState icon={icon} title="T" description="D" />);
     const iconContainer = findByTestId(root, "empty-state-icon");
     expect(iconContainer.props.accessibilityElementsHidden).toBe(true);
   });

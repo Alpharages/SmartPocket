@@ -1,8 +1,4 @@
-import React, {
-  forwardRef,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { forwardRef, useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -134,11 +130,7 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
       }
     }, [disabled, loading, onPress]);
 
-    const {
-      containerStyle,
-      textColor,
-      isIconOnly,
-    } = useMemo(() => {
+    const { containerStyle, textColor, isIconOnly } = useMemo(() => {
       const iconOnly = variant === "icon-only";
       let bg: string;
       let border: string | undefined;
@@ -222,35 +214,24 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
         {loading ? (
           <ActivityIndicator size="small" color={textColor} />
         ) : (
-          leftIcon ?? rightIcon
+          (leftIcon ?? rightIcon)
         )}
       </>
     ) : (
       <>
-        {leftIcon && !loading && (
-          <View className="mr-2">{leftIcon}</View>
-        )}
+        {leftIcon && !loading && <View className="mr-2">{leftIcon}</View>}
         {loading ? (
-          <ActivityIndicator
-            size="small"
-            color={textColor}
-            className="mr-2"
-          />
+          <ActivityIndicator size="small" color={textColor} className="mr-2" />
         ) : (
           <Text
-            className={cn(
-              "font-semibold",
-              SIZE_TEXT[size],
-            )}
+            className={cn("font-semibold", SIZE_TEXT[size])}
             style={{ color: textColor }}
             numberOfLines={1}
           >
             {label}
           </Text>
         )}
-        {rightIcon && !loading && (
-          <View className="ml-2">{rightIcon}</View>
-        )}
+        {rightIcon && !loading && <View className="ml-2">{rightIcon}</View>}
       </>
     );
 

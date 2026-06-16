@@ -13,11 +13,21 @@ import {
 } from "react-native";
 import { ResponsiveContent } from "@/components/responsive-content";
 import { ScreenContainer } from "@/components/screen-container";
-import { useExpense, type CreditCard as CreditCardRecord } from "@/lib/expense-context";
+import {
+  useExpense,
+  type CreditCard as CreditCardRecord,
+} from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInUp } from "react-native-reanimated";
-import { Button, ConfirmSheet, CreditCard, EmptyState, ScreenHeader, Sheet } from "@/components/ui";
+import {
+  Button,
+  ConfirmSheet,
+  CreditCard,
+  EmptyState,
+  ScreenHeader,
+  Sheet,
+} from "@/components/ui";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ContentMaxWidth } from "@/lib/_core/theme";
@@ -28,8 +38,14 @@ import {
 } from "@/lib/card-form-validation";
 
 const PREDEFINED_COLORS = [
-  "#6366F1", "#EC4899", "#10B981", "#F59E0B",
-  "#8B5CF6", "#EF4444", "#06B6D4", "#14B8A6",
+  "#6366F1",
+  "#EC4899",
+  "#10B981",
+  "#F59E0B",
+  "#8B5CF6",
+  "#EF4444",
+  "#06B6D4",
+  "#14B8A6",
 ];
 
 const CARD_TYPES = ["credit", "debit"] as const;
@@ -66,10 +82,16 @@ function CardFormFields({
   return (
     <>
       <View>
-        <Text className="text-sm font-semibold text-foreground mb-2">Card Name</Text>
+        <Text className="text-sm font-semibold text-foreground mb-2">
+          Card Name
+        </Text>
         <View
           className="px-4 py-3.5 rounded-xl flex-row items-center"
-          style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+          style={{
+            backgroundColor: colors.background,
+            borderWidth: 0.5,
+            borderColor: colors.border,
+          }}
         >
           <TextInput
             placeholder="e.g., My Visa"
@@ -84,10 +106,16 @@ function CardFormFields({
 
       {mode === "add" ? (
         <View>
-          <Text className="text-sm font-semibold text-foreground mb-2">Card Number</Text>
+          <Text className="text-sm font-semibold text-foreground mb-2">
+            Card Number
+          </Text>
           <View
             className="px-4 py-3.5 rounded-xl flex-row items-center"
-            style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+            style={{
+              backgroundColor: colors.background,
+              borderWidth: 0.5,
+              borderColor: colors.border,
+            }}
           >
             <TextInput
               placeholder="1234 5678 9012 3456"
@@ -102,13 +130,22 @@ function CardFormFields({
         </View>
       ) : (
         <View>
-          <Text className="text-sm font-semibold text-foreground mb-2">Card Number</Text>
+          <Text className="text-sm font-semibold text-foreground mb-2">
+            Card Number
+          </Text>
           <View
             className="px-4 py-3.5 rounded-xl"
-            style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+            style={{
+              backgroundColor: colors.background,
+              borderWidth: 0.5,
+              borderColor: colors.border,
+            }}
             accessibilityLabel={`Card number masked, ending in ${maskedCardNumber?.slice(-4) ?? "unknown"}`}
           >
-            <Text className="text-foreground font-semibold" style={{ fontSize: 15 }}>
+            <Text
+              className="text-foreground font-semibold"
+              style={{ fontSize: 15 }}
+            >
               {maskedCardNumber ?? "•••• •••• •••• ••••"}
             </Text>
           </View>
@@ -116,10 +153,16 @@ function CardFormFields({
       )}
 
       <View>
-        <Text className="text-sm font-semibold text-foreground mb-2">Cardholder Name</Text>
+        <Text className="text-sm font-semibold text-foreground mb-2">
+          Cardholder Name
+        </Text>
         <View
           className="px-4 py-3.5 rounded-xl flex-row items-center"
-          style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+          style={{
+            backgroundColor: colors.background,
+            borderWidth: 0.5,
+            borderColor: colors.border,
+          }}
         >
           <TextInput
             placeholder="John Doe"
@@ -134,10 +177,16 @@ function CardFormFields({
 
       <View className="flex-row gap-3">
         <View className="flex-1">
-          <Text className="text-sm font-semibold text-foreground mb-2">Expiry Month</Text>
+          <Text className="text-sm font-semibold text-foreground mb-2">
+            Expiry Month
+          </Text>
           <View
             className="px-4 py-3.5 rounded-xl"
-            style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+            style={{
+              backgroundColor: colors.background,
+              borderWidth: 0.5,
+              borderColor: colors.border,
+            }}
           >
             <TextInput
               placeholder="MM"
@@ -152,10 +201,16 @@ function CardFormFields({
           </View>
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-semibold text-foreground mb-2">Expiry Year</Text>
+          <Text className="text-sm font-semibold text-foreground mb-2">
+            Expiry Year
+          </Text>
           <View
             className="px-4 py-3.5 rounded-xl"
-            style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+            style={{
+              backgroundColor: colors.background,
+              borderWidth: 0.5,
+              borderColor: colors.border,
+            }}
           >
             <TextInput
               placeholder="YYYY"
@@ -172,10 +227,16 @@ function CardFormFields({
       </View>
 
       <View>
-        <Text className="text-sm font-semibold text-foreground mb-2">Credit Limit</Text>
+        <Text className="text-sm font-semibold text-foreground mb-2">
+          Credit Limit
+        </Text>
         <View
           className="px-4 py-3.5 rounded-xl flex-row items-center"
-          style={{ backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}
+          style={{
+            backgroundColor: colors.background,
+            borderWidth: 0.5,
+            borderColor: colors.border,
+          }}
         >
           <Text className="text-foreground mr-2 font-semibold">$</Text>
           <TextInput
@@ -191,7 +252,9 @@ function CardFormFields({
       </View>
 
       <View>
-        <Text className="text-sm font-semibold text-foreground mb-2">Card Type</Text>
+        <Text className="text-sm font-semibold text-foreground mb-2">
+          Card Type
+        </Text>
         <View className="flex-row gap-3">
           {CARD_TYPES.map((type) => (
             <Pressable
@@ -199,7 +262,8 @@ function CardFormFields({
               onPress={() => onChange({ cardType: type })}
               className="flex-1 py-3 rounded-xl items-center capitalize"
               style={{
-                backgroundColor: values.cardType === type ? colors.primary : colors.background,
+                backgroundColor:
+                  values.cardType === type ? colors.primary : colors.background,
                 borderWidth: values.cardType === type ? 0 : 0.5,
                 borderColor: colors.border,
               }}
@@ -209,7 +273,9 @@ function CardFormFields({
             >
               <Text
                 className="font-semibold capitalize"
-                style={{ color: values.cardType === type ? "white" : colors.foreground }}
+                style={{
+                  color: values.cardType === type ? "white" : colors.foreground,
+                }}
               >
                 {type}
               </Text>
@@ -219,7 +285,9 @@ function CardFormFields({
       </View>
 
       <View>
-        <Text className="text-sm font-semibold text-foreground mb-3">Choose Color</Text>
+        <Text className="text-sm font-semibold text-foreground mb-3">
+          Choose Color
+        </Text>
         <View className="flex-row flex-wrap gap-3">
           {PREDEFINED_COLORS.map((color) => (
             <Pressable
@@ -249,11 +317,21 @@ function CardFormFields({
 export default function CardsScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { creditCards, loadingCards, addCreditCard, updateCreditCard, deleteCreditCard } =
-    useExpense();
+  const {
+    creditCards,
+    loadingCards,
+    addCreditCard,
+    updateCreditCard,
+    deleteCreditCard,
+  } = useExpense();
   const toast = useToast();
-  const { visible: confirmVisible, options: confirmOptions, confirm, onConfirm, onCancel } =
-    useConfirm();
+  const {
+    visible: confirmVisible,
+    options: confirmOptions,
+    confirm,
+    onConfirm,
+    onCancel,
+  } = useConfirm();
   const [sheetMode, setSheetMode] = useState<SheetMode>(null);
   const [editingCard, setEditingCard] = useState<CreditCardRecord | null>(null);
   const [formValues, setFormValues] = useState<CardFormValues>(EMPTY_FORM);
@@ -268,7 +346,11 @@ export default function CardsScreen() {
     Platform.OS === "web" ? { alignSelf: "flex-start" } : undefined;
   const cardPreviewStyle: ViewStyle | undefined =
     Platform.OS === "web"
-      ? { width: "100%" as const, maxWidth: ContentMaxWidth.card, alignSelf: "flex-start" }
+      ? {
+          width: "100%" as const,
+          maxWidth: ContentMaxWidth.card,
+          alignSelf: "flex-start",
+        }
       : undefined;
 
   const resetForm = useCallback(() => {
@@ -312,7 +394,10 @@ export default function CardsScreen() {
   const handleAddCard = async () => {
     if (savingRef.current) return;
     if (!isCardFormValid(formValues, "add")) {
-      toast.show({ type: "error", message: "Please fill in all fields correctly" });
+      toast.show({
+        type: "error",
+        message: "Please fill in all fields correctly",
+      });
       return;
     }
 
@@ -344,7 +429,10 @@ export default function CardsScreen() {
   const handleUpdateCard = async () => {
     if (savingRef.current) return;
     if (!editingCard || !isCardFormValid(formValues, "edit")) {
-      toast.show({ type: "error", message: "Please fill in all fields correctly" });
+      toast.show({
+        type: "error",
+        message: "Please fill in all fields correctly",
+      });
       return;
     }
 
@@ -364,7 +452,10 @@ export default function CardsScreen() {
       if (trimmedNumber) {
         payload.cardNumber = trimmedNumber;
       }
-      await updateCreditCard(editingCard.id, payload as Partial<CreditCardRecord>);
+      await updateCreditCard(
+        editingCard.id,
+        payload as Partial<CreditCardRecord>,
+      );
     } catch {
       return;
     } finally {
@@ -376,7 +467,8 @@ export default function CardsScreen() {
   };
 
   const sheetTitle = sheetMode === "edit" ? "Edit Card" : "New Card";
-  const sheetTestId = sheetMode === "edit" ? "edit-card-sheet" : "add-card-sheet";
+  const sheetTestId =
+    sheetMode === "edit" ? "edit-card-sheet" : "add-card-sheet";
 
   return (
     <ScreenContainer className="flex-1 bg-background">
@@ -391,7 +483,10 @@ export default function CardsScreen() {
             accessibilityLabel="Cards screen"
           />
 
-          <Animated.View entering={FadeInUp.delay(100).duration(500)} className="px-6 mt-5">
+          <Animated.View
+            entering={FadeInUp.delay(100).duration(500)}
+            className="px-6 mt-5"
+          >
             <Button
               variant="primary"
               label="Add New Card"
@@ -414,7 +509,10 @@ export default function CardsScreen() {
                   data={creditCards}
                   keyExtractor={(item) => item.id.toString()}
                   renderItem={({ item, index }) => (
-                    <View style={cardPreviewStyle} testID={`card-preview-${index}`}>
+                    <View
+                      style={cardPreviewStyle}
+                      testID={`card-preview-${index}`}
+                    >
                       <CreditCard
                         name={item.name}
                         cardNumberLast4={item.cardNumberLast4}
@@ -454,7 +552,13 @@ export default function CardsScreen() {
               >
                 <EmptyState
                   variant="no-data"
-                  icon={<Ionicons name="card-outline" size={28} color={colors.muted} />}
+                  icon={
+                    <Ionicons
+                      name="card-outline"
+                      size={28}
+                      color={colors.muted}
+                    />
+                  }
                   title="No cards added yet"
                   description="Add your first card to get started"
                   action={{ label: "Add Card", onPress: openAddSheet }}
@@ -496,7 +600,9 @@ export default function CardsScreen() {
                   ? maskCardLastFour(editingCard.cardNumberLast4)
                   : undefined
               }
-              onChange={(patch) => setFormValues((prev) => ({ ...prev, ...patch }))}
+              onChange={(patch) =>
+                setFormValues((prev) => ({ ...prev, ...patch }))
+              }
               onSelectColor={setSelectedColor}
             />
           )}

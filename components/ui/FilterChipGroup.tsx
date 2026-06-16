@@ -77,11 +77,19 @@ export function FilterChipGroup<T>({
   const childRole = mode === "single" ? "radio" : "button";
 
   return (
-    <View className={className} style={style} accessibilityRole={accessibilityRole} accessibilityLabel={accessibilityLabel}>
+    <View
+      className={className}
+      style={style}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel}
+    >
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[{ paddingHorizontal: 24, gap: 8 }, contentContainerStyle]}
+        contentContainerStyle={[
+          { paddingHorizontal: 24, gap: 8 },
+          contentContainerStyle,
+        ]}
       >
         {options.map((option) => {
           const isSelected = selectedSet.has(option.value);

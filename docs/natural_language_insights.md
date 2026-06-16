@@ -20,12 +20,14 @@ analysis, and a chat interface.
 ## Features
 
 ### 🗣️ **Natural Language Processing**
+
 - Ask questions in plain English (e.g., "What did I spend last month?")
 - Support for voice input via speech-to-text
 - Intelligent intent recognition and query parsing
 - Context-aware response generation
 
 ### 🧠 **Smart Query Understanding**
+
 - Expense and income analysis
 - Category-specific breakdowns
 - Time-based queries (today, this week, last month, etc.)
@@ -34,6 +36,7 @@ analysis, and a chat interface.
 - Budget status inquiries
 
 ### 💬 **Chat Interface**
+
 - Beautiful, WhatsApp-style chat UI
 - Real-time responses with confidence indicators
 - Interactive insights with drill-down capabilities
@@ -41,11 +44,13 @@ analysis, and a chat interface.
 - Conversation history
 
 ### 🎤 **Voice Integration**
+
 - Speech-to-text for hands-free queries
 - Voice activation with visual feedback
 - Error handling for speech recognition
 
 ### 📊 **Rich Insights**
+
 - Detailed financial breakdowns
 - Trend analysis with visual indicators
 - Actionable recommendations
@@ -54,29 +59,35 @@ analysis, and a chat interface.
 ## Query Types Supported
 
 ### **Expense Queries**
+
 - "What did I spend last month?"
 - "How much on food this week?"
 - "Show me my restaurant expenses"
 
 ### **Income Analysis**
+
 - "How much income this year?"
 - "What did I earn last month?"
 
 ### **Top Spending**
+
 - "Top 5 expenses this month"
 - "My biggest spending categories"
 - "Where do I spend the most?"
 
 ### **Balance Calculations**
+
 - "What's my balance this month?"
 - "Income vs expenses"
 - "Am I saving money?"
 
 ### **Budget Status**
+
 - "My budget status"
 - "How am I doing with my budget?"
 
 ### **Time-based Queries**
+
 - Today, this week, this month, last month
 - This year, last year
 - Custom date ranges
@@ -110,7 +121,9 @@ analysis, and a chat interface.
 ### Core Components
 
 #### **NaturalLanguageQueryService**
+
 The main orchestrator that:
+
 - Parses user queries into structured intents
 - Gathers relevant transaction data
 - Generates insights using AI or heuristics
@@ -122,7 +135,7 @@ class NaturalLanguageQueryService {
     required String question,
     required String userId,
   });
-  
+
   QueryIntent parseIntentWithHeuristics(String question);
   Map<String, DateTime> getDateRange(String timeframe);
   String createTransactionSummary(List<Transaction> transactions);
@@ -130,7 +143,9 @@ class NaturalLanguageQueryService {
 ```
 
 #### **QueryResult Model**
+
 Structured response containing:
+
 - **Answer**: Direct response to the user's question
 - **Summary**: Brief overview of findings
 - **Insights**: Detailed breakdowns with values and trends
@@ -138,11 +153,13 @@ Structured response containing:
 - **Confidence**: AI confidence score (0.0 - 1.0)
 
 #### **Intent Recognition**
+
 - **Heuristic Parsing**: Keyword-based analysis for offline use
 - **AI Parsing**: LLM-powered intent extraction (self-hosted / local LLM) for complex queries
 - **Fallback Strategy**: Graceful degradation from AI to heuristics
 
 #### **Data Analysis**
+
 - **Transaction Aggregation**: Grouping by category, time, type
 - **Trend Calculation**: Period-over-period comparisons
 - **Balance Computation**: Income vs expense analysis
@@ -181,12 +198,14 @@ Structured response containing:
 - User controls over AI features (opt-in)
 
 ### **Data Minimization**
+
 - Only relevant transaction data sent to AI
 - No personal identifiers in AI requests
 - Anonymized transaction summaries
 - Minimal data retention
 
 ### **User Controls**
+
 - AI features toggle in privacy settings
 - Network features control
 - API key management
@@ -195,6 +214,7 @@ Structured response containing:
 ## User Experience
 
 ### **Chat Interface Features**
+
 - **Welcome Message**: Friendly introduction with example queries
 - **Quick Questions**: Preset common queries for easy access
 - **Real-time Responses**: Immediate feedback with loading indicators
@@ -202,12 +222,14 @@ Structured response containing:
 - **Action Buttons**: One-click navigation to detailed views
 
 ### **Voice Interaction**
+
 - **Speech Recognition**: High-quality voice input
 - **Visual Feedback**: Microphone status indicators
 - **Error Handling**: Clear feedback for recognition issues
 - **Accessibility**: Full voice navigation support
 
 ### **Response Quality**
+
 - **Contextual Answers**: Responses tailored to user's data
 - **Confidence Indicators**: Visual cues for answer reliability
 - **Trend Analysis**: Up/down/stable indicators with colors
@@ -216,6 +238,7 @@ Structured response containing:
 ## Example Interactions
 
 ### **Simple Expense Query**
+
 ```
 User: "What did I spend last month?"
 Assistant: "You spent $1,247.83 in last month."
@@ -229,6 +252,7 @@ Actions: [View Transactions] [Export Data]
 ```
 
 ### **Category Analysis**
+
 ```
 User: "How much on restaurants?"
 Assistant: "You spent $285.40 on Food & Dining in this month."
@@ -242,6 +266,7 @@ Actions: [View Food Transactions] [Set Budget]
 ```
 
 ### **Top Spending Analysis**
+
 ```
 User: "Top 5 expenses this week"
 Assistant: "Your top spending category this week was Food & Dining with $156.78."
@@ -259,6 +284,7 @@ Actions: [View All Categories] [Create Budget]
 ## Testing Strategy
 
 ### **Unit Tests**
+
 - Intent parsing accuracy
 - Date range calculations
 - Data aggregation logic
@@ -266,12 +292,14 @@ Actions: [View All Categories] [Create Budget]
 - Error handling scenarios
 
 ### **Integration Tests**
+
 - End-to-end query processing
 - AI service integration
 - Voice input handling
 - UI state management
 
 ### **User Experience Tests**
+
 - Query response time
 - Answer accuracy
 - Voice recognition quality
@@ -280,12 +308,14 @@ Actions: [View All Categories] [Create Budget]
 ## Performance Considerations
 
 ### **Response Time**
+
 - Heuristic queries: < 100ms
 - AI-powered queries: < 2 seconds
 - Large dataset handling: Optimized aggregation
 - Background processing: Non-blocking UI
 
 ### **Scalability**
+
 - Efficient data querying
 - Caching for common patterns
 - Debounced voice input
@@ -294,6 +324,7 @@ Actions: [View All Categories] [Create Budget]
 ## Future Enhancements
 
 ### **Planned Features**
+
 - **Multi-turn Conversations**: Context-aware follow-up questions
 - **Learning from Feedback**: Improving accuracy over time
 - **Custom Query Templates**: User-defined frequent questions
@@ -310,12 +341,14 @@ Actions: [View All Categories] [Create Budget]
 ### **Common Issues**
 
 **Voice Recognition Not Working**
+
 - Check microphone permissions
 - Ensure quiet environment
 - Verify speech-to-text service availability
 - Try typing the query instead
 
 **Low Confidence Responses**
+
 - Rephrase question more specifically
 - Include time frame in query
 - Check if sufficient transaction data exists
@@ -328,6 +361,7 @@ Actions: [View All Categories] [Create Budget]
 - Reduce query complexity
 
 **No Insights Available**
+
 - Ensure transaction data exists for the time period
 - Check privacy settings allow AI features
 - Verify categories are properly assigned
@@ -341,6 +375,7 @@ Actions: [View All Categories] [Create Budget]
 > consumed by a React Native chat screen via a tRPC/TanStack Query hook.
 
 ### Query processing (intended shape — TypeScript)
+
 ```ts
 // server: a tRPC procedure
 nlQuery: protectedProcedure
@@ -354,6 +389,7 @@ nlQuery: protectedProcedure
 ```
 
 ### Response handling (client)
+
 ```tsx
 const { mutateAsync } = trpc.insights.nlQuery.useMutation();
 const result = await mutateAsync({ question: "What did I spend on food?" });

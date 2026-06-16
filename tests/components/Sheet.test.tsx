@@ -36,13 +36,8 @@ vi.mock("@/hooks/use-colors", () => ({
 }));
 
 vi.mock("@expo/vector-icons", () => ({
-  Ionicons: ({
-    name,
-  }: {
-    name: string;
-    size?: number;
-    color?: string;
-  }) => React.createElement("Ionicons", { name }),
+  Ionicons: ({ name }: { name: string; size?: number; color?: string }) =>
+    React.createElement("Ionicons", { name }),
 }));
 
 vi.mock("react-native-safe-area-context", () => ({
@@ -66,7 +61,10 @@ afterEach(() => {
   Platform.OS = "ios";
 });
 
-function findByTestId(root: ReactTestInstance, testID: string): ReactTestInstance {
+function findByTestId(
+  root: ReactTestInstance,
+  testID: string,
+): ReactTestInstance {
   return root.find((n) => n.props.testID === testID);
 }
 
@@ -83,10 +81,7 @@ describe("Sheet", () => {
         <></>
       </Sheet>,
     );
-    expect(
-      root.findAll((n) => String(n.type) === "Modal")
-        .length,
-    ).toBe(1);
+    expect(root.findAll((n) => String(n.type) === "Modal").length).toBe(1);
     expect(findByTestId(root, "smartpocket-sheet-backdrop")).toBeDefined();
     expect(findByTestId(root, "smartpocket-sheet-panel")).toBeDefined();
     expect(findByTestId(root, "smartpocket-sheet-handle")).toBeDefined();
@@ -99,10 +94,7 @@ describe("Sheet", () => {
         <></>
       </Sheet>,
     );
-    expect(
-      root.findAll((n) => String(n.type) === "Modal")
-        .length,
-    ).toBe(0);
+    expect(root.findAll((n) => String(n.type) === "Modal").length).toBe(0);
   });
 
   it("sets accessibilityViewIsModal on the Modal host", () => {
@@ -111,9 +103,7 @@ describe("Sheet", () => {
         <></>
       </Sheet>,
     );
-    const modal = root.find(
-      (n) => String(n.type) === "Modal",
-    );
+    const modal = root.find((n) => String(n.type) === "Modal");
     expect(modal.props.accessibilityViewIsModal).toBe(true);
   });
 
@@ -167,9 +157,7 @@ describe("Sheet", () => {
         <></>
       </Sheet>,
     );
-    const modal = root.find(
-      (n) => String(n.type) === "Modal",
-    );
+    const modal = root.find((n) => String(n.type) === "Modal");
     act(() => {
       modal.props.onRequestClose?.();
     });
@@ -182,9 +170,7 @@ describe("Sheet", () => {
         <></>
       </Sheet>,
     );
-    const kav = root.find(
-      (n) => String(n.type) === "KeyboardAvoidingView",
-    );
+    const kav = root.find((n) => String(n.type) === "KeyboardAvoidingView");
     expect(kav.props.behavior).toBe("padding");
   });
 
@@ -226,26 +212,21 @@ describe("Sheet", () => {
     );
     const headers = root.findAll(
       (n) =>
-        String(n.type) === "Text" &&
-        n.props.accessibilityRole === "header",
+        String(n.type) === "Text" && n.props.accessibilityRole === "header",
     );
     expect(headers.length).toBe(0);
     expect(findByTestId(root, "smartpocket-sheet-close")).toBeDefined();
   });
 
   it("AC1: renders immediately and mounts when reduce-motion is enabled", () => {
-    const spy = vi
-      .spyOn(Reanimated, "useReducedMotion")
-      .mockReturnValue(true);
+    const spy = vi.spyOn(Reanimated, "useReducedMotion").mockReturnValue(true);
     try {
       const root = render(
         <Sheet visible onClose={vi.fn()} title="Reduced motion">
           <></>
         </Sheet>,
       );
-      expect(
-        root.findAll((n) => String(n.type) === "Modal").length,
-      ).toBe(1);
+      expect(root.findAll((n) => String(n.type) === "Modal").length).toBe(1);
       expect(findByTestId(root, "smartpocket-sheet-panel")).toBeDefined();
       expect(findByTestId(root, "smartpocket-sheet-backdrop")).toBeDefined();
     } finally {

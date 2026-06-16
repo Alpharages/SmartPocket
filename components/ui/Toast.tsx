@@ -1,5 +1,11 @@
 import React, { useEffect } from "react";
-import { AccessibilityInfo, Platform, Pressable, Text, View } from "react-native";
+import {
+  AccessibilityInfo,
+  Platform,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -30,7 +36,10 @@ const ANIM_DURATION = Motion.sheet.durationMs;
 const MIN_TOUCH = 44;
 const DEFAULT_DURATION_MS = 3500;
 
-const ICON_MAP: Record<ToastType, React.ComponentProps<typeof Ionicons>["name"]> = {
+const ICON_MAP: Record<
+  ToastType,
+  React.ComponentProps<typeof Ionicons>["name"]
+> = {
   success: "checkmark-circle",
   error: "close-circle",
   info: "information-circle",
@@ -110,7 +119,9 @@ export function Toast({
           paddingHorizontal: Spacing.md,
           marginBottom: Spacing.sm,
           ...(Platform.OS === "web"
-            ? { boxShadow: `0 2px 8px color-mix(in srgb, ${colors.overlay} 12%, transparent)` }
+            ? {
+                boxShadow: `0 2px 8px color-mix(in srgb, ${colors.overlay} 12%, transparent)`,
+              }
             : {
                 shadowColor: colors.overlay,
                 shadowOffset: { width: 0, height: 2 },

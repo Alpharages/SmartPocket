@@ -158,7 +158,12 @@ describe("A11y Audit — AC3 Screen-reader labels", () => {
 
   it("StatCard exposes accessible + accessibilityRole + accessibilityLabel", () => {
     const root = render(
-      <StatCard variant="compact" label="Income" amount={100} sign="positive" />,
+      <StatCard
+        variant="compact"
+        label="Income"
+        amount={100}
+        sign="positive"
+      />,
     );
     const card = findByProp(root, "accessible", true);
     expect(card).toBeDefined();
@@ -184,9 +189,10 @@ describe("A11y Audit — AC3 Screen-reader labels", () => {
     const buttons = findAllByProp(root, "accessibilityRole", "button");
     expect(buttons.length).toBeGreaterThanOrEqual(1);
     // The main row is the one with the composite accessibilityLabel
-    const row = buttons.find((b) =>
-      typeof b.props.accessibilityLabel === "string" &&
-      b.props.accessibilityLabel.includes("Groceries"),
+    const row = buttons.find(
+      (b) =>
+        typeof b.props.accessibilityLabel === "string" &&
+        b.props.accessibilityLabel.includes("Groceries"),
     );
     expect(row).toBeDefined();
     expect(row!.props.accessibilityActions).toEqual(
@@ -316,7 +322,9 @@ describe("A11y Audit — AC3 Screen-reader labels", () => {
   });
 
   it("Skeleton exposes accessible element when label provided", () => {
-    const root = render(<Skeleton variant="line" accessibilityLabel="Loading" />);
+    const root = render(
+      <Skeleton variant="line" accessibilityLabel="Loading" />,
+    );
     const skel = findByProp(root, "testID", "skeleton");
     expect(skel).toBeDefined();
     expect(skel.props.accessible).toBe(true);
@@ -387,7 +395,12 @@ describe("A11y Audit — AC6 Non-color encoding", () => {
 
   it("StatCard compact renders explicit sign prefix (+/-) with icon", () => {
     const root = render(
-      <StatCard variant="compact" label="Income" amount={100} sign="positive" />,
+      <StatCard
+        variant="compact"
+        label="Income"
+        amount={100}
+        sign="positive"
+      />,
     );
     const texts = root.findAll((n) => String(n.type) === "Text");
     const amountText = texts.find((t) =>
@@ -398,7 +411,12 @@ describe("A11y Audit — AC6 Non-color encoding", () => {
 
   it("StatCard compact negative renders explicit sign prefix", () => {
     const root = render(
-      <StatCard variant="compact" label="Expense" amount={50} sign="negative" />,
+      <StatCard
+        variant="compact"
+        label="Expense"
+        amount={50}
+        sign="negative"
+      />,
     );
     const texts = root.findAll((n) => String(n.type) === "Text");
     const amountText = texts.find((t) =>

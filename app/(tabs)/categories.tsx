@@ -18,7 +18,13 @@ import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { CATEGORY_COLOR_LIGHT_VALUES } from "@/constants/theme";
-import { Button, CategoryToken, ConfirmSheet, EmptyState, Sheet } from "@/components/ui";
+import {
+  Button,
+  CategoryToken,
+  ConfirmSheet,
+  EmptyState,
+  Sheet,
+} from "@/components/ui";
 import { useConfirm } from "@/hooks/use-confirm";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
 
@@ -54,7 +60,9 @@ function CategoryRow({
         accessibilityRole="button"
         accessibilityLabel={`${item.name}, ${item.type} category`}
         accessibilityHint="Long press to delete"
-        accessibilityActions={[{ name: "delete", label: `Delete ${item.name}` }]}
+        accessibilityActions={[
+          { name: "delete", label: `Delete ${item.name}` },
+        ]}
         onAccessibilityAction={(e) => {
           if (e.nativeEvent.actionName === "delete") onRequestDelete(item);
         }}
@@ -98,7 +106,13 @@ export default function CategoriesScreen() {
     Platform.OS === "web" ? { alignSelf: "flex-start" } : undefined;
   const { categories, loadingCategories, addCategory, deleteCategory } =
     useExpense();
-  const { visible: confirmVisible, options: confirmOptions, confirm, onConfirm, onCancel } = useConfirm();
+  const {
+    visible: confirmVisible,
+    options: confirmOptions,
+    confirm,
+    onConfirm,
+    onCancel,
+  } = useConfirm();
   const [showModal, setShowModal] = useState(false);
   const [categoryType, setCategoryType] = useState<"income" | "expense">(
     "expense",

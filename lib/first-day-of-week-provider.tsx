@@ -106,7 +106,9 @@ export function FirstDayOfWeekProvider({
 export function useFirstDayOfWeek(): FirstDayOfWeekContextValue {
   const ctx = useContext(FirstDayOfWeekContext);
   if (!ctx) {
-    throw new Error("useFirstDayOfWeek must be used within FirstDayOfWeekProvider");
+    throw new Error(
+      "useFirstDayOfWeek must be used within FirstDayOfWeekProvider",
+    );
   }
   return ctx;
 }

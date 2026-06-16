@@ -159,7 +159,9 @@ function AiToggleControl({
       style={{ minHeight: 44 }}
     >
       <View className="flex-1 pr-md">
-        <Text className="text-body font-medium text-foreground">AI features</Text>
+        <Text className="text-body font-medium text-foreground">
+          AI features
+        </Text>
         <Text className="mt-xs text-caption text-muted">{AI_EXPLANATION}</Text>
       </View>
       <Switch
@@ -197,8 +199,8 @@ function ClearDataConfirmationSheet({
     >
       <View className="px-lg pb-lg">
         <Text className="mb-lg text-body text-muted">
-          This permanently deletes all transactions, categories, and credit cards. This
-          action cannot be undone.
+          This permanently deletes all transactions, categories, and credit
+          cards. This action cannot be undone.
         </Text>
         <View className="flex-row gap-md">
           <View className="flex-1">
@@ -239,7 +241,12 @@ function CurrencyPickerSheet({
   const colors = useColors();
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Currency" testID="currency-picker-sheet">
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Currency"
+      testID="currency-picker-sheet"
+    >
       {CURRENCIES.map((entry) => {
         const isActive = entry.code === selected;
         return (
@@ -337,7 +344,11 @@ export default function SettingsScreen() {
             accessibilityLabel="Go back"
             onPress={() => router.back()}
             leftIcon={
-              <Ionicons name="chevron-back" size={22} color={colors.foreground} />
+              <Ionicons
+                name="chevron-back"
+                size={22}
+                color={colors.foreground}
+              />
             }
           />
         }

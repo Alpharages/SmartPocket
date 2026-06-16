@@ -23,9 +23,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const toast = useToast();
   const settingsQuery = trpc.settings.get.useQuery();
   const setAiMutation = trpc.settings.setAiEnabled.useMutation();
-  const [optimisticAiEnabled, setOptimisticAiEnabled] = useState<boolean | null>(
-    null,
-  );
+  const [optimisticAiEnabled, setOptimisticAiEnabled] = useState<
+    boolean | null
+  >(null);
   const [isSavingAi, setIsSavingAi] = useState(false);
   const intendedAiEnabledRef = useRef<boolean | null>(null);
 
@@ -76,7 +76,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>
+    <SettingsContext.Provider value={value}>
+      {children}
+    </SettingsContext.Provider>
   );
 }
 

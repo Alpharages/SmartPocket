@@ -1,6 +1,10 @@
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import TestRenderer, { act, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
+import TestRenderer, {
+  act,
+  type ReactTestInstance,
+  type ReactTestRenderer,
+} from "react-test-renderer";
 
 import { Skeleton } from "@/components/ui/Skeleton";
 import * as Reanimated from "react-native-reanimated";
@@ -68,17 +72,23 @@ describe("Skeleton", () => {
     // Do NOT pass a custom testID — the component fiber would also match,
     // causing find() to return the wrong node. Use the default "skeleton" ID.
     const root = render(<Skeleton variant="circle" />);
-    expect(flatStyle(findByTestId(root, "skeleton")).borderRadius).toBe(Radius.full);
+    expect(flatStyle(findByTestId(root, "skeleton")).borderRadius).toBe(
+      Radius.full,
+    );
   });
 
   it("AC6: rect variant has md border radius", () => {
     const root = render(<Skeleton variant="rect" />);
-    expect(flatStyle(findByTestId(root, "skeleton")).borderRadius).toBe(Radius.md);
+    expect(flatStyle(findByTestId(root, "skeleton")).borderRadius).toBe(
+      Radius.md,
+    );
   });
 
   it("AC6: line variant has sm border radius", () => {
     const root = render(<Skeleton variant="line" />);
-    expect(flatStyle(findByTestId(root, "skeleton")).borderRadius).toBe(Radius.sm);
+    expect(flatStyle(findByTestId(root, "skeleton")).borderRadius).toBe(
+      Radius.sm,
+    );
   });
 
   it("AC6: custom width, height, radius override variant defaults", () => {
@@ -94,13 +104,17 @@ describe("Skeleton", () => {
   it("AC1: uses token color for base (colors.border) — no hardcoded hex", () => {
     const root = render(<Skeleton />);
     // border token resolves to #E5E7EB in the mock
-    expect(flatStyle(findByTestId(root, "skeleton")).backgroundColor).toBe("#E5E7EB");
+    expect(flatStyle(findByTestId(root, "skeleton")).backgroundColor).toBe(
+      "#E5E7EB",
+    );
   });
 
   it("AC5: shimmer layer uses muted token color", () => {
     const root = render(<Skeleton />);
     // muted token resolves to #6B7280 in the mock
-    expect(flatStyle(findByTestId(root, "skeleton-shimmer")).backgroundColor).toBe("#6B7280");
+    expect(
+      flatStyle(findByTestId(root, "skeleton-shimmer")).backgroundColor,
+    ).toBe("#6B7280");
   });
 
   it("AC5 reduced-motion: shimmer node still renders (content visible), no animation", () => {
@@ -117,7 +131,9 @@ describe("Skeleton", () => {
     const root = render(<Skeleton />);
     const container = findByTestId(root, "skeleton");
     expect(container.props.accessibilityElementsHidden).toBe(true);
-    expect(container.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(container.props.importantForAccessibility).toBe(
+      "no-hide-descendants",
+    );
   });
 
   it("AC5 a11y: accessibilityLabel exposes element as accessible (accessible=true required, per Lore lesson)", () => {

@@ -17,9 +17,12 @@ async function devLogin() {
 
 async function trpcQuery(token, path, input) {
   const encoded = encodeURIComponent(JSON.stringify({ 0: { json: input } }));
-  const res = await fetch(`${API_URL}/api/trpc/${path}?batch=1&input=${encoded}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await fetch(
+    `${API_URL}/api/trpc/${path}?batch=1&input=${encoded}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
   const json = await res.json();
   if (json[0]?.error) throw new Error(`${path}: ${json[0].error.json.message}`);
   return json[0].result.data.json;
@@ -82,11 +85,14 @@ async function seedQaData(token) {
   });
 
   const categories = await trpcQuery(token, "categories.list", {});
-  const expenseCat = categories.find((c) => c.type === "expense") ?? categories[0];
+  const expenseCat =
+    categories.find((c) => c.type === "expense") ?? categories[0];
 
-  const existing = (await trpcQuery(token, "transactions.listByCreditCard", {
-    creditCardId: cardA.id,
-  })).length;
+  const existing = (
+    await trpcQuery(token, "transactions.listByCreditCard", {
+      creditCardId: cardA.id,
+    })
+  ).length;
 
   if (existing < 2) {
     const seeds = [
@@ -134,7 +140,9 @@ async function main() {
   const { cardA, cardB, linkedCount } = await seedQaData(token);
 
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+  });
   const page = await context.newPage();
 
   // Web bundle may target Android emulator host (10.0.2.2) — rewrite to local API.
@@ -147,28 +155,47 @@ async function main() {
     await page.addInitScript((sessionToken) => {
       localStorage.setItem("app_session_token", sessionToken);
     }, token);
-    await page.goto(`${BASE_URL}/cards`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto(`${BASE_URL}/cards`, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
     await page.waitForTimeout(4000);
-    await page.getByText(/\d+ cards?/).waitFor({ timeout: 15000 }).catch(() => {});
+    await page
+      .getByText(/\d+ cards?/)
+      .waitFor({ timeout: 15000 })
+      .catch(() => {});
 
     // Cards tab (direct /cards route may already be active)
-    await page.getByRole("tab", { name: "Cards" }).click().catch(() => {});
+    await page
+      .getByRole("tab", { name: "Cards" })
+      .click()
+      .catch(() => {});
     await page.waitForTimeout(1000);
 
-    const cardABtn = page.getByRole("button", { name: /QA Card A card ending in/i });
+    const cardABtn = page.getByRole("button", {
+      name: /QA Card A card ending in/i,
+    });
     if (!(await cardABtn.isVisible().catch(() => false))) {
-      results.push(fail("Tap Card A → detail", "QA Card A not visible on Cards tab"));
+      results.push(
+        fail("Tap Card A → detail", "QA Card A not visible on Cards tab"),
+      );
     } else {
       await cardABtn.click();
       await page.waitForTimeout(1500);
 
       const onDetail = page.url().includes(`/card/${cardA.id}`);
-      const hasTotal = await page.getByText("Total on this card").isVisible().catch(() => false);
+      const hasTotal = await page
+        .getByText("Total on this card")
+        .isVisible()
+        .catch(() => false);
       const bodyText = await page.locator("body").innerText();
       const hasMask =
         bodyText.includes("•••• •••• •••• 1234") &&
         !bodyText.includes("4111111111111234");
-      const rowCount = await page.locator('[role="button"]').filter({ hasText: /\$/ }).count();
+      const rowCount = await page
+        .locator('[role="button"]')
+        .filter({ hasText: /\$/ })
+        .count();
 
       if (onDetail && hasTotal && linkedCount > 0 && rowCount >= 1) {
         results.push(
@@ -189,17 +216,27 @@ async function main() {
       if (hasMask) {
         results.push(pass("Card masking on detail", "Last-4 masking visible"));
       } else {
-        results.push(fail("Card masking on detail", "Full card number visible or last-4 missing"));
+        results.push(
+          fail(
+            "Card masking on detail",
+            "Full card number visible or last-4 missing",
+          ),
+        );
       }
 
       await page.getByLabel("Go back").click();
       await page.waitForTimeout(800);
     }
 
-    await page.getByRole("tab", { name: "Cards" }).click().catch(() => {});
+    await page
+      .getByRole("tab", { name: "Cards" })
+      .click()
+      .catch(() => {});
     await page.waitForTimeout(500);
 
-    const cardBBtn = page.getByRole("button", { name: /QA Card B card ending in/i });
+    const cardBBtn = page.getByRole("button", {
+      name: /QA Card B card ending in/i,
+    });
     if (!(await cardBBtn.isVisible().catch(() => false))) {
       results.push(fail("Tap Card B → empty state", "QA Card B not visible"));
     } else {
@@ -210,7 +247,9 @@ async function main() {
         .isVisible()
         .catch(() => false);
       if (empty) {
-        results.push(pass("Tap Card B → empty state", "Empty state message shown"));
+        results.push(
+          pass("Tap Card B → empty state", "Empty state message shown"),
+        );
       } else {
         results.push(fail("Tap Card B → empty state", `url=${page.url()}`));
       }
@@ -218,7 +257,10 @@ async function main() {
       await page.waitForTimeout(800);
     }
 
-    await page.getByRole("tab", { name: "Cards" }).click().catch(() => {});
+    await page
+      .getByRole("tab", { name: "Cards" })
+      .click()
+      .catch(() => {});
     await page.waitForTimeout(500);
 
     const cardBForLongPress = page.getByRole("button", {
@@ -233,12 +275,25 @@ async function main() {
         await page.mouse.up();
       }
       await page.waitForTimeout(800);
-      const deleteDialog = await page.getByText("Delete Card").isVisible().catch(() => false);
+      const deleteDialog = await page
+        .getByText("Delete Card")
+        .isVisible()
+        .catch(() => false);
       if (deleteDialog) {
-        await page.getByText("Cancel").click().catch(() => page.keyboard.press("Escape"));
-        results.push(pass("Long-press delete dialog", "Delete confirmation appeared; cancelled"));
+        await page
+          .getByText("Cancel")
+          .click()
+          .catch(() => page.keyboard.press("Escape"));
+        results.push(
+          pass(
+            "Long-press delete dialog",
+            "Delete confirmation appeared; cancelled",
+          ),
+        );
       } else {
-        const stillThere = await cardBForLongPress.isVisible().catch(() => false);
+        const stillThere = await cardBForLongPress
+          .isVisible()
+          .catch(() => false);
         results.push(
           stillThere
             ? blocked(
@@ -249,11 +304,18 @@ async function main() {
         );
       }
     } catch (err) {
-      results.push(blocked("Long-press delete dialog", String(err.message ?? err)));
+      results.push(
+        blocked("Long-press delete dialog", String(err.message ?? err)),
+      );
     }
 
     // Light theme spot-check (default)
-    results.push(pass("Theme (light)", "Default light theme rendered without layout break"));
+    results.push(
+      pass(
+        "Theme (light)",
+        "Default light theme rendered without layout break",
+      ),
+    );
 
     // Dark theme via prefers-color-scheme
     await context.close();
@@ -263,15 +325,23 @@ async function main() {
     });
     const darkPage = await darkContext.newPage();
     await darkPage.route("**/*", (route) => {
-      const url = route.request().url().replace("http://10.0.2.2:3000", API_URL);
+      const url = route
+        .request()
+        .url()
+        .replace("http://10.0.2.2:3000", API_URL);
       route.continue({ url });
     });
     await darkPage.addInitScript((sessionToken) => {
       localStorage.setItem("app_session_token", sessionToken);
     }, token);
-    await darkPage.goto(`${BASE_URL}/card/${cardA.id}`, { waitUntil: "domcontentloaded" });
+    await darkPage.goto(`${BASE_URL}/card/${cardA.id}`, {
+      waitUntil: "domcontentloaded",
+    });
     await darkPage.waitForTimeout(2000);
-    const darkOk = await darkPage.getByText("Total on this card").isVisible().catch(() => false);
+    const darkOk = await darkPage
+      .getByText("Total on this card")
+      .isVisible()
+      .catch(() => false);
     results.push(
       darkOk
         ? pass("Theme (dark)", "Card detail readable in dark mode")
@@ -285,7 +355,13 @@ async function main() {
   const failed = results.filter((r) => r.status === "FAIL");
   const verdict = failed.length > 0 ? "fail" : "pass";
 
-  console.log(JSON.stringify({ verdict, cardAId: cardA.id, cardBId: cardB.id, results }, null, 2));
+  console.log(
+    JSON.stringify(
+      { verdict, cardAId: cardA.id, cardBId: cardB.id, results },
+      null,
+      2,
+    ),
+  );
   process.exit(failed.length > 0 ? 1 : 0);
 }
 

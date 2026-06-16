@@ -46,13 +46,15 @@ const buildEndpoint = (rpc: string): string => {
   if (!ENV.forgeApiUrl) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: "Heartbeat service URL is not configured (BUILT_IN_FORGE_API_URL).",
+      message:
+        "Heartbeat service URL is not configured (BUILT_IN_FORGE_API_URL).",
     });
   }
   if (!ENV.forgeApiKey) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: "Heartbeat service API key is not configured (BUILT_IN_FORGE_API_KEY).",
+      message:
+        "Heartbeat service API key is not configured (BUILT_IN_FORGE_API_KEY).",
     });
   }
   const baseUrl = ENV.forgeApiUrl;
@@ -63,7 +65,7 @@ const buildEndpoint = (rpc: string): string => {
 const callForge = async <T>(
   rpc: string,
   body: Record<string, unknown>,
-  userSession: string
+  userSession: string,
 ): Promise<T> => {
   const endpoint = buildEndpoint(rpc);
   const headers: Record<string, string> = {
@@ -102,7 +104,7 @@ const callForge = async <T>(
 const mapForgeError = (
   response: Response,
   detail: string,
-  rpc: string
+  rpc: string,
 ): TRPCError => {
   const status = response.status;
   let code: TRPCError["code"] = "INTERNAL_SERVER_ERROR";
@@ -139,7 +141,7 @@ const validateCallbackPath = (path: string): void => {
  */
 export async function createHeartbeatJob(
   job: HeartbeatJob,
-  userSession: string
+  userSession: string,
 ): Promise<{ taskUid: string; nextExecutionAt?: string | null }> {
   validateCallbackPath(job.path);
   return callForge<{ taskUid: string; nextExecutionAt?: string | null }>(
@@ -152,7 +154,7 @@ export async function createHeartbeatJob(
       callbackPayload: stringifyPayload(job.payload),
       description: job.description ?? "",
     },
-    userSession
+    userSession,
   );
 }
 
@@ -163,7 +165,7 @@ export async function createHeartbeatJob(
 export async function updateHeartbeatJob(
   taskUid: string,
   patch: HeartbeatJobUpdate,
-  userSession: string
+  userSession: string,
 ): Promise<{ nextExecutionAt?: string | null }> {
   if (patch.path !== undefined) validateCallbackPath(patch.path);
   const body: Record<string, unknown> = { taskUid };
@@ -178,14 +180,14 @@ export async function updateHeartbeatJob(
   return callForge<{ nextExecutionAt?: string | null }>(
     "UpdateHeartbeatJob",
     body,
-    userSession
+    userSession,
   );
 }
 
 /** Delete a cron located by `taskUid`. Idempotent on caller side. */
 export async function deleteHeartbeatJob(
   taskUid: string,
-  userSession: string
+  userSession: string,
 ): Promise<void> {
   await callForge("DeleteHeartbeatJob", { taskUid }, userSession);
 }
@@ -200,7 +202,7 @@ export async function deleteHeartbeatJob(
  */
 export async function listHeartbeatJobs(
   userSession: string,
-  pagination?: { page?: number; pageSize?: number }
+  pagination?: { page?: number; pageSize?: number },
 ): Promise<{ total: number; actorUserId: string; jobs: HeartbeatJobInfo[] }> {
   const body: Record<string, unknown> = {};
   if (pagination?.page !== undefined) body.page = pagination.page;

@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AccessibilityInfo,
   KeyboardAvoidingView,
@@ -25,7 +31,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useColors } from "@/hooks/use-colors";
-import { ContentMaxWidth, Elevation, Motion, Radius, Spacing, Typography } from "@/lib/_core/theme";
+import {
+  ContentMaxWidth,
+  Elevation,
+  Motion,
+  Radius,
+  Spacing,
+  Typography,
+} from "@/lib/_core/theme";
 
 const MIN_TOUCH_TARGET = 44;
 const SHEET_MOTION = Motion.sheet;
@@ -259,9 +272,7 @@ export function Sheet({
             width: "100%",
             maxWidth: Platform.OS === "web" ? panelMaxWidth : undefined,
             alignSelf: Platform.OS === "web" ? "center" : undefined,
-            ...(Platform.OS === "web"
-              ? { boxShadow: Elevation.lg }
-              : {}),
+            ...(Platform.OS === "web" ? { boxShadow: Elevation.lg } : {}),
           },
           panelStyle,
           panelWebProps as StyleProp<ViewStyle>,

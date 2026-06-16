@@ -27,7 +27,8 @@ vi.mock("@/hooks/use-colors", () => ({
 }));
 
 vi.mock("@expo/vector-icons", () => ({
-  Ionicons: ({ name }: { name: string }) => React.createElement("Text", {}, name),
+  Ionicons: ({ name }: { name: string }) =>
+    React.createElement("Text", {}, name),
 }));
 
 vi.mock("@/lib/currency-provider", () => ({
@@ -50,7 +51,11 @@ afterEach(() => {
 function textOf(node: { children?: unknown[] } | string): string {
   if (typeof node === "string") return node;
   return (node.children ?? [])
-    .map((child) => (typeof child === "string" ? child : textOf(child as { children?: unknown[] })))
+    .map((child) =>
+      typeof child === "string"
+        ? child
+        : textOf(child as { children?: unknown[] }),
+    )
     .join("");
 }
 
@@ -60,7 +65,12 @@ describe("summary currency rendering", () => {
 
     act(() => {
       renderer = TestRenderer.create(
-        <StatCard variant="compact" label="Expenses" amount={250} sign="negative" />,
+        <StatCard
+          variant="compact"
+          label="Expenses"
+          amount={250}
+          sign="negative"
+        />,
       );
     });
 

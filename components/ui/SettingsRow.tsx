@@ -82,7 +82,9 @@ export function SettingsRow({
       </Text>
 
       {resolvedTrailing ? (
-        <Text className="text-caption text-muted mr-sm">{resolvedTrailing}</Text>
+        <Text className="text-caption text-muted mr-sm">
+          {resolvedTrailing}
+        </Text>
       ) : null}
 
       {showChevron ? (

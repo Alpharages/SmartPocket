@@ -35,6 +35,7 @@ LLM is unavailable).
 - User control over AI features
 
 ### 📱 **User Experience**
+
 - Real-time suggestions as you type
 - Beautiful suggestion cards with confidence indicators
 - One-click apply or dismiss options
@@ -57,6 +58,7 @@ description, and surface suggestions in the add-transaction screen. Gate the cal
 opt-in before any transaction text is sent to the LLM.
 
 ### 3. Using AI Suggestions (intended UX)
+
 1. Add a new transaction
 2. Type in the description (e.g., "Coffee at Starbucks")
 3. An AI suggestion appears (debounced)
@@ -96,12 +98,14 @@ opt-in before any transaction text is sent to the LLM.
 - Rate limiting / debounce consideration
 
 #### Categorization procedure (to build, in `server/routers.ts`)
+
 - Strategy selection (heuristic vs. LLM)
 - Opt-in / privacy gate before sending any data
 - Optional historical transaction context
 - Confidence scoring
 
 #### LLM categorization strategy
+
 - Prompt engineering for the categorization task
 - Response validation
 - Category mapping to available options
@@ -113,6 +117,7 @@ The model is the env-configured `LLM_MODEL`. Use `response_format`/JSON-schema t
 result where the local model supports it; otherwise parse the text response defensively.
 
 **Sample request (conceptual):**
+
 ```json
 {
   "model": "<LLM_MODEL>",
@@ -131,6 +136,7 @@ result where the local model supports it; otherwise parse the text response defe
 ```
 
 **Sample Response**:
+
 ```json
 {
   "category": "Food & Dining",
@@ -148,11 +154,13 @@ result where the local model supports it; otherwise parse the text response defe
 - No transaction data is sent anywhere unless AI features are explicitly enabled
 
 ### User Controls
+
 - **AI Features Toggle**: Enable/disable all AI functionality (opt-in)
 - **Consent gate**: no transaction data leaves the server for the LLM unless AI features are enabled (and it only ever goes to the self-hosted endpoint)
 - **Heuristic fallback**: always-available keyword-based categorization when AI is off
 
 ### Compliance
+
 - GDPR compliant (user consent required)
 - Data minimization principles
 - Right to deletion (simply disable features)
@@ -162,11 +170,13 @@ result where the local model supports it; otherwise parse the text response defe
 
 A self-hosted / local model has **no per-call API billing** — cost is the compute/infra to run it.
 Categorization prompts are small (~100 tokens), so they are cheap to serve. Optimize compute/latency by:
+
 - keeping prompts compact and forcing structured JSON output
 - debouncing requests while the user types
 - falling back to the free keyword heuristic when possible
 
 ### Optimization
+
 - Efficient prompts minimize token usage
 - Fallback to free heuristics when possible
 - User control over when AI is used
@@ -176,11 +186,13 @@ Categorization prompts are small (~100 tokens), so they are cheap to serve. Opti
 
 ### Unit Tests
 - Mock the self-hosted LLM client responses
+
 - Strategy pattern testing
 - Error handling validation
 - Privacy controls verification
 
 ### Integration Tests
+
 - End-to-end categorization flow
 - Settings integration
 - Network failure scenarios
@@ -189,12 +201,14 @@ Categorization prompts are small (~100 tokens), so they are cheap to serve. Opti
 ## Future Enhancements
 
 ### Planned Features
+
 - **Learning from Corrections**: Improve suggestions based on user feedback
 - **Multiple Model Support**: swap the local model via `LLM_MODEL`, or point `LLM_BASE_URL` at a different OpenAI-compatible backend
 - **Batch Processing**: Categorize multiple transactions
 - **Custom Training**: Fine-tune on user's transaction history
 
 ### Performance Improvements
+
 - **Response Caching**: Cache common categorizations
 - **Debounced Requests**: Reduce API calls while typing
 - **Streaming Responses**: Real-time suggestion updates
@@ -213,16 +227,19 @@ Categorization prompts are small (~100 tokens), so they are cheap to serve. Opti
 - Check the local LLM server / process status
 
 **No Suggestions Appearing**
+
 - Ensure AI features are enabled (opt-in)
 - Check privacy settings
 - Verify transaction description length
 
 **Slow Response Times**
 - Monitor the local LLM server load / latency
+
 - Check network latency
 - Consider heuristic fallback usage
 
 ### Support
+
 - Check app logs for error details
 - Verify settings configuration
 - Test API key independently

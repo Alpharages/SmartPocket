@@ -20,7 +20,8 @@ const schemeFromBundleId = `manus${timestamp}`;
 const env = {
   appName: "Expense Tracker",
   appSlug: "expense-tracker-app",
-  logoUrl: "https://d2xsxph8kpxj0f.cloudfront.net/310519663047064921/hxpiTJvwMmNSu7di699jqw/icon-P5bkGGifnXEVDxAdLtvPBT.webp",
+  logoUrl:
+    "https://d2xsxph8kpxj0f.cloudfront.net/310519663047064921/hxpiTJvwMmNSu7di699jqw/icon-P5bkGGifnXEVDxAdLtvPBT.webp",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
@@ -38,9 +39,9 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
-    "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+    },
   },
   android: {
     adaptiveIcon: {
@@ -77,7 +78,8 @@ const config: ExpoConfig = {
     [
       "expo-audio",
       {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
+        microphonePermission:
+          "Allow $(PRODUCT_NAME) to access your microphone.",
       },
     ],
     [
@@ -106,7 +108,9 @@ const config: ExpoConfig = {
           buildArchs: ["armeabi-v7a", "arm64-v8a"],
           minSdkVersion: 24,
           // Allow http:// only in dev builds — never in production.
-          ...(process.env.APP_ENV !== "production" && { usesCleartextTraffic: true }),
+          ...(process.env.APP_ENV !== "production" && {
+            usesCleartextTraffic: true,
+          }),
         },
       },
     ],

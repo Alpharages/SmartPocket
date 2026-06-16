@@ -21,16 +21,23 @@ describe("deleteAllUserData", () => {
     expect(callDataApi).toHaveBeenCalledTimes(3);
 
     const queries = callDataApi.mock.calls.map(
-      (call) => (call[1] as { body: { query: string; params: unknown[] } }).body,
+      (call) =>
+        (call[1] as { body: { query: string; params: unknown[] } }).body,
     );
 
-    expect(queries[0].query).toMatch(/DELETE FROM transactions WHERE userId = \?/);
+    expect(queries[0].query).toMatch(
+      /DELETE FROM transactions WHERE userId = \?/,
+    );
     expect(queries[0].params).toEqual([42]);
 
-    expect(queries[1].query).toMatch(/DELETE FROM creditCards WHERE userId = \?/);
+    expect(queries[1].query).toMatch(
+      /DELETE FROM creditCards WHERE userId = \?/,
+    );
     expect(queries[1].params).toEqual([42]);
 
-    expect(queries[2].query).toMatch(/DELETE FROM categories WHERE userId = \?/);
+    expect(queries[2].query).toMatch(
+      /DELETE FROM categories WHERE userId = \?/,
+    );
     expect(queries[2].params).toEqual([42]);
   });
 

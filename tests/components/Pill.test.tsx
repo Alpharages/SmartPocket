@@ -72,9 +72,7 @@ function textOf(node: ReactTestInstance | string): string {
 }
 
 function queryText(root: ReactTestInstance, text: string): ReactTestInstance[] {
-  return root.findAll(
-    (n) => String(n.type) === "Text" && textOf(n) === text,
-  );
+  return root.findAll((n) => String(n.type) === "Text" && textOf(n) === text);
 }
 
 function getByText(root: ReactTestInstance, text: string): ReactTestInstance {
@@ -139,9 +137,7 @@ describe("Pill", () => {
     });
 
     it("renders a leftIcon alongside the label", () => {
-      const root = render(
-        <Pill label="With icon" leftIcon={<Text>★</Text>} />,
-      );
+      const root = render(<Pill label="With icon" leftIcon={<Text>★</Text>} />);
       expect(getByText(root, "★")).toBeTruthy();
       expect(getByText(root, "With icon")).toBeTruthy();
     });
@@ -157,9 +153,7 @@ describe("Pill", () => {
 
     it("does not call onPress when disabled", () => {
       const onPress = vi.fn();
-      const root = render(
-        <Pill label="Disabled" onPress={onPress} disabled />,
-      );
+      const root = render(<Pill label="Disabled" onPress={onPress} disabled />);
       press(getPill(root));
       expect(onPress).not.toHaveBeenCalled();
     });
@@ -264,10 +258,13 @@ describe("FilterChipGroup", () => {
       // Single-select children announce as radio (checked), matching the
       // radiogroup container — not as toggle buttons.
       const pills = root.findAll(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "radio",
+        (n) =>
+          typeof n.type === "string" && n.props.accessibilityRole === "radio",
       );
-      const incomePill = pills.find((p) =>
-        p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Income").length > 0,
+      const incomePill = pills.find(
+        (p) =>
+          p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Income")
+            .length > 0,
       );
       expect(incomePill).toBeTruthy();
       expect(incomePill!.props.accessibilityState.checked).toBe(true);
@@ -284,10 +281,13 @@ describe("FilterChipGroup", () => {
         />,
       );
       const pills = root.findAll(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "radio",
+        (n) =>
+          typeof n.type === "string" && n.props.accessibilityRole === "radio",
       );
-      const expensePill = pills.find((p) =>
-        p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Expense").length > 0,
+      const expensePill = pills.find(
+        (p) =>
+          p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Expense")
+            .length > 0,
       );
       press(expensePill!);
       expect(onChange).toHaveBeenCalledTimes(1);
@@ -304,7 +304,9 @@ describe("FilterChipGroup", () => {
         />,
       );
       const group = root.find(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "radiogroup",
+        (n) =>
+          typeof n.type === "string" &&
+          n.props.accessibilityRole === "radiogroup",
       );
       expect(group).toBeTruthy();
     });
@@ -322,10 +324,13 @@ describe("FilterChipGroup", () => {
         />,
       );
       const pills = root.findAll(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "button",
+        (n) =>
+          typeof n.type === "string" && n.props.accessibilityRole === "button",
       );
-      const incomePill = pills.find((p) =>
-        p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Income").length > 0,
+      const incomePill = pills.find(
+        (p) =>
+          p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Income")
+            .length > 0,
       );
       press(incomePill!);
       expect(onChange).toHaveBeenCalledTimes(1);
@@ -343,10 +348,13 @@ describe("FilterChipGroup", () => {
         />,
       );
       const pills = root.findAll(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "button",
+        (n) =>
+          typeof n.type === "string" && n.props.accessibilityRole === "button",
       );
-      const incomePill = pills.find((p) =>
-        p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Income").length > 0,
+      const incomePill = pills.find(
+        (p) =>
+          p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Income")
+            .length > 0,
       );
       press(incomePill!);
       expect(onChange).toHaveBeenCalledTimes(1);
@@ -364,10 +372,13 @@ describe("FilterChipGroup", () => {
         />,
       );
       const pills = root.findAll(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "button",
+        (n) =>
+          typeof n.type === "string" && n.props.accessibilityRole === "button",
       );
-      const expensePill = pills.find((p) =>
-        p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Expense").length > 0,
+      const expensePill = pills.find(
+        (p) =>
+          p.findAll((n) => String(n.type) === "Text" && textOf(n) === "Expense")
+            .length > 0,
       );
       press(expensePill!);
       expect(onChange).toHaveBeenCalledTimes(1);
@@ -387,7 +398,9 @@ describe("FilterChipGroup", () => {
         />,
       );
       const group = root.findAll(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "radiogroup",
+        (n) =>
+          typeof n.type === "string" &&
+          n.props.accessibilityRole === "radiogroup",
       );
       expect(group).toHaveLength(0);
     });
@@ -404,7 +417,8 @@ describe("FilterChipGroup", () => {
         />,
       );
       const pills = root.findAll(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "button",
+        (n) =>
+          typeof n.type === "string" && n.props.accessibilityRole === "button",
       );
       expect(pills).toHaveLength(0);
     });
@@ -424,10 +438,13 @@ describe("FilterChipGroup", () => {
         />,
       );
       const pills = root.findAll(
-        (n) => typeof n.type === "string" && n.props.accessibilityRole === "radio",
+        (n) =>
+          typeof n.type === "string" && n.props.accessibilityRole === "radio",
       );
-      const bPill = pills.find((p) =>
-        p.findAll((n) => String(n.type) === "Text" && textOf(n) === "B").length > 0,
+      const bPill = pills.find(
+        (p) =>
+          p.findAll((n) => String(n.type) === "Text" && textOf(n) === "B")
+            .length > 0,
       );
       expect(bPill!.props.accessibilityState.disabled).toBe(true);
       press(bPill!);

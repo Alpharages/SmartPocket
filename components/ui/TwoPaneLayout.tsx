@@ -43,7 +43,11 @@ export function TwoPaneLayout({
 }: TwoPaneLayoutProps) {
   return (
     <View
-      className={cn("flex-1 flex-col lg:flex-row", className, containerClassName)}
+      className={cn(
+        "flex-1 flex-col lg:flex-row",
+        className,
+        containerClassName,
+      )}
       style={style}
       {...props}
     >
