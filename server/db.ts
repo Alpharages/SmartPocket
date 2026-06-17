@@ -11,12 +11,14 @@ import {
   categories,
   creditCards,
   transactions,
+  recurringTransactions,
   monthlySummaries,
   users,
   InsertCategory,
   InsertCreditCard,
   InsertTransaction,
   InsertBudget,
+  InsertRecurringTransaction,
   InsertMonthlySummary,
   Category,
   CreditCard,
@@ -24,6 +26,7 @@ import {
   Budget,
   MonthlySummary,
   User,
+  RecurringTransaction,
 } from "@/drizzle/schema";
 
 /**
@@ -496,6 +499,12 @@ export async function deleteTransaction(id: number) {
 export async function deleteAllUserData(userId: number) {
   await callDataApi("Database/query", {
     body: {
+      query: "DELETE FROM recurringTransactions WHERE userId = ?",
+      params: [userId],
+    },
+  });
+  await callDataApi("Database/query", {
+    body: {
       query: "DELETE FROM transactions WHERE userId = ?",
       params: [userId],
     },
@@ -526,6 +535,158 @@ export async function getTransactionById(id: number) {
   } catch {
     return null;
   }
+}
+
+// ============================================================================
+// RECURRING TRANSACTIONS
+// ============================================================================
+
+export async function getUserRecurringTransactions(
+  userId: number,
+): Promise<RecurringTransaction[]> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query:
+          "SELECT * FROM recurringTransactions WHERE userId = ? ORDER BY createdAt DESC",
+        params: [userId],
+      },
+    });
+    return Array.isArray(result) ? (result as RecurringTransaction[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createRecurringTransaction(
+  data: InsertRecurringTransaction,
+): Promise<number> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query: `
+        INSERT INTO recurringTransactions (
+          userId, categoryId, creditCardId, type, amount, description, frequency, interval,
+          endCondition, occurrenceCount, endDate, startDate, nextRunDate, lastRunDate,
+          generatedCount, isActive
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      params: [
+        data.userId,
+        data.categoryId,
+        data.creditCardId ?? null,
+        data.type,
+        data.amount,
+        data.description ?? null,
+        data.frequency,
+        data.interval ?? 1,
+        data.endCondition,
+        data.occurrenceCount ?? null,
+        data.endDate ?? null,
+        data.startDate,
+        data.nextRunDate,
+        data.lastRunDate ?? null,
+        data.generatedCount ?? 0,
+        data.isActive ?? true,
+      ],
+    },
+  });
+  return result && typeof result === "object" && "insertId" in result
+    ? (result as { insertId: number }).insertId
+    : 0;
+}
+
+export async function updateRecurringTransaction(
+  id: number,
+  userId: number,
+  data: Partial<InsertRecurringTransaction>,
+): Promise<void> {
+  const updates = Object.entries(data)
+    .map(([key]) => `${key} = ?`)
+    .join(", ");
+  if (!updates) {
+    return;
+  }
+  const values = Object.values(data);
+  await callDataApi("Database/query", {
+    body: {
+      query: `UPDATE recurringTransactions SET ${updates} WHERE id = ? AND userId = ?`,
+      params: [...values, id, userId],
+    },
+  });
+}
+
+export async function deleteRecurringTransaction(
+  id: number,
+  userId: number,
+): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query: "DELETE FROM recurringTransactions WHERE id = ? AND userId = ?",
+      params: [id, userId],
+    },
+  });
+}
+
+export async function getRecurringTransactionById(
+  id: number,
+  userId: number,
+): Promise<RecurringTransaction | null> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query:
+          "SELECT * FROM recurringTransactions WHERE id = ? AND userId = ?",
+        params: [id, userId],
+      },
+    });
+    const row = Array.isArray(result) ? result[0] : null;
+    return row ? (row as RecurringTransaction) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getDueRecurringTransactions(
+  now: Date,
+): Promise<RecurringTransaction[]> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query:
+          "SELECT * FROM recurringTransactions WHERE isActive = 1 AND nextRunDate <= ? ORDER BY nextRunDate ASC",
+        params: [now],
+      },
+    });
+    return Array.isArray(result) ? (result as RecurringTransaction[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function advanceRecurringTransaction(
+  id: number,
+  updates: Pick<
+    InsertRecurringTransaction,
+    "nextRunDate" | "lastRunDate" | "generatedCount" | "isActive"
+  >,
+): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query: `
+        UPDATE recurringTransactions
+        SET nextRunDate = ?, lastRunDate = ?, generatedCount = ?, isActive = ?
+        WHERE id = ?
+      `,
+      params: [
+        updates.nextRunDate,
+        updates.lastRunDate ?? null,
+        updates.generatedCount,
+        updates.isActive,
+        id,
+      ],
+    },
+  });
 }
 
 // ============================================================================

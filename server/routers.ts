@@ -57,6 +57,76 @@ const budgetSchema = z.object({
   endDate: z.date().optional(),
 });
 
+const recurringTransactionSchemaBase = z.object({
+  categoryId: z.number(),
+  creditCardId: z.number().nullable().optional(),
+  type: z.enum(["income", "expense"]),
+  amount: z.string().regex(/^\d+(\.\d{1,2})?$/),
+  description: z.string().max(500).nullable().optional(),
+  frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
+  interval: z.number().int().positive(),
+  endCondition: z.enum(["count", "endDate", "never"]),
+  occurrenceCount: z.number().int().min(1).nullable().optional(),
+  endDate: z.date().nullable().optional(),
+  startDate: z.date(),
+});
+
+const recurringTransactionSchema = recurringTransactionSchemaBase.superRefine(
+  (value, ctx) => {
+    if (value.endCondition === "count") {
+      if (value.occurrenceCount == null || value.occurrenceCount < 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "occurrenceCount must be >= 1 when endCondition is count",
+          path: ["occurrenceCount"],
+        });
+      }
+      if (value.endDate != null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "endDate must be omitted when endCondition is count",
+          path: ["endDate"],
+        });
+      }
+    }
+
+    if (value.endCondition === "endDate") {
+      if (value.endDate == null || value.endDate <= value.startDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "endDate must be greater than startDate",
+          path: ["endDate"],
+        });
+      }
+      if (value.occurrenceCount != null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "occurrenceCount must be omitted when endCondition is endDate",
+          path: ["occurrenceCount"],
+        });
+      }
+    }
+
+    if (value.endCondition === "never") {
+      if (value.endDate != null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "endDate must be omitted when endCondition is never",
+          path: ["endDate"],
+        });
+      }
+      if (value.occurrenceCount != null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "occurrenceCount must be omitted when endCondition is never",
+          path: ["occurrenceCount"],
+        });
+      }
+    }
+  },
+);
+
 // ============================================================================
 // CATEGORIES ROUTER
 // ============================================================================
@@ -249,6 +319,57 @@ const transactionsRouter = router({
     }),
 });
 
+const recurringTransactionsRouter = router({
+  list: protectedProcedure.query(({ ctx }) => {
+    return db.getUserRecurringTransactions(ctx.user.id);
+  }),
+
+  create: protectedProcedure
+    .input(recurringTransactionSchema)
+    .mutation(({ ctx, input }) => {
+      return db.createRecurringTransaction({
+        userId: ctx.user.id,
+        categoryId: input.categoryId,
+        creditCardId: input.creditCardId ?? null,
+        type: input.type,
+        amount: input.amount,
+        description: input.description ?? null,
+        frequency: input.frequency,
+        interval: input.interval,
+        endCondition: input.endCondition,
+        occurrenceCount: input.occurrenceCount ?? null,
+        endDate: input.endDate ?? null,
+        startDate: input.startDate,
+        nextRunDate: input.startDate,
+      });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({ id: z.number() }).and(recurringTransactionSchema))
+    .mutation(({ ctx, input }) => {
+      const { id, ...data } = input;
+      return db.updateRecurringTransaction(id, ctx.user.id, {
+        ...data,
+        creditCardId: data.creditCardId ?? null,
+        description: data.description ?? null,
+        occurrenceCount: data.occurrenceCount ?? null,
+        endDate: data.endDate ?? null,
+      });
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(({ ctx, input }) => {
+      return db.deleteRecurringTransaction(input.id, ctx.user.id);
+    }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(({ ctx, input }) => {
+      return db.getRecurringTransactionById(input.id, ctx.user.id);
+    }),
+});
+
 // ============================================================================
 // SUMMARY ROUTER
 // ============================================================================
@@ -430,6 +551,7 @@ export const appRouter = router({
   categories: categoriesRouter,
   creditCards: creditCardsRouter,
   transactions: transactionsRouter,
+  recurringTransactions: recurringTransactionsRouter,
   summary: summaryRouter,
   budgets: budgetsRouter,
   settings: settingsRouter,

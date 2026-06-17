@@ -1,0 +1,22 @@
+CREATE TABLE `recurringTransactions` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int NOT NULL,
+	`categoryId` int NOT NULL,
+	`creditCardId` int,
+	`type` enum('income','expense') NOT NULL,
+	`amount` decimal(12,2) NOT NULL,
+	`description` text,
+	`frequency` enum('daily','weekly','monthly','yearly') NOT NULL,
+	`interval` int NOT NULL DEFAULT 1,
+	`endCondition` enum('count','endDate','never') NOT NULL,
+	`occurrenceCount` int,
+	`endDate` timestamp,
+	`startDate` timestamp NOT NULL,
+	`nextRunDate` timestamp NOT NULL,
+	`lastRunDate` timestamp,
+	`generatedCount` int NOT NULL DEFAULT 0,
+	`isActive` boolean NOT NULL DEFAULT true,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `recurringTransactions_id` PRIMARY KEY(`id`)
+);

@@ -105,6 +105,44 @@ export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = typeof transactions.$inferInsert;
 
 /**
+ * Recurring transactions table for scheduled transaction generation.
+ */
+export const recurringTransactions = mysqlTable("recurringTransactions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  categoryId: int("categoryId").notNull(),
+  creditCardId: int("creditCardId"),
+  type: mysqlEnum("type", ["income", "expense"]).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  description: text("description"),
+  frequency: mysqlEnum("frequency", [
+    "daily",
+    "weekly",
+    "monthly",
+    "yearly",
+  ]).notNull(),
+  interval: int("interval").notNull().default(1),
+  endCondition: mysqlEnum("endCondition", [
+    "count",
+    "endDate",
+    "never",
+  ]).notNull(),
+  occurrenceCount: int("occurrenceCount"),
+  endDate: timestamp("endDate"),
+  startDate: timestamp("startDate").notNull(),
+  nextRunDate: timestamp("nextRunDate").notNull(),
+  lastRunDate: timestamp("lastRunDate"),
+  generatedCount: int("generatedCount").notNull().default(0),
+  isActive: boolean("isActive").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type RecurringTransaction = typeof recurringTransactions.$inferSelect;
+export type InsertRecurringTransaction =
+  typeof recurringTransactions.$inferInsert;
+
+/**
  * Budgets table: per-category spending caps for a period.
  * Progress (spent vs. limit) is computed at read-time in Story 6.3 — not stored here.
  */

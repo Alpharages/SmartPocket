@@ -5,6 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
+import { generateDueTransactions } from "./recurrenceGenerator";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { sdk } from "./sdk";
@@ -66,6 +67,16 @@ async function startServer() {
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
+  });
+
+  app.post("/api/scheduled/generate-recurring", async (_req, res) => {
+    try {
+      const result = await generateDueTransactions();
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      console.error("[scheduled/generate-recurring] failed:", error);
+      res.status(500).json({ ok: false, error: "Recurring generation failed" });
+    }
   });
 
   // Dev-only login — creates a local dev user and returns a signed session token.

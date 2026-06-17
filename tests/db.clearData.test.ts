@@ -13,12 +13,12 @@ describe("deleteAllUserData", () => {
     vi.resetModules();
   });
 
-  it("deletes transactions, credit cards, and categories in FK-safe order scoped by userId", async () => {
+  it("deletes recurring transactions, transactions, credit cards, and categories in FK-safe order scoped by userId", async () => {
     const { deleteAllUserData } = await import("@/server/db");
 
     await deleteAllUserData(42);
 
-    expect(callDataApi).toHaveBeenCalledTimes(3);
+    expect(callDataApi).toHaveBeenCalledTimes(4);
 
     const queries = callDataApi.mock.calls.map(
       (call) =>
@@ -26,19 +26,24 @@ describe("deleteAllUserData", () => {
     );
 
     expect(queries[0].query).toMatch(
-      /DELETE FROM transactions WHERE userId = \?/,
+      /DELETE FROM recurringTransactions WHERE userId = \?/,
     );
     expect(queries[0].params).toEqual([42]);
 
     expect(queries[1].query).toMatch(
-      /DELETE FROM creditCards WHERE userId = \?/,
+      /DELETE FROM transactions WHERE userId = \?/,
     );
     expect(queries[1].params).toEqual([42]);
 
     expect(queries[2].query).toMatch(
-      /DELETE FROM categories WHERE userId = \?/,
+      /DELETE FROM creditCards WHERE userId = \?/,
     );
     expect(queries[2].params).toEqual([42]);
+
+    expect(queries[3].query).toMatch(
+      /DELETE FROM categories WHERE userId = \?/,
+    );
+    expect(queries[3].params).toEqual([42]);
   });
 
   it("propagates errors from the data API", async () => {
