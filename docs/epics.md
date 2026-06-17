@@ -212,6 +212,21 @@ transaction data is sent.
 this epic introduces a self-hosted/local OpenAI-compatible LLM client instead.*
 **Covers:** FR-11, FR-12, FR-13.
 
+### Epic 12: Complete Redesign — Premium Multi-Theme Experience
+
+A ground-up visual redesign that gives SmartPocket a flagship, "wow" look and lets users
+**choose between three switchable premium themes** — **Aurora Glass** (glassmorphism over a
+living aurora gradient), **Obsidian & Gold** (dark-OLED private-banking luxury), and **Midnight
+Spectrum** (vivid purple→pink→gold fintech). The redesign replaces the single-source "Refined
+Indigo" approach with a **theme-aware token architecture** (each theme is a full token set:
+color, gradient, glass/blur, elevation, motion), adds a signature glass surface layer and motion
+language, and re-skins every existing screen — **without changing navigation, flows, or feature
+behavior**.
+*Brownfield: re-skins built screens and reuses the Epic 1 primitive library (`components/ui/`);
+no behavioral changes to FR-1/2/3/5/7/9. Supersedes the single "Refined Indigo" decision
+(Story 1.2 / UX-DR3) and extends the Settings light/dark toggle (Story 4.4) into a theme picker.*
+**Covers:** RDR-1–9 (see Epic 12 detail). **Touches:** UX-DR1–17 (re-skin), NFR-2, NFR-5, FR-20.
+
 ---
 
 ## Epic 1: Design System Foundation & Built-Screen Retrofit
@@ -947,3 +962,154 @@ So that I get answers without building reports.
 **When** I ask a question in the Insights ask-bar (e.g., "Top expenses last month?")
 **Then** the server answers using my data via the self-hosted / local LLM and returns a focused answer card
 **And** the feature is absent/disabled when AI is off, and errors degrade to a friendly message.
+
+---
+
+## Epic 12: Complete Redesign — Premium Multi-Theme Experience
+
+**Goal:** A flagship, "wow" redesign with three user-switchable premium themes (Aurora Glass,
+Obsidian & Gold, Midnight Spectrum) on a theme-aware token architecture, a signature glass +
+motion language, and a full re-skin of every screen — flows unchanged.
+**Covers:** RDR-1–9 · **Brownfield:** re-skins built screens, reuses Epic 1 primitives, changes
+no FR behavior. Supersedes Story 1.2 / UX-DR3 (single "Refined Indigo" source of truth) and
+extends Story 4.4 (light/dark toggle) into a theme picker.
+
+> **Design source of truth:** `docs/ux-redesign-samples.html` (the three chosen directions A/B/C).
+> Each theme ships **both a dark (signature) and a light variant** from the start, so theme × mode
+> (Aurora/Obsidian/Spectrum × light/dark/system) is fully supported on day one. Dark is each
+> theme's hero look; the light variant keeps the theme's identity and independently meets AA.
+
+### Redesign Requirements (RDR)
+
+| ID | Requirement | Realized by |
+|---|---|---|
+| RDR-1 | Theme-aware token architecture: a theme registry where each theme is a complete token set; runtime switching; persisted selection | Story 12.1 |
+| RDR-2 | Three authored theme token sets — Aurora Glass, Obsidian & Gold, Midnight Spectrum — **each with both a dark and a light variant**, AA-passing semantic + category colors | Story 12.2 |
+| RDR-3 | Glass/surface primitive layer (`GlassSurface`, gradient hero, theme-driven elevation) with non-blur fallback | Story 12.3 |
+| RDR-4 | Signature redesigned balance hero with animated value, per-theme treatment | Story 12.4 |
+| RDR-5 | Redesigned navigation chrome: floating center "+" action, glass tab bar; stray `index` tab removed | Story 12.5 |
+| RDR-6 | Theme picker in Settings with live preview + persistence (extends Story 4.4) | Story 12.6 |
+| RDR-7 | Re-skin all existing screens to the new language, behavior unchanged | Stories 12.7–12.8 |
+| RDR-8 | Motion & micro-interaction language with reduced-motion support | Story 12.9 |
+| RDR-9 | Accessibility (AA across all themes × light/dark) + blur/render performance (60fps, NFR-2/5) | Stories 12.10–12.11 |
+
+### Story 12.1: Theme-aware token architecture and runtime switcher
+
+As a developer, I want a theme registry where each theme is a complete, swappable token set,
+So that the app can offer multiple full visual identities instead of one fixed palette.
+
+**Acceptance Criteria:**
+**Given** `theme.config.js` today encodes a single color system with only light/dark variants
+**When** the theme architecture is built
+**Then** a theme registry exposes named themes (`aurora`, `obsidian`, `spectrum`), each providing the full token surface (color, gradient, glass/blur, radius, elevation, motion), resolved through a `ThemeProvider` and consumable via NativeWind classes and a `useTheme()` hook
+**And** the active theme is persisted (secure/async storage), restored on launch, switchable at runtime with no reload, and a sensible default is chosen for first run — replacing the single hardcoded "Refined Indigo" source of truth.
+
+### Story 12.2: Author the three themes — dark and light variants
+
+As a user, I want three distinct, polished themes — each with a light and dark version —
+So that the app feels personal and premium whichever theme and mode I pick.
+
+**Acceptance Criteria:**
+**Given** the theme registry from 12.1 exists
+**When** the three themes are authored
+**Then** **Aurora Glass** (indigo→violet→cyan aurora + translucent surfaces), **Obsidian & Gold** (near-black navy `#0F172A` + gold `#CA8A04`), and **Midnight Spectrum** (vivid purple→pink→gold) are each defined as complete token sets — including hero gradient, glass parameters, and a per-theme category color map — with **both a dark (signature) and a light variant** that keeps the theme's identity (e.g. Aurora light glass, Obsidian "ivory & gold", Spectrum light)
+**And** in every theme **and both variants** `income`/`expense`/`destructive` stay strictly semantic and all text/UI meets WCAG 2.1 AA contrast (verified per theme × variant, incl. category colors).
+
+### Story 12.3: Glass / surface primitive layer with fallback
+
+As a developer, I want shared glass and gradient surface primitives,
+So that the signature look is consistent and degrades safely on weak devices.
+
+**Acceptance Criteria:**
+**Given** the redesign relies on frosted glass and gradient surfaces
+**When** the surface layer is built
+**Then** theme-driven primitives (`GlassSurface`/`GradientHero` + theme elevation) are added and the Epic 1 primitives (Button, StatCard, TransactionRow, Sheet, Pill, etc.) are re-skinned to consume them
+**And** where backdrop blur is unsupported or perf-constrained the surface falls back to an opaque tinted equivalent that still meets AA, with no behavioral change to the primitives.
+
+### Story 12.4: Redesign the signature balance hero
+
+As a user, I want a beautiful, alive balance card,
+So that opening the app feels premium and my balance is the hero.
+
+**Acceptance Criteria:**
+**Given** the dashboard hero is a flat gradient card today
+**When** the hero is redesigned
+**Then** it renders the active theme's signature treatment (Aurora: glass over aurora; Obsidian: gold-accented navy; Spectrum: vivid gradient), shows balance with tabular figures + income/expense split, and animates the value to its new amount on update
+**And** the figure stays legible at AA in all themes, announces sign + currency, and respects reduced-motion (FR-9 behavior unchanged).
+
+### Story 12.5: Redesign the navigation chrome (glass tab bar + floating add)
+
+As a user, I want a modern, thumb-friendly bottom bar,
+So that adding a transaction is one obvious tap.
+
+**Acceptance Criteria:**
+**Given** the current tab bar is standard and a stray `index` tab is visible
+**When** the nav chrome is redesigned
+**Then** the bottom bar uses the theme's glass/elevation treatment with a prominent floating center "+" that opens the add-transaction Sheet, and the stray `index` tab is removed
+**And** the bar keeps the existing five destinations, stays within the safe area, has ≥44pt targets with labels, and tab routing behavior is unchanged.
+
+### Story 12.6: Theme picker in Settings with live preview
+
+As a user, I want to switch between the three themes,
+So that I can make the app look the way I like.
+
+**Acceptance Criteria:**
+**Given** Settings currently offers only light/dark/system (Story 4.4)
+**When** the theme picker is added
+**Then** an Appearance section lets me choose Aurora Glass, Obsidian & Gold, or Midnight Spectrum with a live preview swatch/card per option, the choice applies instantly app-wide and persists via the 12.1 store
+**And** the existing light/dark/system mode control is preserved and composes with the selected theme (theme × mode), with the picker reachable from Home/Settings (not a new tab).
+
+### Story 12.7: Re-skin the core capture screens (Dashboard + Add-Transaction)
+
+As a user, I want the screens I use most to feel redesigned,
+So that the daily loop is delightful.
+
+**Acceptance Criteria:**
+**Given** the Dashboard and Add-Transaction screens use the old styling
+**When** they are re-skinned
+**Then** both adopt the new theme tokens, glass surfaces, redesigned hero, and motion, with Add-Transaction in the redesigned Sheet (amount focused first, type segment, category grid, save)
+**And** capture/validation behavior (FR-1) and balance/recent-activity behavior (FR-9) are unchanged.
+
+### Story 12.8: Re-skin the remaining screens (Activity, Categories, Insights, Cards)
+
+As a user, I want the whole app to feel cohesive,
+So that no screen looks like the old version.
+
+**Acceptance Criteria:**
+**Given** Activity, Categories, Insights, and Cards use the old styling
+**When** they are re-skinned
+**Then** each adopts the new theme tokens, surfaces, and motion via the re-skinned primitives (TransactionRow, FilterChip, CategoryToken, StatCard, EmptyState, card visual)
+**And** list/filter/search (FR-3), category CRUD (FR-5), monthly summary (FR-9), and card create/delete (FR-7) behavior are all unchanged.
+
+### Story 12.9: Motion & micro-interaction language
+
+As a user, I want tasteful motion,
+So that the app feels responsive and crafted.
+
+**Acceptance Criteria:**
+**Given** motion is ad hoc today
+**When** the motion language is defined
+**Then** standardized micro-interactions exist (press scale 0.97 + haptic, sheet/screen transitions ~250–300ms, balance count-up, a subtle save "celebration"), driven by theme motion tokens and built on Reanimated
+**And** all non-essential motion is disabled when the OS reduced-motion flag is set, with no layout shift.
+
+### Story 12.10: Accessibility pass across all themes (light + dark)
+
+As a user with accessibility needs, I want the redesign to stay WCAG 2.1 AA,
+So that beauty never costs me usability.
+
+**Acceptance Criteria:**
+**Given** three themes, each with a light and dark variant, now exist
+**When** the a11y pass runs
+**Then** contrast (incl. category colors and text over glass/gradient), ≥44pt targets, screen-reader labels, dynamic type to 200%, and color-independent income/expense (sign + icon) are verified **in every theme × variant**
+**And** glass/gradient surfaces guarantee a minimum text contrast (scrim/tint applied where needed) so no theme or variant drops below AA.
+
+### Story 12.11: Render & blur performance
+
+As a user on any device, I want the redesign to stay smooth,
+So that the premium look never makes the app feel slow.
+
+**Acceptance Criteria:**
+**Given** glass/blur and gradients are GPU-cost-sensitive (NFR-2)
+**When** performance is validated
+**Then** scrolling and theme switching hold ~60fps on a mid-range device, cold start stays ≤3s and primary screens ≤1s, and a low-cost fallback (reduced/!blur) engages on constrained devices
+**And** there is no perceptible jank when switching themes or opening the add-transaction Sheet.

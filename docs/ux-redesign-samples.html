@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SmartPocket — Redesign Visual Samples</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Work+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  :root { --tab: #0f172a; }
+  body {
+    font-family: 'Work Sans', system-ui, sans-serif;
+    background: #0a0a0f;
+    color: #e2e8f0;
+    padding: 40px 24px 80px;
+    line-height: 1.5;
+  }
+  .page-head { max-width: 1200px; margin: 0 auto 8px; text-align: center; }
+  .page-head h1 { font-family: 'Outfit'; font-weight: 800; font-size: 34px; letter-spacing: -0.02em; color: #fff; }
+  .page-head p { color: #94a3b8; font-size: 15px; margin-top: 8px; }
+  .grid {
+    max-width: 1280px; margin: 48px auto 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 40px 28px; justify-items: center;
+  }
+  .col { width: 320px; }
+  .col-head { text-align: center; margin-bottom: 18px; }
+  .col-head h2 { font-family: 'Outfit'; font-size: 19px; font-weight: 700; color: #fff; }
+  .col-head .tag { font-size: 12px; color: #64748b; margin-top: 4px; letter-spacing: .03em; text-transform: uppercase; }
+  .col-head .swatches { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+  .col-head .sw { width: 20px; height: 20px; border-radius: 6px; border: 1px solid rgba(255,255,255,.15); }
+  .note { font-size: 12px; color: #94a3b8; margin-top: 14px; text-align: center; padding: 0 6px; }
+
+  /* ---- Phone frame ---- */
+  .phone {
+    width: 300px; height: 620px; border-radius: 42px; padding: 10px;
+    background: #000; box-shadow: 0 30px 60px rgba(0,0,0,.55), 0 0 0 2px rgba(255,255,255,.06);
+    position: relative; overflow: hidden;
+  }
+  .notch { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); width: 90px; height: 22px; background: #000; border-radius: 14px; z-index: 30; }
+  .screen { width: 100%; height: 100%; border-radius: 33px; overflow: hidden; position: relative; }
+  .scr { position: absolute; inset: 0; padding: 46px 18px 0; display: flex; flex-direction: column; }
+  .status { display:flex; justify-content:space-between; font-size:11px; font-weight:600; margin-bottom: 14px; opacity:.85; }
+  .hdr-row { display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; }
+  .hi { font-size: 13px; opacity:.7; }
+  .name { font-family:'Outfit'; font-weight:700; font-size:17px; }
+  .avatar { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; }
+
+  .card { border-radius: 22px; padding: 18px; margin-bottom: 14px; }
+  .card .lbl { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; opacity:.7; }
+  .card .bal { font-family:'Outfit'; font-weight:800; font-size:34px; letter-spacing:-.02em; margin-top:6px; font-variant-numeric: tabular-nums; }
+  .ie { display:flex; gap:10px; margin-top:16px; }
+  .ie > div { flex:1; border-radius:14px; padding:10px 12px; }
+  .ie .k { font-size:10px; opacity:.7; text-transform:uppercase; letter-spacing:.06em; }
+  .ie .v { font-weight:700; font-size:15px; margin-top:3px; font-variant-numeric: tabular-nums; }
+
+  .quick { display:flex; gap:10px; margin-bottom:16px; }
+  .quick > div { flex:1; border-radius:16px; padding:12px 8px; text-align:center; font-size:12px; font-weight:600; display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .qicon { width:30px; height:30px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:15px; }
+
+  .sec-t { font-family:'Outfit'; font-weight:700; font-size:14px; margin: 4px 2px 10px; display:flex; justify-content:space-between; align-items:center; }
+  .sec-t a { font-size:11px; font-weight:600; opacity:.7; }
+  .row { display:flex; align-items:center; gap:11px; padding:9px 4px; }
+  .ricon { width:36px; height:36px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
+  .rmid { flex:1; }
+  .rmid .rt { font-size:13px; font-weight:600; }
+  .rmid .rd { font-size:11px; opacity:.6; }
+  .ramt { font-weight:700; font-size:14px; font-variant-numeric: tabular-nums; }
+
+  .tabbar { position:absolute; bottom:0; left:0; right:0; height:64px; display:flex; justify-content:space-around; align-items:center; padding:0 14px 10px; }
+  .tb { font-size:18px; opacity:.45; }
+  .tb.on { opacity:1; }
+  .tbadd { width:46px; height:46px; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:700; margin-top:-14px; }
+
+  /* =========================================================
+     A. AURORA GLASS
+     ========================================================= */
+  .aurora .screen { background: #0b1020; }
+  .aurora .aurora-bg { position:absolute; inset:0; overflow:hidden; }
+  .aurora .blob { position:absolute; border-radius:50%; filter: blur(48px); opacity:.85; }
+  .aurora .b1 { width:240px; height:240px; background:#6366f1; top:-40px; left:-50px; }
+  .aurora .b2 { width:220px; height:220px; background:#a855f7; top:120px; right:-70px; opacity:.7;}
+  .aurora .b3 { width:200px; height:200px; background:#22d3ee; bottom:60px; left:-40px; opacity:.55; }
+  .aurora .scr { color:#f1f5f9; }
+  .aurora .avatar { background:rgba(255,255,255,.14); backdrop-filter:blur(8px); color:#fff; }
+  .aurora .card.hero { background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.22); backdrop-filter:blur(16px); box-shadow:0 8px 32px rgba(0,0,0,.3); }
+  .aurora .ie > div { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); }
+  .aurora .ie .income { color:#6ee7b7; } .aurora .ie .exp { color:#fca5a5; }
+  .aurora .quick > div { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); backdrop-filter:blur(10px); }
+  .aurora .qicon { background:rgba(255,255,255,.16); }
+  .aurora .row { background:rgba(255,255,255,.05); border-radius:14px; margin-bottom:7px; border:1px solid rgba(255,255,255,.07); }
+  .aurora .tabbar { background:rgba(12,16,32,.6); backdrop-filter:blur(20px); border-top:1px solid rgba(255,255,255,.1); }
+  .aurora .tbadd { background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff; box-shadow:0 6px 18px rgba(99,102,241,.6); }
+
+  /* =========================================================
+     B. OBSIDIAN & GOLD
+     ========================================================= */
+  .obsidian .screen { background:#0f172a; }
+  .obsidian .scr { color:#e2e8f0; }
+  .obsidian .avatar { background:#1e293b; color:#ca8a04; border:1px solid #334155; }
+  .obsidian .card.hero { background:linear-gradient(160deg,#16213e,#0f172a); border:1px solid #243049; position:relative; overflow:hidden; }
+  .obsidian .card.hero::after { content:''; position:absolute; top:-30px; right:-30px; width:120px; height:120px; background:radial-gradient(circle,rgba(202,138,4,.35),transparent 70%); }
+  .obsidian .card .bal { color:#fff; }
+  .obsidian .card .lbl { color:#ca8a04; }
+  .obsidian .ie > div { background:rgba(255,255,255,.04); border:1px solid #243049; }
+  .obsidian .ie .income { color:#34d399; } .obsidian .ie .exp { color:#f87171; }
+  .obsidian .quick > div { background:#16213e; border:1px solid #243049; }
+  .obsidian .qicon { background:rgba(202,138,4,.15); color:#ca8a04; }
+  .obsidian .row { border-bottom:1px solid #1e293b; }
+  .obsidian .ricon { background:#1e293b; }
+  .obsidian .tabbar { background:#0c1322; border-top:1px solid #1e293b; }
+  .obsidian .tb.on { color:#ca8a04; }
+  .obsidian .tbadd { background:#ca8a04; color:#0f172a; box-shadow:0 6px 18px rgba(202,138,4,.5); }
+
+  /* =========================================================
+     C. MIDNIGHT SPECTRUM
+     ========================================================= */
+  .spectrum .screen { background:#0f172a; }
+  .spectrum .scr { color:#f1f5f9; }
+  .spectrum .avatar { background:linear-gradient(135deg,#f59e0b,#8b5cf6); color:#fff; }
+  .spectrum .card.hero { background:linear-gradient(135deg,#7c3aed 0%, #db2777 60%, #f59e0b 130%); position:relative; overflow:hidden; box-shadow:0 10px 30px rgba(124,58,237,.45); }
+  .spectrum .card .bal, .spectrum .card .lbl { color:#fff; }
+  .spectrum .ie > div { background:rgba(255,255,255,.12); }
+  .spectrum .ie .k, .spectrum .ie .v { color:#fff; }
+  .spectrum .quick > div { background:#1e293b; border:1px solid #334155; }
+  .spectrum .qicon { background:linear-gradient(135deg,#f59e0b,#8b5cf6); color:#fff; }
+  .spectrum .row { background:#1a2236; border-radius:14px; margin-bottom:7px; }
+  .spectrum .ricon { background:linear-gradient(135deg,rgba(245,158,11,.25),rgba(139,92,246,.25)); }
+  .spectrum .ramt.pos { color:#34d399; } .spectrum .ramt.neg { color:#f87171; }
+  .spectrum .tabbar { background:#0c1322; border-top:1px solid #1e293b; }
+  .spectrum .tb.on { color:#f59e0b; }
+  .spectrum .tbadd { background:linear-gradient(135deg,#f59e0b,#8b5cf6); color:#fff; box-shadow:0 6px 18px rgba(139,92,246,.6); }
+
+  /* =========================================================
+     D. LUMINOUS LIGHT
+     ========================================================= */
+  .light .screen { background:#f1f5f9; }
+  .light .light-bg { position:absolute; inset:0; }
+  .light .lblob { position:absolute; border-radius:50%; filter:blur(50px); opacity:.5; }
+  .light .l1 { width:200px; height:200px; background:#c7d2fe; top:-30px; right:-40px; }
+  .light .l2 { width:180px; height:180px; background:#fbcfe8; top:200px; left:-50px; }
+  .light .scr { color:#0f172a; }
+  .light .hi { color:#64748b; }
+  .light .avatar { background:#4f46e5; color:#fff; }
+  .light .card.hero { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:#fff; box-shadow:0 12px 30px rgba(79,70,229,.35); }
+  .light .card .bal, .light .card .lbl { color:#fff; }
+  .light .ie > div { background:rgba(255,255,255,.18); }
+  .light .ie .k, .light .ie .v { color:#fff; }
+  .light .quick > div { background:rgba(255,255,255,.8); border:1px solid #e2e8f0; backdrop-filter:blur(10px); box-shadow:0 2px 8px rgba(15,23,42,.04); color:#0f172a; }
+  .light .qicon { background:#eef2ff; color:#4f46e5; }
+  .light .sec-t { color:#0f172a; }
+  .light .row { background:rgba(255,255,255,.75); border:1px solid #e2e8f0; border-radius:14px; margin-bottom:7px; backdrop-filter:blur(6px); }
+  .light .rmid .rd { color:#64748b; }
+  .light .ricon { background:#eef2ff; }
+  .light .ramt.pos { color:#059669; } .light .ramt.neg { color:#dc2626; }
+  .light .tabbar { background:rgba(255,255,255,.85); backdrop-filter:blur(18px); border-top:1px solid #e2e8f0; }
+  .light .tb { color:#94a3b8; } .light .tb.on { color:#4f46e5; opacity:1; }
+  .light .tbadd { background:#4f46e5; color:#fff; box-shadow:0 6px 18px rgba(79,70,229,.4); }
+</style>
+</head>
+<body>
+  <div class="page-head">
+    <h1>SmartPocket — Redesign Directions</h1>
+    <p>Four candidate looks for the same Home screen. Pick one and I'll write the epic around it.</p>
+  </div>
+
+  <div class="grid">
+
+    <!-- A. AURORA GLASS -->
+    <div class="col">
+      <div class="col-head">
+        <h2>A · Aurora Glass</h2>
+        <div class="tag">Glassmorphism + Aurora</div>
+        <div class="swatches">
+          <div class="sw" style="background:#6366f1"></div>
+          <div class="sw" style="background:#a855f7"></div>
+          <div class="sw" style="background:#22d3ee"></div>
+          <div class="sw" style="background:rgba(255,255,255,.15)"></div>
+        </div>
+      </div>
+      <div class="phone aurora">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="aurora-bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+          <div class="scr">
+            <div class="status"><span>9:41</span><span>● ▮▮▮</span></div>
+            <div class="hdr-row"><div><div class="hi">Good morning</div><div class="name">Alex</div></div><div class="avatar">A</div></div>
+            <div class="card hero">
+              <div class="lbl">Total balance</div>
+              <div class="bal">$4,820.50</div>
+              <div class="ie">
+                <div><div class="k">Income</div><div class="v income">+$6,200</div></div>
+                <div><div class="k">Expense</div><div class="v exp">−$1,379</div></div>
+              </div>
+            </div>
+            <div class="quick">
+              <div><div class="qicon">↑</div>Income</div>
+              <div><div class="qicon">↓</div>Expense</div>
+              <div><div class="qicon">▦</div>Scan</div>
+            </div>
+            <div class="sec-t">Recent activity <a>See all</a></div>
+            <div class="row"><div class="ricon" style="background:rgba(244,114,182,.3)">🍔</div><div class="rmid"><div class="rt">Lunch</div><div class="rd">Food · Today</div></div><div class="ramt">−$25.50</div></div>
+            <div class="row"><div class="ricon" style="background:rgba(110,231,183,.3)">💼</div><div class="rmid"><div class="rt">Salary</div><div class="rd">Income · Mon</div></div><div class="ramt">+$3,100</div></div>
+          </div>
+          <div class="tabbar"><span class="tb on">⌂</span><span class="tb">≣</span><span class="tbadd">+</span><span class="tb">◔</span><span class="tb">▤</span></div>
+        </div>
+      </div>
+      <div class="note">Frosted cards float over a living indigo→violet→cyan aurora. Highest "wow"; needs blur-perf care on low-end Android.</div>
+    </div>
+
+    <!-- B. OBSIDIAN & GOLD -->
+    <div class="col">
+      <div class="col-head">
+        <h2>B · Obsidian &amp; Gold</h2>
+        <div class="tag">Dark OLED · Banking</div>
+        <div class="swatches">
+          <div class="sw" style="background:#0f172a"></div>
+          <div class="sw" style="background:#1e3a8a"></div>
+          <div class="sw" style="background:#ca8a04"></div>
+          <div class="sw" style="background:#e2e8f0"></div>
+        </div>
+      </div>
+      <div class="phone obsidian">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="scr">
+            <div class="status"><span>9:41</span><span>● ▮▮▮</span></div>
+            <div class="hdr-row"><div><div class="hi">Good morning</div><div class="name">Alex</div></div><div class="avatar">A</div></div>
+            <div class="card hero">
+              <div class="lbl">Total balance</div>
+              <div class="bal">$4,820.50</div>
+              <div class="ie">
+                <div><div class="k">Income</div><div class="v income">+$6,200</div></div>
+                <div><div class="k">Expense</div><div class="v exp">−$1,379</div></div>
+              </div>
+            </div>
+            <div class="quick">
+              <div><div class="qicon">↑</div>Income</div>
+              <div><div class="qicon">↓</div>Expense</div>
+              <div><div class="qicon">▦</div>Scan</div>
+            </div>
+            <div class="sec-t">Recent activity <a>See all</a></div>
+            <div class="row"><div class="ricon">🍔</div><div class="rmid"><div class="rt">Lunch</div><div class="rd">Food · Today</div></div><div class="ramt" style="color:#f87171">−$25.50</div></div>
+            <div class="row"><div class="ricon">💼</div><div class="rmid"><div class="rt">Salary</div><div class="rd">Income · Mon</div></div><div class="ramt" style="color:#34d399">+$3,100</div></div>
+          </div>
+          <div class="tabbar"><span class="tb on">⌂</span><span class="tb">≣</span><span class="tbadd">+</span><span class="tb">◔</span><span class="tb">▤</span></div>
+        </div>
+      </div>
+      <div class="note">Private-banking luxury: near-black navy, gold accents, calm. Most "trust/serious money"; lowest visual risk.</div>
+    </div>
+
+    <!-- C. MIDNIGHT SPECTRUM -->
+    <div class="col">
+      <div class="col-head">
+        <h2>C · Midnight Spectrum</h2>
+        <div class="tag">Dark · Vivid Fintech</div>
+        <div class="swatches">
+          <div class="sw" style="background:#0f172a"></div>
+          <div class="sw" style="background:#7c3aed"></div>
+          <div class="sw" style="background:#db2777"></div>
+          <div class="sw" style="background:#f59e0b"></div>
+        </div>
+      </div>
+      <div class="phone spectrum">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="scr">
+            <div class="status"><span>9:41</span><span>● ▮▮▮</span></div>
+            <div class="hdr-row"><div><div class="hi">Good morning</div><div class="name">Alex</div></div><div class="avatar">A</div></div>
+            <div class="card hero">
+              <div class="lbl">Total balance</div>
+              <div class="bal">$4,820.50</div>
+              <div class="ie">
+                <div><div class="k">Income</div><div class="v">+$6,200</div></div>
+                <div><div class="k">Expense</div><div class="v">−$1,379</div></div>
+              </div>
+            </div>
+            <div class="quick">
+              <div><div class="qicon">↑</div>Income</div>
+              <div><div class="qicon">↓</div>Expense</div>
+              <div><div class="qicon">▦</div>Scan</div>
+            </div>
+            <div class="sec-t">Recent activity <a>See all</a></div>
+            <div class="row"><div class="ricon">🍔</div><div class="rmid"><div class="rt">Lunch</div><div class="rd">Food · Today</div></div><div class="ramt neg">−$25.50</div></div>
+            <div class="row"><div class="ricon">💼</div><div class="rmid"><div class="rt">Salary</div><div class="rd">Income · Mon</div></div><div class="ramt pos">+$3,100</div></div>
+          </div>
+          <div class="tabbar"><span class="tb on">⌂</span><span class="tb">≣</span><span class="tbadd">+</span><span class="tb">◔</span><span class="tb">▤</span></div>
+        </div>
+      </div>
+      <div class="note">Bold, energetic, crypto-app confidence: a vivid purple→pink→gold hero. Most eye-catching; least "calm finance".</div>
+    </div>
+
+    <!-- D. LUMINOUS LIGHT -->
+    <div class="col">
+      <div class="col-head">
+        <h2>D · Luminous Light</h2>
+        <div class="tag">Light Glass · Indigo</div>
+        <div class="swatches">
+          <div class="sw" style="background:#f8fafc;border-color:#cbd5e1"></div>
+          <div class="sw" style="background:#4f46e5"></div>
+          <div class="sw" style="background:#7c3aed"></div>
+          <div class="sw" style="background:#c7d2fe"></div>
+        </div>
+      </div>
+      <div class="phone light">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="light-bg"><div class="lblob l1"></div><div class="lblob l2"></div></div>
+          <div class="scr">
+            <div class="status"><span>9:41</span><span>● ▮▮▮</span></div>
+            <div class="hdr-row"><div><div class="hi">Good morning</div><div class="name">Alex</div></div><div class="avatar">A</div></div>
+            <div class="card hero">
+              <div class="lbl">Total balance</div>
+              <div class="bal">$4,820.50</div>
+              <div class="ie">
+                <div><div class="k">Income</div><div class="v">+$6,200</div></div>
+                <div><div class="k">Expense</div><div class="v">−$1,379</div></div>
+              </div>
+            </div>
+            <div class="quick">
+              <div><div class="qicon">↑</div>Income</div>
+              <div><div class="qicon">↓</div>Expense</div>
+              <div><div class="qicon">▦</div>Scan</div>
+            </div>
+            <div class="sec-t">Recent activity <a>See all</a></div>
+            <div class="row"><div class="ricon">🍔</div><div class="rmid"><div class="rt">Lunch</div><div class="rd">Food · Today</div></div><div class="ramt neg">−$25.50</div></div>
+            <div class="row"><div class="ricon">💼</div><div class="rmid"><div class="rt">Salary</div><div class="rd">Income · Mon</div></div><div class="ramt pos">+$3,100</div></div>
+          </div>
+          <div class="tabbar"><span class="tb on">⌂</span><span class="tb">≣</span><span class="tbadd">+</span><span class="tb">◔</span><span class="tb">▤</span></div>
+        </div>
+      </div>
+      <div class="note">Bright, airy, Apple-Wallet-clean glass on light. Builds directly on today's indigo; lowest rework, daylight-friendly.</div>
+    </div>
+
+  </div>
+</body>
+</html>
