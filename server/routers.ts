@@ -345,15 +345,20 @@ const recurringTransactionsRouter = router({
     }),
 
   update: protectedProcedure
-    .input(z.object({ id: z.number() }).and(recurringTransactionSchema))
+    .input(
+      z
+        .object({ id: z.number(), isActive: z.boolean().optional() })
+        .and(recurringTransactionSchema),
+    )
     .mutation(({ ctx, input }) => {
-      const { id, ...data } = input;
+      const { id, isActive, ...data } = input;
       return db.updateRecurringTransaction(id, ctx.user.id, {
         ...data,
         creditCardId: data.creditCardId ?? null,
         description: data.description ?? null,
         occurrenceCount: data.occurrenceCount ?? null,
         endDate: data.endDate ?? null,
+        ...(isActive !== undefined ? { isActive } : {}),
       });
     }),
 

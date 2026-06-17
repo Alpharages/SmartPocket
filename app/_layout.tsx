@@ -185,6 +185,7 @@ export default function RootLayout() {
                           animation: "none",
                         }}
                       />
+                      <Stack.Screen name="recurring" />
                       <Stack.Screen name="oauth/callback" />
                       <Stack.Screen name="card/[id]" />
                       <Stack.Screen name="settings" />

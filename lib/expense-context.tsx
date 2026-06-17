@@ -12,6 +12,28 @@ import { applyOptimistic, snapshotList } from "./optimistic";
 import { getMonthBoundaries, getWeekBoundaries } from "./budget-period";
 import { useFirstDayOfWeek } from "./first-day-of-week-provider";
 
+function toRecurringMutationInput(
+  rule: RecurringTransaction,
+): CreateRecurringTransactionInput {
+  return {
+    categoryId: rule.categoryId,
+    creditCardId: rule.creditCardId ?? null,
+    type: rule.type,
+    amount: rule.amount,
+    description: rule.description ?? undefined,
+    frequency: rule.frequency,
+    interval: rule.interval,
+    endCondition: rule.endCondition,
+    occurrenceCount:
+      rule.endCondition === "count"
+        ? (rule.occurrenceCount ?? undefined)
+        : undefined,
+    endDate:
+      rule.endCondition === "endDate" ? (rule.endDate ?? undefined) : undefined,
+    startDate: new Date(rule.startDate),
+  };
+}
+
 export interface Category {
   id: number;
   userId: number;
@@ -79,6 +101,40 @@ export type CreateBudgetInput = {
   endDate?: Date;
 };
 
+export interface RecurringTransaction {
+  id: number;
+  userId: number;
+  categoryId: number;
+  creditCardId?: number | null;
+  type: "income" | "expense";
+  amount: string;
+  description?: string | null;
+  frequency: "daily" | "weekly" | "monthly" | "yearly";
+  interval: number;
+  endCondition: "count" | "endDate" | "never";
+  occurrenceCount?: number | null;
+  endDate?: Date | null;
+  startDate: Date;
+  nextRunDate: Date;
+  lastRunDate?: Date | null;
+  generatedCount: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CreateRecurringTransactionInput = Omit<
+  RecurringTransaction,
+  | "id"
+  | "userId"
+  | "createdAt"
+  | "updatedAt"
+  | "nextRunDate"
+  | "lastRunDate"
+  | "generatedCount"
+  | "isActive"
+>;
+
 export interface BudgetProgress {
   budgetId: number;
   spent: string;
@@ -140,6 +196,19 @@ interface ExpenseContextType {
   monthlyStats: MonthlyStats | null;
   loadingStats: boolean;
   refreshMonthlyStats: (year: number, month: number) => Promise<void>;
+
+  // Recurring transactions
+  recurringTransactions: RecurringTransaction[];
+  loadingRecurringTransactions: boolean;
+  refreshRecurringTransactions: () => Promise<void>;
+  addRecurringTransaction: (
+    data: CreateRecurringTransactionInput,
+  ) => Promise<void>;
+  updateRecurringTransaction: (
+    id: number,
+    data: CreateRecurringTransactionInput,
+  ) => Promise<void>;
+  cancelRecurringTransaction: (id: number) => Promise<void>;
 }
 
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
@@ -181,6 +250,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loadingBudgets, setLoadingBudgets] = useState(false);
+
+  const [recurringTransactions, setRecurringTransactions] = useState<
+    RecurringTransaction[]
+  >([]);
+  const [loadingRecurringTransactions, setLoadingRecurringTransactions] =
+    useState(false);
 
   // Categories
   const categoriesQuery = trpc.categories.list.useQuery();
@@ -382,6 +457,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const updateBudgetMutation = trpc.budgets.update.useMutation();
   const deleteBudgetMutation = trpc.budgets.delete.useMutation();
   const budgetProgressQuery = trpc.budgets.progress.useQuery(periodBoundaries);
+
+  const recurringTransactionsQuery = trpc.recurringTransactions.list.useQuery();
+  const createRecurringMutation =
+    trpc.recurringTransactions.create.useMutation();
+  const updateRecurringMutation =
+    trpc.recurringTransactions.update.useMutation();
 
   const progressByBudgetId = useMemo(
     () =>
@@ -588,6 +669,147 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     [deleteTransactionMutation, refreshBudgetProgress, transactions, toast],
   );
 
+  const refreshRecurringTransactions = useCallback(async () => {
+    setLoadingRecurringTransactions(true);
+    try {
+      const { data } = await recurringTransactionsQuery.refetch();
+      if (data) {
+        setRecurringTransactions(data as RecurringTransaction[]);
+      }
+    } finally {
+      setLoadingRecurringTransactions(false);
+    }
+  }, [recurringTransactionsQuery]);
+
+  const addRecurringTransaction = useCallback(
+    async (data: CreateRecurringTransactionInput) => {
+      const now = new Date();
+      const optimistic: RecurringTransaction = {
+        ...data,
+        id: -Date.now(),
+        userId: 0,
+        creditCardId: data.creditCardId ?? null,
+        description: data.description ?? null,
+        occurrenceCount: data.occurrenceCount ?? null,
+        endDate: data.endDate ?? null,
+        nextRunDate: data.startDate,
+        lastRunDate: null,
+        generatedCount: 0,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const snapshot = snapshotList(recurringTransactions);
+      setRecurringTransactions((prev) =>
+        applyOptimistic(prev, {
+          type: "add",
+          item: optimistic,
+          position: "end",
+        }),
+      );
+      try {
+        await createRecurringMutation.mutateAsync(data);
+        await refreshRecurringTransactions();
+        toast.show({ type: "success", message: "Recurring rule added" });
+      } catch (err) {
+        setRecurringTransactions(snapshot);
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to add recurring rule"),
+        });
+        throw new Error("addRecurringTransaction failed");
+      }
+    },
+    [
+      createRecurringMutation,
+      refreshRecurringTransactions,
+      recurringTransactions,
+      toast,
+    ],
+  );
+
+  const updateRecurringTransaction = useCallback(
+    async (id: number, data: CreateRecurringTransactionInput) => {
+      const snapshot = snapshotList(recurringTransactions);
+      setRecurringTransactions((prev) =>
+        applyOptimistic(prev, {
+          type: "update",
+          id,
+          data: {
+            ...data,
+            creditCardId: data.creditCardId ?? null,
+            description: data.description ?? null,
+            occurrenceCount: data.occurrenceCount ?? null,
+            endDate: data.endDate ?? null,
+          },
+        }),
+      );
+      try {
+        await updateRecurringMutation.mutateAsync({ id, ...data });
+        await refreshRecurringTransactions();
+        toast.show({ type: "success", message: "Recurring rule updated" });
+      } catch (err) {
+        setRecurringTransactions(snapshot);
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(
+            err,
+            "Failed to update recurring rule",
+          ),
+        });
+        throw new Error("updateRecurringTransaction failed");
+      }
+    },
+    [
+      updateRecurringMutation,
+      refreshRecurringTransactions,
+      recurringTransactions,
+      toast,
+    ],
+  );
+
+  const cancelRecurringTransaction = useCallback(
+    async (id: number) => {
+      const rule = recurringTransactions.find((item) => item.id === id);
+      if (!rule) {
+        throw new Error("cancelRecurringTransaction: rule not found");
+      }
+      const snapshot = snapshotList(recurringTransactions);
+      setRecurringTransactions((prev) =>
+        applyOptimistic(prev, {
+          type: "update",
+          id,
+          data: { isActive: false },
+        }),
+      );
+      try {
+        await updateRecurringMutation.mutateAsync({
+          id,
+          ...toRecurringMutationInput(rule),
+          isActive: false,
+        });
+        await refreshRecurringTransactions();
+        toast.show({ type: "success", message: "Recurring rule stopped" });
+      } catch (err) {
+        setRecurringTransactions(snapshot);
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(
+            err,
+            "Failed to stop recurring rule",
+          ),
+        });
+        throw new Error("cancelRecurringTransaction failed");
+      }
+    },
+    [
+      updateRecurringMutation,
+      refreshRecurringTransactions,
+      recurringTransactions,
+      toast,
+    ],
+  );
+
   const statsQuery = trpc.summary.monthlyStats.useQuery({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
@@ -618,6 +840,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         refreshTransactions(),
         refreshBudgets(),
         refreshBudgetProgress(),
+        refreshRecurringTransactions(),
         refreshMonthlyStats(now.getFullYear(), now.getMonth() + 1),
       ]);
       toast.show({ type: "success", message: "All data cleared" });
@@ -632,6 +855,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     refreshTransactions,
     refreshBudgets,
     refreshBudgetProgress,
+    refreshRecurringTransactions,
     refreshMonthlyStats,
     toast,
   ]);
@@ -642,6 +866,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     refreshCreditCards();
     refreshTransactions();
     refreshBudgets();
+    refreshRecurringTransactions();
     refreshMonthlyStats(new Date().getFullYear(), new Date().getMonth() + 1);
   }, []);
 
@@ -682,6 +907,13 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     monthlyStats,
     loadingStats,
     refreshMonthlyStats,
+
+    recurringTransactions,
+    loadingRecurringTransactions,
+    refreshRecurringTransactions,
+    addRecurringTransaction,
+    updateRecurringTransaction,
+    cancelRecurringTransaction,
   };
 
   return (

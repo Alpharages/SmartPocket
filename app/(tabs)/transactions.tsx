@@ -373,26 +373,46 @@ export default function TransactionsScreen() {
         }`}
         accessibilityLabel="Activity screen header"
         action={
-          <Pressable
-            onPress={() => router.push("/add-transaction")}
-            accessibilityRole="button"
-            accessibilityLabel="Add transaction"
-            hitSlop={8}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: colors.primary,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Ionicons
-              name="add"
-              size={22}
-              color={readableTextOn(colors.primary)}
-            />
-          </Pressable>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Pressable
+              onPress={() => router.push("/recurring")}
+              accessibilityRole="button"
+              accessibilityLabel="Recurring transactions"
+              hitSlop={8}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: colors.surface,
+                borderWidth: 0.5,
+                borderColor: colors.border,
+              }}
+            >
+              <Ionicons name="repeat" size={18} color={colors.foreground} />
+            </Pressable>
+            <Pressable
+              onPress={() => router.push("/add-transaction")}
+              accessibilityRole="button"
+              accessibilityLabel="Add transaction"
+              hitSlop={8}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: colors.primary,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons
+                name="add"
+                size={22}
+                color={readableTextOn(colors.primary)}
+              />
+            </Pressable>
+          </View>
         }
       />
 
