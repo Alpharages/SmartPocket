@@ -6,9 +6,9 @@
 > **Stack reality:** The app is **Expo / React Native** (not Flutter), and the LLM is called
 > **server-side** against a **self-hosted / local LLM** over an OpenAI-compatible `/v1/chat/completions`
 > API, configured via env (`LLM_BASE_URL`, optional `LLM_API_KEY`, `LLM_MODEL`) — not a third-party
-> gateway and not a client-side OpenAI key. *(Provider decision 2026-06-17: this supersedes the earlier
+> gateway and not a client-side OpenAI key. _(Provider decision 2026-06-17: this supersedes the earlier
 > Manus Forge / `gemini-2.5-flash` plan; the legacy Forge client `server/_core/llm.ts` is unused and being
-> retired, and a new env-driven OpenAI-compatible client under `server/ai/` will replace it.)* The "API key
+> retired, and a new env-driven OpenAI-compatible client under `server/ai/` will replace it.)_ The "API key
 > on device / offline-first" framing below is from the original Flutter concept and does **not** apply to
 > the current architecture. See [`ARCHITECTURE.md`](./ARCHITECTURE.md) §8.
 
@@ -23,12 +23,14 @@ LLM is unavailable).
 ## Features
 
 ### 🤖 **AI-Powered Categorization**
+
 - Uses a server-side self-hosted / local LLM (OpenAI-compatible, model from env) for transaction analysis
 - Contextual understanding of transaction descriptions
 - Confidence scoring for suggestions
 - Historical pattern consideration
 
 ### 🔒 **Privacy-First Design**
+
 - LLM host/key/model held in server env, not on the device
 - Data only sent to the self-hosted / local LLM when the user explicitly enables AI features — never to a third-party API
 - Offline fallback with keyword matching
@@ -44,7 +46,9 @@ LLM is unavailable).
 ## Setup (intended)
 
 ### 1. Server configuration
+
 The LLM connection is configured via server-side env vars:
+
 - `LLM_BASE_URL` — base URL of the self-hosted / local OpenAI-compatible endpoint (e.g. `http://localhost:11434/v1`)
 - `LLM_API_KEY` — optional; many local servers (Ollama, LM Studio) need none
 - `LLM_MODEL` — model name served by the local endpoint (e.g. `llama3.1`, `qwen2.5`)
@@ -52,6 +56,7 @@ The LLM connection is configured via server-side env vars:
 No per-user API key and no on-device key entry. The model is selected via `LLM_MODEL` (not hardcoded).
 
 ### 2. Feature exposure (to build)
+
 Add a categorization tRPC procedure that calls the self-hosted LLM client (a new env-driven
 OpenAI-compatible client under `server/ai/`, not the legacy Forge `invokeLLM`) with the transaction
 description, and surface suggestions in the add-transaction screen. Gate the call behind an explicit user
@@ -92,6 +97,7 @@ opt-in before any transaction text is sent to the LLM.
 ### Key Components
 
 #### LLM call (new self-hosted client under `server/ai/`)
+
 - Handles communication with the self-hosted / local LLM (OpenAI-compatible API); base URL/key/model from env
 - Structured JSON response parsing (via `response_format`/JSON-schema, with a plain-text JSON fallback for local models that don't support it)
 - Error handling and fallback to the heuristic strategy (incl. when the local LLM is unreachable)
@@ -148,6 +154,7 @@ result where the local model supports it; otherwise parse the text response defe
 ## Privacy & Security
 
 ### Data Handling
+
 - LLM host/key/model held in server env vars (not on the device)
 - Transaction data sent to the self-hosted / local LLM only after the user opts in to AI features
 - Minimal data sent (description, and optionally amount — no user identifiers)
@@ -185,6 +192,7 @@ Categorization prompts are small (~100 tokens), so they are cheap to serve. Opti
 ## Testing
 
 ### Unit Tests
+
 - Mock the self-hosted LLM client responses
 
 - Strategy pattern testing
@@ -218,11 +226,13 @@ Categorization prompts are small (~100 tokens), so they are cheap to serve. Opti
 ### Common Issues
 
 **Connection / Auth Invalid**
+
 - Verify `LLM_BASE_URL` (and `LLM_API_KEY` if your endpoint requires one) are set in the server env
 - Check the local LLM server is running and the `LLM_MODEL` is loaded
 - Rotate the key if your endpoint uses one
 
 **Network Errors**
+
 - Verify the API server can reach the `LLM_BASE_URL` endpoint
 - Check the local LLM server / process status
 
@@ -233,6 +243,7 @@ Categorization prompts are small (~100 tokens), so they are cheap to serve. Opti
 - Verify transaction description length
 
 **Slow Response Times**
+
 - Monitor the local LLM server load / latency
 
 - Check network latency

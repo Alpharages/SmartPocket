@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import {
+  RefreshControl,
   ScrollView,
   View,
   Text,
@@ -31,6 +32,7 @@ import {
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ContentMaxWidth } from "@/lib/_core/theme";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import {
   isCardFormValid,
   maskCardLastFour,
@@ -323,6 +325,7 @@ export default function CardsScreen() {
     addCreditCard,
     updateCreditCard,
     deleteCreditCard,
+    refreshCreditCards,
   } = useExpense();
   const toast = useToast();
   const {
@@ -341,6 +344,11 @@ export default function CardsScreen() {
   // the disabled/loading state, so the async `saving` state alone can't stop
   // a same-tick second press.
   const savingRef = useRef(false);
+
+  const onRefresh = useCallback(async () => {
+    await refreshCreditCards();
+  }, [refreshCreditCards]);
+  const refreshProps = usePullToRefresh(onRefresh);
 
   const desktopActionStyle: ViewStyle | undefined =
     Platform.OS === "web" ? { alignSelf: "flex-start" } : undefined;
@@ -475,6 +483,7 @@ export default function CardsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={<RefreshControl {...refreshProps} />}
       >
         <ResponsiveContent maxWidth={ContentMaxWidth.screen}>
           <ScreenHeader

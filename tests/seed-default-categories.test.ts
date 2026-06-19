@@ -109,7 +109,7 @@ describe("ensureUserSeeded", () => {
     await expect(ensureUserSeeded(1)).resolves.toBeUndefined();
 
     expect(consoleError).toHaveBeenCalledWith(
-      "[seed] failed to seed default categories",
+      "[seed] failed to seed default user data",
       expect.any(Error),
     );
     consoleError.mockRestore();

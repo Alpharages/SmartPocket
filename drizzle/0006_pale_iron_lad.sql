@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `remindersEnabled` boolean DEFAULT false NOT NULL;

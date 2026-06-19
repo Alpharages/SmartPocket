@@ -15,6 +15,7 @@ type SettingsContextValue = {
   setAiEnabled: (enabled: boolean) => Promise<void>;
   isSavingAi: boolean;
   isReady: boolean;
+  refreshSettings: () => Promise<void>;
 };
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -31,6 +32,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const serverAiEnabled = settingsQuery.data?.aiEnabled ?? false;
   const aiEnabled = optimisticAiEnabled ?? serverAiEnabled;
+
+  const refreshSettings = useCallback(async () => {
+    await settingsQuery.refetch();
+  }, [settingsQuery]);
 
   const setAiEnabled = useCallback(
     async (enabled: boolean) => {
@@ -71,8 +76,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setAiEnabled,
       isSavingAi,
       isReady: !settingsQuery.isLoading,
+      refreshSettings,
     }),
-    [aiEnabled, setAiEnabled, isSavingAi, settingsQuery.isLoading],
+    [aiEnabled, setAiEnabled, isSavingAi, settingsQuery.isLoading, refreshSettings],
   );
 
   return (

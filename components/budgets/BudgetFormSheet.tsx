@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -20,6 +21,7 @@ import { getCurrencySymbol } from "@/lib/currency";
 import { Spacing, Typography } from "@/lib/_core/theme";
 import { resolveCategoryColor } from "@/constants/theme";
 import { isPositiveBudgetAmount } from "@/lib/budget-validation";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 export { isPositiveBudgetAmount };
 
@@ -43,7 +45,13 @@ export function BudgetFormSheet({
   const colors = useColors();
   const scheme = (useColorScheme() ?? "light") as "light" | "dark";
   const { currency } = useCurrency();
-  const { categories, transactions, addBudget, updateBudget } = useExpense();
+  const { categories, transactions, addBudget, updateBudget, refreshCategories } =
+    useExpense();
+
+  const onRefresh = useCallback(async () => {
+    await refreshCategories();
+  }, [refreshCategories]);
+  const refreshProps = usePullToRefresh(onRefresh);
 
   const isEditing = budget != null;
   const [period, setPeriod] = useState<"monthly" | "weekly">(
@@ -109,6 +117,7 @@ export function BudgetFormSheet({
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl {...refreshProps} />}
         contentContainerStyle={{ gap: Spacing.lg, paddingBottom: Spacing.sm }}
       >
         <View>

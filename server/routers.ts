@@ -4,6 +4,7 @@ import { router, protectedProcedure, publicProcedure } from "./_core/trpc";
 import * as db from "./db";
 import {
   CATEGORY_DEFAULT_COLOR,
+  DEFAULT_CATEGORY_ICON,
   getCategoryColorForName,
 } from "../shared/theme";
 
@@ -35,6 +36,29 @@ const creditCardSchema = z.object({
   cardType: z.string().max(50).optional(),
 });
 
+const accountSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  type: z.enum(["cash", "bank", "wallet"]),
+  currency: z.string().length(3).optional(),
+});
+
+const transferSchema = z
+  .object({
+    fromAccountId: z.number(),
+    toAccountId: z.number(),
+    amount: z
+      .string()
+      .regex(/^\d+(\.\d{1,2})?$/)
+      .refine((value) => Number(value) > 0, {
+        message: "Amount must be positive",
+      }),
+    description: z.string().max(500).optional(),
+    date: z.date(),
+  })
+  .refine((value) => value.fromAccountId !== value.toAccountId, {
+    message: "Source and destination must be different accounts",
+  });
+
 const transactionSchema = z.object({
   categoryId: z.number(),
   type: z.enum(["income", "expense"]),
@@ -42,6 +66,7 @@ const transactionSchema = z.object({
   description: z.string().max(500).optional(),
   date: z.date(),
   creditCardId: z.number().optional(),
+  accountId: z.number().optional(),
 });
 
 const budgetSchema = z.object({
@@ -55,6 +80,75 @@ const budgetSchema = z.object({
     }),
   startDate: z.date().optional(),
   endDate: z.date().optional(),
+});
+
+const positiveMoneySchema = z
+  .string()
+  .regex(/^\d+(\.\d{1,2})?$/)
+  .refine((v) => Number(v) > 0, {
+    message: "Amount must be greater than zero",
+  });
+
+const loanSchema = z
+  .object({
+    direction: z.enum(["lend", "borrow"]),
+    counterparty: z.string().max(100).nullable().optional(),
+    principal: positiveMoneySchema,
+    rate: z
+      .string()
+      .regex(/^\d+(\.\d{1,2})?$/)
+      .refine((v) => Number(v) >= 0, {
+        message: "Rate must be zero or greater",
+      })
+      .nullable()
+      .optional(),
+    periodicity: z.enum(["weekly", "monthly", "yearly", "none"]),
+    installmentCount: z.number().int().positive().nullable().optional(),
+    endDate: z.date().nullable().optional(),
+    nextDueDate: z.date().nullable().optional(),
+    status: z.enum(["active", "settled"]).optional(),
+    note: z.string().max(2000).nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.periodicity === "none") {
+      return;
+    }
+
+    const hasCount =
+      value.installmentCount != null && value.installmentCount > 0;
+    const hasEndDate = value.endDate != null;
+
+    if (!hasCount && !hasEndDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Schedule requires installment count or end date",
+        path: ["installmentCount"],
+      });
+    }
+
+    if (hasEndDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const endDay = new Date(
+        value.endDate!.getFullYear(),
+        value.endDate!.getMonth(),
+        value.endDate!.getDate(),
+      );
+      if (endDay <= today) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "End date must be in the future",
+          path: ["endDate"],
+        });
+      }
+    }
+  });
+
+const repaymentInputSchema = z.object({
+  loanId: z.number(),
+  amount: positiveMoneySchema,
+  date: z.date(),
+  note: z.string().max(2000).nullable().optional(),
 });
 
 const recurringTransactionSchemaBase = z.object({
@@ -149,7 +243,7 @@ const categoriesRouter = router({
         // No explicit color → assign a distinct palette token by hashing the
         // name, so auto-defaulted categories don't all collide on indigo.
         color: input.color || getCategoryColorForName(input.name),
-        icon: input.icon || "tag",
+        icon: input.icon || DEFAULT_CATEGORY_ICON,
       });
     }),
 
@@ -235,6 +329,190 @@ const creditCardsRouter = router({
 });
 
 // ============================================================================
+// ACCOUNTS ROUTER
+// ============================================================================
+
+const accountsRouter = router({
+  list: protectedProcedure.query(({ ctx }) => {
+    return db.getUserAccounts(ctx.user.id);
+  }),
+
+  create: protectedProcedure
+    .input(accountSchema)
+    .mutation(({ ctx, input }) => {
+      return db.createAccount({
+        userId: ctx.user.id,
+        name: input.name,
+        type: input.type,
+        currency: input.currency ?? "USD",
+      });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({ id: z.number(), ...accountSchema.partial().shape }))
+    .mutation(({ ctx, input }) => {
+      const { id, ...data } = input;
+      return db.updateAccount(id, ctx.user.id, data);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const account = await db.getAccountById(input.id, ctx.user.id);
+      if (!account) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Account not found",
+        });
+      }
+
+      const txCount = await db.getAccountTransactionCount(
+        input.id,
+        ctx.user.id,
+      );
+      if (txCount > 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Account has linked transactions",
+        });
+      }
+
+      const transferCount = await db.getAccountTransferCount(
+        input.id,
+        ctx.user.id,
+      );
+      if (transferCount > 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Account has linked transfers",
+        });
+      }
+
+      await db.deleteAccount(input.id, ctx.user.id);
+    }),
+
+  transactionCount: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const account = await db.getAccountById(input.id, ctx.user.id);
+      if (!account) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Account not found",
+        });
+      }
+      return db.getAccountTransactionCount(input.id, ctx.user.id);
+    }),
+
+  transferCount: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const account = await db.getAccountById(input.id, ctx.user.id);
+      if (!account) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Account not found",
+        });
+      }
+      return db.getAccountTransferCount(input.id, ctx.user.id);
+    }),
+
+  reassignAndDelete: protectedProcedure
+    .input(
+      z
+        .object({
+          id: z.number(),
+          targetAccountId: z.number(),
+        })
+        .refine((value) => value.id !== value.targetAccountId, {
+          message: "Cannot reassign to the same account",
+        }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await db.reassignAndDeleteAccount(
+          input.id,
+          input.targetAccountId,
+          ctx.user.id,
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to reassign account";
+        if (message === "Account not found") {
+          throw new TRPCError({ code: "NOT_FOUND", message });
+        }
+        if (message === "Cannot reassign to the same account") {
+          throw new TRPCError({ code: "BAD_REQUEST", message });
+        }
+        throw error;
+      }
+    }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(({ ctx, input }) => {
+      return db.getAccountById(input.id, ctx.user.id);
+    }),
+
+  balances: protectedProcedure.query(async ({ ctx }) => {
+    const balances = await db.getAccountBalances(ctx.user.id);
+    return Object.entries(balances).map(([accountId, balance]) => ({
+      accountId: Number(accountId),
+      balance,
+    }));
+  }),
+
+  transfers: protectedProcedure.query(({ ctx }) => {
+    return db.getUserTransfers(ctx.user.id);
+  }),
+
+  transfer: protectedProcedure
+    .input(transferSchema)
+    .mutation(async ({ ctx, input }) => {
+      const fromAccount = await db.getAccountById(
+        input.fromAccountId,
+        ctx.user.id,
+      );
+      const toAccount = await db.getAccountById(
+        input.toAccountId,
+        ctx.user.id,
+      );
+
+      if (!fromAccount || !toAccount) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Account not found",
+        });
+      }
+
+      if (fromAccount.currency !== toAccount.currency) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Transfers require accounts with the same currency",
+        });
+      }
+
+      const created = await db.createTransfer({
+        userId: ctx.user.id,
+        fromAccountId: input.fromAccountId,
+        toAccountId: input.toAccountId,
+        amount: input.amount,
+        description: input.description,
+        date: input.date,
+      });
+
+      if (!created) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create transfer",
+        });
+      }
+
+      return created;
+    }),
+});
+
+// ============================================================================
 // TRANSACTIONS ROUTER
 // ============================================================================
 
@@ -296,6 +574,7 @@ const transactionsRouter = router({
         description: input.description,
         date: input.date,
         creditCardId: input.creditCardId,
+        accountId: input.accountId,
       });
     }),
 
@@ -520,6 +799,127 @@ const budgetsRouter = router({
 });
 
 // ============================================================================
+// LOANS ROUTER
+// ============================================================================
+
+const loansRouter = router({
+  list: protectedProcedure.query(({ ctx }) => {
+    return db.getUserLoans(ctx.user.id);
+  }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(({ ctx, input }) => {
+      return db.getLoanWithBalance(input.id, ctx.user.id);
+    }),
+
+  create: protectedProcedure
+    .input(loanSchema)
+    .mutation(({ ctx, input }) => {
+      return db.createLoan({
+        userId: ctx.user.id,
+        direction: input.direction,
+        counterparty: input.counterparty ?? null,
+        principal: input.principal,
+        rate: input.rate ?? null,
+        periodicity: input.periodicity,
+        installmentCount: input.installmentCount ?? null,
+        endDate: input.endDate ?? null,
+        nextDueDate: input.nextDueDate ?? null,
+        status: input.status ?? "active",
+        note: input.note ?? null,
+      });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({ id: z.number(), ...loanSchema.partial().shape }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      await db.updateLoan(id, ctx.user.id, data);
+      return db.getLoanById(id, ctx.user.id);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(({ ctx, input }) => {
+      return db.deleteLoan(input.id, ctx.user.id);
+    }),
+
+  addRepayment: protectedProcedure
+    .input(repaymentInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const updated = await db.recordRepayment({
+          loanId: input.loanId,
+          userId: ctx.user.id,
+          amount: input.amount,
+          date: input.date,
+          note: input.note ?? null,
+        });
+        if (!updated) {
+          return null;
+        }
+        return (
+          updated.repayments.find(
+            (repayment) =>
+              repayment.amount === input.amount &&
+              new Date(repayment.date).getTime() === input.date.getTime(),
+          ) ?? updated.repayments[0] ?? null
+        );
+      } catch (err) {
+        if (err instanceof db.RepaymentExceedsBalanceError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+    }),
+
+  recordRepayment: protectedProcedure
+    .input(repaymentInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const updated = await db.recordRepayment({
+          loanId: input.loanId,
+          userId: ctx.user.id,
+          amount: input.amount,
+          date: input.date,
+          note: input.note ?? null,
+        });
+        if (!updated) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Loan not found",
+          });
+        }
+        return updated;
+      } catch (err) {
+        if (err instanceof db.RepaymentExceedsBalanceError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+    }),
+
+  listRepayments: protectedProcedure
+    .input(z.object({ loanId: z.number() }))
+    .query(({ ctx, input }) => {
+      return db.getRepaymentsByLoan(input.loanId, ctx.user.id);
+    }),
+
+  deleteRepayment: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(({ ctx, input }) => {
+      return db.deleteRepayment(input.id, ctx.user.id);
+    }),
+});
+
+// ============================================================================
 // SETTINGS ROUTER
 // ============================================================================
 
@@ -555,10 +955,12 @@ export const appRouter = router({
 
   categories: categoriesRouter,
   creditCards: creditCardsRouter,
+  accounts: accountsRouter,
   transactions: transactionsRouter,
   recurringTransactions: recurringTransactionsRouter,
   summary: summaryRouter,
   budgets: budgetsRouter,
+  loans: loansRouter,
   settings: settingsRouter,
   data: dataRouter,
 });

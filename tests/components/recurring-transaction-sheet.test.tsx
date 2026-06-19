@@ -110,6 +110,20 @@ function findByLabel(tree: ReactTestRenderer, label: string) {
   );
 }
 
+function textOf(node: { children?: unknown[] }): string {
+  return (node.children ?? [])
+    .map((c) =>
+      typeof c === "string" ? c : textOf(c as { children?: unknown[] }),
+    )
+    .join("");
+}
+
+function findText(tree: ReactTestRenderer, text: string) {
+  return tree.root.findAll(
+    (node) => String(node.type) === "Text" && textOf(node).includes(text),
+  );
+}
+
 describe("RecurringTransactionSheet", () => {
   const addRecurringTransaction = vi.fn().mockResolvedValue(undefined);
   const updateRecurringTransaction = vi.fn().mockResolvedValue(undefined);
@@ -141,7 +155,7 @@ describe("RecurringTransactionSheet", () => {
     vi.clearAllMocks();
   });
 
-  it("blocks submit with invalid amount and does not call create", async () => {
+  it("blocks submit with invalid amount and shows inline error", async () => {
     let tree!: ReactTestRenderer;
     await act(async () => {
       tree = TestRenderer.create(
@@ -155,11 +169,61 @@ describe("RecurringTransactionSheet", () => {
     });
 
     const createButton = tree.root.findByProps({ label: "Create" });
+    expect(createButton.props.disabled).not.toBe(true);
+
     await act(async () => {
       await createButton.props.onPress();
     });
 
     expect(addRecurringTransaction).not.toHaveBeenCalled();
+    expect(findText(tree, "Enter a valid amount").length).toBeGreaterThan(0);
+  });
+
+  it("blocks submit without category and shows inline error", async () => {
+    let tree!: ReactTestRenderer;
+    await act(async () => {
+      tree = TestRenderer.create(
+        <RecurringTransactionSheet visible onClose={vi.fn()} />,
+      );
+    });
+
+    await act(async () => {
+      findByLabel(tree, "Recurring amount")[0].props.onChangeText("50.00");
+    });
+
+    const createButton = tree.root.findByProps({ label: "Create" });
+    await act(async () => {
+      await createButton.props.onPress();
+    });
+
+    expect(addRecurringTransaction).not.toHaveBeenCalled();
+    expect(findText(tree, "Select a category").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the sheet open when create mutation fails (AC8)", async () => {
+    addRecurringTransaction.mockRejectedValueOnce(new Error("network"));
+    const onClose = vi.fn();
+
+    let tree!: ReactTestRenderer;
+    await act(async () => {
+      tree = TestRenderer.create(
+        <RecurringTransactionSheet visible onClose={onClose} />,
+      );
+    });
+
+    await act(async () => {
+      findByLabel(tree, "Recurring amount")[0].props.onChangeText("50.00");
+      tree.root.findByProps({ accessibilityLabel: "Rent" }).props.onPress();
+    });
+
+    const createButton = tree.root.findByProps({ label: "Create" });
+    await act(async () => {
+      await createButton.props.onPress();
+    });
+
+    expect(addRecurringTransaction).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(findByLabel(tree, "Recurring amount")[0].props.value).toBe("50.00");
   });
 
   it("calls create with validated payload on save", async () => {

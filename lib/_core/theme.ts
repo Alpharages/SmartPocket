@@ -91,10 +91,12 @@ export {
   CATEGORY_COLOR_LIGHT_VALUES,
   CATEGORY_COLOR_DARK_VALUES,
   CATEGORY_DEFAULT_COLOR,
+  DEFAULT_CATEGORY_ICON,
   getCategoryColorByIndex,
   getCategoryColorForName,
   hashToPaletteIndex,
   resolveCategoryColor,
+  resolveCategoryIcon,
   type CategoryColorToken,
 } from "@/shared/theme";
 

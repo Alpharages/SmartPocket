@@ -17,18 +17,18 @@ TypeScript codebase. Users authenticate via Manus OAuth and manage transactions,
 cards. The app is backed by a small Express + tRPC API and a managed MySQL database accessed through the
 Manus platform's Data API.
 
-| Concern | Choice |
-|---|---|
-| Client | Expo SDK 54, React Native 0.81, React 19, Expo Router 6 (file-based routing) |
-| Styling | NativeWind 4 (Tailwind for RN) + Reanimated 4 animations |
-| Client data layer | tRPC v11 client + TanStack Query 5, wrapped by an `ExpenseProvider` context |
-| API | Express 4 + tRPC v11 (`@trpc/server`), superjson transformer |
-| Validation | Zod 4 (shared between client types and server input parsing) |
-| ORM / schema | Drizzle ORM (MySQL dialect) — schema-as-types; runtime queries use raw parameterized SQL |
-| Database | MySQL, reached via Manus Data API (`callDataApi`), not a direct connection |
-| Auth | Manus OAuth → JWT session (jose); bearer token on native, cookie on web |
-| AI inference | Self-hosted / local LLM over an OpenAI-compatible `/v1/chat/completions` API, env-configured (`LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`) — **planned**. A legacy Manus Forge client (`server/_core/llm.ts`) exists but is unused and being retired. |
-| Tooling | pnpm, TypeScript strict, Vitest, ESLint (expo config), Prettier, drizzle-kit |
+| Concern           | Choice                                                                                                                                                                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Client            | Expo SDK 54, React Native 0.81, React 19, Expo Router 6 (file-based routing)                                                                                                                                                                           |
+| Styling           | NativeWind 4 (Tailwind for RN) + Reanimated 4 animations                                                                                                                                                                                               |
+| Client data layer | tRPC v11 client + TanStack Query 5, wrapped by an `ExpenseProvider` context                                                                                                                                                                            |
+| API               | Express 4 + tRPC v11 (`@trpc/server`), superjson transformer                                                                                                                                                                                           |
+| Validation        | Zod 4 (shared between client types and server input parsing)                                                                                                                                                                                           |
+| ORM / schema      | Drizzle ORM (MySQL dialect) — schema-as-types; runtime queries use raw parameterized SQL                                                                                                                                                               |
+| Database          | MySQL, reached via Manus Data API (`callDataApi`), not a direct connection                                                                                                                                                                             |
+| Auth              | Manus OAuth → JWT session (jose); bearer token on native, cookie on web                                                                                                                                                                                |
+| AI inference      | Self-hosted / local LLM over an OpenAI-compatible `/v1/chat/completions` API, env-configured (`LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`) — **planned**. A legacy Manus Forge client (`server/_core/llm.ts`) exists but is unused and being retired. |
+| Tooling           | pnpm, TypeScript strict, Vitest, ESLint (expo config), Prettier, drizzle-kit                                                                                                                                                                           |
 
 ---
 

@@ -1,5 +1,5 @@
-import { View, type ViewProps } from "react-native";
-import { SafeAreaView, type Edge } from "react-native-safe-area-context";
+import { View, type ViewProps, type ViewStyle } from "react-native";
+import { useSafeAreaInsets, type Edge } from "react-native-safe-area-context";
 
 import { cn } from "@/lib/utils";
 
@@ -18,16 +18,29 @@ export interface ScreenContainerProps extends ViewProps {
    */
   containerClassName?: string;
   /**
-   * Additional className for the SafeAreaView (content layer).
+   * Additional className for the safe-area padding wrapper.
    */
   safeAreaClassName?: string;
+}
+
+function paddingForEdges(
+  edges: Edge[],
+  insets: ReturnType<typeof useSafeAreaInsets>,
+): ViewStyle {
+  return {
+    paddingTop: edges.includes("top") ? insets.top : 0,
+    paddingBottom: edges.includes("bottom") ? insets.bottom : 0,
+    paddingLeft: edges.includes("left") ? insets.left : 0,
+    paddingRight: edges.includes("right") ? insets.right : 0,
+  };
 }
 
 /**
  * A container component that properly handles SafeArea and background colors.
  *
- * The outer View extends to full screen (including status bar area) with the background color,
- * while the inner SafeAreaView ensures content is within safe bounds.
+ * Uses `useSafeAreaInsets()` padding instead of the deprecated React Native
+ * `SafeAreaView` so insets stay correct without triggering RN deprecation
+ * warnings.
  *
  * Usage:
  * ```tsx
@@ -47,18 +60,19 @@ export function ScreenContainer({
   style,
   ...props
 }: ScreenContainerProps) {
+  const insets = useSafeAreaInsets();
+
   return (
     <View
       className={cn("flex-1", "bg-background", containerClassName)}
       {...props}
     >
-      <SafeAreaView
-        edges={edges}
+      <View
         className={cn("flex-1", safeAreaClassName)}
-        style={style}
+        style={[paddingForEdges(edges, insets), style]}
       >
         <View className={cn("flex-1", className)}>{children}</View>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }

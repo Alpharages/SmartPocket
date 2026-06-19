@@ -29,6 +29,8 @@ export const users = mysqlTable("users", {
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   /** Explicit opt-in for AI features; default off for all users (FR-20, NFR-1). */
   aiEnabled: boolean("aiEnabled").default(false).notNull(),
+  /** Opt-in for payment/loan reminder notifications (Epic 7). */
+  remindersEnabled: boolean("remindersEnabled").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -49,7 +51,7 @@ export const categories = mysqlTable("categories", {
   color: varchar("color", { length: 7 })
     .default(CATEGORY_DEFAULT_COLOR)
     .notNull(), // Hex color
-  icon: varchar("icon", { length: 50 }).default("tag").notNull(),
+  icon: varchar("icon", { length: 50 }).default("pricetag-outline").notNull(),
   isDefault: boolean("isDefault").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -86,6 +88,41 @@ export type CreditCard = typeof creditCards.$inferSelect;
 export type InsertCreditCard = typeof creditCards.$inferInsert;
 
 /**
+ * Accounts table for tracking cash, bank, and wallet balances per user.
+ */
+export const accounts = mysqlTable("accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  type: mysqlEnum("type", ["cash", "bank", "wallet"]).notNull(),
+  currency: varchar("currency", { length: 3 }).default("USD").notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Account = typeof accounts.$inferSelect;
+export type InsertAccount = typeof accounts.$inferInsert;
+
+/**
+ * Transfers table for moving money between accounts without affecting income/expense summaries.
+ */
+export const transfers = mysqlTable("transfers", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  fromAccountId: int("fromAccountId").notNull(),
+  toAccountId: int("toAccountId").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  description: text("description"),
+  date: timestamp("date").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Transfer = typeof transfers.$inferSelect;
+export type InsertTransfer = typeof transfers.$inferInsert;
+
+/**
  * Transactions table for logging income and expenses.
  */
 export const transactions = mysqlTable("transactions", {
@@ -93,6 +130,7 @@ export const transactions = mysqlTable("transactions", {
   userId: int("userId").notNull(),
   categoryId: int("categoryId").notNull(),
   creditCardId: int("creditCardId"), // Optional: link to credit card
+  accountId: int("accountId"), // Optional: link to account
   type: mysqlEnum("type", ["income", "expense"]).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   description: text("description"),
@@ -185,3 +223,48 @@ export const monthlySummaries = mysqlTable("monthlySummaries", {
 
 export type MonthlySummary = typeof monthlySummaries.$inferSelect;
 export type InsertMonthlySummary = typeof monthlySummaries.$inferInsert;
+
+/**
+ * Loans table for tracking money lent to or borrowed from others.
+ */
+export const loans = mysqlTable("loans", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  direction: mysqlEnum("direction", ["lend", "borrow"]).notNull(),
+  counterparty: varchar("counterparty", { length: 100 }),
+  principal: decimal("principal", { precision: 12, scale: 2 }).notNull(),
+  rate: decimal("rate", { precision: 5, scale: 2 }),
+  periodicity: mysqlEnum("periodicity", [
+    "weekly",
+    "monthly",
+    "yearly",
+    "none",
+  ]).notNull(),
+  installmentCount: int("installmentCount"),
+  endDate: timestamp("endDate"),
+  nextDueDate: timestamp("nextDueDate"),
+  status: mysqlEnum("status", ["active", "settled"]).default("active").notNull(),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Loan = typeof loans.$inferSelect;
+export type InsertLoan = typeof loans.$inferInsert;
+
+/**
+ * Repayments table for logging payments against a loan.
+ */
+export const repayments = mysqlTable("repayments", {
+  id: int("id").autoincrement().primaryKey(),
+  loanId: int("loanId").notNull(),
+  userId: int("userId").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  date: timestamp("date").notNull(),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Repayment = typeof repayments.$inferSelect;
+export type InsertRepayment = typeof repayments.$inferInsert;

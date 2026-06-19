@@ -12,6 +12,11 @@ const mocks = vi.hoisted(() => {
   });
   const budgetsRefetch = vi.fn().mockResolvedValue({ data: [] });
   const budgetProgressRefetch = vi.fn().mockResolvedValue({ data: [] });
+  const loansRefetch = vi.fn().mockResolvedValue({ data: [] });
+  const accountsRefetch = vi.fn().mockResolvedValue({ data: [] });
+  const accountBalancesRefetch = vi.fn().mockResolvedValue({ data: [] });
+  const transfersRefetch = vi.fn().mockResolvedValue({ data: [] });
+  const recurringTransactionsRefetch = vi.fn().mockResolvedValue({ data: [] });
   const toastShow = vi.fn();
 
   const useQuery = () => ({
@@ -31,6 +36,11 @@ const mocks = vi.hoisted(() => {
     monthlyStatsRefetch,
     budgetsRefetch,
     budgetProgressRefetch,
+    loansRefetch,
+    accountsRefetch,
+    accountBalancesRefetch,
+    transfersRefetch,
+    recurringTransactionsRefetch,
     toastShow,
     useQuery,
     useMutation,
@@ -49,8 +59,22 @@ vi.mock("@/components/ui/ToastProvider", () => ({
   useToast: () => ({ show: mocks.toastShow }),
 }));
 
+vi.mock("@/lib/loan-reminders", () => ({
+  syncLoanReminderState: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/lib/trpc", () => ({
   trpc: {
+    useUtils: () => ({
+      accounts: {
+        transactionCount: {
+          fetch: vi.fn().mockResolvedValue(0),
+        },
+        transferCount: {
+          fetch: vi.fn().mockResolvedValue(0),
+        },
+      },
+    }),
     categories: {
       list: {
         useQuery: () => ({ refetch: mocks.categoriesRefetch, data: [] }),
@@ -98,6 +122,45 @@ vi.mock("@/lib/trpc", () => ({
         }),
       },
     },
+    loans: {
+      list: { useQuery: () => ({ refetch: mocks.loansRefetch, data: [] }) },
+      create: { useMutation: mocks.useMutation },
+      recordRepayment: { useMutation: mocks.useMutation },
+    },
+    accounts: {
+      list: { useQuery: () => ({ refetch: mocks.accountsRefetch, data: [] }) },
+      create: { useMutation: mocks.useMutation },
+      update: { useMutation: mocks.useMutation },
+      delete: { useMutation: mocks.useMutation },
+      reassignAndDelete: { useMutation: mocks.useMutation },
+      balances: {
+        useQuery: () => ({ refetch: mocks.accountBalancesRefetch, data: [] }),
+      },
+      transfers: {
+        useQuery: () => ({ refetch: mocks.transfersRefetch, data: [] }),
+      },
+      transfer: { useMutation: mocks.useMutation },
+      transactionCount: { useQuery: mocks.useQuery },
+      transferCount: { useQuery: mocks.useQuery },
+    },
+    recurringTransactions: {
+      list: {
+        useQuery: () => ({
+          refetch: mocks.recurringTransactionsRefetch,
+          data: [],
+        }),
+      },
+      create: { useMutation: mocks.useMutation },
+      update: { useMutation: mocks.useMutation },
+    },
+    settings: {
+      get: {
+        useQuery: () => ({
+          data: { aiEnabled: false, remindersEnabled: false },
+          isSuccess: true,
+        }),
+      },
+    },
   },
 }));
 
@@ -126,7 +189,7 @@ afterEach(() => {
 });
 
 describe("ExpenseProvider clearAllData", () => {
-  it("refreshes categories, cards, transactions, budgets, and monthly stats after success", async () => {
+  it("refreshes categories, cards, accounts, transactions, budgets, loans, and monthly stats after success", async () => {
     let clearAllData: (() => Promise<void>) | null = null;
 
     act(() => {
@@ -148,9 +211,13 @@ describe("ExpenseProvider clearAllData", () => {
     expect(mocks.clearAllMutateAsync).toHaveBeenCalledTimes(1);
     expect(mocks.categoriesRefetch).toHaveBeenCalled();
     expect(mocks.creditCardsRefetch).toHaveBeenCalled();
+    expect(mocks.accountsRefetch).toHaveBeenCalled();
+    expect(mocks.accountBalancesRefetch).toHaveBeenCalled();
     expect(mocks.transactionsRefetch).toHaveBeenCalled();
     expect(mocks.budgetsRefetch).toHaveBeenCalled();
     expect(mocks.budgetProgressRefetch).toHaveBeenCalled();
+    expect(mocks.recurringTransactionsRefetch).toHaveBeenCalled();
+    expect(mocks.loansRefetch).toHaveBeenCalled();
     expect(mocks.monthlyStatsRefetch).toHaveBeenCalled();
     expect(mocks.toastShow).toHaveBeenCalledWith({
       type: "success",

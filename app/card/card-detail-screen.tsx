@@ -1,10 +1,12 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   View,
   Text,
   Pressable,
   FlatList,
   ActivityIndicator,
+  RefreshControl,
+  ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +24,7 @@ import { maskCardLastFour } from "@/lib/card-form-validation";
 import { useCardTransactions, useExpense } from "@/lib/expense-context";
 import { useCurrency } from "@/lib/currency-provider";
 import { formatCurrency } from "@/lib/currency";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 function formatMoney(
   total: number,
@@ -36,9 +39,14 @@ export default function CardDetailScreen() {
   const { currency } = useCurrency();
   const { id } = useLocalSearchParams<{ id: string }>();
   const cardId = parseCardRouteId(id);
-  const { creditCards, categories } = useExpense();
-  const { cardTransactions, loadingCardTransactions } =
+  const { creditCards, categories, refreshCreditCards } = useExpense();
+  const { cardTransactions, loadingCardTransactions, refreshCardTransactions } =
     useCardTransactions(cardId);
+
+  const onRefresh = useCallback(async () => {
+    await Promise.all([refreshCreditCards(), refreshCardTransactions()]);
+  }, [refreshCreditCards, refreshCardTransactions]);
+  const refreshProps = usePullToRefresh(onRefresh);
 
   const card = useMemo(
     () => creditCards.find((item) => item.id === cardId),
@@ -131,14 +139,7 @@ export default function CardDetailScreen() {
       </Animated.View>
 
       <View className="flex-1 px-6 mt-6">
-        {loadingCardTransactions ? (
-          <View
-            className="flex-1 items-center justify-center"
-            testID="card-detail-loading"
-          >
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : cardTransactions.length > 0 ? (
+        {cardTransactions.length > 0 ? (
           <Animated.View
             entering={FadeInDown.delay(150).duration(400)}
             className="flex-1 rounded-3xl overflow-hidden"
@@ -147,6 +148,7 @@ export default function CardDetailScreen() {
             <FlatList
               data={cardTransactions}
               keyExtractor={(item) => item.id.toString()}
+              refreshControl={<RefreshControl {...refreshProps} />}
               renderItem={({ item, index }) => {
                 const category = categoriesById.get(item.categoryId);
                 const categoryIcon = (category?.icon ??
@@ -179,24 +181,34 @@ export default function CardDetailScreen() {
             />
           </Animated.View>
         ) : (
-          <Animated.View
-            entering={FadeInDown.delay(150).duration(400)}
+          <ScrollView
             className="flex-1 rounded-3xl overflow-hidden"
             style={{ backgroundColor: colors.surface }}
+            contentContainerStyle={{ flexGrow: 1 }}
+            refreshControl={<RefreshControl {...refreshProps} />}
           >
-            <EmptyState
-              variant="no-data"
-              icon={
-                <Ionicons
-                  name="receipt-outline"
-                  size={28}
-                  color={colors.muted}
-                />
-              }
-              title="No transactions for this card yet"
-              description="Expenses linked to this card will appear here"
-            />
-          </Animated.View>
+            {loadingCardTransactions ? (
+              <View
+                className="flex-1 items-center justify-center py-20"
+                testID="card-detail-loading"
+              >
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : (
+              <EmptyState
+                variant="no-data"
+                icon={
+                  <Ionicons
+                    name="receipt-outline"
+                    size={28}
+                    color={colors.muted}
+                  />
+                }
+                title="No transactions for this card yet"
+                description="Expenses linked to this card will appear here"
+              />
+            )}
+          </ScrollView>
         )}
       </View>
     </ScreenContainer>

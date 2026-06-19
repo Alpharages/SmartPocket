@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { applyOptimistic, snapshotList } from "./optimistic";
 import { getMonthBoundaries, getWeekBoundaries } from "./budget-period";
 import { useFirstDayOfWeek } from "./first-day-of-week-provider";
+import { syncLoanReminderState } from "./loan-reminders";
 
 function toRecurringMutationInput(
   rule: RecurringTransaction,
@@ -62,6 +63,43 @@ export interface CreditCard {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface Account {
+  id: number;
+  userId: number;
+  name: string;
+  type: "cash" | "bank" | "wallet";
+  currency: string;
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CreateAccountInput = {
+  name: string;
+  type: "cash" | "bank" | "wallet";
+  currency: string;
+};
+
+export interface Transfer {
+  id: number;
+  userId: number;
+  fromAccountId: number;
+  toAccountId: number;
+  amount: string;
+  description?: string | null;
+  date: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CreateTransferInput = {
+  fromAccountId: number;
+  toAccountId: number;
+  amount: string;
+  description?: string;
+  date: Date;
+};
 
 export type CreateCreditCardInput = Omit<
   CreditCard,
@@ -135,6 +173,58 @@ export type CreateRecurringTransactionInput = Omit<
   | "isActive"
 >;
 
+export interface Loan {
+  id: number;
+  userId: number;
+  direction: "lend" | "borrow";
+  counterparty: string | null;
+  principal: string;
+  rate: string | null;
+  periodicity: "weekly" | "monthly" | "yearly" | "none";
+  installmentCount: number | null;
+  endDate: Date | null;
+  nextDueDate: Date | null;
+  status: "active" | "settled";
+  note: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CreateLoanInput = {
+  direction: "lend" | "borrow";
+  counterparty?: string | null;
+  principal: string;
+  rate?: string | null;
+  periodicity: "weekly" | "monthly" | "yearly" | "none";
+  installmentCount?: number | null;
+  endDate?: Date | null;
+  nextDueDate?: Date | null;
+  note?: string | null;
+};
+
+export type RecordRepaymentInput = {
+  loanId: number;
+  amount: string;
+  date: Date;
+  note?: string | null;
+};
+
+export interface LoanRepayment {
+  id: number;
+  loanId: number;
+  userId: number;
+  amount: string;
+  date: Date;
+  note: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type LoanDetail = Loan & {
+  remainingBalance: string;
+  repayments: LoanRepayment[];
+};
+
 export interface BudgetProgress {
   budgetId: number;
   spent: string;
@@ -168,6 +258,27 @@ interface ExpenseContextType {
     data: Partial<CreditCard> & { cardNumber?: string },
   ) => Promise<void>;
   deleteCreditCard: (id: number) => Promise<void>;
+
+  // Accounts
+  accounts: Account[];
+  loadingAccounts: boolean;
+  refreshAccounts: () => Promise<void>;
+  addAccount: (data: CreateAccountInput) => Promise<void>;
+  updateAccount: (id: number, data: Partial<CreateAccountInput>) => Promise<void>;
+  deleteAccount: (id: number) => Promise<void>;
+  reassignAndDeleteAccount: (
+    id: number,
+    targetAccountId: number,
+  ) => Promise<void>;
+  fetchAccountTransactionCount: (id: number) => Promise<number>;
+  fetchAccountTransferCount: (id: number) => Promise<number>;
+  getAccountBalance: (accountId: number) => number;
+  loadingAccountBalances: boolean;
+  refreshAccountBalances: () => Promise<void>;
+  transfers: Transfer[];
+  loadingTransfers: boolean;
+  refreshTransfers: () => Promise<void>;
+  addTransfer: (data: CreateTransferInput) => Promise<void>;
 
   // Transactions
   transactions: Transaction[];
@@ -209,6 +320,16 @@ interface ExpenseContextType {
     data: CreateRecurringTransactionInput,
   ) => Promise<void>;
   cancelRecurringTransaction: (id: number) => Promise<void>;
+
+  // Loans
+  loans: Loan[];
+  loadingLoans: boolean;
+  refreshLoans: () => Promise<void>;
+  addLoan: (data: CreateLoanInput) => Promise<void>;
+  recordRepayment: (data: RecordRepaymentInput) => Promise<LoanDetail>;
+
+  /** Refetch all expense-tracker data (categories, cards, transactions, etc.). */
+  refreshAll: () => Promise<void>;
 }
 
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
@@ -240,7 +361,15 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const [loadingCategories, setLoadingCategories] = useState(false);
 
   const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadingCards, setLoadingCards] = useState(false);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [accountBalances, setAccountBalances] = useState<Map<number, number>>(
+    () => new Map(),
+  );
+  const [loadingAccountBalances, setLoadingAccountBalances] = useState(false);
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [loadingTransfers, setLoadingTransfers] = useState(false);
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -256,6 +385,9 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   >([]);
   const [loadingRecurringTransactions, setLoadingRecurringTransactions] =
     useState(false);
+
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [loadingLoans, setLoadingLoans] = useState(false);
 
   // Categories
   const categoriesQuery = trpc.categories.list.useQuery();
@@ -445,6 +577,293 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     [deleteCardMutation, creditCards, toast],
   );
 
+  // Accounts
+  const accountsQuery = trpc.accounts.list.useQuery();
+  const createAccountMutation = trpc.accounts.create.useMutation();
+  const updateAccountMutation = trpc.accounts.update.useMutation();
+  const deleteAccountMutation = trpc.accounts.delete.useMutation();
+  const reassignAndDeleteAccountMutation =
+    trpc.accounts.reassignAndDelete.useMutation();
+  const accountBalancesQuery = trpc.accounts.balances.useQuery();
+  const transfersQuery = trpc.accounts.transfers.useQuery();
+  const createTransferMutation = trpc.accounts.transfer.useMutation();
+  const trpcUtils = trpc.useUtils();
+
+  const refreshAccountBalances = useCallback(async () => {
+    setLoadingAccountBalances(true);
+    try {
+      const { data } = await accountBalancesQuery.refetch();
+      if (data) {
+        setAccountBalances(
+          new Map(data.map((entry) => [entry.accountId, entry.balance])),
+        );
+      }
+    } finally {
+      setLoadingAccountBalances(false);
+    }
+  }, [accountBalancesQuery]);
+
+  const refreshTransfers = useCallback(async () => {
+    setLoadingTransfers(true);
+    try {
+      const { data } = await transfersQuery.refetch();
+      if (data) {
+        setTransfers(data);
+      }
+    } finally {
+      setLoadingTransfers(false);
+    }
+  }, [transfersQuery]);
+
+  const getAccountBalance = useCallback(
+    (accountId: number) => accountBalances.get(accountId) ?? 0,
+    [accountBalances],
+  );
+
+  const refreshAccounts = useCallback(async () => {
+    setLoadingAccounts(true);
+    try {
+      const { data } = await accountsQuery.refetch();
+      if (data) {
+        setAccounts(data);
+      }
+    } finally {
+      setLoadingAccounts(false);
+    }
+  }, [accountsQuery]);
+
+  const addAccount = useCallback(
+    async (data: CreateAccountInput) => {
+      const now = new Date();
+      const optimistic: Account = {
+        id: -Date.now(),
+        userId: 0,
+        name: data.name,
+        type: data.type,
+        currency: data.currency,
+        isDefault: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const snapshot = snapshotList(accounts);
+      setAccounts((prev) =>
+        applyOptimistic(prev, {
+          type: "add",
+          item: optimistic,
+          position: "end",
+        }),
+      );
+      try {
+        await createAccountMutation.mutateAsync(data);
+        await refreshAccounts();
+        toast.show({ type: "success", message: "Account added" });
+      } catch {
+        setAccounts(snapshot);
+        toast.show({ type: "error", message: "Failed to add account" });
+        throw new Error("addAccount failed");
+      }
+    },
+    [createAccountMutation, refreshAccounts, accounts, toast],
+  );
+
+  const updateAccount = useCallback(
+    async (id: number, data: Partial<CreateAccountInput>) => {
+      const snapshot = snapshotList(accounts);
+      setAccounts((prev) =>
+        applyOptimistic(prev, {
+          type: "update",
+          id,
+          data: data as Partial<Account>,
+        }),
+      );
+      try {
+        await updateAccountMutation.mutateAsync({ id, ...data });
+        toast.show({ type: "success", message: "Account updated" });
+      } catch {
+        setAccounts(snapshot);
+        toast.show({ type: "error", message: "Failed to update account" });
+        throw new Error("updateAccount failed");
+      }
+    },
+    [updateAccountMutation, accounts, toast],
+  );
+
+  const deleteAccount = useCallback(
+    async (id: number) => {
+      const snapshot = snapshotList(accounts);
+      setAccounts((prev) => applyOptimistic(prev, { type: "delete", id }));
+      try {
+        await deleteAccountMutation.mutateAsync({ id });
+        setAccountBalances((prev) => {
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
+        toast.show({ type: "success", message: "Account deleted" });
+      } catch (err) {
+        setAccounts(snapshot);
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to delete account"),
+        });
+        throw new Error("deleteAccount failed");
+      }
+    },
+    [deleteAccountMutation, accounts, toast],
+  );
+
+  const reassignAndDeleteAccount = useCallback(
+    async (id: number, targetAccountId: number) => {
+      const snapshot = snapshotList(accounts);
+      setAccounts((prev) => applyOptimistic(prev, { type: "delete", id }));
+      try {
+        await reassignAndDeleteAccountMutation.mutateAsync({
+          id,
+          targetAccountId,
+        });
+        await refreshAccountBalances();
+        toast.show({ type: "success", message: "Account deleted" });
+      } catch {
+        setAccounts(snapshot);
+        toast.show({
+          type: "error",
+          message: "Failed to reassign and delete account",
+        });
+        throw new Error("reassignAndDeleteAccount failed");
+      }
+    },
+    [reassignAndDeleteAccountMutation, accounts, refreshAccountBalances, toast],
+  );
+
+  const fetchAccountTransactionCount = useCallback(
+    async (id: number) => {
+      return trpcUtils.accounts.transactionCount.fetch({ id });
+    },
+    [trpcUtils],
+  );
+
+  const fetchAccountTransferCount = useCallback(
+    async (id: number) => {
+      return trpcUtils.accounts.transferCount.fetch({ id });
+    },
+    [trpcUtils],
+  );
+
+  const addTransfer = useCallback(
+    async (data: CreateTransferInput) => {
+      try {
+        await createTransferMutation.mutateAsync(data);
+        await Promise.all([refreshTransfers(), refreshAccountBalances()]);
+        toast.show({ type: "success", message: "Transfer recorded" });
+      } catch (err) {
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to record transfer"),
+        });
+        throw new Error("addTransfer failed");
+      }
+    },
+    [createTransferMutation, refreshTransfers, refreshAccountBalances, toast],
+  );
+
+  // Loans
+  const loansQuery = trpc.loans.list.useQuery();
+  const createLoanMutation = trpc.loans.create.useMutation();
+  const recordRepaymentMutation = trpc.loans.recordRepayment.useMutation();
+  const settingsQuery = trpc.settings.get.useQuery();
+  const remindersEnabled = settingsQuery.data?.remindersEnabled ?? false;
+
+  const refreshLoans = useCallback(async () => {
+    setLoadingLoans(true);
+    try {
+      const { data } = await loansQuery.refetch();
+      if (data) {
+        setLoans(data);
+      }
+    } finally {
+      setLoadingLoans(false);
+    }
+  }, [loansQuery]);
+
+  const addLoan = useCallback(
+    async (data: CreateLoanInput) => {
+      const now = new Date();
+      const optimistic: Loan = {
+        id: -Date.now(),
+        userId: 0,
+        direction: data.direction,
+        counterparty: data.counterparty ?? null,
+        principal: data.principal,
+        rate: data.rate ?? null,
+        periodicity: data.periodicity,
+        installmentCount: data.installmentCount ?? null,
+        endDate: data.endDate ?? null,
+        nextDueDate: data.nextDueDate ?? null,
+        status: "active",
+        note: data.note ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const snapshot = snapshotList(loans);
+      setLoans((prev) =>
+        applyOptimistic(prev, {
+          type: "add",
+          item: optimistic,
+          position: "start",
+        }),
+      );
+      try {
+        await createLoanMutation.mutateAsync({
+          direction: data.direction,
+          counterparty: data.counterparty?.trim() || null,
+          principal: data.principal,
+          rate: data.rate?.trim() ? data.rate.trim() : null,
+          periodicity: data.periodicity,
+          installmentCount: data.installmentCount ?? null,
+          endDate: data.endDate ?? null,
+          nextDueDate: data.nextDueDate ?? null,
+          note: data.note ?? null,
+        });
+        await refreshLoans();
+        toast.show({ type: "success", message: "Loan added" });
+      } catch (err) {
+        setLoans(snapshot);
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to add loan"),
+        });
+        throw new Error("addLoan failed");
+      }
+    },
+    [createLoanMutation, refreshLoans, loans, toast],
+  );
+
+  const recordRepayment = useCallback(
+    async (data: RecordRepaymentInput) => {
+      try {
+        const updated = await recordRepaymentMutation.mutateAsync({
+          loanId: data.loanId,
+          amount: data.amount,
+          date: data.date,
+          note: data.note?.trim() ? data.note.trim() : null,
+        });
+        await refreshLoans();
+        toast.show({ type: "success", message: "Repayment recorded" });
+        return updated as LoanDetail;
+      } catch (err) {
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(
+            err,
+            "Failed to record repayment",
+          ),
+        });
+        throw new Error("recordRepayment failed");
+      }
+    },
+    [recordRepaymentMutation, refreshLoans, toast],
+  );
+
   // Transactions
   const transactionsQuery = trpc.transactions.list.useQuery();
   const createTransactionMutation = trpc.transactions.create.useMutation();
@@ -608,6 +1027,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         await createTransactionMutation.mutateAsync(data);
         await refreshTransactions();
         await refreshBudgetProgress();
+        await refreshAccountBalances();
         toast.show({ type: "success", message: "Transaction added" });
       } catch {
         setTransactions(snapshot);
@@ -619,6 +1039,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       createTransactionMutation,
       refreshTransactions,
       refreshBudgetProgress,
+      refreshAccountBalances,
       transactions,
       toast,
     ],
@@ -642,6 +1063,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       try {
         await updateTransactionMutation.mutateAsync({ id, ...data } as any);
         await refreshBudgetProgress();
+        await refreshAccountBalances();
         toast.show({ type: "success", message: "Transaction updated" });
       } catch {
         setTransactions(snapshot);
@@ -649,7 +1071,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("updateTransaction failed");
       }
     },
-    [updateTransactionMutation, refreshBudgetProgress, transactions, toast],
+    [updateTransactionMutation, refreshBudgetProgress, refreshAccountBalances, transactions, toast],
   );
 
   const deleteTransaction = useCallback(
@@ -659,6 +1081,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       try {
         await deleteTransactionMutation.mutateAsync({ id });
         await refreshBudgetProgress();
+        await refreshAccountBalances();
         toast.show({ type: "success", message: "Transaction deleted" });
       } catch {
         setTransactions(snapshot);
@@ -666,7 +1089,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("deleteTransaction failed");
       }
     },
-    [deleteTransactionMutation, refreshBudgetProgress, transactions, toast],
+    [deleteTransactionMutation, refreshBudgetProgress, refreshAccountBalances, transactions, toast],
   );
 
   const refreshRecurringTransactions = useCallback(async () => {
@@ -830,6 +1253,35 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     [statsQuery],
   );
 
+  const refreshAll = useCallback(async () => {
+    const now = new Date();
+    await Promise.all([
+      refreshCategories(),
+      refreshCreditCards(),
+      refreshAccounts(),
+      refreshAccountBalances(),
+      refreshTransfers(),
+      refreshTransactions(),
+      refreshBudgets(),
+      refreshBudgetProgress(),
+      refreshRecurringTransactions(),
+      refreshLoans(),
+      refreshMonthlyStats(now.getFullYear(), now.getMonth() + 1),
+    ]);
+  }, [
+    refreshCategories,
+    refreshCreditCards,
+    refreshAccounts,
+    refreshAccountBalances,
+    refreshTransfers,
+    refreshTransactions,
+    refreshBudgets,
+    refreshBudgetProgress,
+    refreshRecurringTransactions,
+    refreshLoans,
+    refreshMonthlyStats,
+  ]);
+
   const clearAllData = useCallback(async () => {
     const now = new Date();
     try {
@@ -837,10 +1289,14 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       await Promise.all([
         refreshCategories(),
         refreshCreditCards(),
+        refreshAccounts(),
+        refreshAccountBalances(),
+        refreshTransfers(),
         refreshTransactions(),
         refreshBudgets(),
         refreshBudgetProgress(),
         refreshRecurringTransactions(),
+        refreshLoans(),
         refreshMonthlyStats(now.getFullYear(), now.getMonth() + 1),
       ]);
       toast.show({ type: "success", message: "All data cleared" });
@@ -852,21 +1308,36 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     clearAllMutation,
     refreshCategories,
     refreshCreditCards,
+    refreshAccounts,
+    refreshAccountBalances,
+    refreshTransfers,
     refreshTransactions,
     refreshBudgets,
     refreshBudgetProgress,
     refreshRecurringTransactions,
+    refreshLoans,
     refreshMonthlyStats,
     toast,
   ]);
+
+  useEffect(() => {
+    if (!settingsQuery.isSuccess) {
+      return;
+    }
+    void syncLoanReminderState(loans, { remindersEnabled });
+  }, [loans, remindersEnabled, settingsQuery.isSuccess]);
 
   // Initialize data on mount
   useEffect(() => {
     refreshCategories();
     refreshCreditCards();
+    refreshAccounts();
+    refreshAccountBalances();
+    refreshTransfers();
     refreshTransactions();
     refreshBudgets();
     refreshRecurringTransactions();
+    refreshLoans();
     refreshMonthlyStats(new Date().getFullYear(), new Date().getMonth() + 1);
   }, []);
 
@@ -884,6 +1355,23 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     addCreditCard,
     updateCreditCard,
     deleteCreditCard,
+
+    accounts,
+    loadingAccounts,
+    refreshAccounts,
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    reassignAndDeleteAccount,
+    fetchAccountTransactionCount,
+    fetchAccountTransferCount,
+    getAccountBalance,
+    loadingAccountBalances,
+    refreshAccountBalances,
+    transfers,
+    loadingTransfers,
+    refreshTransfers,
+    addTransfer,
 
     transactions,
     loadingTransactions,
@@ -914,6 +1402,14 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     addRecurringTransaction,
     updateRecurringTransaction,
     cancelRecurringTransaction,
+
+    loans,
+    loadingLoans,
+    refreshLoans,
+    addLoan,
+    recordRepayment,
+
+    refreshAll,
   };
 
   return (
@@ -945,5 +1441,22 @@ export function useCardTransactions(creditCardId: number) {
     cardTransactions: (query.data ?? []) as Transaction[],
     loadingCardTransactions: enabled && query.isLoading,
     refreshCardTransactions,
+  };
+}
+
+/** User-scoped loan detail with repayments and remaining balance (Story 8.3). */
+export function useLoanDetail(loanId: number) {
+  const enabled = Number.isFinite(loanId) && loanId > 0;
+  const query = trpc.loans.getById.useQuery({ id: loanId }, { enabled });
+
+  const refreshLoanDetail = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
+
+  return {
+    loanDetail: (query.data ?? null) as LoanDetail | null,
+    loadingLoanDetail: enabled && query.isLoading,
+    loanDetailError: enabled && query.isError,
+    refreshLoanDetail,
   };
 }

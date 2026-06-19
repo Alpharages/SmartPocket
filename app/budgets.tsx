@@ -1,6 +1,8 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
+  RefreshControl,
+  ScrollView,
   FlatList,
   Pressable,
   Text,
@@ -10,8 +12,9 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
-import { ScreenContainer } from "@/components/screen-container";
+import { DEFAULT_CATEGORY_ICON } from "@/constants/theme";
 import { ResponsiveContent } from "@/components/responsive-content";
+import { ScreenContainer } from "@/components/screen-container";
 import { BudgetThresholdProgress } from "@/components/budgets/BudgetThresholdProgress";
 import {
   Button,
@@ -30,6 +33,7 @@ import { useCurrency } from "@/lib/currency-provider";
 import { formatCurrency } from "@/lib/currency";
 import { ContentMaxWidth, Typography } from "@/lib/_core/theme";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -141,7 +145,14 @@ export default function BudgetsScreen() {
     loadingBudgets,
     progressByBudgetId,
     loadingBudgetProgress,
+    refreshBudgets,
+    refreshBudgetProgress,
   } = useExpense();
+
+  const onRefresh = useCallback(async () => {
+    await Promise.all([refreshBudgets(), refreshBudgetProgress()]);
+  }, [refreshBudgets, refreshBudgetProgress]);
+  const refreshProps = usePullToRefresh(onRefresh);
 
   const categoriesById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
@@ -150,6 +161,11 @@ export default function BudgetsScreen() {
 
   return (
     <ScreenContainer className="flex-1 bg-background">
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={<RefreshControl {...refreshProps} />}
+      >
       <ResponsiveContent maxWidth={ContentMaxWidth.screen}>
         <ScreenHeader
           title="Budgets"
@@ -220,7 +236,7 @@ export default function BudgetsScreen() {
                       category?.name ?? `Category ${item.categoryId}`
                     }
                     categoryColor={category?.color ?? colors.muted}
-                    categoryIcon={category?.icon ?? "tag"}
+                    categoryIcon={category?.icon ?? DEFAULT_CATEGORY_ICON}
                     index={index}
                     onPress={() => router.push(`/budget-form?id=${item.id}`)}
                   />
@@ -236,6 +252,7 @@ export default function BudgetsScreen() {
           </View>
         )}
       </ResponsiveContent>
+      </ScrollView>
     </ScreenContainer>
   );
 }

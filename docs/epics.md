@@ -37,28 +37,28 @@ already-built areas cover only the remaining gaps, not the completed functionali
 
 ### Functional Requirements
 
-| ID | Requirement | Status | Evidence in repo |
-|---|---|---|---|
-| FR-1 | Create, edit, delete income/expense with category, amount, date, notes | ✅ built | `transactions.create/update/delete`, `add-transaction.tsx` |
-| FR-2 | Optionally link an expense to a credit card | ✅ built | `transactions` schema `creditCardId`, add-transaction flow |
-| FR-3 | List, filter (date range / category / card), and search transactions | ✅ built | `transactions.list/listByDateRange/listByCategory/listByCreditCard`, `transactions.tsx` search |
-| FR-4 | Recurring transactions with custom frequency & end conditions | 🔲 planned | — |
-| FR-5 | Create, edit, delete custom income/expense categories (color, icon) | ✅ built | `categories` router CRUD, `categories.tsx` |
-| FR-6 | Seed predefined default categories for new users | 🔲 planned | `isDefault` column exists; no seeding logic |
-| FR-7 | Create and delete credit cards (name, number, holder, expiry, limit, color, type) | ✅ built | `creditCards.create/delete`, `cards.tsx` |
-| FR-8 | Edit credit cards & view transactions associated with a card | 🟡 partial | `creditCards.update` + `listByCreditCard` exist server-side; **no edit UI, no per-card txn view** |
-| FR-9 | Monthly summary: income, expense, net; per-category breakdown | ✅ built | `summary.monthlyStats/expensesByCategory`, `summary.tsx`, dashboard |
-| FR-10 | Charts (pie/breakdown), trends, basic forecasting, anomaly highlights | 🟡 partial | per-category list w/ % built; **no chart lib, no trends/forecast** |
-| FR-11 | Smart categorization suggestions for new transactions | 🔲 planned | self-hosted/local LLM, planned |
-| FR-12 | Natural-language Q&A ("Top expenses last month?") | 🔲 planned | — |
-| FR-13 | Server-side inference via a self-hosted / local LLM (OpenAI-compatible, env-configured); data sent only after explicit consent | 🔲 planned | legacy Forge client `server/_core/llm.ts` unused, being retired |
-| FR-14 | Category budgets (monthly/weekly) with progress & threshold alerts | 🔲 planned | — |
-| FR-15 | Create loans (lend/borrow): principal, rate, schedule, due dates | 🔲 planned | — |
-| FR-16 | Track repayments & remaining balance; due/overdue reminders | 🔲 planned | — |
-| FR-17 | Multiple accounts (cash/bank/wallet), balances, transfers | 🔲 planned | — |
-| FR-18 | CSV & JSON export; CSV import for transactions | 🔲 planned | — |
-| FR-19 | Local reminders for recurring payments & loan schedules (`expo-notifications`) | 🔲 planned | not wired |
-| FR-20 | Settings: currency, first day of week, theme, data management, AI toggles | 🔲 planned | no Settings screen |
+| ID    | Requirement                                                                                                                    | Status     | Evidence in repo                                                                                  |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------- |
+| FR-1  | Create, edit, delete income/expense with category, amount, date, notes                                                         | ✅ built   | `transactions.create/update/delete`, `add-transaction.tsx`                                        |
+| FR-2  | Optionally link an expense to a credit card                                                                                    | ✅ built   | `transactions` schema `creditCardId`, add-transaction flow                                        |
+| FR-3  | List, filter (date range / category / card), and search transactions                                                           | ✅ built   | `transactions.list/listByDateRange/listByCategory/listByCreditCard`, `transactions.tsx` search    |
+| FR-4  | Recurring transactions with custom frequency & end conditions                                                                  | 🔲 planned | —                                                                                                 |
+| FR-5  | Create, edit, delete custom income/expense categories (color, icon)                                                            | ✅ built   | `categories` router CRUD, `categories.tsx`                                                        |
+| FR-6  | Seed predefined default categories for new users                                                                               | 🔲 planned | `isDefault` column exists; no seeding logic                                                       |
+| FR-7  | Create and delete credit cards (name, number, holder, expiry, limit, color, type)                                              | ✅ built   | `creditCards.create/delete`, `cards.tsx`                                                          |
+| FR-8  | Edit credit cards & view transactions associated with a card                                                                   | 🟡 partial | `creditCards.update` + `listByCreditCard` exist server-side; **no edit UI, no per-card txn view** |
+| FR-9  | Monthly summary: income, expense, net; per-category breakdown                                                                  | ✅ built   | `summary.monthlyStats/expensesByCategory`, `summary.tsx`, dashboard                               |
+| FR-10 | Charts (pie/breakdown), trends, basic forecasting, anomaly highlights                                                          | 🟡 partial | per-category list w/ % built; **no chart lib, no trends/forecast**                                |
+| FR-11 | Smart categorization suggestions for new transactions                                                                          | 🔲 planned | self-hosted/local LLM, planned                                                                    |
+| FR-12 | Natural-language Q&A ("Top expenses last month?")                                                                              | 🔲 planned | —                                                                                                 |
+| FR-13 | Server-side inference via a self-hosted / local LLM (OpenAI-compatible, env-configured); data sent only after explicit consent | 🔲 planned | legacy Forge client `server/_core/llm.ts` unused, being retired                                   |
+| FR-14 | Category budgets (monthly/weekly) with progress & threshold alerts                                                             | 🔲 planned | —                                                                                                 |
+| FR-15 | Create loans (lend/borrow): principal, rate, schedule, due dates                                                               | 🔲 planned | —                                                                                                 |
+| FR-16 | Track repayments & remaining balance; due/overdue reminders                                                                    | 🔲 planned | —                                                                                                 |
+| FR-17 | Multiple accounts (cash/bank/wallet), balances, transfers                                                                      | 🔲 planned | —                                                                                                 |
+| FR-18 | CSV & JSON export; CSV import for transactions                                                                                 | 🔲 planned | —                                                                                                 |
+| FR-19 | Local reminders for recurring payments & loan schedules (`expo-notifications`)                                                 | 🔲 planned | not wired                                                                                         |
+| FR-20 | Settings: currency, first day of week, theme, data management, AI toggles                                                      | 🔲 planned | no Settings screen                                                                                |
 
 ### Non-Functional Requirements
 
@@ -208,8 +208,8 @@ Opt-in, transparent AI: smart category suggestions while adding a transaction an
 natural-language Q&A ask-bar on Insights, with server-side inference via a self-hosted / local LLM
 (OpenAI-compatible, env-configured — not the Manus Forge gateway) and explicit consent before any
 transaction data is sent.
-*Brownfield: a legacy Forge client (`server/_core/llm.ts`) exists but is unused and will be retired;
-this epic introduces a self-hosted/local OpenAI-compatible LLM client instead.*
+_Brownfield: a legacy Forge client (`server/_core/llm.ts`) exists but is unused and will be retired;
+this epic introduces a self-hosted/local OpenAI-compatible LLM client instead._
 **Covers:** FR-11, FR-12, FR-13.
 
 ### Epic 12: Complete Redesign — Premium Multi-Theme Experience

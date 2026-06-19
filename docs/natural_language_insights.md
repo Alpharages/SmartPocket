@@ -193,6 +193,7 @@ Structured response containing:
 ## Privacy & Security
 
 ### **Privacy-First Design**
+
 - Heuristic analysis is the default; the self-hosted / local LLM is used only when AI features are explicitly enabled
 - No persistent storage of queries or responses
 - User controls over AI features (opt-in)
@@ -331,6 +332,7 @@ Actions: [View All Categories] [Create Budget]
 - **Advanced Analytics**: Forecasting and budgeting insights
 
 ### **Technical Improvements**
+
 - **On-device Models**: client-device inference for even stronger privacy (the baseline is already self-hosted server-side)
 - **Query Caching**: Faster responses for repeated questions
 - **Real-time Data**: Live transaction updates in conversations
@@ -355,6 +357,7 @@ Actions: [View All Categories] [Create Budget]
 - Verify AI features are enabled
 
 **Slow Response Times**
+
 - Check that the API server can reach the `LLM_BASE_URL` endpoint
 - Verify the local LLM server status / load
 - Fall back to heuristic responses for speed

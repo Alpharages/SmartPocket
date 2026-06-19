@@ -39,40 +39,63 @@ describe("getUserSettings", () => {
   });
 
   it("returns aiEnabled false when MySQL stores 0", async () => {
-    callDataApi.mockResolvedValueOnce([{ aiEnabled: 0 }]);
+    callDataApi.mockResolvedValueOnce([
+      { aiEnabled: 0, remindersEnabled: 0 },
+    ]);
 
-    await expect(getUserSettings(42)).resolves.toEqual({ aiEnabled: false });
+    await expect(getUserSettings(42)).resolves.toEqual({
+      aiEnabled: false,
+      remindersEnabled: false,
+    });
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query: "SELECT aiEnabled FROM users WHERE id = ?",
+        query: "SELECT aiEnabled, remindersEnabled FROM users WHERE id = ?",
         params: [42],
       },
     });
   });
 
   it("coerces MySQL 1 to boolean true", async () => {
-    callDataApi.mockResolvedValueOnce([{ aiEnabled: 1 }]);
+    callDataApi.mockResolvedValueOnce([
+      { aiEnabled: 1, remindersEnabled: 1 },
+    ]);
 
-    await expect(getUserSettings(7)).resolves.toEqual({ aiEnabled: true });
+    await expect(getUserSettings(7)).resolves.toEqual({
+      aiEnabled: true,
+      remindersEnabled: true,
+    });
   });
 
   it('treats string "0" as false (not Boolean coercion)', async () => {
-    callDataApi.mockResolvedValueOnce([{ aiEnabled: "0" }]);
+    callDataApi.mockResolvedValueOnce([
+      { aiEnabled: "0", remindersEnabled: "0" },
+    ]);
 
-    await expect(getUserSettings(8)).resolves.toEqual({ aiEnabled: false });
+    await expect(getUserSettings(8)).resolves.toEqual({
+      aiEnabled: false,
+      remindersEnabled: false,
+    });
   });
 
   it('treats string "1" as false for default-off safety', async () => {
-    callDataApi.mockResolvedValueOnce([{ aiEnabled: "1" }]);
+    callDataApi.mockResolvedValueOnce([
+      { aiEnabled: "1", remindersEnabled: "1" },
+    ]);
 
-    await expect(getUserSettings(8)).resolves.toEqual({ aiEnabled: false });
+    await expect(getUserSettings(8)).resolves.toEqual({
+      aiEnabled: false,
+      remindersEnabled: false,
+    });
   });
 
   it("defaults to false when no row is returned", async () => {
     callDataApi.mockResolvedValueOnce([]);
 
-    await expect(getUserSettings(99)).resolves.toEqual({ aiEnabled: false });
+    await expect(getUserSettings(99)).resolves.toEqual({
+      aiEnabled: false,
+      remindersEnabled: false,
+    });
   });
 });
 
@@ -101,18 +124,23 @@ describe("settings router", () => {
   });
 
   it("get returns aiEnabled default false for a user", async () => {
-    callDataApi.mockResolvedValueOnce([{ aiEnabled: 0 }]);
+    callDataApi.mockResolvedValueOnce([
+      { aiEnabled: 0, remindersEnabled: 0 },
+    ]);
     const caller = appRouter.createCaller(createUserContext(1));
 
-    await expect(caller.settings.get()).resolves.toEqual({ aiEnabled: false });
+    await expect(caller.settings.get()).resolves.toEqual({
+      aiEnabled: false,
+      remindersEnabled: false,
+    });
   });
 
   it("setAiEnabled round-trips true then false scoped by user id", async () => {
     callDataApi
       .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce([{ aiEnabled: 1 }])
+      .mockResolvedValueOnce([{ aiEnabled: 1, remindersEnabled: 0 }])
       .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce([{ aiEnabled: 0 }]);
+      .mockResolvedValueOnce([{ aiEnabled: 0, remindersEnabled: 0 }]);
 
     const caller = appRouter.createCaller(createUserContext(10));
 
@@ -121,14 +149,20 @@ describe("settings router", () => {
     ).resolves.toEqual({
       aiEnabled: true,
     });
-    await expect(caller.settings.get()).resolves.toEqual({ aiEnabled: true });
+    await expect(caller.settings.get()).resolves.toEqual({
+      aiEnabled: true,
+      remindersEnabled: false,
+    });
 
     await expect(
       caller.settings.setAiEnabled({ enabled: false }),
     ).resolves.toEqual({
       aiEnabled: false,
     });
-    await expect(caller.settings.get()).resolves.toEqual({ aiEnabled: false });
+    await expect(caller.settings.get()).resolves.toEqual({
+      aiEnabled: false,
+      remindersEnabled: false,
+    });
 
     const updateCalls = callDataApi.mock.calls.filter((call) =>
       (call[1] as { body: { query: string } }).body.query.includes(
@@ -145,14 +179,16 @@ describe("settings router", () => {
   });
 
   it("scopes settings.get to ctx.user.id", async () => {
-    callDataApi.mockResolvedValueOnce([{ aiEnabled: 1 }]);
+    callDataApi.mockResolvedValueOnce([
+      { aiEnabled: 1, remindersEnabled: 1 },
+    ]);
     const caller = appRouter.createCaller(createUserContext(3));
 
     await caller.settings.get();
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query: "SELECT aiEnabled FROM users WHERE id = ?",
+        query: "SELECT aiEnabled, remindersEnabled FROM users WHERE id = ?",
         params: [3],
       },
     });

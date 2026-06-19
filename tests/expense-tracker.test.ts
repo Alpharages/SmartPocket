@@ -51,7 +51,7 @@ describe("Expense Tracker", () => {
         name: "Groceries",
         type: "expense" as const,
         color: "#FF6B6B",
-        icon: "tag",
+        icon: "pricetag-outline",
         isDefault: false,
       };
 

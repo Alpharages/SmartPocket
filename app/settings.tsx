@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -31,6 +31,7 @@ import { useThemeContext } from "@/lib/theme-provider";
 import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { Spacing } from "@/lib/_core/theme";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 const AI_EXPLANATION =
   "Lets SmartPocket suggest categories and answer questions about your spending. Your data is only sent for AI when this is on.";
@@ -199,8 +200,8 @@ function ClearDataConfirmationSheet({
     >
       <View className="px-lg pb-lg">
         <Text className="mb-lg text-body text-muted">
-          This permanently deletes all transactions, categories, and credit
-          cards. This action cannot be undone.
+          This permanently deletes all transactions, categories, accounts, and
+          credit cards. This action cannot be undone.
         </Text>
         <View className="flex-row gap-md">
           <View className="flex-1">
@@ -281,14 +282,19 @@ export default function SettingsScreen() {
   const { currency, setCurrency } = useCurrency();
   const { firstDayOfWeek, setFirstDayOfWeek } = useFirstDayOfWeek();
   const { themePreference, setThemePreference } = useThemeContext();
-  const { aiEnabled, setAiEnabled, isSavingAi } = useSettings();
-  const { clearAllData } = useExpense();
+  const { aiEnabled, setAiEnabled, isSavingAi, refreshSettings } = useSettings();
+  const { clearAllData, refreshAll } = useExpense();
   const [currencySheetVisible, setCurrencySheetVisible] = useState(false);
   const [firstDaySheetVisible, setFirstDaySheetVisible] = useState(false);
   const [clearDataSheetVisible, setClearDataSheetVisible] = useState(false);
   const [clearingData, setClearingData] = useState(false);
 
   const { name: appName, version: appVersion } = getAppMetadata();
+
+  const onRefresh = useCallback(async () => {
+    await Promise.all([refreshSettings(), refreshAll()]);
+  }, [refreshSettings, refreshAll]);
+  const refreshProps = usePullToRefresh(onRefresh);
 
   const handleSelectCurrency = useCallback(
     (code: CurrencyCode) => {
@@ -357,6 +363,7 @@ export default function SettingsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+        refreshControl={<RefreshControl {...refreshProps} />}
       >
         <SettingsSectionGroup title="Preferences">
           <SettingsRow
@@ -382,6 +389,13 @@ export default function SettingsScreen() {
         </SettingsSectionGroup>
 
         <SettingsSectionGroup title="Data Management">
+          <SettingsRow
+            icon="wallet-outline"
+            label="Accounts"
+            onPress={() => router.push("/accounts")}
+            accessibilityLabel="Accounts"
+          />
+          <SectionDivider />
           <SettingsRow
             icon="download-outline"
             label="Export data"

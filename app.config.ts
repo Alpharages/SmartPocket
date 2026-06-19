@@ -90,6 +90,12 @@ const config: ExpoConfig = {
       },
     ],
     [
+      "expo-notifications",
+      {
+        color: "#4F46E5",
+      },
+    ],
+    [
       "expo-splash-screen",
       {
         image: "./assets/images/splash-icon.png",

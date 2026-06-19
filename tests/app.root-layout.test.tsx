@@ -63,6 +63,7 @@ vi.mock("@/lib/settings-provider", () => providers);
 vi.mock("@/lib/expense-context", () => providers);
 vi.mock("@/components/ui/ToastProvider", () => providers);
 vi.mock("expo-router", () => ({
+  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
   Stack: Object.assign(
     ({ children }: { children: React.ReactNode }) =>
       React.createElement("Stack", {}, children),
@@ -71,6 +72,22 @@ vi.mock("expo-router", () => ({
         React.createElement("StackScreen", {}, children),
     },
   ),
+}));
+vi.mock("expo-notifications", () => ({
+  setNotificationHandler: vi.fn(),
+  addNotificationResponseReceivedListener: vi.fn(() => ({ remove: vi.fn() })),
+  getLastNotificationResponseAsync: vi.fn().mockResolvedValue(null),
+  getPermissionsAsync: vi.fn(),
+  SchedulableTriggerInputTypes: { DATE: "date" },
+  IosAuthorizationStatus: {
+    AUTHORIZED: 2,
+    PROVISIONAL: 3,
+    EPHEMERAL: 4,
+    NOT_DETERMINED: 0,
+  },
+}));
+vi.mock("@/lib/notification-routing", () => ({
+  handleLoanNotificationResponse: vi.fn(),
 }));
 vi.mock("react-native-gesture-handler", () => ({
   GestureHandlerRootView: ({ children }: { children: React.ReactNode }) =>
@@ -141,6 +158,7 @@ describe("RootLayout dev auth bootstrap", () => {
     });
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
       json: async () => ({ token: "dev-token" }),
     } as Response);
   });
@@ -203,7 +221,7 @@ describe("RootLayout dev auth bootstrap", () => {
     });
   });
 
-  it("renders the native app shell immediately and still fires dev auto-login", async () => {
+  it("keeps the native app shell hidden until dev auto-login completes", async () => {
     Platform.OS = "ios";
     auth.getSessionToken.mockResolvedValueOnce(null);
 
@@ -211,22 +229,23 @@ describe("RootLayout dev auth bootstrap", () => {
       renderer = TestRenderer.create(<RootLayout />);
     });
 
-    // Native is never gated — the shell is present from the first render even
-    // before auto-login resolves.
     expect(
-      renderer!.root.findByType(
+      renderer!.root.findAllByType(
         "ExpenseProvider" as unknown as React.ElementType,
       ),
-    ).toBeTruthy();
+    ).toHaveLength(0);
 
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    // …and dev auto-login still runs on native (regression guard: the effect
-    // must not be scoped to web only).
     expect(fetchSpy).toHaveBeenCalled();
     expect(auth.setSessionToken).toHaveBeenCalledWith("dev-token");
+    expect(
+      renderer!.root.findByType(
+        "ExpenseProvider" as unknown as React.ElementType,
+      ),
+    ).toBeTruthy();
   });
 });

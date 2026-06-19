@@ -269,9 +269,6 @@ export function RecurringTransactionSheet({
     }
   };
 
-  const formValues = buildFormValues();
-  const canSave = isRecurringFormValid(formValues) && !saving;
-
   return (
     <Sheet
       visible={visible}
@@ -622,7 +619,7 @@ export function RecurringTransactionSheet({
               label={isEditing ? "Save" : "Create"}
               onPress={handleSave}
               className="flex-1"
-              disabled={!canSave}
+              disabled={saving}
               loading={saving}
             />
           </View>

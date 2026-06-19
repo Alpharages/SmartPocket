@@ -1,3 +1,4 @@
+import { DEFAULT_CATEGORY_ICON } from "../../shared/theme";
 import { encryptCardNumber } from "./crypto";
 
 /**
@@ -23,7 +24,11 @@ type TableName =
   | "creditCards"
   | "transactions"
   | "budgets"
-  | "monthlySummaries";
+  | "monthlySummaries"
+  | "loans"
+  | "repayments"
+  | "accounts"
+  | "transfers";
 
 const DATE_COLUMNS = new Set([
   "createdAt",
@@ -32,16 +37,22 @@ const DATE_COLUMNS = new Set([
   "date",
   "startDate",
   "endDate",
+  "nextDueDate",
 ]);
 const NUMERIC_COLUMNS = new Set([
   "id",
   "userId",
   "categoryId",
   "creditCardId",
+  "accountId",
+  "fromAccountId",
+  "toAccountId",
+  "loanId",
   "year",
   "month",
   "expiryMonth",
   "expiryYear",
+  "installmentCount",
 ]);
 
 const store: Record<TableName, Row[]> = {
@@ -51,6 +62,10 @@ const store: Record<TableName, Row[]> = {
   transactions: [],
   budgets: [],
   monthlySummaries: [],
+  loans: [],
+  repayments: [],
+  accounts: [],
+  transfers: [],
 };
 
 const nextId: Record<TableName, number> = {
@@ -60,6 +75,10 @@ const nextId: Record<TableName, number> = {
   transactions: 1,
   budgets: 1,
   monthlySummaries: 1,
+  loans: 1,
+  repayments: 1,
+  accounts: 1,
+  transfers: 1,
 };
 
 function insertRow(table: TableName, row: Row): number {
@@ -392,7 +411,7 @@ function applyInsertDefaults(table: TableName, row: Row): void {
       if (row.lastSignedIn == null) row.lastSignedIn = now;
       break;
     case "categories":
-      if (row.icon == null) row.icon = "tag";
+      if (row.icon == null) row.icon = DEFAULT_CATEGORY_ICON;
       if (row.isDefault == null) row.isDefault = false;
       break;
     case "creditCards":
@@ -404,6 +423,13 @@ function applyInsertDefaults(table: TableName, row: Row): void {
       if (row.totalIncome == null) row.totalIncome = "0";
       if (row.totalExpense == null) row.totalExpense = "0";
       if (row.netBalance == null) row.netBalance = "0";
+      break;
+    case "loans":
+      if (row.status == null) row.status = "active";
+      break;
+    case "accounts":
+      if (row.currency == null) row.currency = "USD";
+      if (row.isDefault == null) row.isDefault = false;
       break;
   }
 }

@@ -1,4 +1,8 @@
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { resolveNextDueDateAfterRepayment } from "../lib/loan-schedule";
+import {
+  applyTransferLegs,
+  reduceAccountBalances,
+} from "@/lib/account-balances";
 import { callDataApi } from "./_core/dataApi";
 import {
   decryptCardNumber,
@@ -6,7 +10,7 @@ import {
   maskCardNumber,
 } from "./_core/crypto";
 import { DEFAULT_CATEGORIES } from "./_core/default-categories";
-import { CATEGORY_DEFAULT_COLOR, getCategoryColorForName } from "@shared/theme";
+import { CATEGORY_DEFAULT_COLOR, DEFAULT_CATEGORY_ICON, getCategoryColorForName } from "@shared/theme";
 import {
   categories,
   creditCards,
@@ -20,6 +24,8 @@ import {
   InsertBudget,
   InsertRecurringTransaction,
   InsertMonthlySummary,
+  InsertLoan,
+  InsertRepayment,
   Category,
   CreditCard,
   Transaction,
@@ -27,6 +33,12 @@ import {
   MonthlySummary,
   User,
   RecurringTransaction,
+  Loan,
+  Repayment,
+  Account,
+  InsertAccount,
+  Transfer,
+  InsertTransfer,
 } from "@/drizzle/schema";
 
 /**
@@ -98,20 +110,23 @@ function coerceDbBoolean(value: unknown): boolean {
 
 export async function getUserSettings(
   userId: number,
-): Promise<{ aiEnabled: boolean }> {
+): Promise<{ aiEnabled: boolean; remindersEnabled: boolean }> {
   const result = await callDataApi("Database/query", {
     body: {
-      query: "SELECT aiEnabled FROM users WHERE id = ?",
+      query: "SELECT aiEnabled, remindersEnabled FROM users WHERE id = ?",
       params: [userId],
     },
   });
 
   const row = result && Array.isArray(result) ? result[0] : null;
   if (!row) {
-    return { aiEnabled: false };
+    return { aiEnabled: false, remindersEnabled: false };
   }
 
-  return { aiEnabled: coerceDbBoolean(row.aiEnabled) };
+  return {
+    aiEnabled: coerceDbBoolean(row.aiEnabled),
+    remindersEnabled: coerceDbBoolean(row.remindersEnabled),
+  };
 }
 
 export async function updateAiEnabled(
@@ -162,7 +177,7 @@ export async function createCategory(data: InsertCategory) {
         data.type,
         // Assign a distinct palette token by name when no color is supplied.
         data.color || getCategoryColorForName(data.name),
-        data.icon || "tag",
+        data.icon || DEFAULT_CATEGORY_ICON,
         data.isDefault || false,
       ],
     },
@@ -360,6 +375,309 @@ export async function getCreditCardById(
 }
 
 // ============================================================================
+// ACCOUNTS
+// ============================================================================
+
+export async function getUserAccounts(userId: number): Promise<Account[]> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query: "SELECT * FROM accounts WHERE userId = ? ORDER BY name",
+        params: [userId],
+      },
+    });
+    return Array.isArray(result) ? (result as Account[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createAccount(
+  data: InsertAccount,
+): Promise<Account | null> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query: `
+        INSERT INTO accounts (userId, name, type, currency, isDefault)
+        VALUES (?, ?, ?, ?, ?)
+      `,
+      params: [
+        data.userId,
+        data.name,
+        data.type,
+        data.currency ?? "USD",
+        data.isDefault ?? false,
+      ],
+    },
+  });
+  const insertId =
+    result && typeof result === "object" && "insertId" in result
+      ? (result as { insertId: number }).insertId
+      : 0;
+  if (!insertId) {
+    return null;
+  }
+  return getAccountById(insertId, data.userId);
+}
+
+export async function updateAccount(
+  id: number,
+  userId: number,
+  data: Partial<InsertAccount>,
+): Promise<Account | null> {
+  const updates = Object.entries(data)
+    .map(([key]) => `${key} = ?`)
+    .join(", ");
+  const values = Object.values(data);
+
+  if (updates.length === 0) {
+    return getAccountById(id, userId);
+  }
+
+  await callDataApi("Database/query", {
+    body: {
+      query: `UPDATE accounts SET ${updates} WHERE id = ? AND userId = ?`,
+      params: [...values, id, userId],
+    },
+  });
+
+  return getAccountById(id, userId);
+}
+
+export async function deleteAccount(id: number, userId: number): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query: "DELETE FROM accounts WHERE id = ? AND userId = ?",
+      params: [id, userId],
+    },
+  });
+}
+
+export async function getAccountById(
+  id: number,
+  userId: number,
+): Promise<Account | null> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query: "SELECT * FROM accounts WHERE id = ? AND userId = ?",
+        params: [id, userId],
+      },
+    });
+    const row = Array.isArray(result) ? result[0] : null;
+    return row ? (row as Account) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getAccountTransactionCount(
+  accountId: number,
+  userId: number,
+): Promise<number> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query:
+        "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ?",
+      params: [userId, accountId],
+    },
+  });
+  const row =
+    Array.isArray(result) && result.length > 0
+      ? (result[0] as Record<string, unknown>)
+      : null;
+  return Number(row?.txCount ?? 0);
+}
+
+export async function getAccountTransferCount(
+  accountId: number,
+  userId: number,
+): Promise<number> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query:
+        "SELECT COUNT(*) as transferCount FROM transfers WHERE userId = ? AND (fromAccountId = ? OR toAccountId = ?)",
+      params: [userId, accountId, accountId],
+    },
+  });
+  const row =
+    Array.isArray(result) && result.length > 0
+      ? (result[0] as Record<string, unknown>)
+      : null;
+  return Number(row?.transferCount ?? 0);
+}
+
+export async function createTransfer(
+  data: InsertTransfer,
+): Promise<Transfer | null> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query: `
+        INSERT INTO transfers (userId, fromAccountId, toAccountId, amount, description, date)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      params: [
+        data.userId,
+        data.fromAccountId,
+        data.toAccountId,
+        data.amount,
+        data.description || null,
+        data.date,
+      ],
+    },
+  });
+  const insertId =
+    result && typeof result === "object" && "insertId" in result
+      ? (result as { insertId: number }).insertId
+      : 0;
+  if (!insertId) {
+    return null;
+  }
+  return getTransferById(insertId, data.userId);
+}
+
+export async function getTransferById(
+  id: number,
+  userId: number,
+): Promise<Transfer | null> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query: "SELECT * FROM transfers WHERE id = ? AND userId = ?",
+        params: [id, userId],
+      },
+    });
+    const row = Array.isArray(result) ? result[0] : null;
+    return row ? (row as Transfer) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getUserTransfers(userId: number): Promise<Transfer[]> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query:
+          "SELECT * FROM transfers WHERE userId = ? ORDER BY date DESC, id DESC",
+        params: [userId],
+      },
+    });
+    return Array.isArray(result) ? (result as Transfer[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function reassignAccountTransfers(
+  fromAccountId: number,
+  toAccountId: number,
+  userId: number,
+): Promise<void> {
+  // Direct legs between source and target are absorbed when merging accounts.
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "DELETE FROM transfers WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
+      params: [userId, fromAccountId, toAccountId],
+    },
+  });
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "DELETE FROM transfers WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
+      params: [userId, toAccountId, fromAccountId],
+    },
+  });
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE transfers SET fromAccountId = ? WHERE userId = ? AND fromAccountId = ?",
+      params: [toAccountId, userId, fromAccountId],
+    },
+  });
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE transfers SET toAccountId = ? WHERE userId = ? AND toAccountId = ?",
+      params: [toAccountId, userId, fromAccountId],
+    },
+  });
+}
+
+export async function reassignAccountTransactions(
+  fromAccountId: number,
+  toAccountId: number,
+  userId: number,
+): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE transactions SET accountId = ? WHERE userId = ? AND accountId = ?",
+      params: [toAccountId, userId, fromAccountId],
+    },
+  });
+}
+
+export async function reassignAndDeleteAccount(
+  accountId: number,
+  targetAccountId: number,
+  userId: number,
+): Promise<void> {
+  if (accountId === targetAccountId) {
+    throw new Error("Cannot reassign to the same account");
+  }
+
+  const source = await getAccountById(accountId, userId);
+  const target = await getAccountById(targetAccountId, userId);
+  if (!source || !target) {
+    throw new Error("Account not found");
+  }
+
+  await reassignAccountTransactions(accountId, targetAccountId, userId);
+  await reassignAccountTransfers(accountId, targetAccountId, userId);
+  await deleteAccount(accountId, userId);
+}
+
+/** Idempotent: creates a default Cash account and backfills null accountId rows. */
+export async function ensureDefaultAccount(userId: number): Promise<void> {
+  const countResult = await callDataApi("Database/query", {
+    body: {
+      query: "SELECT COUNT(*) as accountCount FROM accounts WHERE userId = ?",
+      params: [userId],
+    },
+  });
+
+  const row =
+    Array.isArray(countResult) && countResult.length > 0
+      ? (countResult[0] as Record<string, unknown>)
+      : null;
+  const existingCount = Number(row?.accountCount ?? 0);
+  if (existingCount > 0) {
+    return;
+  }
+
+  const created = await createAccount({
+    userId,
+    name: "Cash",
+    type: "cash",
+    currency: "USD",
+    isDefault: true,
+  });
+  if (!created) {
+    return;
+  }
+
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE transactions SET accountId = ? WHERE userId = ? AND accountId IS NULL",
+      params: [created.id, userId],
+    },
+  });
+}
+
+// ============================================================================
 // TRANSACTIONS
 // ============================================================================
 
@@ -450,13 +768,14 @@ export async function createTransaction(data: InsertTransaction) {
   const result = await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO transactions (userId, categoryId, creditCardId, type, amount, description, date)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO transactions (userId, categoryId, creditCardId, accountId, type, amount, description, date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         data.userId,
         data.categoryId,
         data.creditCardId || null,
+        data.accountId ?? null,
         data.type,
         data.amount,
         data.description || null,
@@ -506,6 +825,18 @@ export async function deleteAllUserData(userId: number) {
   await callDataApi("Database/query", {
     body: {
       query: "DELETE FROM transactions WHERE userId = ?",
+      params: [userId],
+    },
+  });
+  await callDataApi("Database/query", {
+    body: {
+      query: "DELETE FROM transfers WHERE userId = ?",
+      params: [userId],
+    },
+  });
+  await callDataApi("Database/query", {
+    body: {
+      query: "DELETE FROM accounts WHERE userId = ?",
       params: [userId],
     },
   });
@@ -565,7 +896,7 @@ export async function createRecurringTransaction(
     body: {
       query: `
         INSERT INTO recurringTransactions (
-          userId, categoryId, creditCardId, type, amount, description, frequency, interval,
+          userId, categoryId, creditCardId, type, amount, description, frequency, \`interval\`,
           endCondition, occurrenceCount, endDate, startDate, nextRunDate, lastRunDate,
           generatedCount, isActive
         )
@@ -596,13 +927,17 @@ export async function createRecurringTransaction(
     : 0;
 }
 
+function sqlColumnName(column: string): string {
+  return column === "interval" ? "`interval`" : column;
+}
+
 export async function updateRecurringTransaction(
   id: number,
   userId: number,
   data: Partial<InsertRecurringTransaction>,
 ): Promise<void> {
   const updates = Object.entries(data)
-    .map(([key]) => `${key} = ?`)
+    .map(([key]) => `${sqlColumnName(key)} = ?`)
     .join(", ");
   if (!updates) {
     return;
@@ -945,6 +1280,45 @@ export async function updateMonthlySummary(
 // ============================================================================
 
 /**
+ * Derive per-account balances from all user transactions (JS reduce, no GROUP BY).
+ */
+export async function getAccountBalances(
+  userId: number,
+): Promise<Record<number, number>> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query:
+          "SELECT id, accountId, type, amount FROM transactions WHERE userId = ?",
+        params: [userId],
+      },
+    });
+
+    const rows = Array.isArray(result) ? result : [];
+    const txnBalances = reduceAccountBalances(
+      rows.map((row: Record<string, unknown>) => ({
+        accountId:
+          row.accountId == null ? null : Number(row.accountId as number),
+        type: String(row.type ?? ""),
+        amount: String(row.amount ?? "0"),
+      })),
+    );
+
+    const transfers = await getUserTransfers(userId);
+    return applyTransferLegs(
+      txnBalances,
+      transfers.map((transfer) => ({
+        fromAccountId: transfer.fromAccountId,
+        toAccountId: transfer.toAccountId,
+        amount: String(transfer.amount),
+      })),
+    );
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Get monthly statistics for a user.
  * Calculates total income, expenses, and net balance for a given month.
  */
@@ -1215,4 +1589,296 @@ export async function getRecentTransactions(userId: number, limit: number = 7) {
   } catch {
     return [];
   }
+}
+
+// ============================================================================
+// LOANS
+// ============================================================================
+
+export type LoanWithBalance = Loan & {
+  remainingBalance: string;
+  repayments: Repayment[];
+};
+
+export function computeRemainingBalance(
+  principal: string,
+  repayments: Pick<Repayment, "amount">[],
+): string {
+  const totalRepaid = repayments.reduce(
+    (sum, repayment) => sum + Number(repayment.amount),
+    0,
+  );
+  return Math.max(0, Number(principal) - totalRepaid).toFixed(2);
+}
+
+export class RepaymentExceedsBalanceError extends Error {
+  constructor(
+    public readonly remainingBalance: string,
+  ) {
+    super("Repayment cannot exceed remaining balance");
+    this.name = "RepaymentExceedsBalanceError";
+  }
+}
+
+export async function getUserLoans(userId: number): Promise<Loan[]> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query: "SELECT * FROM loans WHERE userId = ? ORDER BY createdAt DESC",
+        params: [userId],
+      },
+    });
+    return Array.isArray(result) ? (result as Loan[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createLoan(data: InsertLoan): Promise<Loan | null> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query: `
+        INSERT INTO loans (
+          userId, direction, counterparty, principal, rate, periodicity,
+          installmentCount, endDate, nextDueDate, status, note
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      params: [
+        data.userId,
+        data.direction,
+        data.counterparty ?? null,
+        data.principal,
+        data.rate ?? null,
+        data.periodicity,
+        data.installmentCount ?? null,
+        data.endDate ?? null,
+        data.nextDueDate ?? null,
+        data.status ?? "active",
+        data.note ?? null,
+      ],
+    },
+  });
+  const insertId =
+    result && typeof result === "object" && "insertId" in result
+      ? (result as { insertId: number }).insertId
+      : 0;
+  if (!insertId) {
+    return null;
+  }
+  return getLoanById(insertId, data.userId);
+}
+
+export async function getLoanById(
+  id: number,
+  userId: number,
+): Promise<Loan | null> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query: "SELECT * FROM loans WHERE id = ? AND userId = ?",
+        params: [id, userId],
+      },
+    });
+    const row = Array.isArray(result) ? result[0] : null;
+    return row ? (row as Loan) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateLoan(
+  id: number,
+  userId: number,
+  data: Partial<InsertLoan>,
+): Promise<void> {
+  const updates = Object.entries(data)
+    .map(([key]) => `${key} = ?`)
+    .join(", ");
+  const values = Object.values(data);
+
+  if (updates.length === 0) {
+    return;
+  }
+
+  await callDataApi("Database/query", {
+    body: {
+      query: `UPDATE loans SET ${updates} WHERE id = ? AND userId = ?`,
+      params: [...values, id, userId],
+    },
+  });
+}
+
+export async function deleteLoan(id: number, userId: number): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query: "DELETE FROM loans WHERE id = ? AND userId = ?",
+      params: [id, userId],
+    },
+  });
+}
+
+export async function createRepayment(
+  data: InsertRepayment,
+): Promise<Repayment | null> {
+  const loan = await getLoanById(data.loanId, data.userId);
+  if (!loan) {
+    return null;
+  }
+
+  const result = await callDataApi("Database/query", {
+    body: {
+      query: `
+        INSERT INTO repayments (loanId, userId, amount, date, note)
+        VALUES (?, ?, ?, ?, ?)
+      `,
+      params: [
+        data.loanId,
+        data.userId,
+        data.amount,
+        data.date,
+        data.note ?? null,
+      ],
+    },
+  });
+  const insertId =
+    result && typeof result === "object" && "insertId" in result
+      ? (result as { insertId: number }).insertId
+      : 0;
+  if (!insertId) {
+    return null;
+  }
+  return getRepaymentById(insertId, data.userId);
+}
+
+export async function recordRepayment(
+  data: InsertRepayment,
+): Promise<LoanWithBalance | null> {
+  const loan = await getLoanById(data.loanId, data.userId);
+  if (!loan) {
+    return null;
+  }
+
+  const existingRepayments = await getRepaymentsByLoan(data.loanId, data.userId);
+  const remainingBefore = computeRemainingBalance(
+    loan.principal,
+    existingRepayments,
+  );
+
+  if (Number(data.amount) > Number(remainingBefore)) {
+    throw new RepaymentExceedsBalanceError(remainingBefore);
+  }
+
+  const result = await callDataApi("Database/query", {
+    body: {
+      query: `
+        INSERT INTO repayments (loanId, userId, amount, date, note)
+        VALUES (?, ?, ?, ?, ?)
+      `,
+      params: [
+        data.loanId,
+        data.userId,
+        data.amount,
+        data.date,
+        data.note ?? null,
+      ],
+    },
+  });
+  const insertId =
+    result && typeof result === "object" && "insertId" in result
+      ? (result as { insertId: number }).insertId
+      : 0;
+  if (!insertId) {
+    return null;
+  }
+
+  const remainingAfter = computeRemainingBalance(loan.principal, [
+    ...existingRepayments,
+    { amount: data.amount },
+  ]);
+
+  const loanUpdates: Partial<InsertLoan> = {};
+
+  const advancedDue = resolveNextDueDateAfterRepayment(
+    loan.periodicity,
+    loan.nextDueDate,
+  );
+  if (advancedDue) {
+    loanUpdates.nextDueDate = advancedDue;
+  }
+
+  if (Number(remainingAfter) === 0) {
+    loanUpdates.status = "settled";
+  }
+
+  if (Object.keys(loanUpdates).length > 0) {
+    await updateLoan(data.loanId, data.userId, loanUpdates);
+  }
+
+  return getLoanWithBalance(data.loanId, data.userId);
+}
+
+export async function getRepaymentById(
+  id: number,
+  userId: number,
+): Promise<Repayment | null> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query: "SELECT * FROM repayments WHERE id = ? AND userId = ?",
+        params: [id, userId],
+      },
+    });
+    const row = Array.isArray(result) ? result[0] : null;
+    return row ? (row as Repayment) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getRepaymentsByLoan(
+  loanId: number,
+  userId: number,
+): Promise<Repayment[]> {
+  try {
+    const result = await callDataApi("Database/query", {
+      body: {
+        query:
+          "SELECT * FROM repayments WHERE loanId = ? AND userId = ? ORDER BY date DESC",
+        params: [loanId, userId],
+      },
+    });
+    return Array.isArray(result) ? (result as Repayment[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function deleteRepayment(
+  id: number,
+  userId: number,
+): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query: "DELETE FROM repayments WHERE id = ? AND userId = ?",
+      params: [id, userId],
+    },
+  });
+}
+
+export async function getLoanWithBalance(
+  id: number,
+  userId: number,
+): Promise<LoanWithBalance | null> {
+  const loan = await getLoanById(id, userId);
+  if (!loan) {
+    return null;
+  }
+
+  const repayments = await getRepaymentsByLoan(id, userId);
+  return {
+    ...loan,
+    remainingBalance: computeRemainingBalance(loan.principal, repayments),
+    repayments,
+  };
 }

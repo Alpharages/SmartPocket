@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import {
   View,
   Text,
@@ -5,6 +6,7 @@ import {
   ScrollView,
   Alert,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
@@ -14,6 +16,7 @@ import { useExpense } from "@/lib/expense-context";
 import { useCurrency } from "@/lib/currency-provider";
 import { formatSignedCurrency } from "@/lib/currency";
 import Animated, { FadeInUp } from "react-native-reanimated";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -33,8 +36,13 @@ export default function TransactionDetailScreen() {
   const colors = useColors();
   const { currency } = useCurrency();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { transactions, categories, deleteTransaction, loadingTransactions } =
+  const { transactions, categories, deleteTransaction, loadingTransactions, refreshTransactions } =
     useExpense();
+
+  const onRefresh = useCallback(async () => {
+    await refreshTransactions();
+  }, [refreshTransactions]);
+  const refreshProps = usePullToRefresh(onRefresh);
 
   const transactionId = Number(id);
   const transaction = transactions.find((t) => t.id === transactionId);
@@ -111,6 +119,7 @@ export default function TransactionDetailScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={<RefreshControl {...refreshProps} />}
       >
         {/* Header */}
         <View className="flex-row items-center justify-between px-6 pt-6 pb-2">

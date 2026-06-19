@@ -108,6 +108,7 @@ vi.mock("@/lib/theme-provider", () => ({
 vi.mock("@/lib/expense-context", () => ({
   useExpense: () => ({
     clearAllData: mockClearAllData,
+    refreshAll: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 
@@ -117,6 +118,7 @@ vi.mock("@/lib/settings-provider", () => ({
     setAiEnabled: mockSetAiEnabled,
     isSavingAi: false,
     isReady: true,
+    refreshSettings: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 

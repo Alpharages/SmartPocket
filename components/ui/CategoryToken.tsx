@@ -21,10 +21,12 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { cn } from "@/lib/utils";
 import {
   CATEGORY_DEFAULT_COLOR,
+  DEFAULT_CATEGORY_ICON,
   Radius,
   Spacing,
   Typography,
   resolveCategoryColor,
+  resolveCategoryIcon,
 } from "@/constants/theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -40,7 +42,7 @@ export interface CategoryTokenProps {
   name: string;
   /** Stored category color (light-mode hex). The dark-mode variant is resolved internally. */
   color: string;
-  /** Ionicons glyph name. Falls back to "tag" if invalid/absent. */
+  /** Ionicons glyph name. Falls back to {@link DEFAULT_CATEGORY_ICON} if invalid/absent. */
   icon?: string;
   /** Visual + interaction state. */
   state?: CategoryTokenState;
@@ -173,8 +175,10 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
     // `icon` is DB-sourced (categories.icon) — a stale/typo'd name renders a
     // blank glyph. Validate against the runtime map and fall back.
     const iconName = useMemo(() => {
-      if (!icon) return "tag";
-      return icon in Ionicons.glyphMap ? icon : "tag";
+      const normalized = resolveCategoryIcon(icon);
+      return normalized in Ionicons.glyphMap
+        ? normalized
+        : DEFAULT_CATEGORY_ICON;
     }, [icon]);
 
     const sizeTokens = SIZE_TOKENS[size];

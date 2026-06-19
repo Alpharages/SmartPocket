@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import {
+  RefreshControl,
   ScrollView,
   View,
   Text,
@@ -23,6 +24,7 @@ import {
   EmptyState,
 } from "@/components/ui";
 import { ContentMaxWidth, Spacing } from "@/lib/_core/theme";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -34,7 +36,10 @@ export default function DashboardScreen() {
     categories,
     loadingTransactions,
     loadingStats,
+    refreshAll,
   } = useExpense();
+
+  const refreshProps = usePullToRefresh(refreshAll);
 
   const recentTransactions = useMemo(
     () => transactions.slice(0, 5),
@@ -233,6 +238,7 @@ export default function DashboardScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={<RefreshControl {...refreshProps} />}
       >
         <ResponsiveContent maxWidth={ContentMaxWidth.dashboard}>
           {/* Header */}

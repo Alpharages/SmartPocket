@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
+  RefreshControl,
   ScrollView,
   View,
   Text,
@@ -17,7 +18,7 @@ import { useExpense, type Category } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
-import { CATEGORY_COLOR_LIGHT_VALUES } from "@/constants/theme";
+import { CATEGORY_COLOR_LIGHT_VALUES, DEFAULT_CATEGORY_ICON } from "@/constants/theme";
 import {
   Button,
   CategoryToken,
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui";
 import { useConfirm } from "@/hooks/use-confirm";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -82,7 +84,7 @@ function CategoryRow({
         <CategoryToken
           name={item.name}
           color={item.color}
-          icon={item.icon || "tag"}
+          icon={item.icon || DEFAULT_CATEGORY_ICON}
           state="default"
           size="md"
         />
@@ -104,7 +106,7 @@ export default function CategoriesScreen() {
   const colors = useColors();
   const desktopActionStyle: ViewStyle | undefined =
     Platform.OS === "web" ? { alignSelf: "flex-start" } : undefined;
-  const { categories, loadingCategories, addCategory, deleteCategory } =
+  const { categories, loadingCategories, addCategory, deleteCategory, refreshCategories } =
     useExpense();
   const {
     visible: confirmVisible,
@@ -125,6 +127,11 @@ export default function CategoriesScreen() {
   const expenseCategories = categories.filter((c) => c.type === "expense");
   const incomeCategories = categories.filter((c) => c.type === "income");
 
+  const onRefresh = useCallback(async () => {
+    await refreshCategories();
+  }, [refreshCategories]);
+  const refreshProps = usePullToRefresh(onRefresh);
+
   const handleAddCategory = async () => {
     if (!categoryName.trim()) return;
 
@@ -133,7 +140,7 @@ export default function CategoriesScreen() {
         name: categoryName,
         type: categoryType,
         color: selectedColor,
-        icon: "tag",
+        icon: DEFAULT_CATEGORY_ICON,
         isDefault: false,
       });
     } catch {
@@ -245,6 +252,7 @@ export default function CategoriesScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={<RefreshControl {...refreshProps} />}
       >
         <ResponsiveContent maxWidth={ContentMaxWidth.screen}>
           {/* Header */}

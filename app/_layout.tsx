@@ -1,11 +1,15 @@
 import "@/global.css";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
+import * as Notifications from "expo-notifications";
+import {
+  handleLoanNotificationResponse,
+} from "@/lib/notification-routing";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { CurrencyProvider } from "@/lib/currency-provider";
@@ -53,50 +57,96 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  const router = useRouter();
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
-  const isDevWeb = __DEV__ && Platform.OS === "web";
 
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
-  // Gate the first render on dev-web cold starts only, where the tRPC client
-  // would otherwise mount and fire its first authenticated batch before dev
-  // auto-login stores the session token (transient 401). The synchronous
-  // localStorage read is safe: this gate is dev-only (`isDevWeb` requires
-  // `__DEV__`), and the web static-export path runs with `__DEV__ === false`,
-  // so the gate never engages there and cannot cause a hydration mismatch.
-  const [isAppShellReady, setIsAppShellReady] = useState(
-    () => !isDevWeb || hasWebSessionToken(),
-  );
+  // Gate the first render on dev cold starts so the tRPC client does not fire
+  // authenticated requests before dev auto-login stores the session token.
+  const [isAppShellReady, setIsAppShellReady] = useState(() => {
+    if (!__DEV__) return true;
+    if (Platform.OS === "web") return hasWebSessionToken();
+    return false;
+  });
 
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
     initManusRuntime();
   }, []);
 
-  // In development, automatically obtain a dev session if none exists. This
-  // runs on every dev platform (native + web) — native relies on it for its
-  // dev auto-login. The `isAppShellReady` gate above is what defers web's
-  // first render until the token is stored; native renders immediately.
+  useEffect(() => {
+    if (Platform.OS !== "ios" && Platform.OS !== "android") {
+      return;
+    }
+
+    const navigateFromNotification = (
+      response: Notifications.NotificationResponse,
+    ) => {
+      handleLoanNotificationResponse(response, (path) => router.push(path));
+    };
+
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        navigateFromNotification(response);
+      }
+    });
+
+    const subscription =
+      Notifications.addNotificationResponseReceivedListener(
+        navigateFromNotification,
+      );
+
+    return () => subscription.remove();
+  }, [router]);
+
+  // In development, automatically obtain a dev session if none exists.
   useEffect(() => {
     if (!__DEV__) return;
     let cancelled = false;
 
     (async () => {
+      const apiUrl = getApiBaseUrl();
+      const loginUrl = `${apiUrl}/api/dev/login`;
+
       try {
         const existing = await Auth.getSessionToken();
-        if (!existing) {
-          const res = await fetch(`${getApiBaseUrl()}/api/dev/login`, {
-            method: "POST",
-          });
-          const data = await res.json();
-          if (data.token) {
-            await Auth.setSessionToken(data.token);
-            console.log("[Dev] Auto-login successful");
+        if (existing) {
+          return;
+        }
+
+        const maxAttempts = 3;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          if (cancelled) return;
+          try {
+            const res = await fetch(loginUrl, { method: "POST" });
+            if (!res.ok) {
+              throw new Error(`HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            if (data.token) {
+              await Auth.setSessionToken(data.token);
+              if (__DEV__) {
+                console.log("[Dev] Auto-login successful");
+              }
+              return;
+            }
+            throw new Error("No token in response");
+          } catch (err) {
+            if (attempt < maxAttempts) {
+              await new Promise((r) => setTimeout(r, 1000 * attempt));
+              continue;
+            }
+            console.warn(
+              `[Dev] Auto-login failed after ${maxAttempts} attempts.\n` +
+                `  API: ${loginUrl}\n` +
+                `  Start the backend with: pnpm dev (or pnpm dev:server)\n` +
+                `  On a physical device, set EXPO_PUBLIC_API_BASE_URL to your machine's LAN IP.`,
+              err,
+            );
           }
         }
-      } catch (err) {
-        console.warn("[Dev] Auto-login skipped (server not reachable):", err);
       } finally {
         if (!cancelled) {
           setIsAppShellReady(true);
@@ -178,6 +228,7 @@ export default function RootLayout() {
                         }}
                       />
                       <Stack.Screen name="budgets" />
+                      <Stack.Screen name="accounts" />
                       <Stack.Screen
                         name="budget-form"
                         options={{
@@ -188,6 +239,14 @@ export default function RootLayout() {
                       <Stack.Screen name="recurring" />
                       <Stack.Screen name="oauth/callback" />
                       <Stack.Screen name="card/[id]" />
+                      <Stack.Screen name="loan/[id]" />
+                      <Stack.Screen
+                        name="loan/record-repayment"
+                        options={{
+                          presentation: "transparentModal",
+                          animation: "none",
+                        }}
+                      />
                       <Stack.Screen name="settings" />
                     </Stack>
                     <StatusBar style="auto" />

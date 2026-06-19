@@ -1,4 +1,4 @@
-import { ScrollView, View, Text, Pressable, FlatList } from "react-native";
+import { ScrollView, View, Text, Pressable, FlatList, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
@@ -9,7 +9,7 @@ import {
   resolveCategoryColor,
 } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import {
   Button,
@@ -33,6 +33,7 @@ import { useCurrency } from "@/lib/currency-provider";
 import { formatCurrency } from "@/lib/currency";
 import { computeMonthEndForecastState } from "@/lib/forecast";
 import { trpc } from "@/lib/trpc";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 export default function SummaryScreen() {
   const router = useRouter();
@@ -46,6 +47,7 @@ export default function SummaryScreen() {
     refreshMonthlyStats,
     categories,
     transactions,
+    refreshTransactions,
   } = useExpense();
   const { isLg } = useBreakpoints();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -76,6 +78,23 @@ export default function SummaryScreen() {
     }
     return ids;
   }, [anomaliesQuery.data]);
+
+  const onRefresh = useCallback(async () => {
+    await Promise.all([
+      refreshMonthlyStats(year, month),
+      trendQuery.refetch(),
+      anomaliesQuery.refetch(),
+      refreshTransactions(),
+    ]);
+  }, [
+    year,
+    month,
+    refreshMonthlyStats,
+    trendQuery,
+    anomaliesQuery,
+    refreshTransactions,
+  ]);
+  const refreshProps = usePullToRefresh(onRefresh);
 
   const handleSelectMonth = (selectedYear: number, selectedMonth: number) => {
     const newDate = new Date(selectedYear, selectedMonth - 1, 1);
@@ -576,6 +595,7 @@ export default function SummaryScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+          refreshControl={<RefreshControl {...refreshProps} />}
         >
           {/* Detail header */}
           <View className="px-6 pt-6 pb-2">
@@ -679,6 +699,7 @@ export default function SummaryScreen() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+            refreshControl={<RefreshControl {...refreshProps} />}
           >
             {header}
             {monthNav}

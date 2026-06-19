@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   Text,
   View,
 } from "react-native";
@@ -24,6 +25,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { resolveCategoryColor } from "@/constants/theme";
 import { Spacing } from "@/lib/_core/theme";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 export default function RecurringScreen() {
   const router = useRouter();
@@ -34,7 +36,13 @@ export default function RecurringScreen() {
     loadingRecurringTransactions,
     categories,
     cancelRecurringTransaction,
+    refreshRecurringTransactions,
   } = useExpense();
+
+  const onRefresh = useCallback(async () => {
+    await refreshRecurringTransactions();
+  }, [refreshRecurringTransactions]);
+  const refreshProps = usePullToRefresh(onRefresh);
 
   const [sheetVisible, setSheetVisible] = useState(false);
   const [editingRule, setEditingRule] = useState<
@@ -201,26 +209,33 @@ export default function RecurringScreen() {
           }
         />
 
-        {loadingRecurringTransactions && sortedRules.length === 0 ? (
-          <View className="items-center justify-center py-20">
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : (
-          <FlatList
-            data={sortedRules}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderItem}
-            contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
-            ListEmptyComponent={
+        <FlatList
+          data={sortedRules}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={renderItem}
+          contentContainerStyle={{
+            paddingBottom: Spacing["2xl"],
+            flexGrow: sortedRules.length === 0 ? 1 : undefined,
+          }}
+          refreshControl={<RefreshControl {...refreshProps} />}
+          ListEmptyComponent={
+            loadingRecurringTransactions ? (
+              <View className="items-center justify-center py-20">
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : (
               <EmptyState
                 variant="no-data"
+                icon={
+                  <Ionicons name="repeat" size={28} color={colors.muted} />
+                }
                 title="No recurring rules yet"
                 description="Create a rule to automatically log regular income or expenses."
                 action={{ label: "Add recurring rule", onPress: openCreate }}
               />
-            }
-          />
-        )}
+            )
+          }
+        />
       </ResponsiveContent>
 
       <RecurringTransactionSheet

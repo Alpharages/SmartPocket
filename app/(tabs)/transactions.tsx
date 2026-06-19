@@ -3,6 +3,7 @@ import {
   Alert,
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   SectionList,
   Text,
@@ -31,6 +32,7 @@ import { formatSignedCurrency } from "@/lib/currency";
 import { getStartOfWeek } from "@/lib/date-utils";
 import { useFirstDayOfWeek } from "@/lib/first-day-of-week-provider";
 import { Spacing, Typography, resolveCategoryColor } from "@/lib/_core/theme";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -125,8 +127,10 @@ type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
 function TransactionDetailPane({
   transaction,
+  refreshControlProps,
 }: {
   transaction: ExpenseTransaction;
+  refreshControlProps?: ReturnType<typeof usePullToRefresh>;
 }) {
   const colors = useColors();
   const { currency } = useCurrency();
@@ -162,6 +166,11 @@ function TransactionDetailPane({
     <ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+      refreshControl={
+        refreshControlProps ? (
+          <RefreshControl {...refreshControlProps} />
+        ) : undefined
+      }
     >
       {/* Header */}
       <View className="flex-row items-center justify-between px-6 pt-6 pb-2">
@@ -263,7 +272,7 @@ function TransactionDetailPane({
 
 export default function TransactionsScreen() {
   const router = useRouter();
-  const { transactions, categories, loadingTransactions, deleteTransaction } =
+  const { transactions, categories, loadingTransactions, deleteTransaction, refreshTransactions } =
     useExpense();
   const [searchText, setSearchText] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
@@ -273,6 +282,11 @@ export default function TransactionsScreen() {
   const colors = useColors();
   const { isLg } = useBreakpoints();
   const { firstDayOfWeek } = useFirstDayOfWeek();
+
+  const onRefresh = useCallback(async () => {
+    await refreshTransactions();
+  }, [refreshTransactions]);
+  const refreshProps = usePullToRefresh(onRefresh);
 
   const isSearchOrFilterActive = searchText.length > 0 || filterType !== "all";
 
@@ -502,6 +516,7 @@ export default function TransactionsScreen() {
       stickySectionHeadersEnabled={false}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+      refreshControl={<RefreshControl {...refreshProps} />}
       renderSectionHeader={({ section }) => (
         <View
           className="px-lg py-xs"
@@ -560,7 +575,10 @@ export default function TransactionsScreen() {
   );
 
   const detailPane = selectedTransaction ? (
-    <TransactionDetailPane transaction={selectedTransaction} />
+    <TransactionDetailPane
+      transaction={selectedTransaction}
+      refreshControlProps={refreshProps}
+    />
   ) : (
     <View className="flex-1 items-center justify-center">
       <EmptyState

@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -43,6 +44,7 @@ import {
   Typography,
 } from "@/lib/_core/theme";
 import { resolveCategoryColor } from "@/constants/theme";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 const OPEN_DURATION = 250;
 const CLOSE_DURATION = 220;
@@ -62,7 +64,7 @@ export default function AddTransactionScreen() {
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const { type: queryType } = useLocalSearchParams();
   const scheme = (useColorScheme() ?? "light") as "light" | "dark";
-  const { categories, transactions, addTransaction } = useExpense();
+  const { categories, transactions, addTransaction, refreshCategories, refreshCreditCards } = useExpense();
   const toast = useToast();
   const { currency } = useCurrency();
 
@@ -80,6 +82,11 @@ export default function AddTransactionScreen() {
   const reducedMotion = useReducedMotion();
 
   const goBack = useCallback(() => router.back(), [router]);
+
+  const onRefresh = useCallback(async () => {
+    await Promise.all([refreshCategories(), refreshCreditCards()]);
+  }, [refreshCategories, refreshCreditCards]);
+  const refreshProps = usePullToRefresh(onRefresh);
 
   const close = useCallback(() => {
     if (closingRef.current) return;
@@ -229,6 +236,7 @@ export default function AddTransactionScreen() {
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              refreshControl={<RefreshControl {...refreshProps} />}
               contentContainerStyle={{
                 gap: Spacing.lg,
                 paddingBottom: Spacing.sm,

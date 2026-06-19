@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +14,7 @@ import { ThemedView } from "@/components/themed-view";
 import { Button } from "@/components/ui/Button";
 import { FilterChipGroup, Pill, ScreenHeader } from "@/components/ui";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { SchemeColors, type ColorScheme } from "@/constants/theme";
 import { useColors } from "@/hooks/use-colors";
 import { useThemeContext } from "@/lib/theme-provider";
@@ -102,9 +104,14 @@ export default function ThemeLabScreen() {
     };
   }, []);
 
+  const refreshProps = usePullToRefresh(useCallback(async () => {}, []));
+
   return (
     <ScreenContainer className="p-5">
-      <ScrollView className="flex-1">
+      <ScrollView
+        className="flex-1"
+        refreshControl={<RefreshControl {...refreshProps} />}
+      >
         <View className="gap-4 pb-8">
           <View className="flex-row gap-2">
             {(["light", "dark"] as ColorScheme[]).map((scheme) => (

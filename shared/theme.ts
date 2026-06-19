@@ -42,6 +42,18 @@ export const CATEGORY_COLOR_DARK_VALUES = CategoryColors.map((c) => c.dark);
  */
 export const CATEGORY_DEFAULT_COLOR = CategoryColors[0].light;
 
+/** Default Ionicons glyph for categories without an explicit icon. */
+export const DEFAULT_CATEGORY_ICON = "pricetag-outline";
+
+/**
+ * Normalize a stored category icon name. Maps the legacy default `"tag"` (not a
+ * valid Ionicons name) to {@link DEFAULT_CATEGORY_ICON}.
+ */
+export function resolveCategoryIcon(icon?: string | null): string {
+  if (!icon || icon === "tag") return DEFAULT_CATEGORY_ICON;
+  return icon;
+}
+
 /** Reverse lookup: stored light hex -> dark variant. Light values are unique. */
 const LIGHT_TO_DARK = new Map(
   CategoryColors.map((c) => [c.light.toLowerCase(), c.dark] as const),

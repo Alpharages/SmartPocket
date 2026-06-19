@@ -28,7 +28,7 @@ export const OWNER_NAME = env.ownerName;
 export const API_BASE_URL = env.apiBaseUrl;
 
 /** Host Metro reports in dev — e.g. "192.168.1.5:8081" or "localhost:8081". */
-function getMetroDevHost(): string | null {
+export function getMetroDevHost(): string | null {
   const hostUri =
     Constants.expoConfig?.hostUri ??
     (Constants.expoGoConfig as { debuggerHost?: string } | undefined)
@@ -37,15 +37,63 @@ function getMetroDevHost(): string | null {
   return hostUri.split(":")[0] ?? null;
 }
 
+function isLoopbackHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "[::1]"
+  );
+}
+
+/** Best host for the dev API server when running on a native client. */
+export function resolveNativeDevApiHost(): string {
+  const metroHost = getMetroDevHost();
+
+  if (ReactNative.Platform.OS === "android") {
+    if (!metroHost || isLoopbackHost(metroHost)) {
+      return "10.0.2.2";
+    }
+    return metroHost;
+  }
+
+  if (metroHost && !isLoopbackHost(metroHost)) {
+    return metroHost;
+  }
+
+  return "localhost";
+}
+
+/**
+ * On native, `localhost` in EXPO_PUBLIC_API_BASE_URL points at the device,
+ * not the dev machine. Rewrite loopback hosts to Metro's LAN host (or the
+ * Android emulator's `10.0.2.2` alias).
+ */
+export function rewriteLoopbackApiUrlForNativeDev(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!isLoopbackHost(parsed.hostname)) {
+      return url.replace(/\/$/, "");
+    }
+    parsed.hostname = resolveNativeDevApiHost();
+    return parsed.origin;
+  } catch {
+    return url.replace(/\/$/, "");
+  }
+}
+
 /**
  * Get the API base URL, deriving from current hostname if not set.
  * Metro runs on 8081, API server runs on 3000.
  * URL pattern: https://PORT-sandboxid.region.domain
  */
 export function getApiBaseUrl(): string {
-  // If API_BASE_URL is set, use it
   if (API_BASE_URL) {
-    return API_BASE_URL.replace(/\/$/, "");
+    const trimmed = API_BASE_URL.replace(/\/$/, "");
+    if (__DEV__ && ReactNative.Platform.OS !== "web") {
+      return rewriteLoopbackApiUrlForNativeDev(trimmed);
+    }
+    return trimmed;
   }
 
   // On web, derive from current hostname by replacing port 8081 with 3000
@@ -63,19 +111,8 @@ export function getApiBaseUrl(): string {
   }
 
   // Native dev: relative URLs fail on React Native — point at the local API server.
-  // Android emulator: 10.0.2.2 reaches the host machine's localhost.
-  // Physical device / iOS simulator: use the same LAN host Metro uses.
   if (__DEV__ && ReactNative.Platform.OS !== "web") {
-    const metroHost = getMetroDevHost();
-    if (ReactNative.Platform.OS === "android") {
-      const host =
-        !metroHost || metroHost === "localhost" || metroHost === "127.0.0.1"
-          ? "10.0.2.2"
-          : metroHost;
-      return `http://${host}:${API_PORT}`;
-    }
-    const host = metroHost ?? "localhost";
-    return `http://${host}:${API_PORT}`;
+    return `http://${resolveNativeDevApiHost()}:${API_PORT}`;
   }
 
   // Production native builds must set EXPO_PUBLIC_API_BASE_URL explicitly.

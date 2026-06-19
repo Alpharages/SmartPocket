@@ -1,0 +1,390 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appRouter } from "../server/routers";
+import type { TrpcContext } from "../server/_core/context";
+import type { Account } from "@/drizzle/schema";
+
+const callDataApi = vi.fn();
+
+vi.mock("../server/_core/dataApi", () => ({
+  callDataApi: (...args: unknown[]) => callDataApi(...args),
+}));
+
+type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
+
+function createUserContext(userId: number): TrpcContext {
+  const user: AuthenticatedUser = {
+    id: userId,
+    openId: `user-${userId}`,
+    email: `user${userId}@example.com`,
+    name: `User ${userId}`,
+    loginMethod: "manus",
+    role: "user",
+    aiEnabled: false,
+    remindersEnabled: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastSignedIn: new Date(),
+  };
+
+  return {
+    user,
+    req: { protocol: "https", headers: {} } as TrpcContext["req"],
+    res: {} as TrpcContext["res"],
+  };
+}
+
+const now = new Date("2026-06-01T00:00:00.000Z");
+
+const sampleAccount: Account = {
+  id: 1,
+  userId: 1,
+  name: "Checking",
+  type: "bank",
+  currency: "USD",
+  isDefault: false,
+  createdAt: now,
+  updatedAt: now,
+};
+
+describe("accounts router", () => {
+  beforeEach(() => {
+    callDataApi.mockReset();
+  });
+
+  it("creates and returns an account scoped to the authenticated user", async () => {
+    callDataApi
+      .mockResolvedValueOnce({ insertId: 2 })
+      .mockResolvedValueOnce([{ ...sampleAccount, id: 2, userId: 1 }]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    const created = await caller.accounts.create({
+      name: "Checking",
+      type: "bank",
+      currency: "USD",
+    });
+
+    expect(created?.userId).toBe(1);
+    expect(created?.name).toBe("Checking");
+  });
+
+  it("lists only the authenticated user's accounts", async () => {
+    callDataApi.mockResolvedValueOnce([sampleAccount]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(caller.accounts.list()).resolves.toEqual([sampleAccount]);
+
+    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+      body: {
+        query: "SELECT * FROM accounts WHERE userId = ? ORDER BY name",
+        params: [1],
+      },
+    });
+  });
+
+  it("rejects invalid account type at the API boundary", async () => {
+    const caller = appRouter.createCaller(createUserContext(1));
+
+    await expect(
+      caller.accounts.create({
+        name: "Crypto",
+        type: "crypto",
+      } as Parameters<typeof caller.accounts.create>[0]),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("rejects whitespace-only account names", async () => {
+    const caller = appRouter.createCaller(createUserContext(1));
+
+    await expect(
+      caller.accounts.create({
+        name: "   ",
+        type: "cash",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("propagates transaction count query failures", async () => {
+    callDataApi
+      .mockResolvedValueOnce([sampleAccount])
+      .mockRejectedValueOnce(new Error("database unavailable"));
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(caller.accounts.transactionCount({ id: 1 })).rejects.toThrow(
+      "database unavailable",
+    );
+  });
+
+  it("rejects invalid currency length", async () => {
+    const caller = appRouter.createCaller(createUserContext(1));
+
+    await expect(
+      caller.accounts.create({
+        name: "Wallet",
+        type: "wallet",
+        currency: "US",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("allows transactions.create without accountId", async () => {
+    callDataApi.mockResolvedValueOnce({ insertId: 99 });
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    const id = await caller.transactions.create({
+      categoryId: 1,
+      type: "expense",
+      amount: "12.50",
+      date: new Date("2026-06-10"),
+    });
+
+    expect(id).toBe(99);
+    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+      body: expect.objectContaining({
+        params: expect.arrayContaining([1, 1, null, "expense", "12.50"]),
+      }),
+    });
+  });
+
+  it("returns transaction count scoped to the authenticated user", async () => {
+    callDataApi
+      .mockResolvedValueOnce([sampleAccount])
+      .mockResolvedValueOnce([{ txCount: 3 }]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(caller.accounts.transactionCount({ id: 1 })).resolves.toBe(3);
+
+    expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
+      body: {
+        query:
+          "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ?",
+        params: [1, 1],
+      },
+    });
+  });
+
+  it("blocks delete when linked transactions exist", async () => {
+    callDataApi
+      .mockResolvedValueOnce([sampleAccount])
+      .mockResolvedValueOnce([{ txCount: 2 }]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(caller.accounts.delete({ id: 1 })).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+    });
+  });
+
+  it("reassigns transactions then deletes the source account", async () => {
+    const targetAccount = { ...sampleAccount, id: 2, name: "Savings" };
+    callDataApi
+      .mockResolvedValueOnce([sampleAccount])
+      .mockResolvedValueOnce([targetAccount])
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(
+      caller.accounts.reassignAndDelete({ id: 1, targetAccountId: 2 }),
+    ).resolves.toBeUndefined();
+
+    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+      body: {
+        query:
+          "UPDATE transactions SET accountId = ? WHERE userId = ? AND accountId = ?",
+        params: [2, 1, 1],
+      },
+    });
+    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+      body: {
+        query:
+          "DELETE FROM transfers WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
+        params: [1, 1, 2],
+      },
+    });
+    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+      body: {
+        query:
+          "DELETE FROM transfers WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
+        params: [1, 2, 1],
+      },
+    });
+    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+      body: {
+        query: "DELETE FROM accounts WHERE id = ? AND userId = ?",
+        params: [1, 1],
+      },
+    });
+  });
+
+  it("returns transfer count scoped to the authenticated user", async () => {
+    callDataApi
+      .mockResolvedValueOnce([sampleAccount])
+      .mockResolvedValueOnce([{ transferCount: 2 }]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(caller.accounts.transferCount({ id: 1 })).resolves.toBe(2);
+
+    expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
+      body: {
+        query:
+          "SELECT COUNT(*) as transferCount FROM transfers WHERE userId = ? AND (fromAccountId = ? OR toAccountId = ?)",
+        params: [1, 1, 1],
+      },
+    });
+  });
+
+  it("rejects reassigning to the same account", async () => {
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(
+      caller.accounts.reassignAndDelete({ id: 1, targetAccountId: 1 }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("returns derived balances scoped to the authenticated user", async () => {
+    callDataApi
+      .mockResolvedValueOnce([
+        { id: 1, accountId: 1, type: "income", amount: "50.00" },
+        { id: 2, accountId: 1, type: "expense", amount: "20.00" },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(caller.accounts.balances()).resolves.toEqual([
+      { accountId: 1, balance: 30 },
+    ]);
+
+    expect(callDataApi).toHaveBeenNthCalledWith(1, "Database/query", {
+      body: {
+        query:
+          "SELECT id, accountId, type, amount FROM transactions WHERE userId = ?",
+        params: [1],
+      },
+    });
+    expect(callDataApi).toHaveBeenNthCalledWith(2, "Database/query", {
+      body: {
+        query:
+          "SELECT * FROM transfers WHERE userId = ? ORDER BY date DESC, id DESC",
+        params: [1],
+      },
+    });
+  });
+
+  it("records a transfer and folds legs into balances (AC1, AC5)", async () => {
+    const fromAccount = { ...sampleAccount, id: 1 };
+    const toAccount = { ...sampleAccount, id: 2, name: "Savings" };
+    const transferDate = new Date("2026-06-10");
+
+    callDataApi
+      .mockResolvedValueOnce([fromAccount])
+      .mockResolvedValueOnce([toAccount])
+      .mockResolvedValueOnce({ insertId: 9 })
+      .mockResolvedValueOnce([
+        {
+          id: 9,
+          userId: 1,
+          fromAccountId: 1,
+          toAccountId: 2,
+          amount: "50.00",
+          description: null,
+          date: transferDate,
+          createdAt: transferDate,
+          updatedAt: transferDate,
+        },
+      ])
+      .mockResolvedValueOnce([
+        { id: 1, accountId: 1, type: "income", amount: "100.00" },
+        { id: 2, accountId: 2, type: "income", amount: "20.00" },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 9,
+          userId: 1,
+          fromAccountId: 1,
+          toAccountId: 2,
+          amount: "50.00",
+          description: null,
+          date: transferDate,
+          createdAt: transferDate,
+          updatedAt: transferDate,
+        },
+      ]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    const created = await caller.accounts.transfer({
+      fromAccountId: 1,
+      toAccountId: 2,
+      amount: "50.00",
+      date: transferDate,
+    });
+
+    expect(created?.id).toBe(9);
+
+    await expect(caller.accounts.balances()).resolves.toEqual([
+      { accountId: 1, balance: 50 },
+      { accountId: 2, balance: 70 },
+    ]);
+  });
+
+  it("rejects same-account transfers (AC3)", async () => {
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(
+      caller.accounts.transfer({
+        fromAccountId: 1,
+        toAccountId: 1,
+        amount: "10.00",
+        date: new Date("2026-06-10"),
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("rejects non-positive transfer amounts (AC4)", async () => {
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(
+      caller.accounts.transfer({
+        fromAccountId: 1,
+        toAccountId: 2,
+        amount: "0",
+        date: new Date("2026-06-10"),
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("rejects transfers referencing another user's account", async () => {
+    callDataApi.mockResolvedValueOnce([sampleAccount]).mockResolvedValueOnce([]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(
+      caller.accounts.transfer({
+        fromAccountId: 1,
+        toAccountId: 2,
+        amount: "10.00",
+        date: new Date("2026-06-10"),
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("rejects cross-currency transfers", async () => {
+    callDataApi
+      .mockResolvedValueOnce([sampleAccount])
+      .mockResolvedValueOnce([
+        { ...sampleAccount, id: 2, currency: "EUR" },
+      ]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(
+      caller.accounts.transfer({
+        fromAccountId: 1,
+        toAccountId: 2,
+        amount: "10.00",
+        date: new Date("2026-06-10"),
+      }),
+    ).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "Transfers require accounts with the same currency",
+    });
+  });
+});

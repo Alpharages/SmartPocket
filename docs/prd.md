@@ -98,6 +98,7 @@ Status: **[built]** implemented today · **[planned]** roadmap (§12).
 ## 7. Non‑Functional Requirements
 
 Each has an ID (`NFR-#`) and a measurable target where applicable.
+
 - **NFR-1 Privacy:** user data is scoped to the authenticated user; transaction data is sent for AI inference only after explicit opt‑in, and only to the self‑hosted / local LLM endpoint — never to a third‑party AI API. No third‑party analytics SDKs without disclosure.
 
 - **NFR-2 Performance:** cold start ≤ 3s on a mid‑range device; primary screens interactive ≤ 1s after data load; p95 API response < 500ms under normal load.
@@ -143,7 +144,7 @@ Each has an ID (`NFR-#`) and a measurable target where applicable.
 - Notifications: `expo-notifications` (local reminders) — planned, not yet wired.
 - Charts: pie/breakdown charts planned for the Insights screen (no chart lib integrated yet).
 - AI integrations
-  - Server‑side inference targets a **self‑hosted / local LLM** over an OpenAI‑compatible `/v1/chat/completions` API, configured via env (`LLM_BASE_URL`, optional `LLM_API_KEY`, `LLM_MODEL`); no third‑party gateway. Host/key/model live in server env, never hardcoded. *(A legacy Manus Forge client exists in `server/_core/llm.ts` but is unused and being retired.)*
+  - Server‑side inference targets a **self‑hosted / local LLM** over an OpenAI‑compatible `/v1/chat/completions` API, configured via env (`LLM_BASE_URL`, optional `LLM_API_KEY`, `LLM_MODEL`); no third‑party gateway. Host/key/model live in server env, never hardcoded. _(A legacy Manus Forge client exists in `server/_core/llm.ts` but is unused and being retired.)_
   - On‑device (user‑device) inference is not part of the architecture; the LLM runs server‑side on infrastructure we control.
 
 ## 11. Privacy, Security, and Compliance

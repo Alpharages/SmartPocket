@@ -145,17 +145,17 @@ describe("CategoryToken", () => {
       }
     });
 
-    it("falls back to 'tag' icon when icon name is invalid", () => {
+    it("falls back to default icon when icon name is invalid", () => {
       const root = render(
         <CategoryToken name="Food" color="#E11D48" icon="not-a-real-icon" />,
       );
       // The Ionicons component should still render; the fallback happens
-      // internally by mapping to "tag". We verify the component renders.
+      // internally by mapping to DEFAULT_CATEGORY_ICON. We verify the component renders.
       const container = getIconContainer(root);
       expect(container).toBeTruthy();
     });
 
-    it("falls back to 'tag' icon when icon is undefined", () => {
+    it("falls back to default icon when icon is undefined", () => {
       const root = render(<CategoryToken name="Food" color="#E11D48" />);
       const container = getIconContainer(root);
       expect(container).toBeTruthy();
