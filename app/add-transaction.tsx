@@ -373,70 +373,90 @@ export default function AddTransactionScreen() {
                 )}
               </View>
 
-              {/* Account */}
-              <View>
-                <Text
-                  className="text-muted font-semibold mb-xs"
-                  style={{ fontSize: Typography.label.fontSize }}
-                >
-                  Account (Optional)
-                </Text>
-                <View style={styles.accountOptions}>
-                  <Pressable
-                    onPress={() => setSelectedAccount(null)}
-                    accessibilityRole="radio"
-                    accessibilityLabel="Account No account"
-                    accessibilityState={{ selected: selectedAccount === null }}
-                    style={[
-                      styles.accountOption,
-                      {
-                        borderColor:
-                          selectedAccount === null
-                            ? colors.primary
-                            : colors.border,
-                        backgroundColor:
-                          selectedAccount === null
-                            ? colors.primary + "12"
-                            : colors.surface,
-                      },
-                    ]}
+              {/* Account — only shown when the user has accounts to choose from. */}
+              {accounts.length > 0 ? (
+                <View>
+                  <Text
+                    className="text-muted font-semibold mb-xs"
+                    style={{ fontSize: Typography.label.fontSize }}
                   >
-                    <Text className="text-foreground font-medium">
-                      No account
-                    </Text>
-                  </Pressable>
-                  {accounts.map((account) => {
-                    const selected = selectedAccount === account.id;
-                    return (
-                      <Pressable
-                        key={account.id}
-                        onPress={() => setSelectedAccount(account.id)}
-                        accessibilityRole="radio"
-                        accessibilityLabel={`Account ${account.name}, ${account.currency}`}
-                        accessibilityState={{ selected }}
-                        style={[
-                          styles.accountOption,
-                          {
-                            borderColor: selected
+                    Account (Optional)
+                  </Text>
+                  <View style={styles.accountOptions}>
+                    <Pressable
+                      onPress={() => setSelectedAccount(null)}
+                      accessibilityRole="radio"
+                      accessibilityLabel="Account No account"
+                      accessibilityState={{
+                        selected: selectedAccount === null,
+                      }}
+                      style={[
+                        styles.accountOption,
+                        {
+                          borderColor:
+                            selectedAccount === null
                               ? colors.primary
                               : colors.border,
-                            backgroundColor: selected
+                          backgroundColor:
+                            selectedAccount === null
                               ? colors.primary + "12"
                               : colors.surface,
-                          },
-                        ]}
-                      >
-                        <Text className="text-foreground font-medium">
-                          {account.name}
-                        </Text>
-                        <Text className="text-muted text-sm">
-                          {account.currency}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                        },
+                      ]}
+                    >
+                      <Text className="text-foreground font-medium">
+                        No account
+                      </Text>
+                      {selectedAccount === null ? (
+                        <Ionicons
+                          name="checkmark"
+                          size={18}
+                          color={colors.primary}
+                        />
+                      ) : null}
+                    </Pressable>
+                    {accounts.map((account) => {
+                      const selected = selectedAccount === account.id;
+                      return (
+                        <Pressable
+                          key={account.id}
+                          onPress={() => setSelectedAccount(account.id)}
+                          accessibilityRole="radio"
+                          accessibilityLabel={`Account ${account.name}, ${account.currency}`}
+                          accessibilityState={{ selected }}
+                          style={[
+                            styles.accountOption,
+                            {
+                              borderColor: selected
+                                ? colors.primary
+                                : colors.border,
+                              backgroundColor: selected
+                                ? colors.primary + "12"
+                                : colors.surface,
+                            },
+                          ]}
+                        >
+                          <View>
+                            <Text className="text-foreground font-medium">
+                              {account.name}
+                            </Text>
+                            <Text className="text-muted text-sm">
+                              {account.currency}
+                            </Text>
+                          </View>
+                          {selected ? (
+                            <Ionicons
+                              name="checkmark"
+                              size={18}
+                              color={colors.primary}
+                            />
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
+              ) : null}
 
               {/* Note */}
               <View>
@@ -526,6 +546,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
 });

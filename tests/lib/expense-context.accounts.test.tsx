@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => {
   const updateAccountMutateAsync = vi.fn().mockResolvedValue(undefined);
   const deleteAccountMutateAsync = vi.fn().mockResolvedValue(undefined);
   const reassignAndDeleteMutateAsync = vi.fn().mockResolvedValue(undefined);
+  const updateTransactionMutateAsync = vi.fn().mockResolvedValue(undefined);
   const transactionCountFetch = vi.fn().mockResolvedValue(0);
   const transferCountFetch = vi.fn().mockResolvedValue(0);
   const toastShow = vi.fn();
@@ -55,6 +56,7 @@ const mocks = vi.hoisted(() => {
     updateAccountMutateAsync,
     deleteAccountMutateAsync,
     reassignAndDeleteMutateAsync,
+    updateTransactionMutateAsync,
     transactionCountFetch,
     transferCountFetch,
     toastShow,
@@ -115,7 +117,9 @@ vi.mock("@/lib/trpc", () => ({
         useMutation: () => ({ mutateAsync: mocks.deleteAccountMutateAsync }),
       },
       reassignAndDelete: {
-        useMutation: () => ({ mutateAsync: mocks.reassignAndDeleteMutateAsync }),
+        useMutation: () => ({
+          mutateAsync: mocks.reassignAndDeleteMutateAsync,
+        }),
       },
       balances: {
         useQuery: () => ({ refetch: mocks.accountBalancesRefetch, data: [] }),
@@ -132,17 +136,26 @@ vi.mock("@/lib/trpc", () => ({
     transactions: {
       list: { useQuery: mocks.useQuery },
       create: { useMutation: mocks.useMutation },
-      update: { useMutation: mocks.useMutation },
+      update: {
+        useMutation: () => ({
+          mutateAsync: mocks.updateTransactionMutateAsync,
+        }),
+      },
       delete: { useMutation: mocks.useMutation },
     },
     data: {
       clearAll: {
-        useMutation: () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined) }),
+        useMutation: () => ({
+          mutateAsync: vi.fn().mockResolvedValue(undefined),
+        }),
       },
     },
     summary: {
       monthlyStats: {
-        useQuery: () => ({ refetch: vi.fn().mockResolvedValue({ data: null }), data: null }),
+        useQuery: () => ({
+          refetch: vi.fn().mockResolvedValue({ data: null }),
+          data: null,
+        }),
       },
     },
     budgets: {
@@ -293,5 +306,61 @@ describe("expense context accounts", () => {
       type: "success",
       message: "Account deleted",
     });
+  });
+
+  // AC3: reassigning a transaction's account must refresh per-account balances
+  // via refreshAccountBalances() (no manual reload), and forward the partial
+  // { id, accountId } payload the edit screen sends.
+  it("refreshes account balances after reassigning a transaction's account", async () => {
+    let api: ReturnType<typeof useExpense> | null = null;
+
+    await act(async () => {
+      TestRenderer.create(
+        <ExpenseProvider>
+          <Probe onReady={(value) => (api = value)} />
+        </ExpenseProvider>,
+      );
+    });
+
+    mocks.accountBalancesRefetch.mockClear();
+
+    await act(async () => {
+      await api!.updateTransaction(7, { accountId: 2 });
+    });
+
+    expect(mocks.updateTransactionMutateAsync).toHaveBeenCalledWith({
+      id: 7,
+      accountId: 2,
+    });
+    expect(mocks.accountBalancesRefetch).toHaveBeenCalled();
+    expect(mocks.toastShow).toHaveBeenCalledWith({
+      type: "success",
+      message: "Transaction updated",
+    });
+  });
+
+  // AC3: clearing the account (accountId: null) must also refresh balances.
+  it("refreshes account balances after clearing a transaction's account", async () => {
+    let api: ReturnType<typeof useExpense> | null = null;
+
+    await act(async () => {
+      TestRenderer.create(
+        <ExpenseProvider>
+          <Probe onReady={(value) => (api = value)} />
+        </ExpenseProvider>,
+      );
+    });
+
+    mocks.accountBalancesRefetch.mockClear();
+
+    await act(async () => {
+      await api!.updateTransaction(7, { accountId: null });
+    });
+
+    expect(mocks.updateTransactionMutateAsync).toHaveBeenCalledWith({
+      id: 7,
+      accountId: null,
+    });
+    expect(mocks.accountBalancesRefetch).toHaveBeenCalled();
   });
 });

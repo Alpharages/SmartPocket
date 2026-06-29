@@ -228,6 +228,86 @@ describe("accounts router", () => {
     expect(callDataApi).toHaveBeenCalledTimes(1);
   });
 
+  // Regression (Story 9.5 P0): the edit screen's "Save account" sends ONLY
+  // { id, accountId } — the exact partial payload below. The update input must
+  // accept it (transactionSchema.partial()); a full-required schema rejected it
+  // with a Zod BAD_REQUEST before the resolver ran, so the feature never worked.
+  it("accepts a partial { id, accountId } payload (the real edit-screen shape) and persists it", async () => {
+    callDataApi
+      .mockResolvedValueOnce([{ ...sampleAccount, id: 11, userId: 1 }]) // ownership check
+      .mockResolvedValueOnce(undefined); // UPDATE
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(
+      caller.transactions.update({ id: 7, accountId: 11 }),
+    ).resolves.not.toThrow();
+
+    expect(callDataApi).toHaveBeenNthCalledWith(1, "Database/query", {
+      body: {
+        query: "SELECT * FROM accounts WHERE id = ? AND userId = ?",
+        params: [11, 1],
+      },
+    });
+    expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
+      body: {
+        query:
+          "UPDATE transactions SET accountId = ? WHERE id = ? AND userId = ?",
+        params: [11, 7, 1],
+      },
+    });
+  });
+
+  it("accepts a partial { id, accountId: null } clear payload without an ownership check", async () => {
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(
+      caller.transactions.update({ id: 7, accountId: null }),
+    ).resolves.not.toThrow();
+
+    // null accountId skips ownership lookup → exactly one call: the UPDATE.
+    expect(callDataApi).toHaveBeenCalledTimes(1);
+    expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
+      body: {
+        query:
+          "UPDATE transactions SET accountId = ? WHERE id = ? AND userId = ?",
+        params: [null, 7, 1],
+      },
+    });
+  });
+
+  it("emits no SQL when transactions.update has no fields to change", async () => {
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(caller.transactions.update({ id: 7 })).resolves.not.toThrow();
+
+    // Empty data → updateTransaction returns early, avoiding `SET  WHERE ...`.
+    expect(callDataApi).not.toHaveBeenCalled();
+  });
+
+  it("scopes transactions.delete by the authenticated user (IDOR guard)", async () => {
+    const caller = appRouter.createCaller(createUserContext(1));
+    await caller.transactions.delete({ id: 7 });
+
+    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+      body: {
+        query: "DELETE FROM transactions WHERE id = ? AND userId = ?",
+        params: [7, 1],
+      },
+    });
+  });
+
+  it("scopes transactions.getById by the authenticated user (IDOR guard)", async () => {
+    callDataApi.mockResolvedValueOnce([]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await caller.transactions.getById({ id: 7 });
+
+    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+      body: {
+        query: "SELECT * FROM transactions WHERE id = ? AND userId = ?",
+        params: [7, 1],
+      },
+    });
+  });
+
   it("returns transaction count scoped to the authenticated user", async () => {
     callDataApi
       .mockResolvedValueOnce([sampleAccount])

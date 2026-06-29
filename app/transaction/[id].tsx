@@ -54,16 +54,27 @@ export default function TransactionDetailScreen() {
 
   const transactionId = Number(id);
   const transaction = transactions.find((t) => t.id === transactionId);
+  const currentAccountId = transaction?.accountId ?? null;
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
-    transaction?.accountId ?? null,
+    currentAccountId,
   );
 
   useEffect(() => {
     setSelectedAccountId(transaction?.accountId ?? null);
   }, [transaction?.accountId, transaction?.id]);
 
+  // The assignment changed only if the selection differs from what's persisted.
+  const isAccountDirty = selectedAccountId !== currentAccountId;
+  // A previously-assigned account that no longer exists (deleted, or not yet
+  // loaded) renders no visible selection — flag it so the user understands why.
+  const selectedAccountMissing =
+    selectedAccountId !== null &&
+    !accounts.some((account) => account.id === selectedAccountId);
+
   const handleSaveAccount = useCallback(async () => {
-    if (!transaction) return;
+    if (!transaction || selectedAccountId === (transaction.accountId ?? null)) {
+      return;
+    }
     await updateTransaction(transaction.id, { accountId: selectedAccountId });
   }, [transaction, selectedAccountId, updateTransaction]);
 
@@ -225,60 +236,43 @@ export default function TransactionDetailScreen() {
 
           <View style={{ height: 0.5, backgroundColor: colors.border }} />
 
-          {/* Account */}
-          <View className="px-5 py-4" testID="transaction-account-picker">
-            <Text className="text-sm font-medium text-muted">Account</Text>
-            <View style={{ gap: 8, marginTop: 12 }}>
-              <Pressable
-                onPress={() => setSelectedAccountId(null)}
-                accessibilityRole="radio"
-                accessibilityLabel="Account No account"
-                accessibilityState={{ selected: selectedAccountId === null }}
-                className="flex-row items-center justify-between rounded-xl px-4 py-3"
-                style={{
-                  borderWidth: 0.5,
-                  borderColor:
-                    selectedAccountId === null ? colors.primary : colors.border,
-                  backgroundColor:
-                    selectedAccountId === null
-                      ? colors.primary + "12"
-                      : colors.background,
-                }}
-              >
-                <Text className="text-sm font-semibold text-foreground">
-                  No account
-                </Text>
-                {selectedAccountId === null ? (
-                  <Ionicons name="checkmark" size={18} color={colors.primary} />
+          {/* Account — hidden only when the user has no accounts and this
+              transaction has none assigned (nothing to pick or clear). */}
+          {accounts.length > 0 || currentAccountId !== null ? (
+            <>
+              <View className="px-5 py-4" testID="transaction-account-picker">
+                <Text className="text-sm font-medium text-muted">Account</Text>
+                {selectedAccountMissing ? (
+                  <Text className="text-xs text-warning mt-1">
+                    The assigned account is no longer available. Pick another or
+                    choose “No account”.
+                  </Text>
                 ) : null}
-              </Pressable>
-              {accounts.map((account) => {
-                const selected = selectedAccountId === account.id;
-                return (
+                <View style={{ gap: 8, marginTop: 12 }}>
                   <Pressable
-                    key={account.id}
-                    onPress={() => setSelectedAccountId(account.id)}
+                    onPress={() => setSelectedAccountId(null)}
                     accessibilityRole="radio"
-                    accessibilityLabel={`Account ${account.name}, ${account.currency}`}
-                    accessibilityState={{ selected }}
+                    accessibilityLabel="Account No account"
+                    accessibilityState={{
+                      selected: selectedAccountId === null,
+                    }}
                     className="flex-row items-center justify-between rounded-xl px-4 py-3"
                     style={{
                       borderWidth: 0.5,
-                      borderColor: selected ? colors.primary : colors.border,
-                      backgroundColor: selected
-                        ? colors.primary + "12"
-                        : colors.background,
+                      borderColor:
+                        selectedAccountId === null
+                          ? colors.primary
+                          : colors.border,
+                      backgroundColor:
+                        selectedAccountId === null
+                          ? colors.primary + "12"
+                          : colors.background,
                     }}
                   >
-                    <View>
-                      <Text className="text-sm font-semibold text-foreground">
-                        {account.name}
-                      </Text>
-                      <Text className="text-xs text-muted">
-                        {account.currency}
-                      </Text>
-                    </View>
-                    {selected ? (
+                    <Text className="text-sm font-semibold text-foreground">
+                      No account
+                    </Text>
+                    {selectedAccountId === null ? (
                       <Ionicons
                         name="checkmark"
                         size={18}
@@ -286,22 +280,65 @@ export default function TransactionDetailScreen() {
                       />
                     ) : null}
                   </Pressable>
-                );
-              })}
-              <Pressable
-                onPress={() => void handleSaveAccount()}
-                accessibilityRole="button"
-                className="items-center justify-center rounded-xl px-4 py-3"
-                style={{ backgroundColor: colors.primary }}
-              >
-                <Text className="text-sm font-semibold text-white">
-                  Save account
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+                  {accounts.map((account) => {
+                    const selected = selectedAccountId === account.id;
+                    return (
+                      <Pressable
+                        key={account.id}
+                        onPress={() => setSelectedAccountId(account.id)}
+                        accessibilityRole="radio"
+                        accessibilityLabel={`Account ${account.name}, ${account.currency}`}
+                        accessibilityState={{ selected }}
+                        className="flex-row items-center justify-between rounded-xl px-4 py-3"
+                        style={{
+                          borderWidth: 0.5,
+                          borderColor: selected
+                            ? colors.primary
+                            : colors.border,
+                          backgroundColor: selected
+                            ? colors.primary + "12"
+                            : colors.background,
+                        }}
+                      >
+                        <View>
+                          <Text className="text-sm font-semibold text-foreground">
+                            {account.name}
+                          </Text>
+                          <Text className="text-xs text-muted">
+                            {account.currency}
+                          </Text>
+                        </View>
+                        {selected ? (
+                          <Ionicons
+                            name="checkmark"
+                            size={18}
+                            color={colors.primary}
+                          />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                  <Pressable
+                    onPress={() => void handleSaveAccount()}
+                    disabled={!isAccountDirty}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !isAccountDirty }}
+                    className="items-center justify-center rounded-xl px-4 py-3"
+                    style={{
+                      backgroundColor: colors.primary,
+                      opacity: isAccountDirty ? 1 : 0.5,
+                    }}
+                  >
+                    <Text className="text-sm font-semibold text-white">
+                      Save account
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
 
-          <View style={{ height: 0.5, backgroundColor: colors.border }} />
+              <View style={{ height: 0.5, backgroundColor: colors.border }} />
+            </>
+          ) : null}
 
           {/* Date */}
           <View className="flex-row items-center justify-between px-5 py-4">

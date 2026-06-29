@@ -1064,7 +1064,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         }),
       );
       try {
-        await updateTransactionMutation.mutateAsync({ id, ...data } as any);
+        await updateTransactionMutation.mutateAsync({ id, ...data });
         await refreshBudgetProgress();
         await refreshAccountBalances();
         toast.show({ type: "success", message: "Transaction updated" });

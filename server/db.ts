@@ -797,10 +797,13 @@ export async function updateTransaction(
   userId: number,
   data: Partial<InsertTransaction>,
 ) {
-  const updates = Object.entries(data)
-    .map(([key]) => `${key} = ?`)
-    .join(", ");
-  const values = Object.values(data);
+  const entries = Object.entries(data);
+  // No fields to update — avoid emitting `SET  WHERE ...` (invalid SQL).
+  if (entries.length === 0) {
+    return;
+  }
+  const updates = entries.map(([key]) => `${key} = ?`).join(", ");
+  const values = entries.map(([, value]) => value);
 
   await callDataApi("Database/query", {
     body: {
@@ -810,11 +813,11 @@ export async function updateTransaction(
   });
 }
 
-export async function deleteTransaction(id: number) {
+export async function deleteTransaction(id: number, userId: number) {
   await callDataApi("Database/query", {
     body: {
-      query: "DELETE FROM transactions WHERE id = ?",
-      params: [id],
+      query: "DELETE FROM transactions WHERE id = ? AND userId = ?",
+      params: [id, userId],
     },
   });
 }
@@ -859,12 +862,12 @@ export async function deleteAllUserData(userId: number) {
   });
 }
 
-export async function getTransactionById(id: number) {
+export async function getTransactionById(id: number, userId: number) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM transactions WHERE id = ?",
-        params: [id],
+        query: "SELECT * FROM transactions WHERE id = ? AND userId = ?",
+        params: [id, userId],
       },
     });
     return Array.isArray(result) ? result[0] : null;

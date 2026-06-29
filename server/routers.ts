@@ -583,7 +583,7 @@ const transactionsRouter = router({
     }),
 
   update: protectedProcedure
-    .input(z.object({ id: z.number(), ...transactionSchema.shape }))
+    .input(z.object({ id: z.number(), ...transactionSchema.partial().shape }))
     .mutation(async ({ ctx, input }) => {
       if (input.accountId != null) {
         const account = await db.getAccountById(input.accountId, ctx.user.id);
@@ -600,14 +600,14 @@ const transactionsRouter = router({
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(({ input }) => {
-      return db.deleteTransaction(input.id);
+    .mutation(({ ctx, input }) => {
+      return db.deleteTransaction(input.id, ctx.user.id);
     }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(({ input }) => {
-      return db.getTransactionById(input.id);
+    .query(({ ctx, input }) => {
+      return db.getTransactionById(input.id, ctx.user.id);
     }),
 });
 
