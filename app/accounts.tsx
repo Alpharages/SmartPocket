@@ -61,12 +61,14 @@ const EMPTY_FORM: AccountFormValues = {
 function AccountRow({
   account,
   balance,
+  loadingBalance,
   index,
   onEdit,
   onDelete,
 }: {
   account: Account;
   balance: number;
+  loadingBalance: boolean;
   index: number;
   onEdit: () => void;
   onDelete: () => void;
@@ -88,7 +90,12 @@ function AccountRow({
           borderColor: colors.border,
           minHeight: 44,
         }}
-        accessibilityLabel={`${account.name}, ${typeLabel}, ${account.currency}, balance ${balanceDisplay}`}
+        accessible
+        accessibilityLabel={
+          loadingBalance
+            ? `${account.name}, ${typeLabel}, ${account.currency}, balance loading`
+            : `${account.name}, ${typeLabel}, ${account.currency}, balance ${balanceDisplay}`
+        }
       >
         <View className="flex-1">
           <Text className="text-body font-semibold text-foreground">
@@ -98,12 +105,21 @@ function AccountRow({
             {typeLabel} · {account.currency}
           </Text>
         </View>
-        <Text
-          className="text-body font-semibold text-foreground tabular-nums mr-sm"
-          accessibilityRole="text"
-        >
-          {balanceDisplay}
-        </Text>
+        {loadingBalance ? (
+          <ActivityIndicator
+            size="small"
+            color={colors.muted}
+            className="mr-sm"
+            testID={`account-balance-loading-${account.id}`}
+          />
+        ) : (
+          <Text
+            className="text-body font-semibold text-foreground tabular-nums mr-sm"
+            accessibilityRole="text"
+          >
+            {balanceDisplay}
+          </Text>
+        )}
         <Pressable
           onPress={onEdit}
           accessibilityRole="button"
@@ -182,7 +198,9 @@ function AccountFormFields({
                 style={{
                   minHeight: 44,
                   justifyContent: "center",
-                  backgroundColor: selected ? colors.primary : colors.background,
+                  backgroundColor: selected
+                    ? colors.primary
+                    : colors.background,
                   borderWidth: 0.5,
                   borderColor: selected ? colors.primary : colors.border,
                 }}
@@ -355,7 +373,8 @@ function TransferFormSheet({
   const formValid = isTransferFormValid(values);
   const fromAccount = accounts.find((a) => a.id === values.fromAccountId);
   const destinationCandidates = useMemo(() => {
-    if (!fromAccount) return accounts.filter((a) => a.id !== values.fromAccountId);
+    if (!fromAccount)
+      return accounts.filter((a) => a.id !== values.fromAccountId);
     return accounts.filter(
       (a) =>
         a.id !== values.fromAccountId && a.currency === fromAccount.currency,
@@ -365,7 +384,12 @@ function TransferFormSheet({
   const canPickDestination = values.fromAccountId != null;
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Transfer" testID="transfer-sheet">
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Transfer"
+      testID="transfer-sheet"
+    >
       <ScrollView
         showsVerticalScrollIndicator={false}
         style={{ flexShrink: 1 }}
@@ -420,7 +444,8 @@ function TransferFormSheet({
             </Pressable>
             {fromAccount && destinationCandidates.length === 0 ? (
               <Text className="text-caption text-warning mt-sm">
-                No other accounts share {fromAccount.currency}. Add a matching-currency account first.
+                No other accounts share {fromAccount.currency}. Add a
+                matching-currency account first.
               </Text>
             ) : null}
           </View>
@@ -551,7 +576,9 @@ function ReassignAccountSheet({
               className="flex-row items-center rounded-xl px-md mb-sm"
               style={{
                 minHeight: 44,
-                backgroundColor: selected ? colors.primary + "14" : colors.background,
+                backgroundColor: selected
+                  ? colors.primary + "14"
+                  : colors.background,
                 borderWidth: 0.5,
                 borderColor: selected ? colors.primary : colors.border,
               }}
@@ -596,6 +623,7 @@ export default function AccountsScreen() {
     refreshAccounts,
     refreshAccountBalances,
     getAccountBalance,
+    loadingAccountBalances,
     addAccount,
     updateAccount,
     deleteAccount,
@@ -623,7 +651,9 @@ export default function AccountsScreen() {
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [transferVisible, setTransferVisible] = useState(false);
-  const [transferValues, setTransferValues] = useState(createDefaultTransferForm);
+  const [transferValues, setTransferValues] = useState(
+    createDefaultTransferForm,
+  );
   const [transferSaving, setTransferSaving] = useState(false);
   const [fromPickerVisible, setFromPickerVisible] = useState(false);
   const [toPickerVisible, setToPickerVisible] = useState(false);
@@ -667,9 +697,7 @@ export default function AccountsScreen() {
     setEditingAccount(null);
     setFormValues({
       ...EMPTY_FORM,
-      currency: isSupportedCurrency(defaultCurrency)
-        ? defaultCurrency
-        : "USD",
+      currency: isSupportedCurrency(defaultCurrency) ? defaultCurrency : "USD",
     });
   }, [defaultCurrency]);
 
@@ -677,9 +705,7 @@ export default function AccountsScreen() {
     setEditingAccount(null);
     setFormValues({
       ...EMPTY_FORM,
-      currency: isSupportedCurrency(defaultCurrency)
-        ? defaultCurrency
-        : "USD",
+      currency: isSupportedCurrency(defaultCurrency) ? defaultCurrency : "USD",
     });
     setSheetMode("add");
   }, [defaultCurrency]);
@@ -817,11 +843,19 @@ export default function AccountsScreen() {
   }, []);
 
   const handleTransferSubmit = useCallback(async () => {
-    if (transferSavingRef.current || !isTransferFormValid(transferValues)) return;
+    if (transferSavingRef.current || !isTransferFormValid(transferValues))
+      return;
 
     const date = parseDateInput(transferValues.date);
-    if (!date || transferValues.fromAccountId == null || transferValues.toAccountId == null) {
-      toast.show({ type: "error", message: "Please complete all transfer fields" });
+    if (
+      !date ||
+      transferValues.fromAccountId == null ||
+      transferValues.toAccountId == null
+    ) {
+      toast.show({
+        type: "error",
+        message: "Please complete all transfer fields",
+      });
       return;
     }
 
@@ -888,7 +922,11 @@ export default function AccountsScreen() {
                 variant="secondary"
                 label="Transfer"
                 leftIcon={
-                  <Ionicons name="swap-horizontal" size={18} color={colors.primary} />
+                  <Ionicons
+                    name="swap-horizontal"
+                    size={18}
+                    color={colors.primary}
+                  />
                 }
                 onPress={openTransferSheet}
                 size="lg"
@@ -911,6 +949,7 @@ export default function AccountsScreen() {
                   <AccountRow
                     account={item}
                     balance={getAccountBalance(item.id)}
+                    loadingBalance={loadingAccountBalances}
                     index={index}
                     onEdit={() => openEditSheet(item)}
                     onDelete={() => void handleDeletePress(item)}
@@ -949,7 +988,9 @@ export default function AccountsScreen() {
         visible={sheetMode !== null}
         onClose={closeSheet}
         title={sheetTitle}
-        testID={sheetMode === "edit" ? "edit-account-sheet" : "add-account-sheet"}
+        testID={
+          sheetMode === "edit" ? "edit-account-sheet" : "add-account-sheet"
+        }
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -987,7 +1028,9 @@ export default function AccountsScreen() {
         visible={currencyPickerVisible}
         selected={formValues.currency}
         onClose={() => setCurrencyPickerVisible(false)}
-        onSelect={(code) => setFormValues((prev) => ({ ...prev, currency: code }))}
+        onSelect={(code) =>
+          setFormValues((prev) => ({ ...prev, currency: code }))
+        }
       />
 
       <ReassignAccountSheet
@@ -1012,7 +1055,10 @@ export default function AccountsScreen() {
         onChange={(patch) =>
           setTransferValues((prev) => {
             const next = { ...prev, ...patch };
-            if (patch.fromAccountId != null && patch.fromAccountId === next.toAccountId) {
+            if (
+              patch.fromAccountId != null &&
+              patch.fromAccountId === next.toAccountId
+            ) {
               next.toAccountId = null;
             }
             if (patch.fromAccountId != null) {
@@ -1020,7 +1066,8 @@ export default function AccountsScreen() {
               if (
                 from &&
                 next.toAccountId != null &&
-                accounts.find((a) => a.id === next.toAccountId)?.currency !== from.currency
+                accounts.find((a) => a.id === next.toAccountId)?.currency !==
+                  from.currency
               ) {
                 next.toAccountId = null;
               }
@@ -1057,7 +1104,9 @@ export default function AccountsScreen() {
         accounts={transferDestinationAccounts}
         selectedId={transferValues.toAccountId}
         onClose={() => setToPickerVisible(false)}
-        onSelect={(id) => setTransferValues((prev) => ({ ...prev, toAccountId: id }))}
+        onSelect={(id) =>
+          setTransferValues((prev) => ({ ...prev, toAccountId: id }))
+        }
         testID="transfer-to-picker-sheet"
       />
     </ScreenContainer>

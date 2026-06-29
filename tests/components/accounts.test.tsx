@@ -275,6 +275,98 @@ describe("AccountsScreen", () => {
     ).not.toBeNull();
   });
 
+  it("renders a zero-decimal currency (JPY) balance without fraction digits", async () => {
+    const yenAccount = {
+      ...sampleAccount,
+      id: 4,
+      name: "Yen Wallet",
+      currency: "JPY",
+      type: "cash" as const,
+    };
+    vi.mocked(useExpense).mockReturnValue({
+      accounts: [yenAccount],
+      loadingAccounts: false,
+      refreshAccounts,
+      refreshAccountBalances,
+      getAccountBalance: vi.fn(() => 0),
+      addAccount,
+      updateAccount,
+      deleteAccount,
+      reassignAndDeleteAccount,
+      fetchAccountTransactionCount,
+    } as unknown as ReturnType<typeof useExpense>);
+
+    await act(async () => {
+      renderer = TestRenderer.create(<AccountsScreen />);
+    });
+
+    // JPY formats with zero fraction digits (e.g. "¥0", not "¥0.00").
+    expect(formatCurrency(0, "JPY")).not.toContain(".");
+    expect(
+      findByAccessibilityLabel(
+        renderer.root,
+        `Yen Wallet, Cash, JPY, balance ${formatCurrency(0, "JPY")}`,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("renders a negative balance with its sign and currency", async () => {
+    vi.mocked(useExpense).mockReturnValue({
+      accounts: [sampleAccount],
+      loadingAccounts: false,
+      refreshAccounts,
+      refreshAccountBalances,
+      getAccountBalance: vi.fn(() => -42.5),
+      addAccount,
+      updateAccount,
+      deleteAccount,
+      reassignAndDeleteAccount,
+      fetchAccountTransactionCount,
+    } as unknown as ReturnType<typeof useExpense>);
+
+    await act(async () => {
+      renderer = TestRenderer.create(<AccountsScreen />);
+    });
+
+    expect(formatCurrency(-42.5, "USD")).toContain("-");
+    expect(
+      findByAccessibilityLabel(
+        renderer.root,
+        `Cash Wallet, Cash, USD, balance ${formatCurrency(-42.5, "USD")}`,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("shows a balance loading indicator while balances are loading", async () => {
+    vi.mocked(useExpense).mockReturnValue({
+      accounts: [sampleAccount],
+      loadingAccounts: false,
+      loadingAccountBalances: true,
+      refreshAccounts,
+      refreshAccountBalances,
+      getAccountBalance,
+      addAccount,
+      updateAccount,
+      deleteAccount,
+      reassignAndDeleteAccount,
+      fetchAccountTransactionCount,
+    } as unknown as ReturnType<typeof useExpense>);
+
+    await act(async () => {
+      renderer = TestRenderer.create(<AccountsScreen />);
+    });
+
+    expect(
+      findByTestId(renderer.root, "account-balance-loading-1"),
+    ).not.toBeNull();
+    expect(
+      findByAccessibilityLabel(
+        renderer.root,
+        "Cash Wallet, Cash, USD, balance loading",
+      ),
+    ).not.toBeNull();
+  });
+
   it("shows empty state when there are no accounts", async () => {
     vi.mocked(useExpense).mockReturnValue({
       accounts: [],
@@ -293,7 +385,9 @@ describe("AccountsScreen", () => {
       renderer = TestRenderer.create(<AccountsScreen />);
     });
 
-    expect(renderer.root.findByProps({ title: "No accounts yet" })).toBeTruthy();
+    expect(
+      renderer.root.findByProps({ title: "No accounts yet" }),
+    ).toBeTruthy();
   });
 
   it("opens add account sheet and saves a valid account", async () => {
@@ -354,7 +448,9 @@ describe("AccountsScreen", () => {
       await deleteButton?.props.onPress();
     });
 
-    expect(findByTestId(renderer.root, "reassign-account-sheet")).not.toBeNull();
+    expect(
+      findByTestId(renderer.root, "reassign-account-sheet"),
+    ).not.toBeNull();
     expect(mockConfirm).not.toHaveBeenCalled();
   });
 
@@ -423,7 +519,9 @@ describe("AccountsScreen", () => {
       await deleteButton?.props.onPress();
     });
 
-    expect(findByTestId(renderer.root, "reassign-account-sheet")).not.toBeNull();
+    expect(
+      findByTestId(renderer.root, "reassign-account-sheet"),
+    ).not.toBeNull();
     expect(mockConfirm).not.toHaveBeenCalled();
   });
 
@@ -461,8 +559,10 @@ describe("AccountsScreen", () => {
     expect(findByTestId(renderer.root, "transfer-sheet")).not.toBeNull();
 
     await act(async () => {
-      findByAccessibilityLabel(renderer.root, "Source account, not selected")
-        ?.props.onPress();
+      findByAccessibilityLabel(
+        renderer.root,
+        "Source account, not selected",
+      )?.props.onPress();
     });
     await act(async () => {
       findByAccessibilityLabel(renderer.root, "Cash Wallet")?.props.onPress();
@@ -475,13 +575,11 @@ describe("AccountsScreen", () => {
       )?.props.onPress();
     });
 
-    expect(findByTestId(renderer.root, "transfer-to-picker-sheet")).not.toBeNull();
     expect(
-      findByAccessibilityLabel(renderer.root, "Main Bank"),
+      findByTestId(renderer.root, "transfer-to-picker-sheet"),
     ).not.toBeNull();
-    expect(
-      findByAccessibilityLabel(renderer.root, "Cash Wallet"),
-    ).toBeNull();
+    expect(findByAccessibilityLabel(renderer.root, "Main Bank")).not.toBeNull();
+    expect(findByAccessibilityLabel(renderer.root, "Cash Wallet")).toBeNull();
   });
 
   it("submits a valid transfer", async () => {
@@ -494,28 +592,36 @@ describe("AccountsScreen", () => {
     });
 
     await act(async () => {
-      findByAccessibilityLabel(renderer.root, "Source account, not selected")
-        ?.props.onPress();
+      findByAccessibilityLabel(
+        renderer.root,
+        "Source account, not selected",
+      )?.props.onPress();
     });
     await act(async () => {
       findByAccessibilityLabel(renderer.root, "Cash Wallet")?.props.onPress();
     });
     await act(async () => {
-      findByAccessibilityLabel(renderer.root, "Destination account, not selected")
-        ?.props.onPress();
+      findByAccessibilityLabel(
+        renderer.root,
+        "Destination account, not selected",
+      )?.props.onPress();
     });
     await act(async () => {
       findByAccessibilityLabel(renderer.root, "Main Bank")?.props.onPress();
     });
 
     await act(async () => {
-      findByAccessibilityLabel(renderer.root, "Transfer amount")?.props.onChangeText(
-        "25.00",
-      );
+      findByAccessibilityLabel(
+        renderer.root,
+        "Transfer amount",
+      )?.props.onChangeText("25.00");
     });
 
     await act(async () => {
-      await findByTestId(renderer.root, "confirm-transfer-button")?.props.onPress();
+      await findByTestId(
+        renderer.root,
+        "confirm-transfer-button",
+      )?.props.onPress();
     });
 
     expect(addTransfer).toHaveBeenCalledWith(

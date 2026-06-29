@@ -264,7 +264,10 @@ interface ExpenseContextType {
   loadingAccounts: boolean;
   refreshAccounts: () => Promise<void>;
   addAccount: (data: CreateAccountInput) => Promise<void>;
-  updateAccount: (id: number, data: Partial<CreateAccountInput>) => Promise<void>;
+  updateAccount: (
+    id: number,
+    data: Partial<CreateAccountInput>,
+  ) => Promise<void>;
   deleteAccount: (id: number) => Promise<void>;
   reassignAndDeleteAccount: (
     id: number,
@@ -367,7 +370,9 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const [accountBalances, setAccountBalances] = useState<Map<number, number>>(
     () => new Map(),
   );
-  const [loadingAccountBalances, setLoadingAccountBalances] = useState(false);
+  // Starts true: balances are unknown until the on-mount refresh resolves, so
+  // the Accounts list shows a loading indicator instead of flashing a stale 0.
+  const [loadingAccountBalances, setLoadingAccountBalances] = useState(true);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loadingTransfers, setLoadingTransfers] = useState(false);
 
@@ -853,10 +858,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         toast.show({
           type: "error",
-          message: getMutationErrorMessage(
-            err,
-            "Failed to record repayment",
-          ),
+          message: getMutationErrorMessage(err, "Failed to record repayment"),
         });
         throw new Error("recordRepayment failed");
       }
@@ -1071,7 +1073,13 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("updateTransaction failed");
       }
     },
-    [updateTransactionMutation, refreshBudgetProgress, refreshAccountBalances, transactions, toast],
+    [
+      updateTransactionMutation,
+      refreshBudgetProgress,
+      refreshAccountBalances,
+      transactions,
+      toast,
+    ],
   );
 
   const deleteTransaction = useCallback(
@@ -1089,7 +1097,13 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         throw new Error("deleteTransaction failed");
       }
     },
-    [deleteTransactionMutation, refreshBudgetProgress, refreshAccountBalances, transactions, toast],
+    [
+      deleteTransactionMutation,
+      refreshBudgetProgress,
+      refreshAccountBalances,
+      transactions,
+      toast,
+    ],
   );
 
   const refreshRecurringTransactions = useCallback(async () => {
