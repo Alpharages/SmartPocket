@@ -64,3 +64,51 @@ describe("getApiBaseUrl native dev loopback rewrite", () => {
     expect(getApiBaseUrl()).toBe("http://192.168.2.15:3000");
   });
 });
+
+describe("getApiBaseUrl web host derivation when env is unset", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "");
+    vi.stubEnv("EXPO_PUBLIC_API_PORT", "3000");
+    vi.stubGlobal("__DEV__", true);
+    vi.doMock("react-native", () => ({ Platform: { OS: "web" } }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("rewrites the sandbox 8081- hostname prefix to 3000-", async () => {
+    vi.stubGlobal("window", {
+      location: { protocol: "https:", hostname: "8081-abc123.region.example.dev" },
+    });
+    const { getApiBaseUrl } = await import("@/constants/oauth");
+    expect(getApiBaseUrl()).toBe("https://3000-abc123.region.example.dev");
+  });
+
+  it("falls back to the API port on plain localhost", async () => {
+    vi.stubGlobal("window", {
+      location: { protocol: "http:", hostname: "localhost" },
+    });
+    const { getApiBaseUrl } = await import("@/constants/oauth");
+    expect(getApiBaseUrl()).toBe("http://localhost:3000");
+  });
+
+  it("falls back to the API port on a LAN dev host", async () => {
+    vi.stubGlobal("window", {
+      location: { protocol: "http:", hostname: "192.168.2.15" },
+    });
+    const { getApiBaseUrl } = await import("@/constants/oauth");
+    expect(getApiBaseUrl()).toBe("http://192.168.2.15:3000");
+  });
+
+  it("does NOT fall back outside dev (production web must set the env)", async () => {
+    vi.stubGlobal("__DEV__", false);
+    vi.stubGlobal("window", {
+      location: { protocol: "https:", hostname: "app.smartpocket.example" },
+    });
+    const { getApiBaseUrl } = await import("@/constants/oauth");
+    expect(getApiBaseUrl()).toBe("");
+  });
+});

@@ -108,6 +108,13 @@ export function getApiBaseUrl(): string {
     if (apiHostname !== hostname) {
       return `${protocol}//${apiHostname}`;
     }
+    // Plain dev host (no sandbox prefix): Metro and the API share a hostname
+    // but run on different ports, so point at the API port directly. Scoped to
+    // dev + loopback/LAN so production web (which must set
+    // EXPO_PUBLIC_API_BASE_URL) never falls back to a wrong origin.
+    if (__DEV__) {
+      return `${protocol}//${hostname}:${API_PORT}`;
+    }
   }
 
   // Native dev: relative URLs fail on React Native — point at the local API server.
