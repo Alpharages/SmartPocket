@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -36,16 +36,36 @@ export default function TransactionDetailScreen() {
   const colors = useColors();
   const { currency } = useCurrency();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { transactions, categories, deleteTransaction, loadingTransactions, refreshTransactions } =
-    useExpense();
+  const {
+    transactions,
+    categories,
+    accounts,
+    updateTransaction,
+    deleteTransaction,
+    loadingTransactions,
+    refreshTransactions,
+    refreshAccounts,
+  } = useExpense();
 
   const onRefresh = useCallback(async () => {
-    await refreshTransactions();
-  }, [refreshTransactions]);
+    await Promise.all([refreshTransactions(), refreshAccounts()]);
+  }, [refreshTransactions, refreshAccounts]);
   const refreshProps = usePullToRefresh(onRefresh);
 
   const transactionId = Number(id);
   const transaction = transactions.find((t) => t.id === transactionId);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
+    transaction?.accountId ?? null,
+  );
+
+  useEffect(() => {
+    setSelectedAccountId(transaction?.accountId ?? null);
+  }, [transaction?.accountId, transaction?.id]);
+
+  const handleSaveAccount = useCallback(async () => {
+    if (!transaction) return;
+    await updateTransaction(transaction.id, { accountId: selectedAccountId });
+  }, [transaction, selectedAccountId, updateTransaction]);
 
   // Loading / not-found states — the transaction list may still be fetching,
   // or the id may not resolve (e.g. deep-linked to a deleted transaction).
@@ -200,6 +220,84 @@ export default function TransactionDetailScreen() {
               <Text className="text-sm font-semibold text-foreground">
                 {category?.name ?? "Uncategorized"}
               </Text>
+            </View>
+          </View>
+
+          <View style={{ height: 0.5, backgroundColor: colors.border }} />
+
+          {/* Account */}
+          <View className="px-5 py-4" testID="transaction-account-picker">
+            <Text className="text-sm font-medium text-muted">Account</Text>
+            <View style={{ gap: 8, marginTop: 12 }}>
+              <Pressable
+                onPress={() => setSelectedAccountId(null)}
+                accessibilityRole="radio"
+                accessibilityLabel="Account No account"
+                accessibilityState={{ selected: selectedAccountId === null }}
+                className="flex-row items-center justify-between rounded-xl px-4 py-3"
+                style={{
+                  borderWidth: 0.5,
+                  borderColor:
+                    selectedAccountId === null ? colors.primary : colors.border,
+                  backgroundColor:
+                    selectedAccountId === null
+                      ? colors.primary + "12"
+                      : colors.background,
+                }}
+              >
+                <Text className="text-sm font-semibold text-foreground">
+                  No account
+                </Text>
+                {selectedAccountId === null ? (
+                  <Ionicons name="checkmark" size={18} color={colors.primary} />
+                ) : null}
+              </Pressable>
+              {accounts.map((account) => {
+                const selected = selectedAccountId === account.id;
+                return (
+                  <Pressable
+                    key={account.id}
+                    onPress={() => setSelectedAccountId(account.id)}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Account ${account.name}, ${account.currency}`}
+                    accessibilityState={{ selected }}
+                    className="flex-row items-center justify-between rounded-xl px-4 py-3"
+                    style={{
+                      borderWidth: 0.5,
+                      borderColor: selected ? colors.primary : colors.border,
+                      backgroundColor: selected
+                        ? colors.primary + "12"
+                        : colors.background,
+                    }}
+                  >
+                    <View>
+                      <Text className="text-sm font-semibold text-foreground">
+                        {account.name}
+                      </Text>
+                      <Text className="text-xs text-muted">
+                        {account.currency}
+                      </Text>
+                    </View>
+                    {selected ? (
+                      <Ionicons
+                        name="checkmark"
+                        size={18}
+                        color={colors.primary}
+                      />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+              <Pressable
+                onPress={() => void handleSaveAccount()}
+                accessibilityRole="button"
+                className="items-center justify-center rounded-xl px-4 py-3"
+                style={{ backgroundColor: colors.primary }}
+              >
+                <Text className="text-sm font-semibold text-white">
+                  Save account
+                </Text>
+              </Pressable>
             </View>
           </View>
 

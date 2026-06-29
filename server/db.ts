@@ -10,7 +10,11 @@ import {
   maskCardNumber,
 } from "./_core/crypto";
 import { DEFAULT_CATEGORIES } from "./_core/default-categories";
-import { CATEGORY_DEFAULT_COLOR, DEFAULT_CATEGORY_ICON, getCategoryColorForName } from "@shared/theme";
+import {
+  CATEGORY_DEFAULT_COLOR,
+  DEFAULT_CATEGORY_ICON,
+  getCategoryColorForName,
+} from "@shared/theme";
 import {
   categories,
   creditCards,
@@ -790,6 +794,7 @@ export async function createTransaction(data: InsertTransaction) {
 
 export async function updateTransaction(
   id: number,
+  userId: number,
   data: Partial<InsertTransaction>,
 ) {
   const updates = Object.entries(data)
@@ -799,8 +804,8 @@ export async function updateTransaction(
 
   await callDataApi("Database/query", {
     body: {
-      query: `UPDATE transactions SET ${updates} WHERE id = ?`,
-      params: [...values, id],
+      query: `UPDATE transactions SET ${updates} WHERE id = ? AND userId = ?`,
+      params: [...values, id, userId],
     },
   });
 }
@@ -1612,9 +1617,7 @@ export function computeRemainingBalance(
 }
 
 export class RepaymentExceedsBalanceError extends Error {
-  constructor(
-    public readonly remainingBalance: string,
-  ) {
+  constructor(public readonly remainingBalance: string) {
     super("Repayment cannot exceed remaining balance");
     this.name = "RepaymentExceedsBalanceError";
   }
@@ -1759,7 +1762,10 @@ export async function recordRepayment(
     return null;
   }
 
-  const existingRepayments = await getRepaymentsByLoan(data.loanId, data.userId);
+  const existingRepayments = await getRepaymentsByLoan(
+    data.loanId,
+    data.userId,
+  );
   const remainingBefore = computeRemainingBalance(
     loan.principal,
     existingRepayments,

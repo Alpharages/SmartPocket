@@ -145,6 +145,89 @@ describe("accounts router", () => {
     });
   });
 
+  it("persists accountId on transactions.create after ownership check", async () => {
+    callDataApi
+      .mockResolvedValueOnce([sampleAccount])
+      .mockResolvedValueOnce({ insertId: 100 });
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(
+      caller.transactions.create({
+        categoryId: 1,
+        type: "income",
+        amount: "200.00",
+        date: new Date("2026-06-10"),
+        accountId: 1,
+      }),
+    ).resolves.toBe(100);
+
+    expect(callDataApi).toHaveBeenNthCalledWith(1, "Database/query", {
+      body: {
+        query: "SELECT * FROM accounts WHERE id = ? AND userId = ?",
+        params: [1, 1],
+      },
+    });
+    expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
+      body: expect.objectContaining({
+        params: expect.arrayContaining([1, 1, null, 1, "income", "200.00"]),
+      }),
+    });
+  });
+
+  it("rejects transactions.create with another user's account", async () => {
+    callDataApi.mockResolvedValueOnce([]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(
+      caller.transactions.create({
+        categoryId: 1,
+        type: "expense",
+        amount: "12.50",
+        date: new Date("2026-06-10"),
+        accountId: 99,
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(callDataApi).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists null accountId on user-scoped transactions.update", async () => {
+    const caller = appRouter.createCaller(createUserContext(1));
+    await caller.transactions.update({
+      id: 7,
+      categoryId: 1,
+      type: "expense",
+      amount: "12.50",
+      date: new Date("2026-06-10"),
+      accountId: null,
+    });
+
+    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+      body: {
+        query: expect.stringContaining("WHERE id = ? AND userId = ?"),
+        params: expect.arrayContaining([null, 7, 1]),
+      },
+    });
+  });
+
+  it("rejects transactions.update with another user's account", async () => {
+    callDataApi.mockResolvedValueOnce([]);
+
+    const caller = appRouter.createCaller(createUserContext(1));
+    await expect(
+      caller.transactions.update({
+        id: 7,
+        categoryId: 1,
+        type: "expense",
+        amount: "12.50",
+        date: new Date("2026-06-10"),
+        accountId: 99,
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(callDataApi).toHaveBeenCalledTimes(1);
+  });
+
   it("returns transaction count scoped to the authenticated user", async () => {
     callDataApi
       .mockResolvedValueOnce([sampleAccount])

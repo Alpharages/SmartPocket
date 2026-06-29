@@ -111,6 +111,7 @@ export interface Transaction {
   userId: number;
   categoryId: number;
   creditCardId?: number;
+  accountId?: number | null;
   type: "income" | "expense";
   amount: string;
   description?: string;

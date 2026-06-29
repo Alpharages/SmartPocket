@@ -109,6 +109,29 @@ const mockCategories = [
   },
 ];
 
+const mockAccounts = [
+  {
+    id: 10,
+    userId: 1,
+    name: "Cash Wallet",
+    type: "cash" as const,
+    currency: "USD",
+    isDefault: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: 11,
+    userId: 1,
+    name: "Main Bank",
+    type: "bank" as const,
+    currency: "USD",
+    isDefault: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
+
 const mockAddTransaction = vi.fn();
 
 vi.mock("@/lib/expense-context", () => ({
@@ -197,6 +220,7 @@ describe("AddTransactionScreen", () => {
   beforeEach(() => {
     (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
       categories: mockCategories,
+      accounts: mockAccounts,
       transactions: [],
       addTransaction: mockAddTransaction,
     });
@@ -245,6 +269,7 @@ describe("AddTransactionScreen", () => {
     it("renders an EmptyState when no categories exist for the selected type", () => {
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
         categories: [],
+        accounts: mockAccounts,
         transactions: [],
         addTransaction: mockAddTransaction,
       });
@@ -409,6 +434,46 @@ describe("AddTransactionScreen", () => {
       expect(mockBack).toHaveBeenCalledOnce();
     });
 
+    it("passes selected accountId to addTransaction", async () => {
+      mockAddTransaction.mockResolvedValue(undefined);
+      vi.useFakeTimers();
+
+      const root = render(<AddTransactionScreen />);
+
+      const amountInput = root.findAllByType("TextInput" as any)[0];
+      act(() => {
+        amountInput.props.onChangeText("42.00");
+      });
+
+      const foodChip = findAllByRole(root, "radio").find((b) =>
+        ((b.props as any).accessibilityLabel ?? "").startsWith("Food"),
+      );
+      act(() => {
+        foodChip!.props.onPress();
+      });
+
+      const accountOption = findAllByRole(root, "radio").find(
+        (b) =>
+          (b.props as any).accessibilityLabel === "Account Cash Wallet, USD",
+      );
+      expect(accountOption).toBeTruthy();
+      act(() => {
+        accountOption!.props.onPress();
+      });
+
+      const saveBtn = findAllByRole(root, "button").find(
+        (b) => collectText(b) === "Save",
+      );
+      await act(async () => {
+        saveBtn!.props.onPress();
+      });
+
+      expect(mockAddTransaction.mock.calls[0][0]).toMatchObject({
+        categoryId: 2,
+        accountId: 10,
+      });
+    });
+
     it("Cancel button triggers close and calls router.back()", () => {
       const root = render(<AddTransactionScreen />);
       const cancelBtn = findAllByRole(root, "button").find(
@@ -505,6 +570,7 @@ describe("AddTransactionScreen", () => {
             updatedAt: new Date(),
           },
         ],
+        accounts: mockAccounts,
         transactions: [],
         addTransaction: mockAddTransaction,
       });

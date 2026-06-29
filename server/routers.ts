@@ -66,7 +66,7 @@ const transactionSchema = z.object({
   description: z.string().max(500).optional(),
   date: z.date(),
   creditCardId: z.number().optional(),
-  accountId: z.number().optional(),
+  accountId: z.number().nullable().optional(),
 });
 
 const budgetSchema = z.object({
@@ -337,16 +337,14 @@ const accountsRouter = router({
     return db.getUserAccounts(ctx.user.id);
   }),
 
-  create: protectedProcedure
-    .input(accountSchema)
-    .mutation(({ ctx, input }) => {
-      return db.createAccount({
-        userId: ctx.user.id,
-        name: input.name,
-        type: input.type,
-        currency: input.currency ?? "USD",
-      });
-    }),
+  create: protectedProcedure.input(accountSchema).mutation(({ ctx, input }) => {
+    return db.createAccount({
+      userId: ctx.user.id,
+      name: input.name,
+      type: input.type,
+      currency: input.currency ?? "USD",
+    });
+  }),
 
   update: protectedProcedure
     .input(z.object({ id: z.number(), ...accountSchema.partial().shape }))
@@ -473,10 +471,7 @@ const accountsRouter = router({
         input.fromAccountId,
         ctx.user.id,
       );
-      const toAccount = await db.getAccountById(
-        input.toAccountId,
-        ctx.user.id,
-      );
+      const toAccount = await db.getAccountById(input.toAccountId, ctx.user.id);
 
       if (!fromAccount || !toAccount) {
         throw new TRPCError({
@@ -565,7 +560,16 @@ const transactionsRouter = router({
 
   create: protectedProcedure
     .input(transactionSchema)
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
+      if (input.accountId != null) {
+        const account = await db.getAccountById(input.accountId, ctx.user.id);
+        if (!account) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Account not found",
+          });
+        }
+      }
       return db.createTransaction({
         userId: ctx.user.id,
         categoryId: input.categoryId,
@@ -580,9 +584,18 @@ const transactionsRouter = router({
 
   update: protectedProcedure
     .input(z.object({ id: z.number(), ...transactionSchema.shape }))
-    .mutation(({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      if (input.accountId != null) {
+        const account = await db.getAccountById(input.accountId, ctx.user.id);
+        if (!account) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Account not found",
+          });
+        }
+      }
       const { id, ...data } = input;
-      return db.updateTransaction(id, data);
+      return db.updateTransaction(id, ctx.user.id, data);
     }),
 
   delete: protectedProcedure
@@ -813,23 +826,21 @@ const loansRouter = router({
       return db.getLoanWithBalance(input.id, ctx.user.id);
     }),
 
-  create: protectedProcedure
-    .input(loanSchema)
-    .mutation(({ ctx, input }) => {
-      return db.createLoan({
-        userId: ctx.user.id,
-        direction: input.direction,
-        counterparty: input.counterparty ?? null,
-        principal: input.principal,
-        rate: input.rate ?? null,
-        periodicity: input.periodicity,
-        installmentCount: input.installmentCount ?? null,
-        endDate: input.endDate ?? null,
-        nextDueDate: input.nextDueDate ?? null,
-        status: input.status ?? "active",
-        note: input.note ?? null,
-      });
-    }),
+  create: protectedProcedure.input(loanSchema).mutation(({ ctx, input }) => {
+    return db.createLoan({
+      userId: ctx.user.id,
+      direction: input.direction,
+      counterparty: input.counterparty ?? null,
+      principal: input.principal,
+      rate: input.rate ?? null,
+      periodicity: input.periodicity,
+      installmentCount: input.installmentCount ?? null,
+      endDate: input.endDate ?? null,
+      nextDueDate: input.nextDueDate ?? null,
+      status: input.status ?? "active",
+      note: input.note ?? null,
+    });
+  }),
 
   update: protectedProcedure
     .input(z.object({ id: z.number(), ...loanSchema.partial().shape }))
@@ -864,7 +875,9 @@ const loansRouter = router({
             (repayment) =>
               repayment.amount === input.amount &&
               new Date(repayment.date).getTime() === input.date.getTime(),
-          ) ?? updated.repayments[0] ?? null
+          ) ??
+          updated.repayments[0] ??
+          null
         );
       } catch (err) {
         if (err instanceof db.RepaymentExceedsBalanceError) {

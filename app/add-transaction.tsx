@@ -64,7 +64,15 @@ export default function AddTransactionScreen() {
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const { type: queryType } = useLocalSearchParams();
   const scheme = (useColorScheme() ?? "light") as "light" | "dark";
-  const { categories, transactions, addTransaction, refreshCategories, refreshCreditCards } = useExpense();
+  const {
+    categories,
+    accounts,
+    transactions,
+    addTransaction,
+    refreshCategories,
+    refreshCreditCards,
+    refreshAccounts,
+  } = useExpense();
   const toast = useToast();
   const { currency } = useCurrency();
 
@@ -74,6 +82,7 @@ export default function AddTransactionScreen() {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<number | null>(null);
   const [date] = useState(new Date());
   const closingRef = useRef(false);
 
@@ -84,8 +93,12 @@ export default function AddTransactionScreen() {
   const goBack = useCallback(() => router.back(), [router]);
 
   const onRefresh = useCallback(async () => {
-    await Promise.all([refreshCategories(), refreshCreditCards()]);
-  }, [refreshCategories, refreshCreditCards]);
+    await Promise.all([
+      refreshCategories(),
+      refreshCreditCards(),
+      refreshAccounts(),
+    ]);
+  }, [refreshCategories, refreshCreditCards, refreshAccounts]);
   const refreshProps = usePullToRefresh(onRefresh);
 
   const close = useCallback(() => {
@@ -120,6 +133,7 @@ export default function AddTransactionScreen() {
       amount,
       description: description || undefined,
       date,
+      accountId: selectedAccount ?? undefined,
     });
     close();
   };
@@ -359,6 +373,71 @@ export default function AddTransactionScreen() {
                 )}
               </View>
 
+              {/* Account */}
+              <View>
+                <Text
+                  className="text-muted font-semibold mb-xs"
+                  style={{ fontSize: Typography.label.fontSize }}
+                >
+                  Account (Optional)
+                </Text>
+                <View style={styles.accountOptions}>
+                  <Pressable
+                    onPress={() => setSelectedAccount(null)}
+                    accessibilityRole="radio"
+                    accessibilityLabel="Account No account"
+                    accessibilityState={{ selected: selectedAccount === null }}
+                    style={[
+                      styles.accountOption,
+                      {
+                        borderColor:
+                          selectedAccount === null
+                            ? colors.primary
+                            : colors.border,
+                        backgroundColor:
+                          selectedAccount === null
+                            ? colors.primary + "12"
+                            : colors.surface,
+                      },
+                    ]}
+                  >
+                    <Text className="text-foreground font-medium">
+                      No account
+                    </Text>
+                  </Pressable>
+                  {accounts.map((account) => {
+                    const selected = selectedAccount === account.id;
+                    return (
+                      <Pressable
+                        key={account.id}
+                        onPress={() => setSelectedAccount(account.id)}
+                        accessibilityRole="radio"
+                        accessibilityLabel={`Account ${account.name}, ${account.currency}`}
+                        accessibilityState={{ selected }}
+                        style={[
+                          styles.accountOption,
+                          {
+                            borderColor: selected
+                              ? colors.primary
+                              : colors.border,
+                            backgroundColor: selected
+                              ? colors.primary + "12"
+                              : colors.surface,
+                          },
+                        ]}
+                      >
+                        <Text className="text-foreground font-medium">
+                          {account.name}
+                        </Text>
+                        <Text className="text-muted text-sm">
+                          {account.currency}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
               {/* Note */}
               <View>
                 <Text
@@ -436,6 +515,17 @@ const styles = StyleSheet.create({
     minWidth: MIN_TOUCH_TARGET,
     minHeight: MIN_TOUCH_TARGET,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  accountOptions: {
+    gap: Spacing.sm,
+  },
+  accountOption: {
+    minHeight: MIN_TOUCH_TARGET,
+    borderWidth: 0.5,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
     justifyContent: "center",
   },
 });
