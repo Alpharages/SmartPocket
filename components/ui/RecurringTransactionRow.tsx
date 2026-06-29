@@ -74,6 +74,7 @@ export function RecurringTransactionRow({
       ]}
     >
       <CategoryToken
+        name={categoryName}
         color={categoryColor}
         icon={categoryIcon}
         size="md"

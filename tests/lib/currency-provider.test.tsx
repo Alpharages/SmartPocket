@@ -37,7 +37,7 @@ describe("loadCurrencyPreference", () => {
         languageCode: "en",
         regionCode: "GB",
       },
-    ]);
+    ] as ReturnType<typeof getLocales>);
 
     await expect(loadCurrencyPreference()).resolves.toBe("GBP");
     expect(storage.get(CURRENCY_STORAGE_KEY)).toBe("GBP");

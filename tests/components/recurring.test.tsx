@@ -98,6 +98,9 @@ vi.mock("@/constants/theme", () => ({
   resolveCategoryColor: (color: string) => color,
   CATEGORY_COLOR_LIGHT_VALUES: ["#4F46E5"],
   CATEGORY_DEFAULT_COLOR: "#4F46E5",
+  resolveCategoryIcon: (icon?: string | null) =>
+    !icon || icon === "tag" ? "pricetag-outline" : icon,
+  DEFAULT_CATEGORY_ICON: "pricetag-outline",
   ...TOKENS,
 }));
 

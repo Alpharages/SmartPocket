@@ -331,7 +331,8 @@ describe("CardsScreen", () => {
       const sheet = findByTestId(root, "edit-card-sheet");
       expect(sheet.props.visible).toBe(true);
       const cardNameInput = root.find(
-        (n) => n.type === "TextInput" && n.props.value === "My Visa",
+        (n) =>
+          (n.type as unknown) === "TextInput" && n.props.value === "My Visa",
       );
       expect(cardNameInput).toBeDefined();
     });
@@ -365,7 +366,8 @@ describe("CardsScreen", () => {
         editBtn.props.onPress?.();
       });
       const nameInput = root.find(
-        (n) => n.type === "TextInput" && n.props.value === "My Visa",
+        (n) =>
+          (n.type as unknown) === "TextInput" && n.props.value === "My Visa",
       );
       act(() => {
         nameInput.props.onChangeText("Updated Visa");
@@ -429,7 +431,8 @@ describe("CardsScreen", () => {
         editBtn.props.onPress?.();
       });
       const nameInput = root.find(
-        (n) => n.type === "TextInput" && n.props.value === "My Visa",
+        (n) =>
+          (n.type as unknown) === "TextInput" && n.props.value === "My Visa",
       );
       await act(async () => {
         nameInput.props.onChangeText("Stale Name");
@@ -451,7 +454,8 @@ describe("CardsScreen", () => {
         addBtn.props.onPress?.();
       });
       const staleInputs = root.findAll(
-        (n) => n.type === "TextInput" && n.props.value === "Stale Name",
+        (n) =>
+          (n.type as unknown) === "TextInput" && n.props.value === "Stale Name",
       );
       expect(staleInputs).toHaveLength(0);
       const submitBtn = root.find(
@@ -474,7 +478,7 @@ describe("CardsScreen", () => {
         editBtn.props.onPress?.();
       });
       const monthInput = root.find(
-        (n) => n.type === "TextInput" && n.props.value === "3",
+        (n) => (n.type as unknown) === "TextInput" && n.props.value === "3",
       );
       act(() => {
         monthInput.props.onChangeText("13");
@@ -499,7 +503,8 @@ describe("CardsScreen", () => {
         editBtn.props.onPress?.();
       });
       const nameInput = root.find(
-        (n) => n.type === "TextInput" && n.props.value === "My Visa",
+        (n) =>
+          (n.type as unknown) === "TextInput" && n.props.value === "My Visa",
       );
       await act(async () => {
         nameInput.props.onChangeText("Updated Visa");
@@ -633,7 +638,9 @@ describe("CardsScreen", () => {
       });
       const setField = (value: string, placeholder: string) => {
         const input = root.find(
-          (n) => n.type === "TextInput" && n.props.placeholder === placeholder,
+          (n) =>
+            (n.type as unknown) === "TextInput" &&
+            n.props.placeholder === placeholder,
         );
         act(() => {
           input.props.onChangeText(value);

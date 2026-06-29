@@ -71,7 +71,7 @@ describe("getDefaultCurrencyFromLocale", () => {
         languageCode: "en",
         regionCode: "US",
       },
-    ]);
+    ] as ReturnType<typeof getLocales>);
 
     const spy = vi
       .spyOn(Intl.NumberFormat.prototype, "resolvedOptions")
@@ -92,7 +92,7 @@ describe("getDefaultCurrencyFromLocale", () => {
         languageCode: "en",
         regionCode: "GB",
       },
-    ]);
+    ] as ReturnType<typeof getLocales>);
 
     expect(getDefaultCurrencyFromLocale()).toBe("GBP");
   });
@@ -100,7 +100,7 @@ describe("getDefaultCurrencyFromLocale", () => {
   it("returns supported locale currency from Intl when expo has no code", () => {
     vi.mocked(getLocales).mockReturnValueOnce([
       { languageTag: "en-GB", languageCode: "en", regionCode: "GB" },
-    ]);
+    ] as ReturnType<typeof getLocales>);
 
     const spy = vi
       .spyOn(Intl.NumberFormat.prototype, "resolvedOptions")

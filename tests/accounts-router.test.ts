@@ -88,7 +88,7 @@ describe("accounts router", () => {
       caller.accounts.create({
         name: "Crypto",
         type: "crypto",
-      } as Parameters<typeof caller.accounts.create>[0]),
+      } as unknown as Parameters<typeof caller.accounts.create>[0]),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -354,7 +354,9 @@ describe("accounts router", () => {
   });
 
   it("rejects transfers referencing another user's account", async () => {
-    callDataApi.mockResolvedValueOnce([sampleAccount]).mockResolvedValueOnce([]);
+    callDataApi
+      .mockResolvedValueOnce([sampleAccount])
+      .mockResolvedValueOnce([]);
 
     const caller = appRouter.createCaller(createUserContext(1));
     await expect(
@@ -370,9 +372,7 @@ describe("accounts router", () => {
   it("rejects cross-currency transfers", async () => {
     callDataApi
       .mockResolvedValueOnce([sampleAccount])
-      .mockResolvedValueOnce([
-        { ...sampleAccount, id: 2, currency: "EUR" },
-      ]);
+      .mockResolvedValueOnce([{ ...sampleAccount, id: 2, currency: "EUR" }]);
 
     const caller = appRouter.createCaller(createUserContext(1));
     await expect(

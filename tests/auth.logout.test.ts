@@ -24,6 +24,7 @@ function createAuthContext(): {
     loginMethod: "manus",
     role: "user",
     aiEnabled: false,
+    remindersEnabled: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),

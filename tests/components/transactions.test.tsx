@@ -158,6 +158,12 @@ function makeTransaction(
     date: Date;
   }> = {},
 ) {
+  // The fixture intentionally allows a `null` categoryId/description to exercise
+  // the screen's defensive "Uncategorized"/no-note paths, which the stricter
+  // ExpenseTransaction type (non-null categoryId, `string | undefined`
+  // description) does not permit. Cast to the type `groupTransactionsByDate`
+  // expects so the compile-time shape matches while those values still flow
+  // through at runtime.
   return {
     id: overrides.id ?? 1,
     // Use `in` check so explicit `null` is preserved (null ?? 2 === 2 in JS)
@@ -169,7 +175,7 @@ function makeTransaction(
     userId: 1,
     createdAt: new Date(),
     updatedAt: new Date(),
-  };
+  } as unknown as Parameters<typeof groupTransactionsByDate>[0][number];
 }
 
 const mockDeleteTransaction = vi.fn();
@@ -489,11 +495,12 @@ describe("TransactionsScreen", () => {
 
     it("'All' chip is selected by default", () => {
       const root = render(<TransactionsScreen />);
-      // Pill uses accessibilityRole="button"; check accessibilityState.selected
-      const allBtn = findAllByRole(root, "button").find(
+      // Single-select FilterChipGroup renders Pills as accessibilityRole="radio";
+      // selection is exposed via accessibilityState.checked.
+      const allBtn = findAllByRole(root, "radio").find(
         (n) =>
           collectText(n) === "All" &&
-          (n.props as any).accessibilityState?.selected === true,
+          (n.props as any).accessibilityState?.checked === true,
       );
       expect(allBtn).toBeTruthy();
     });
@@ -507,7 +514,7 @@ describe("TransactionsScreen", () => {
       });
 
       const root = render(<TransactionsScreen />);
-      const incomeBtn = findAllByRole(root, "button").find(
+      const incomeBtn = findAllByRole(root, "radio").find(
         (n) => collectText(n) === "Income",
       );
       expect(incomeBtn).toBeTruthy();
@@ -529,7 +536,7 @@ describe("TransactionsScreen", () => {
       });
 
       const root = render(<TransactionsScreen />);
-      const expenseBtn = findAllByRole(root, "button").find(
+      const expenseBtn = findAllByRole(root, "radio").find(
         (n) => collectText(n) === "Expense",
       );
       expect(expenseBtn).toBeTruthy();
@@ -736,7 +743,7 @@ describe("TransactionsScreen", () => {
       });
 
       const root = render(<TransactionsScreen />);
-      const expenseBtn = findAllByRole(root, "button").find(
+      const expenseBtn = findAllByRole(root, "radio").find(
         (n) => collectText(n) === "Expense",
       );
       expect(expenseBtn).toBeTruthy();
@@ -756,7 +763,7 @@ describe("TransactionsScreen", () => {
       });
 
       const root = render(<TransactionsScreen />);
-      const expenseBtn = findAllByRole(root, "button").find(
+      const expenseBtn = findAllByRole(root, "radio").find(
         (n) => collectText(n) === "Expense",
       );
       expect(expenseBtn).toBeTruthy();
@@ -797,11 +804,12 @@ describe("TransactionsScreen", () => {
   });
 
   // -------------------------------------------------------------------------
-  // AC: Dead route removed (no crash on row press-without-onPress)
+  // AC: Row navigation — tapping a row opens the transaction detail route
+  //     (phone layout). The /transaction/[id] screen now exists.
   // -------------------------------------------------------------------------
 
-  describe("Dead route removed", () => {
-    it("does not navigate to /transaction/:id when a row is tapped (no dead-end route)", () => {
+  describe("Row navigation", () => {
+    it("navigates to /transaction/:id when a row is tapped (phone layout)", () => {
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
         transactions: [makeTransaction()],
         categories: mockCategories,
@@ -818,14 +826,13 @@ describe("TransactionsScreen", () => {
           (n.props as any).accessibilityLabel?.includes("expense"),
       );
 
-      if (rows.length > 0) {
-        act(() => {
-          rows[0].props.onPress?.();
-        });
-      }
+      expect(rows.length).toBeGreaterThan(0);
+      act(() => {
+        rows[0].props.onPress?.();
+      });
 
-      // Should never push the old dead route
-      expect(mockPush).not.toHaveBeenCalledWith(
+      // The detail/edit route exists; the row opens it on a phone layout.
+      expect(mockPush).toHaveBeenCalledWith(
         expect.stringContaining("/transaction/"),
       );
     });

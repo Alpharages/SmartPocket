@@ -115,6 +115,10 @@ vi.mock("@/lib/expense-context", () => ({
   useExpense: vi.fn(),
 }));
 
+vi.mock("@/lib/currency-provider", () => ({
+  useCurrency: () => ({ currency: "USD", setCurrency: vi.fn() }),
+}));
+
 vi.mock("@/components/ui/ToastProvider", () => ({
   useToast: () => ({ show: vi.fn() }),
 }));
@@ -123,7 +127,8 @@ vi.mock("@/hooks/use-color-scheme", () => ({
   useColorScheme: () => "light",
 }));
 
-vi.mock("@/constants/theme", () => ({
+vi.mock("@/constants/theme", async (importActual) => ({
+  ...(await importActual<typeof import("@/constants/theme")>()),
   resolveCategoryColor: (color: string) => color,
 }));
 
@@ -375,8 +380,8 @@ describe("AddTransactionScreen", () => {
       });
 
       // Select a category chip (Food, id=2, type=expense)
-      const foodChip = findAllByRole(root, "button").find(
-        (b) => collectText(b) === "Food",
+      const foodChip = findAllByRole(root, "radio").find((b) =>
+        ((b.props as any).accessibilityLabel ?? "").startsWith("Food"),
       );
       expect(foodChip).toBeTruthy();
       act(() => {
@@ -427,8 +432,8 @@ describe("AddTransactionScreen", () => {
         amountInput.props.onChangeText("20");
       });
 
-      const foodChip = findAllByRole(root, "button").find(
-        (b) => collectText(b) === "Food",
+      const foodChip = findAllByRole(root, "radio").find((b) =>
+        ((b.props as any).accessibilityLabel ?? "").startsWith("Food"),
       );
       act(() => {
         foodChip!.props.onPress();

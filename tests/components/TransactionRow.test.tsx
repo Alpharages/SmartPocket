@@ -240,8 +240,11 @@ describe("TransactionRow", () => {
           categoryIcon={"totally-not-a-real-icon" as never}
         />,
       );
-      // CategoryToken falls back to DEFAULT_CATEGORY_ICON for unknown icons.
-      expect(root.findByProps({ testID: "icon-tag" })).toBeTruthy();
+      // CategoryToken falls back to DEFAULT_CATEGORY_ICON ("pricetag-outline")
+      // for unknown icons.
+      expect(
+        root.findByProps({ testID: "icon-pricetag-outline" }),
+      ).toBeTruthy();
       expect(
         root.findAll((n) => n.props.testID === "icon-totally-not-a-real-icon"),
       ).toHaveLength(0);

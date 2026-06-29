@@ -1,15 +1,13 @@
 import "@/global.css";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
-import {
-  handleLoanNotificationResponse,
-} from "@/lib/notification-routing";
+import { handleLoanNotificationResponse } from "@/lib/notification-routing";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { CurrencyProvider } from "@/lib/currency-provider";
@@ -84,7 +82,9 @@ export default function RootLayout() {
     const navigateFromNotification = (
       response: Notifications.NotificationResponse,
     ) => {
-      handleLoanNotificationResponse(response, (path) => router.push(path));
+      handleLoanNotificationResponse(response, (path) =>
+        router.push(path as Href),
+      );
     };
 
     void Notifications.getLastNotificationResponseAsync().then((response) => {
@@ -93,10 +93,9 @@ export default function RootLayout() {
       }
     });
 
-    const subscription =
-      Notifications.addNotificationResponseReceivedListener(
-        navigateFromNotification,
-      );
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      navigateFromNotification,
+    );
 
     return () => subscription.remove();
   }, [router]);

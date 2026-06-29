@@ -21,6 +21,7 @@ function createUserContext(userId: number): TrpcContext {
     loginMethod: "manus",
     role: "user",
     aiEnabled: false,
+    remindersEnabled: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -39,9 +40,7 @@ describe("getUserSettings", () => {
   });
 
   it("returns aiEnabled false when MySQL stores 0", async () => {
-    callDataApi.mockResolvedValueOnce([
-      { aiEnabled: 0, remindersEnabled: 0 },
-    ]);
+    callDataApi.mockResolvedValueOnce([{ aiEnabled: 0, remindersEnabled: 0 }]);
 
     await expect(getUserSettings(42)).resolves.toEqual({
       aiEnabled: false,
@@ -57,9 +56,7 @@ describe("getUserSettings", () => {
   });
 
   it("coerces MySQL 1 to boolean true", async () => {
-    callDataApi.mockResolvedValueOnce([
-      { aiEnabled: 1, remindersEnabled: 1 },
-    ]);
+    callDataApi.mockResolvedValueOnce([{ aiEnabled: 1, remindersEnabled: 1 }]);
 
     await expect(getUserSettings(7)).resolves.toEqual({
       aiEnabled: true,
@@ -124,9 +121,7 @@ describe("settings router", () => {
   });
 
   it("get returns aiEnabled default false for a user", async () => {
-    callDataApi.mockResolvedValueOnce([
-      { aiEnabled: 0, remindersEnabled: 0 },
-    ]);
+    callDataApi.mockResolvedValueOnce([{ aiEnabled: 0, remindersEnabled: 0 }]);
     const caller = appRouter.createCaller(createUserContext(1));
 
     await expect(caller.settings.get()).resolves.toEqual({
@@ -179,9 +174,7 @@ describe("settings router", () => {
   });
 
   it("scopes settings.get to ctx.user.id", async () => {
-    callDataApi.mockResolvedValueOnce([
-      { aiEnabled: 1, remindersEnabled: 1 },
-    ]);
+    callDataApi.mockResolvedValueOnce([{ aiEnabled: 1, remindersEnabled: 1 }]);
     const caller = appRouter.createCaller(createUserContext(3));
 
     await caller.settings.get();
