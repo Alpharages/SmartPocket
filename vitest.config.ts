@@ -36,6 +36,12 @@ export default defineConfig({
         "./__mocks__/react-native-chart-kit.ts",
       ),
       "@shared/": path.resolve(__dirname, "./shared/") + "/",
+      // Map the SDK 54 legacy subpath (used by lib/share-file.ts) before the
+      // bare specifier so it resolves to the same mock.
+      "expo-file-system/legacy": path.resolve(
+        __dirname,
+        "./__mocks__/expo-file-system.ts",
+      ),
       "expo-file-system": path.resolve(__dirname, "./__mocks__/expo-file-system.ts"),
       "expo-sharing": path.resolve(__dirname, "./__mocks__/expo-sharing.ts"),
     },

@@ -22,9 +22,12 @@ export async function shareFile(
     // Defer revoke — Firefox/Safari fetch the blob asynchronously after click()
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } else {
-    // Lazy-require native modules so they are never evaluated on web
-    const FileSystem = await import("expo-file-system").then((m) => m.default ?? m);
-    const Sharing = await import("expo-sharing").then((m) => m);
+    // Lazy-require native modules so they are never evaluated on web.
+    // SDK 54's expo-file-system@19 moved the legacy file API
+    // (cacheDirectory / writeAsStringAsync / EncodingType) behind the
+    // "/legacy" subpath; the default entry only exposes File/Paths/Directory.
+    const FileSystem = await import("expo-file-system/legacy");
+    const Sharing = await import("expo-sharing");
 
     if (!FileSystem.cacheDirectory) {
       throw new Error("Cache directory unavailable — cannot write export file");
