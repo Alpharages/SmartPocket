@@ -1,5 +1,13 @@
 import React, { useCallback, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -11,10 +19,11 @@ import { SettingsRow } from "@/components/ui/SettingsRow";
 import { Sheet } from "@/components/ui/Sheet";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAppMetadata } from "@/lib/app-metadata";
+import { toTransactionCsv, transactionToExportRow } from "@/lib/csv-export";
 import {
-  toTransactionCsv,
-  transactionToExportRow,
-} from "@/lib/csv-export";
+  toTransactionJson,
+  transactionToJsonExportRow,
+} from "@/lib/json-export";
 import {
   CURRENCIES,
   getCurrencyLabel,
@@ -189,12 +198,16 @@ function AiToggleControl({
 
 type ExportRange = "all" | "thisMonth" | "custom";
 
-function ExportCsvSheet({
+function ExportSheet({
   visible,
   onClose,
+  format,
+  currency,
 }: {
   visible: boolean;
   onClose: () => void;
+  format: "csv" | "json";
+  currency: CurrencyCode;
 }) {
   const colors = useColors();
   const toast = useToast();
@@ -203,6 +216,8 @@ function ExportCsvSheet({
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [exporting, setExporting] = useState(false);
+  const isJson = format === "json";
+  const label = isJson ? "JSON" : "CSV";
 
   const handleExport = useCallback(async () => {
     if (exporting) return;
@@ -224,11 +239,17 @@ function ExportCsvSheet({
         const endDate = new Date(`${customEnd}T23:59:59`);
 
         if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-          toast.show({ type: "error", message: "Invalid date — use YYYY-MM-DD" });
+          toast.show({
+            type: "error",
+            message: "Invalid date — use YYYY-MM-DD",
+          });
           return;
         }
         if (startDate > endDate) {
-          toast.show({ type: "error", message: "Start date must be before end date" });
+          toast.show({
+            type: "error",
+            message: "Start date must be before end date",
+          });
           return;
         }
 
@@ -246,12 +267,27 @@ function ExportCsvSheet({
         return;
       }
 
-      const exportRows = rows.map((t) =>
-        transactionToExportRow(t, categories, creditCards),
-      );
-      const csv = toTransactionCsv(exportRows);
       const today = formatIsoDate(now);
-      await shareFile(`smartpocket-transactions-${today}.csv`, csv, "text/csv");
+      if (isJson) {
+        const exportRows = rows.map((t) =>
+          transactionToJsonExportRow(t, categories, creditCards),
+        );
+        await shareFile(
+          `smartpocket-transactions-${today}.json`,
+          toTransactionJson(exportRows, { currency }),
+          "application/json",
+          "public.json",
+        );
+      } else {
+        const exportRows = rows.map((t) =>
+          transactionToExportRow(t, categories, creditCards),
+        );
+        await shareFile(
+          `smartpocket-transactions-${today}.csv`,
+          toTransactionCsv(exportRows),
+          "text/csv",
+        );
+      }
       toast.show({ type: "success", message: "Export complete" });
       onClose();
     } catch {
@@ -259,17 +295,31 @@ function ExportCsvSheet({
     } finally {
       setExporting(false);
     }
-  }, [exporting, transactions, categories, creditCards, range, customStart, customEnd, toast, onClose]);
+  }, [
+    exporting,
+    transactions,
+    categories,
+    creditCards,
+    range,
+    customStart,
+    customEnd,
+    toast,
+    onClose,
+    isJson,
+    currency,
+  ]);
 
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Export to CSV"
-      testID="export-csv-sheet"
+      title={`Export to ${label}`}
+      testID={`export-${format}-sheet`}
     >
       <View className="px-lg pb-lg">
-        <Text className="mb-sm text-body font-medium text-foreground">Date range</Text>
+        <Text className="mb-sm text-body font-medium text-foreground">
+          Date range
+        </Text>
         <FilterChipGroup
           mode="single"
           value={range}
@@ -285,7 +335,9 @@ function ExportCsvSheet({
         {range === "custom" ? (
           <View className="mt-md gap-sm">
             <View>
-              <Text className="mb-xs text-caption text-muted">Start (YYYY-MM-DD)</Text>
+              <Text className="mb-xs text-caption text-muted">
+                Start (YYYY-MM-DD)
+              </Text>
               <TextInput
                 value={customStart}
                 onChangeText={setCustomStart}
@@ -305,7 +357,9 @@ function ExportCsvSheet({
               />
             </View>
             <View>
-              <Text className="mb-xs text-caption text-muted">End (YYYY-MM-DD)</Text>
+              <Text className="mb-xs text-caption text-muted">
+                End (YYYY-MM-DD)
+              </Text>
               <TextInput
                 value={customEnd}
                 onChangeText={setCustomEnd}
@@ -333,7 +387,7 @@ function ExportCsvSheet({
             onPress={handleExport}
             loading={exporting}
             disabled={exporting}
-            accessibilityLabel="Export transactions to CSV"
+            accessibilityLabel={`Export transactions to ${label}`}
           />
         </View>
       </View>
@@ -443,13 +497,15 @@ export default function SettingsScreen() {
   const { currency, setCurrency } = useCurrency();
   const { firstDayOfWeek, setFirstDayOfWeek } = useFirstDayOfWeek();
   const { themePreference, setThemePreference } = useThemeContext();
-  const { aiEnabled, setAiEnabled, isSavingAi, refreshSettings } = useSettings();
+  const { aiEnabled, setAiEnabled, isSavingAi, refreshSettings } =
+    useSettings();
   const { clearAllData, refreshAll } = useExpense();
   const [currencySheetVisible, setCurrencySheetVisible] = useState(false);
   const [firstDaySheetVisible, setFirstDaySheetVisible] = useState(false);
   const [clearDataSheetVisible, setClearDataSheetVisible] = useState(false);
   const [clearingData, setClearingData] = useState(false);
   const [exportCsvSheetVisible, setExportCsvSheetVisible] = useState(false);
+  const [exportJsonSheetVisible, setExportJsonSheetVisible] = useState(false);
 
   const { name: appName, version: appVersion } = getAppMetadata();
 
@@ -566,6 +622,13 @@ export default function SettingsScreen() {
           />
           <SectionDivider />
           <SettingsRow
+            icon="download-outline"
+            label="Export to JSON"
+            onPress={() => setExportJsonSheetVisible(true)}
+            accessibilityLabel="Export to JSON"
+          />
+          <SectionDivider />
+          <SettingsRow
             icon="cloud-upload-outline"
             label="Backup"
             comingSoon
@@ -619,9 +682,17 @@ export default function SettingsScreen() {
         onConfirm={handleConfirmClearData}
         clearing={clearingData}
       />
-      <ExportCsvSheet
+      <ExportSheet
         visible={exportCsvSheetVisible}
         onClose={() => setExportCsvSheetVisible(false)}
+        format="csv"
+        currency={currency}
+      />
+      <ExportSheet
+        visible={exportJsonSheetVisible}
+        onClose={() => setExportJsonSheetVisible(false)}
+        format="json"
+        currency={currency}
       />
     </ScreenContainer>
   );

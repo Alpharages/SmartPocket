@@ -9,6 +9,7 @@ export async function shareFile(
   filename: string,
   content: string,
   mimeType: string,
+  UTI = "public.comma-separated-values-text",
 ): Promise<void> {
   if (Platform.OS === "web") {
     const blob = new Blob([content], { type: mimeType });
@@ -45,7 +46,7 @@ export async function shareFile(
       });
       await Sharing.shareAsync(uri, {
         mimeType,
-        UTI: "public.comma-separated-values-text",
+        UTI,
       });
     } finally {
       await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});

@@ -110,8 +110,15 @@ vi.mock("@/components/ui/ToastProvider", () => ({
 }));
 
 vi.mock("@/lib/csv-export", () => ({
-  toTransactionCsv: vi.fn().mockReturnValue("Date,Type,Amount,Category,Card,Description"),
+  toTransactionCsv: vi
+    .fn()
+    .mockReturnValue("Date,Type,Amount,Category,Card,Description"),
   transactionToExportRow: vi.fn().mockReturnValue({}),
+}));
+
+vi.mock("@/lib/json-export", () => ({
+  toTransactionJson: vi.fn().mockReturnValue("{}"),
+  transactionToJsonExportRow: vi.fn().mockReturnValue({}),
 }));
 
 vi.mock("@/lib/share-file", () => ({
@@ -330,16 +337,21 @@ describe("SettingsScreen", () => {
     expect(mockSetThemePreference).toHaveBeenCalledWith("dark");
   });
 
-  it("renders Export to CSV row as tappable and Backup as coming soon", () => {
+  it("renders Export rows as tappable and Backup as coming soon", () => {
     const root = render(<SettingsScreen />);
     const body = textOf(root);
     expect(body).toContain("Export to CSV");
+    expect(body).toContain("Export to JSON");
     expect(body).toContain("Backup");
 
     // Export to CSV is now functional — not disabled
     const exportRow = findPressableByLabel(root, "Export to CSV");
     expect(exportRow).toBeTruthy();
     expect(exportRow.props.disabled).toBeFalsy();
+
+    const jsonExportRow = findPressableByLabel(root, "Export to JSON");
+    expect(jsonExportRow).toBeTruthy();
+    expect(jsonExportRow.props.disabled).toBeFalsy();
 
     // Backup remains coming soon
     expect(
@@ -353,6 +365,15 @@ describe("SettingsScreen", () => {
       findPressableByLabel(root, "Export to CSV").props.onPress();
     });
     const sheet = root.find((n) => n.props?.testID === "export-csv-sheet");
+    expect(sheet).toBeTruthy();
+  });
+
+  it("opens the export JSON sheet when Export to JSON is tapped", () => {
+    const root = render(<SettingsScreen />);
+    act(() => {
+      findPressableByLabel(root, "Export to JSON").props.onPress();
+    });
+    const sheet = root.find((n) => n.props?.testID === "export-json-sheet");
     expect(sheet).toBeTruthy();
   });
 

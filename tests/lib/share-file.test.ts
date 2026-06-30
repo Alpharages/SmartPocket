@@ -14,7 +14,11 @@ describe("shareFile", () => {
 
   it("native: writes to cacheDirectory via the legacy API, shares, then cleans up", async () => {
     Platform.OS = "ios";
-    await shareFile("smartpocket-transactions-2026-06-30.csv", "Date,Type\n", "text/csv");
+    await shareFile(
+      "smartpocket-transactions-2026-06-30.csv",
+      "Date,Type\n",
+      "text/csv",
+    );
 
     const expectedUri = "/tmp/cache/smartpocket-transactions-2026-06-30.csv";
     expect(FileSystem.writeAsStringAsync).toHaveBeenCalledWith(
@@ -24,7 +28,10 @@ describe("shareFile", () => {
     );
     expect(Sharing.shareAsync).toHaveBeenCalledWith(
       expectedUri,
-      expect.objectContaining({ mimeType: "text/csv" }),
+      expect.objectContaining({
+        mimeType: "text/csv",
+        UTI: "public.comma-separated-values-text",
+      }),
     );
     // finally-block cleanup runs regardless of share outcome
     expect(FileSystem.deleteAsync).toHaveBeenCalledWith(expectedUri, {
@@ -34,11 +41,13 @@ describe("shareFile", () => {
 
   it("native: still cleans up the temp file when sharing throws", async () => {
     Platform.OS = "ios";
-    vi.mocked(Sharing.shareAsync).mockRejectedValueOnce(new Error("user cancelled"));
+    vi.mocked(Sharing.shareAsync).mockRejectedValueOnce(
+      new Error("user cancelled"),
+    );
 
-    await expect(
-      shareFile("export.csv", "a,b\n", "text/csv"),
-    ).rejects.toThrow("user cancelled");
+    await expect(shareFile("export.csv", "a,b\n", "text/csv")).rejects.toThrow(
+      "user cancelled",
+    );
 
     expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
       "/tmp/cache/export.csv",
@@ -51,7 +60,11 @@ describe("shareFile", () => {
     const createObjectURL = vi.fn().mockReturnValue("blob:mock");
     const revokeObjectURL = vi.fn();
     const click = vi.fn();
-    const anchor = { href: "", download: "", click } as unknown as HTMLAnchorElement;
+    const anchor = {
+      href: "",
+      download: "",
+      click,
+    } as unknown as HTMLAnchorElement;
     // node environment has no DOM — stub the globals the web branch uses.
     vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
     vi.stubGlobal("Blob", class {});
@@ -69,5 +82,18 @@ describe("shareFile", () => {
     expect(Sharing.shareAsync).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
+  });
+
+  it("native: accepts a JSON UTI", async () => {
+    Platform.OS = "ios";
+    await shareFile("export.json", "{}", "application/json", "public.json");
+
+    expect(Sharing.shareAsync).toHaveBeenCalledWith(
+      "/tmp/cache/export.json",
+      expect.objectContaining({
+        mimeType: "application/json",
+        UTI: "public.json",
+      }),
+    );
   });
 });
