@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getStartOfWeek } from "@/lib/date-utils";
+import { formatIsoDate, getStartOfWeek } from "@/lib/date-utils";
 
 describe("getStartOfWeek", () => {
   beforeEach(() => {
@@ -97,5 +97,32 @@ describe("getStartOfWeek", () => {
     const start = getStartOfWeek(now, 0);
 
     expect(start.getTime()).toBe(legacy.getTime());
+  });
+});
+
+describe("formatIsoDate", () => {
+  it("formats a date as YYYY-MM-DD using local calendar (AC3)", () => {
+    const d = new Date(2026, 5, 16, 10, 0, 0); // 2026-06-16
+    expect(formatIsoDate(d)).toBe("2026-06-16");
+  });
+
+  it("pads single-digit month and day with leading zero", () => {
+    const d = new Date(2026, 0, 5, 0, 0, 0); // 2026-01-05
+    expect(formatIsoDate(d)).toBe("2026-01-05");
+  });
+
+  it("handles December 31", () => {
+    const d = new Date(2025, 11, 31, 23, 59, 59);
+    expect(formatIsoDate(d)).toBe("2025-12-31");
+  });
+
+  it("uses local date, not UTC (not affected by time-of-day in local zone)", () => {
+    const d = new Date(2026, 5, 16, 23, 59, 59); // local June 16 at 23:59
+    expect(formatIsoDate(d)).toBe("2026-06-16");
+  });
+
+  it("handles year boundaries correctly (Jan 1)", () => {
+    const d = new Date(2027, 0, 1, 0, 0, 0);
+    expect(formatIsoDate(d)).toBe("2027-01-01");
   });
 });
