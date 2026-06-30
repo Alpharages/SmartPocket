@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, Switch, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -9,13 +9,19 @@ import { FilterChipGroup } from "@/components/ui/FilterChipGroup";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SettingsRow } from "@/components/ui/SettingsRow";
 import { Sheet } from "@/components/ui/Sheet";
+import { useToast } from "@/components/ui/ToastProvider";
 import { getAppMetadata } from "@/lib/app-metadata";
+import {
+  toTransactionCsv,
+  transactionToExportRow,
+} from "@/lib/csv-export";
 import {
   CURRENCIES,
   getCurrencyLabel,
   type CurrencyCode,
 } from "@/lib/currency";
 import { useCurrency } from "@/lib/currency-provider";
+import { formatIsoDate } from "@/lib/date-utils";
 import {
   FIRST_DAY_OF_WEEK_OPTIONS,
   getFirstDayOfWeekLabel,
@@ -23,6 +29,7 @@ import {
 } from "@/lib/first-day-of-week";
 import { useFirstDayOfWeek } from "@/lib/first-day-of-week-provider";
 import { useSettings } from "@/lib/settings-provider";
+import { shareFile } from "@/lib/share-file";
 import {
   THEME_PREFERENCE_OPTIONS,
   type ThemePreference,
@@ -180,6 +187,160 @@ function AiToggleControl({
   );
 }
 
+type ExportRange = "all" | "thisMonth" | "custom";
+
+function ExportCsvSheet({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const colors = useColors();
+  const toast = useToast();
+  const { transactions, categories, creditCards } = useExpense();
+  const [range, setRange] = useState<ExportRange>("all");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const now = new Date();
+      let rows = [...transactions];
+
+      if (range === "thisMonth") {
+        // Compare ISO date strings to avoid UTC/local boundary issues
+        const monthStartStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+        rows = rows.filter((t) => {
+          const d = t.date instanceof Date ? t.date : new Date(t.date);
+          return formatIsoDate(d) >= monthStartStr;
+        });
+      } else if (range === "custom") {
+        // Parse as local time (no timezone suffix) to avoid UTC midnight offset (B1)
+        const startDate = new Date(`${customStart}T00:00:00`);
+        const endDate = new Date(`${customEnd}T23:59:59`);
+
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          toast.show({ type: "error", message: "Invalid date — use YYYY-MM-DD" });
+          return;
+        }
+        if (startDate > endDate) {
+          toast.show({ type: "error", message: "Start date must be before end date" });
+          return;
+        }
+
+        const startStr = formatIsoDate(startDate);
+        const endStr = formatIsoDate(endDate);
+        rows = rows.filter((t) => {
+          const d = t.date instanceof Date ? t.date : new Date(t.date);
+          const iso = formatIsoDate(d);
+          return iso >= startStr && iso <= endStr;
+        });
+      }
+
+      if (rows.length === 0) {
+        toast.show({ type: "error", message: "Nothing to export" });
+        return;
+      }
+
+      const exportRows = rows.map((t) =>
+        transactionToExportRow(t, categories, creditCards),
+      );
+      const csv = toTransactionCsv(exportRows);
+      const today = formatIsoDate(now);
+      await shareFile(`smartpocket-transactions-${today}.csv`, csv, "text/csv");
+      toast.show({ type: "success", message: "Export complete" });
+      onClose();
+    } catch {
+      toast.show({ type: "error", message: "Export failed" });
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, transactions, categories, creditCards, range, customStart, customEnd, toast, onClose]);
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Export to CSV"
+      testID="export-csv-sheet"
+    >
+      <View className="px-lg pb-lg">
+        <Text className="mb-sm text-body font-medium text-foreground">Date range</Text>
+        <FilterChipGroup
+          mode="single"
+          value={range}
+          onChange={(v) => setRange(v as ExportRange)}
+          options={[
+            { label: "All", value: "all" },
+            { label: "This month", value: "thisMonth" },
+            { label: "Custom", value: "custom" },
+          ]}
+          contentContainerStyle={{ paddingHorizontal: 0 }}
+        />
+
+        {range === "custom" ? (
+          <View className="mt-md gap-sm">
+            <View>
+              <Text className="mb-xs text-caption text-muted">Start (YYYY-MM-DD)</Text>
+              <TextInput
+                value={customStart}
+                onChangeText={setCustomStart}
+                placeholder="2026-01-01"
+                placeholderTextColor={colors.muted}
+                style={{
+                  color: colors.foreground,
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  fontSize: 14,
+                }}
+                accessibilityLabel="Export start date"
+              />
+            </View>
+            <View>
+              <Text className="mb-xs text-caption text-muted">End (YYYY-MM-DD)</Text>
+              <TextInput
+                value={customEnd}
+                onChangeText={setCustomEnd}
+                placeholder="2026-12-31"
+                placeholderTextColor={colors.muted}
+                style={{
+                  color: colors.foreground,
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  fontSize: 14,
+                }}
+                accessibilityLabel="Export end date"
+              />
+            </View>
+          </View>
+        ) : null}
+
+        <View className="mt-lg">
+          <Button
+            label="Export"
+            onPress={handleExport}
+            loading={exporting}
+            disabled={exporting}
+            accessibilityLabel="Export transactions to CSV"
+          />
+        </View>
+      </View>
+    </Sheet>
+  );
+}
+
 function ClearDataConfirmationSheet({
   visible,
   onClose,
@@ -288,6 +449,7 @@ export default function SettingsScreen() {
   const [firstDaySheetVisible, setFirstDaySheetVisible] = useState(false);
   const [clearDataSheetVisible, setClearDataSheetVisible] = useState(false);
   const [clearingData, setClearingData] = useState(false);
+  const [exportCsvSheetVisible, setExportCsvSheetVisible] = useState(false);
 
   const { name: appName, version: appVersion } = getAppMetadata();
 
@@ -398,9 +560,9 @@ export default function SettingsScreen() {
           <SectionDivider />
           <SettingsRow
             icon="download-outline"
-            label="Export data"
-            comingSoon
-            accessibilityLabel="Export data, coming soon"
+            label="Export to CSV"
+            onPress={() => setExportCsvSheetVisible(true)}
+            accessibilityLabel="Export to CSV"
           />
           <SectionDivider />
           <SettingsRow
@@ -456,6 +618,10 @@ export default function SettingsScreen() {
         onClose={() => setClearDataSheetVisible(false)}
         onConfirm={handleConfirmClearData}
         clearing={clearingData}
+      />
+      <ExportCsvSheet
+        visible={exportCsvSheetVisible}
+        onClose={() => setExportCsvSheetVisible(false)}
       />
     </ScreenContainer>
   );

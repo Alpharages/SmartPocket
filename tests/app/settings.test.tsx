@@ -105,10 +105,26 @@ vi.mock("@/lib/theme-provider", () => ({
   }),
 }));
 
+vi.mock("@/components/ui/ToastProvider", () => ({
+  useToast: () => ({ show: vi.fn() }),
+}));
+
+vi.mock("@/lib/csv-export", () => ({
+  toTransactionCsv: vi.fn().mockReturnValue("Date,Type,Amount,Category,Card,Description"),
+  transactionToExportRow: vi.fn().mockReturnValue({}),
+}));
+
+vi.mock("@/lib/share-file", () => ({
+  shareFile: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/lib/expense-context", () => ({
   useExpense: () => ({
     clearAllData: mockClearAllData,
     refreshAll: vi.fn().mockResolvedValue(undefined),
+    transactions: [],
+    categories: [],
+    creditCards: [],
   }),
 }));
 
@@ -314,18 +330,30 @@ describe("SettingsScreen", () => {
     expect(mockSetThemePreference).toHaveBeenCalledWith("dark");
   });
 
-  it("renders export and backup rows as coming soon", () => {
+  it("renders Export to CSV row as tappable and Backup as coming soon", () => {
     const root = render(<SettingsScreen />);
     const body = textOf(root);
-    expect(body).toContain("Export data");
+    expect(body).toContain("Export to CSV");
     expect(body).toContain("Backup");
-    expect(body.match(/Coming soon/g)?.length).toBeGreaterThanOrEqual(2);
-    expect(
-      findPressableByLabel(root, "Export data, coming soon").props.disabled,
-    ).toBe(true);
+
+    // Export to CSV is now functional — not disabled
+    const exportRow = findPressableByLabel(root, "Export to CSV");
+    expect(exportRow).toBeTruthy();
+    expect(exportRow.props.disabled).toBeFalsy();
+
+    // Backup remains coming soon
     expect(
       findPressableByLabel(root, "Backup, coming soon").props.disabled,
     ).toBe(true);
+  });
+
+  it("opens the export CSV sheet when Export to CSV is tapped", () => {
+    const root = render(<SettingsScreen />);
+    act(() => {
+      findPressableByLabel(root, "Export to CSV").props.onPress();
+    });
+    const sheet = root.find((n) => n.props?.testID === "export-csv-sheet");
+    expect(sheet).toBeTruthy();
   });
 
   it("does not clear data on the first tap alone", () => {
