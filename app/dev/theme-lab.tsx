@@ -15,8 +15,9 @@ import { Button } from "@/components/ui/Button";
 import { FilterChipGroup, Pill, ScreenHeader } from "@/components/ui";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-import { SchemeColors, type ColorScheme } from "@/constants/theme";
+import { SchemeColors, THEME_IDS, type ColorScheme } from "@/constants/theme";
 import { useColors } from "@/hooks/use-colors";
+import { useTheme } from "@/hooks/use-theme";
 import { useThemeContext } from "@/lib/theme-provider";
 
 type PaletteName = keyof typeof SchemeColors.light;
@@ -78,6 +79,7 @@ export default function ThemeLabScreen() {
   const [pressCount, setPressCount] = useState(0);
   const [lastAction, setLastAction] = useState<string>("None yet");
   const { colorScheme, setColorScheme } = useThemeContext();
+  const { themeId, setThemeId } = useTheme();
   const colors = useColors();
 
   const swatches = useMemo(
@@ -113,6 +115,43 @@ export default function ThemeLabScreen() {
         refreshControl={<RefreshControl {...refreshProps} />}
       >
         <View className="gap-4 pb-8">
+          <ThemedView className="rounded-2xl border border-border p-4">
+            <Text className="text-lg font-bold text-foreground">
+              Story 12.1: Theme identity switcher
+            </Text>
+            <Text className="mt-1 text-sm text-muted">
+              Runtime switch, no reload — composes with light/dark below
+            </Text>
+            <View className="mt-3 flex-row flex-wrap gap-2">
+              {THEME_IDS.map((id) => (
+                <Pressable
+                  key={id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Switch to ${id} theme`}
+                  className={
+                    themeId === id
+                      ? "rounded-full bg-primary px-4 py-2"
+                      : "rounded-full border border-border px-4 py-2"
+                  }
+                  onPress={() => {
+                    void setThemeId(id);
+                    setLastAction(`Switched theme to ${id}`);
+                  }}
+                >
+                  <Text
+                    className={
+                      themeId === id
+                        ? "text-sm font-semibold text-background"
+                        : "text-sm font-semibold text-foreground"
+                    }
+                  >
+                    {id}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </ThemedView>
+
           <View className="flex-row gap-2">
             {(["light", "dark"] as ColorScheme[]).map((scheme) => (
               <Pressable

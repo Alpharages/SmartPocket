@@ -15,10 +15,18 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { colorScheme as nativewindColorScheme, vars } from "nativewind";
 
-import { SchemeColors, type ColorScheme } from "@/constants/theme";
 import {
+  getThemeTokens,
+  type ColorScheme,
+  type ResolvedThemeTokens,
+  type ThemeId,
+} from "@/constants/theme";
+import {
+  DEFAULT_THEME_ID,
   DEFAULT_THEME_PREFERENCE,
+  THEME_ID_STORAGE_KEY,
   THEME_STORAGE_KEY,
+  isSupportedThemeId,
   isSupportedThemePreference,
   resolveColorScheme,
   type ThemePreference,
@@ -30,6 +38,9 @@ type ThemeContextValue = {
   setThemePreference: (preference: ThemePreference) => Promise<void>;
   /** @deprecated Prefer setThemePreference — sets an explicit light/dark preference. */
   setColorScheme: (scheme: ColorScheme) => void;
+  themeId: ThemeId;
+  setThemeId: (themeId: ThemeId) => Promise<void>;
+  theme: ResolvedThemeTokens;
   isReady: boolean;
 };
 
@@ -66,41 +77,86 @@ export async function loadThemePreference(): Promise<ThemePreference> {
   return DEFAULT_THEME_PREFERENCE;
 }
 
+async function readStoredThemeId(): Promise<ThemeId | null> {
+  try {
+    const stored = await AsyncStorage.getItem(THEME_ID_STORAGE_KEY);
+    if (stored && isSupportedThemeId(stored)) {
+      return stored;
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
+async function persistThemeId(themeId: ThemeId): Promise<void> {
+  try {
+    await AsyncStorage.setItem(THEME_ID_STORAGE_KEY, themeId);
+  } catch {
+    // non-fatal — themeId stays in memory for this session
+  }
+}
+
+/** Loads the persisted theme identity or returns the default (aurora). */
+export async function loadThemeId(): Promise<ThemeId> {
+  const stored = await readStoredThemeId();
+  if (stored) {
+    return stored;
+  }
+  return DEFAULT_THEME_ID;
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useSystemColorScheme() ?? "light";
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(
     DEFAULT_THEME_PREFERENCE,
   );
+  const [themeId, setThemeIdState] = useState<ThemeId>(DEFAULT_THEME_ID);
   const [isReady, setIsReady] = useState(false);
   const userChangedPreferenceRef = useRef(false);
+  const userChangedThemeIdRef = useRef(false);
 
   const colorScheme = useMemo(
     () => resolveColorScheme(themePreference, systemScheme),
     [themePreference, systemScheme],
   );
 
-  const applyScheme = useCallback((scheme: ColorScheme) => {
-    nativewindColorScheme.set(scheme);
-    Appearance.setColorScheme?.(scheme);
-    if (typeof document !== "undefined") {
-      const root = document.documentElement;
-      root.dataset.theme = scheme;
-      root.classList.toggle("dark", scheme === "dark");
-      const palette = SchemeColors[scheme];
-      Object.entries(palette).forEach(([token, value]) => {
-        root.style.setProperty(`--color-${token}`, value);
-      });
-    }
-  }, []);
+  const theme = useMemo(
+    () => getThemeTokens(themeId, colorScheme),
+    [themeId, colorScheme],
+  );
+
+  const applyScheme = useCallback(
+    (scheme: ColorScheme, activeThemeId: ThemeId) => {
+      nativewindColorScheme.set(scheme);
+      Appearance.setColorScheme?.(scheme);
+      if (typeof document !== "undefined") {
+        const root = document.documentElement;
+        root.dataset.theme = scheme;
+        root.classList.toggle("dark", scheme === "dark");
+        const resolved = getThemeTokens(activeThemeId, scheme);
+        Object.entries(resolved.colors).forEach(([token, value]) => {
+          root.style.setProperty(`--color-${token}`, value);
+        });
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      const resolved = await loadThemePreference();
+      const [resolvedPreference, resolvedThemeId] = await Promise.all([
+        loadThemePreference(),
+        loadThemeId(),
+      ]);
       if (cancelled) return;
       if (!userChangedPreferenceRef.current) {
-        setThemePreferenceState(resolved);
+        setThemePreferenceState(resolvedPreference);
+      }
+      if (!userChangedThemeIdRef.current) {
+        setThemeIdState(resolvedThemeId);
       }
       setIsReady(true);
     })();
@@ -111,8 +167,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    applyScheme(colorScheme);
-  }, [applyScheme, colorScheme]);
+    applyScheme(colorScheme, themeId);
+  }, [applyScheme, colorScheme, themeId]);
 
   const setThemePreference = useCallback(
     async (preference: ThemePreference) => {
@@ -130,20 +186,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [setThemePreference],
   );
 
+  const setThemeId = useCallback(async (id: ThemeId) => {
+    userChangedThemeIdRef.current = true;
+    setThemeIdState(id);
+    await persistThemeId(id);
+  }, []);
+
   const themeVariables = useMemo(
     () =>
       vars({
-        "color-primary": SchemeColors[colorScheme].primary,
-        "color-background": SchemeColors[colorScheme].background,
-        "color-surface": SchemeColors[colorScheme].surface,
-        "color-foreground": SchemeColors[colorScheme].foreground,
-        "color-muted": SchemeColors[colorScheme].muted,
-        "color-border": SchemeColors[colorScheme].border,
-        "color-success": SchemeColors[colorScheme].success,
-        "color-warning": SchemeColors[colorScheme].warning,
-        "color-error": SchemeColors[colorScheme].error,
+        "color-primary": theme.colors.primary,
+        "color-background": theme.colors.background,
+        "color-surface": theme.colors.surface,
+        "color-foreground": theme.colors.foreground,
+        "color-muted": theme.colors.muted,
+        "color-border": theme.colors.border,
+        "color-success": theme.colors.success,
+        "color-warning": theme.colors.warning,
+        "color-error": theme.colors.error,
       }),
-    [colorScheme],
+    [theme],
   );
 
   const value = useMemo(
@@ -152,9 +214,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       themePreference,
       setThemePreference,
       setColorScheme,
+      themeId,
+      setThemeId,
+      theme,
       isReady,
     }),
-    [colorScheme, themePreference, setThemePreference, setColorScheme, isReady],
+    [
+      colorScheme,
+      themePreference,
+      setThemePreference,
+      setColorScheme,
+      themeId,
+      setThemeId,
+      theme,
+      isReady,
+    ],
   );
 
   return (
