@@ -792,6 +792,32 @@ export async function createTransaction(data: InsertTransaction) {
     : 0;
 }
 
+export async function createTransactionsBulk(rows: InsertTransaction[]) {
+  if (rows.length === 0) return 0;
+
+  const params = rows.flatMap((data) => [
+    data.userId,
+    data.categoryId,
+    data.creditCardId || null,
+    data.accountId ?? null,
+    data.type,
+    data.amount,
+    data.description || null,
+    data.date,
+  ]);
+
+  await callDataApi("Database/query", {
+    body: {
+      query: `
+        INSERT INTO transactions (userId, categoryId, creditCardId, accountId, type, amount, description, date)
+        VALUES ${rows.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}
+      `,
+      params,
+    },
+  });
+  return rows.length;
+}
+
 export async function updateTransaction(
   id: number,
   userId: number,

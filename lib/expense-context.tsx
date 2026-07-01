@@ -120,6 +120,11 @@ export interface Transaction {
   updatedAt: Date;
 }
 
+export type CreateTransactionInput = Omit<
+  Transaction,
+  "id" | "userId" | "createdAt" | "updatedAt"
+>;
+
 export interface Budget {
   id: number;
   userId: number;
@@ -288,9 +293,8 @@ interface ExpenseContextType {
   transactions: Transaction[];
   loadingTransactions: boolean;
   refreshTransactions: () => Promise<void>;
-  addTransaction: (
-    data: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">,
-  ) => Promise<void>;
+  addTransaction: (data: CreateTransactionInput) => Promise<void>;
+  importTransactions: (rows: CreateTransactionInput[]) => Promise<void>;
   updateTransaction: (id: number, data: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: number) => Promise<void>;
   clearAllData: () => Promise<void>;
@@ -870,6 +874,8 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   // Transactions
   const transactionsQuery = trpc.transactions.list.useQuery();
   const createTransactionMutation = trpc.transactions.create.useMutation();
+  const createManyTransactionsMutation =
+    trpc.transactions.createMany.useMutation();
   const updateTransactionMutation = trpc.transactions.update.useMutation();
   const deleteTransactionMutation = trpc.transactions.delete.useMutation();
   const clearAllMutation = trpc.data.clearAll.useMutation();
@@ -1011,9 +1017,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   }, [transactionsQuery]);
 
   const addTransaction = useCallback(
-    async (
-      data: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">,
-    ) => {
+    async (data: CreateTransactionInput) => {
       const now = new Date();
       const optimistic: Transaction = {
         ...data,
@@ -1044,6 +1048,29 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       refreshBudgetProgress,
       refreshAccountBalances,
       transactions,
+      toast,
+    ],
+  );
+
+  const importTransactions = useCallback(
+    async (rows: CreateTransactionInput[]) => {
+      if (rows.length === 0) return;
+      try {
+        await createManyTransactionsMutation.mutateAsync(rows);
+        await refreshTransactions();
+        await refreshBudgetProgress();
+        await refreshAccountBalances();
+        toast.show({ type: "success", message: "Import complete" });
+      } catch {
+        toast.show({ type: "error", message: "Import failed" });
+        throw new Error("importTransactions failed");
+      }
+    },
+    [
+      createManyTransactionsMutation,
+      refreshTransactions,
+      refreshBudgetProgress,
+      refreshAccountBalances,
       toast,
     ],
   );
@@ -1392,6 +1419,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     loadingTransactions,
     refreshTransactions,
     addTransaction,
+    importTransactions,
     updateTransaction,
     deleteTransaction,
     clearAllData,

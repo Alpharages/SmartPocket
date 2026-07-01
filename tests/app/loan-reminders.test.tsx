@@ -69,6 +69,7 @@ vi.mock("@/lib/trpc", () => ({
     transactions: {
       list: { useQuery: mocks.useQuery },
       create: { useMutation: mocks.useMutation },
+      createMany: { useMutation: mocks.useMutation },
       update: { useMutation: mocks.useMutation },
       delete: { useMutation: mocks.useMutation },
     },
@@ -78,7 +79,11 @@ vi.mock("@/lib/trpc", () => ({
       update: { useMutation: mocks.useMutation },
       delete: { useMutation: mocks.useMutation },
       progress: {
-        useQuery: () => ({ refetch: mocks.refetch, data: [], isLoading: false }),
+        useQuery: () => ({
+          refetch: mocks.refetch,
+          data: [],
+          isLoading: false,
+        }),
       },
     },
     recurringTransactions: {

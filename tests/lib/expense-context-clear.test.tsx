@@ -96,6 +96,7 @@ vi.mock("@/lib/trpc", () => ({
         useQuery: () => ({ refetch: mocks.transactionsRefetch, data: [] }),
       },
       create: { useMutation: mocks.useMutation },
+      createMany: { useMutation: mocks.useMutation },
       update: { useMutation: mocks.useMutation },
       delete: { useMutation: mocks.useMutation },
     },

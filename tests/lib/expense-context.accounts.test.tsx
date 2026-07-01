@@ -136,6 +136,7 @@ vi.mock("@/lib/trpc", () => ({
     transactions: {
       list: { useQuery: mocks.useQuery },
       create: { useMutation: mocks.useMutation },
+      createMany: { useMutation: mocks.useMutation },
       update: {
         useMutation: () => ({
           mutateAsync: mocks.updateTransactionMutateAsync,

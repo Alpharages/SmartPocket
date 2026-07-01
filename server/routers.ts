@@ -582,6 +582,70 @@ const transactionsRouter = router({
       });
     }),
 
+  createMany: protectedProcedure
+    .input(z.array(transactionSchema).min(1).max(1000))
+    .mutation(async ({ ctx, input }) => {
+      const accountIds = Array.from(
+        new Set(
+          input
+            .map((row) => row.accountId)
+            .filter((id): id is number => id != null),
+        ),
+      );
+      for (const accountId of accountIds) {
+        const account = await db.getAccountById(accountId, ctx.user.id);
+        if (!account) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Account not found",
+          });
+        }
+      }
+
+      const categoryIds = Array.from(
+        new Set(input.map((row) => row.categoryId)),
+      );
+      for (const categoryId of categoryIds) {
+        const category = await db.getCategoryById(categoryId);
+        if (!category || category.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Category not found",
+          });
+        }
+      }
+
+      const creditCardIds = Array.from(
+        new Set(
+          input
+            .map((row) => row.creditCardId)
+            .filter((id): id is number => id != null),
+        ),
+      );
+      for (const creditCardId of creditCardIds) {
+        const card = await db.getCreditCardById(creditCardId);
+        if (!card || card.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Credit card not found",
+          });
+        }
+      }
+
+      return db.createTransactionsBulk(
+        input.map((row) => ({
+          userId: ctx.user.id,
+          categoryId: row.categoryId,
+          type: row.type,
+          amount: row.amount,
+          description: row.description,
+          date: row.date,
+          creditCardId: row.creditCardId,
+          accountId: row.accountId,
+        })),
+      );
+    }),
+
   update: protectedProcedure
     .input(z.object({ id: z.number(), ...transactionSchema.partial().shape }))
     .mutation(async ({ ctx, input }) => {

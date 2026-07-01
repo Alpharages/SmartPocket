@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -619,6 +619,13 @@ export default function SettingsScreen() {
             label="Export to CSV"
             onPress={() => setExportCsvSheetVisible(true)}
             accessibilityLabel="Export to CSV"
+          />
+          <SectionDivider />
+          <SettingsRow
+            icon="cloud-upload-outline"
+            label="Import from CSV"
+            onPress={() => router.push("/import-csv" as Href)}
+            accessibilityLabel="Import from CSV"
           />
           <SectionDivider />
           <SettingsRow

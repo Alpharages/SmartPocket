@@ -239,6 +239,7 @@ export default function RootLayout() {
                       <Stack.Screen name="oauth/callback" />
                       <Stack.Screen name="card/[id]" />
                       <Stack.Screen name="loan/[id]" />
+                      <Stack.Screen name="import-csv" />
                       <Stack.Screen
                         name="loan/record-repayment"
                         options={{
