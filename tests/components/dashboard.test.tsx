@@ -347,10 +347,36 @@ describe("DashboardScreen", () => {
     });
   });
 
-  describe("AC4 — Behavior unchanged (FR-9)", () => {
-    it("passes netBalance from monthlyStats to the hero StatCard", () => {
+  describe("Hero card label (CU-86ey42aqv)", () => {
+    it("shows both an all-time 'Total Balance' hero and a month-scoped 'This Month' card", () => {
       const root = render(<DashboardScreen />);
-      // StatCard hero renders "$1800.00" — the abs value of netBalance
+      const totalLabel = root.findAll(
+        (n) => String(n.type) === "Text" && collectText(n) === "Total Balance",
+      );
+      const monthScopedLabel = root.findAll(
+        (n) => String(n.type) === "Text" && collectText(n) === "This Month",
+      );
+      expect(totalLabel.length).toBeGreaterThanOrEqual(1);
+      expect(monthScopedLabel.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("binds the hero 'Total Balance' to the all-time net (income − expense) of all transactions", () => {
+      const root = render(<DashboardScreen />);
+      // mockTransactions: income 3000 + 500 = 3500, expense 200 + 150 + 80 = 430
+      // → all-time net 3070; hero renders its absolute value.
+      const allTimeText = root.findAll(
+        (n) =>
+          String(n.type) === "Text" &&
+          collectText(n) === formatCurrency(3070, "USD", { sign: "absolute" }),
+      );
+      expect(allTimeText.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("AC4 — Behavior unchanged (FR-9)", () => {
+    it("passes netBalance from monthlyStats to the 'This Month' StatCard", () => {
+      const root = render(<DashboardScreen />);
+      // The "This Month" card renders "$1800.00" — the abs value of netBalance
       const balanceText = root.findAll(
         (n) =>
           String(n.type) === "Text" &&

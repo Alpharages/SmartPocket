@@ -46,6 +46,20 @@ export default function DashboardScreen() {
     [transactions],
   );
 
+  // All-time net across every transaction (income − expense), for the hero card.
+  // ponytail: client-side float sum, mirrors getMonthlyStats/reduceAccountBalances.
+  // transactions.list is uncapped so this is the full history; move to a
+  // summary.allTimeStats query if that list ever becomes paginated.
+  const allTimeBalance = useMemo(
+    () =>
+      transactions.reduce((net, t) => {
+        const amount = Number(t.amount);
+        if (!Number.isFinite(amount)) return net;
+        return t.type === "income" ? net + amount : net - amount;
+      }, 0),
+    [transactions],
+  );
+
   const categoriesById = useMemo(
     () => Object.fromEntries(categories.map((c) => [c.id, c])),
     [categories],
@@ -158,21 +172,29 @@ export default function DashboardScreen() {
           : { paddingHorizontal: Spacing["2xl"], marginTop: Spacing.sm }
       }
     >
-      {/* Hero balance card */}
+      {/* Hero balance card — all-time net across all transactions */}
       <StatCard
         variant="hero"
         label="Total Balance"
-        amount={monthlyStats?.netBalance ?? 0}
+        amount={allTimeBalance}
         sign="neutral"
-        loading={loadingStats}
+        loading={loadingTransactions}
       />
 
-      {/* Income / Expense compact pair */}
+      {/* This Month / Income / Expense compact trio */}
       <Animated.View
         entering={FadeInUp.delay(150).duration(500)}
         className="flex-row"
         style={{ gap: Spacing.md, marginTop: Spacing.md }}
       >
+        <StatCard
+          variant="compact"
+          label="This Month"
+          amount={monthlyStats?.netBalance ?? 0}
+          sign="neutral"
+          icon="wallet-outline"
+          loading={loadingStats}
+        />
         <StatCard
           variant="compact"
           label="Income"
