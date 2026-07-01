@@ -161,7 +161,7 @@ export default function DashboardScreen() {
       {/* Hero balance card */}
       <StatCard
         variant="hero"
-        label="Total Balance"
+        label="This Month"
         amount={monthlyStats?.netBalance ?? 0}
         sign="neutral"
         loading={loadingStats}

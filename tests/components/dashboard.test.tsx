@@ -347,6 +347,20 @@ describe("DashboardScreen", () => {
     });
   });
 
+  describe("Hero card label (CU-86ey42aqv)", () => {
+    it("labels the hero card as month-scoped, not an all-time 'Total Balance'", () => {
+      const root = render(<DashboardScreen />);
+      const misleadingLabel = root.findAll(
+        (n) => String(n.type) === "Text" && collectText(n) === "Total Balance",
+      );
+      const monthScopedLabel = root.findAll(
+        (n) => String(n.type) === "Text" && collectText(n) === "This Month",
+      );
+      expect(misleadingLabel.length).toBe(0);
+      expect(monthScopedLabel.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
   describe("AC4 — Behavior unchanged (FR-9)", () => {
     it("passes netBalance from monthlyStats to the hero StatCard", () => {
       const root = render(<DashboardScreen />);
