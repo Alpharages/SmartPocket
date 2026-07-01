@@ -15,12 +15,10 @@ import { Button } from "@/components/ui/Button";
 import { FilterChipGroup, Pill, ScreenHeader } from "@/components/ui";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-import { SchemeColors, type ColorScheme, type ThemeId } from "@/constants/theme";
+import { SchemeColors, THEME_IDS, type ColorScheme } from "@/constants/theme";
 import { useColors } from "@/hooks/use-colors";
 import { useTheme } from "@/hooks/use-theme";
 import { useThemeContext } from "@/lib/theme-provider";
-
-const THEME_IDS: ThemeId[] = ["aurora", "obsidian", "spectrum"];
 
 type PaletteName = keyof typeof SchemeColors.light;
 

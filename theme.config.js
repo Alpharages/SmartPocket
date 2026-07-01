@@ -139,10 +139,15 @@ const glass = {
 
 const auroraTheme = { color: themeColors, gradient, glass, elevation, motion };
 
+// ponytail: JSON deep-clone — tokens are plain JSON-safe data, and this keeps
+// the stubs independent objects so Story 12.2 can mutate them in place without
+// aliasing back into aurora. (structuredClone isn't guaranteed on Hermes.)
+const cloneTheme = (theme) => JSON.parse(JSON.stringify(theme));
+
 const themes = {
   aurora: auroraTheme,
-  obsidian: { ...auroraTheme },
-  spectrum: { ...auroraTheme },
+  obsidian: cloneTheme(auroraTheme),
+  spectrum: cloneTheme(auroraTheme),
 };
 
 const DEFAULT_THEME_ID = "aurora";

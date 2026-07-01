@@ -77,9 +77,10 @@ export function getThemeTokens(
   themeId: ThemeId,
   colorScheme: ColorScheme,
 ): ResolvedThemeTokens {
-  const theme = THEMES[themeId] ?? THEMES[DEFAULT_THEME_ID];
+  const resolvedId = THEMES[themeId] ? themeId : DEFAULT_THEME_ID;
+  const theme = THEMES[resolvedId];
   return {
-    themeId,
+    themeId: resolvedId,
     colorScheme,
     colors: buildSchemePalette(theme.color)[colorScheme],
     gradient: theme.gradient,
