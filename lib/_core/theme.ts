@@ -1,8 +1,20 @@
 import { Platform } from "react-native";
 
 import themeConfig from "@/theme.config";
+import type { ThemeId as ThemeIdType, ThemeTokenSet } from "@/theme.config";
 
 export type ColorScheme = "light" | "dark";
+
+/** Theme identity axis (Story 12.1, RDR-1) — orthogonal to light/dark mode. */
+export type ThemeId = ThemeIdType;
+
+/** Full theme registry — each entry is a complete, swappable token set. */
+export const THEMES = themeConfig.themes;
+
+/** First-run default theme identity (Aurora Glass — Epic 12's hero theme). */
+export const DEFAULT_THEME_ID: ThemeId = themeConfig.DEFAULT_THEME_ID;
+
+export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
 
 export const ThemeColors = themeConfig.themeColors;
 
@@ -49,6 +61,33 @@ function buildSchemePalette(colors: ThemeColorTokens): SchemePalette {
 }
 
 export const SchemeColors = buildSchemePalette(ThemeColors);
+
+export type ResolvedThemeTokens = {
+  themeId: ThemeId;
+  colorScheme: ColorScheme;
+  colors: Record<ThemeColorName, string>;
+  gradient: ThemeTokenSet["gradient"];
+  glass: ThemeTokenSet["glass"];
+  elevation: ThemeTokenSet["elevation"];
+  motion: ThemeTokenSet["motion"];
+};
+
+/** Resolves a theme identity + color scheme to its complete token set. */
+export function getThemeTokens(
+  themeId: ThemeId,
+  colorScheme: ColorScheme,
+): ResolvedThemeTokens {
+  const theme = THEMES[themeId] ?? THEMES[DEFAULT_THEME_ID];
+  return {
+    themeId,
+    colorScheme,
+    colors: buildSchemePalette(theme.color)[colorScheme],
+    gradient: theme.gradient,
+    glass: theme.glass,
+    elevation: theme.elevation,
+    motion: theme.motion,
+  };
+}
 
 type RuntimePalette = SchemePaletteItem & {
   text: string;

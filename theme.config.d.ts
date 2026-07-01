@@ -92,7 +92,34 @@ export const motion: {
   };
 };
 
+/** Theme identity axis (Story 12.1, RDR-1) — orthogonal to light/dark mode. */
+export type ThemeId = "aurora" | "obsidian" | "spectrum";
+
+export type GradientToken = {
+  colors: string[];
+  angle: number;
+};
+
+export type GlassToken = {
+  blurRadius: number;
+  tintOpacity: number;
+  borderOpacity: number;
+};
+
+export type ThemeTokenSet = {
+  color: typeof themeColors;
+  gradient: GradientToken;
+  glass: GlassToken;
+  elevation: typeof elevation;
+  motion: typeof motion;
+};
+
+export const themes: Record<ThemeId, ThemeTokenSet>;
+export const DEFAULT_THEME_ID: ThemeId;
+
 declare const themeConfig: {
+  themes: typeof themes;
+  DEFAULT_THEME_ID: typeof DEFAULT_THEME_ID;
   themeColors: typeof themeColors;
   categoryColors: typeof categoryColors;
   spacing: typeof spacing;

@@ -114,7 +114,42 @@ const motion = {
   },
 };
 
+/**
+ * Theme registry (Story 12.1, RDR-1). Each entry is a complete, swappable
+ * token set (color + gradient + glass alongside the existing elevation/motion
+ * dimensions). `aurora` seeds today's single "Refined Indigo" palette in as
+ * the default theme; `obsidian`/`spectrum` are stubs — cloned from `aurora`
+ * until Story 12.2 authors their real color/gradient/glass values.
+ * @type {const}
+ */
+const gradient = {
+  // ponytail: placeholder hero-gradient stops — Story 12.2 authors the real
+  // per-theme gradients (Aurora/Obsidian/Spectrum).
+  colors: [themeColors.primary.light, themeColors.secondary.light],
+  angle: 135,
+};
+
+/** @type {const} */
+const glass = {
+  // ponytail: placeholder glass params — Story 12.3 wires the GlassSurface primitive.
+  blurRadius: 24,
+  tintOpacity: 0.12,
+  borderOpacity: 0.16,
+};
+
+const auroraTheme = { color: themeColors, gradient, glass, elevation, motion };
+
+const themes = {
+  aurora: auroraTheme,
+  obsidian: { ...auroraTheme },
+  spectrum: { ...auroraTheme },
+};
+
+const DEFAULT_THEME_ID = "aurora";
+
 module.exports = {
+  themes,
+  DEFAULT_THEME_ID,
   themeColors,
   categoryColors,
   spacing,
