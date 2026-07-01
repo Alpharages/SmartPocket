@@ -15,7 +15,13 @@ import { Button } from "@/components/ui/Button";
 import { FilterChipGroup, Pill, ScreenHeader } from "@/components/ui";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-import { SchemeColors, THEME_IDS, type ColorScheme } from "@/constants/theme";
+import {
+  SchemeColors,
+  THEME_IDS,
+  getThemeTokens,
+  type ColorScheme,
+  type ThemeId,
+} from "@/constants/theme";
 import { useColors } from "@/hooks/use-colors";
 import { useTheme } from "@/hooks/use-theme";
 import { useThemeContext } from "@/lib/theme-provider";
@@ -72,6 +78,93 @@ function FilterDemo() {
         { value: "entertainment", label: "Entertainment" },
       ]}
     />
+  );
+}
+
+const MATRIX_SEMANTIC_KEYS = [
+  "primary",
+  "success",
+  "warning",
+  "error",
+  "accent",
+  "secondary",
+] as const;
+
+/**
+ * Story 12.2 (AC 7): renders one theme × variant on its OWN background so all
+ * 3 themes × light/dark can be eyeballed side-by-side for AA spot-checking —
+ * independent of the globally active theme. Uses inline styles (not NativeWind
+ * classes) precisely because these tiles must NOT track the active theme's vars.
+ */
+function ThemeCell({
+  themeId,
+  scheme,
+}: {
+  themeId: ThemeId;
+  scheme: ColorScheme;
+}) {
+  const { colors, gradient, category } = getThemeTokens(themeId, scheme);
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        borderColor: colors.border,
+        borderWidth: 1,
+        borderRadius: 16,
+        padding: 12,
+        gap: 8,
+      }}
+    >
+      <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "700" }}>
+        {themeId} · {scheme}
+      </Text>
+      <Text style={{ color: colors.muted, fontSize: 11 }}>
+        bg {colors.background} · fg {colors.foreground}
+      </Text>
+
+      {/* Hero gradient stops */}
+      <View style={{ flexDirection: "row", gap: 3 }}>
+        {gradient.colors.map((stop) => (
+          <View
+            key={stop}
+            style={{ flex: 1, height: 18, borderRadius: 6, backgroundColor: stop }}
+          />
+        ))}
+      </View>
+
+      {/* Semantic tokens */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+        {MATRIX_SEMANTIC_KEYS.map((key) => (
+          <View
+            key={key}
+            style={{
+              height: 22,
+              width: 22,
+              borderRadius: 11,
+              backgroundColor: colors[key],
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          />
+        ))}
+      </View>
+
+      {/* Per-theme category map */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+        {category.map((cat) => (
+          <View
+            key={cat.name}
+            style={{
+              height: 16,
+              width: 16,
+              borderRadius: 4,
+              backgroundColor: scheme === "dark" ? cat.dark : cat.light,
+            }}
+          />
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -148,6 +241,24 @@ export default function ThemeLabScreen() {
                     {id}
                   </Text>
                 </Pressable>
+              ))}
+            </View>
+          </ThemedView>
+
+          <ThemedView className="rounded-2xl border border-border p-4">
+            <Text className="text-lg font-bold text-foreground">
+              Story 12.2: Three themes × light/dark
+            </Text>
+            <Text className="mt-1 text-sm text-muted">
+              Each tile renders on its own theme — semantic tokens, category map,
+              and hero gradient for side-by-side AA spot-checking
+            </Text>
+            <View className="mt-3 gap-3">
+              {THEME_IDS.map((id) => (
+                <View key={id} className="flex-row gap-3">
+                  <ThemeCell themeId={id} scheme="light" />
+                  <ThemeCell themeId={id} scheme="dark" />
+                </View>
               ))}
             </View>
           </ThemedView>

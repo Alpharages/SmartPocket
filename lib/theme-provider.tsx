@@ -204,6 +204,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         "color-success": theme.colors.success,
         "color-warning": theme.colors.warning,
         "color-error": theme.colors.error,
+        // accent/secondary/overlay diverge per theme as of Story 12.2 — they MUST
+        // be in this native vars() map or they'd freeze on the build-time Tailwind
+        // fallback on iOS/Android while switching fine on web (Lore lesson: keep the
+        // native vars() map covering the same token set as the web --color-* loop).
+        "color-accent": theme.colors.accent,
+        "color-secondary": theme.colors.secondary,
+        "color-overlay": theme.colors.overlay,
       }),
     [theme],
   );

@@ -10,6 +10,7 @@
  */
 
 import themeConfig from "../theme.config";
+import type { ThemeId } from "../theme.config";
 
 type Scheme = "light" | "dark";
 
@@ -22,23 +23,42 @@ export type CategoryColorToken = {
   dark: string;
 };
 
-export const CategoryColors: readonly CategoryColorToken[] =
-  themeConfig.categoryColors;
+/** First-run / fallback theme identity — mirrors theme.config's default. */
+export const DEFAULT_THEME_ID = themeConfig.DEFAULT_THEME_ID;
 
 /**
- * All light-mode category hex values as a flat array.
+ * Per-theme category color map (Story 12.2, RDR-2). Each theme owns a distinct
+ * 10-token map tuned to its identity; the resolver/selector helpers below thread
+ * an optional `themeId` (defaulting to the default theme) so every pre-existing
+ * caller keeps today's behavior while new callers can request a theme's map.
+ */
+export function getCategoryColors(
+  themeId: ThemeId = DEFAULT_THEME_ID,
+): readonly CategoryColorToken[] {
+  return themeConfig.themes[themeId]?.category ?? themeConfig.categoryColors;
+}
+
+/**
+ * Default theme's category map. Kept as `CategoryColors` (the pre-12.2 export)
+ * so existing consumers and tests are untouched — it now aliases the default
+ * theme's per-theme map.
+ */
+export const CategoryColors: readonly CategoryColorToken[] = getCategoryColors();
+
+/**
+ * All light-mode category hex values (default theme) as a flat array.
  * Useful for color pickers and deterministic assignment.
  */
 export const CATEGORY_COLOR_LIGHT_VALUES = CategoryColors.map((c) => c.light);
 
 /**
- * All dark-mode category hex values, index-aligned with the light values.
+ * All dark-mode category hex values (default theme), index-aligned with light.
  */
 export const CATEGORY_COLOR_DARK_VALUES = CategoryColors.map((c) => c.dark);
 
 /**
  * Default category color used when none is supplied.
- * This is the first token in the category palette (indigo).
+ * This is the first token in the default theme's category palette.
  */
 export const CATEGORY_DEFAULT_COLOR = CategoryColors[0].light;
 
@@ -54,25 +74,39 @@ export function resolveCategoryIcon(icon?: string | null): string {
   return icon;
 }
 
-/** Reverse lookup: stored light hex -> dark variant. Light values are unique. */
-const LIGHT_TO_DARK = new Map(
-  CategoryColors.map((c) => [c.light.toLowerCase(), c.dark] as const),
-);
+/**
+ * Reverse lookup: stored light hex -> dark variant, per theme. Light values are
+ * unique within a theme. Built lazily and memoised so custom stored colors from
+ * any theme's palette resolve to that theme's dark variant.
+ */
+const lightToDarkByTheme = new Map<ThemeId, Map<string, string>>();
+function lightToDark(themeId: ThemeId): Map<string, string> {
+  let map = lightToDarkByTheme.get(themeId);
+  if (!map) {
+    map = new Map(
+      getCategoryColors(themeId).map(
+        (c) => [c.light.toLowerCase(), c.dark] as const,
+      ),
+    );
+    lightToDarkByTheme.set(themeId, map);
+  }
+  return map;
+}
 
 /**
  * Deterministic category color assignment by numeric ID/index.
  * Returns a stable hex for the given index, wrapping when it exceeds the
- * palette length. Pass `scheme` to get the theme-appropriate variant.
+ * palette length. Pass `scheme` to get the theme-appropriate variant and
+ * `themeId` to select a theme's palette (defaults to the default theme).
  */
 export function getCategoryColorByIndex(
   index: number,
   scheme: Scheme = "light",
+  themeId: ThemeId = DEFAULT_THEME_ID,
 ): string {
-  const values =
-    scheme === "dark"
-      ? CATEGORY_COLOR_DARK_VALUES
-      : CATEGORY_COLOR_LIGHT_VALUES;
-  return values[index % values.length];
+  const palette = getCategoryColors(themeId);
+  const token = palette[index % palette.length];
+  return scheme === "dark" ? token.dark : token.light;
 }
 
 /**
@@ -84,21 +118,25 @@ export function getCategoryColorByIndex(
 export function resolveCategoryColor(
   stored: string,
   scheme: Scheme = "light",
+  themeId: ThemeId = DEFAULT_THEME_ID,
 ): string {
   if (scheme !== "dark" || !stored) return stored;
-  return LIGHT_TO_DARK.get(stored.toLowerCase()) ?? stored;
+  return lightToDark(themeId).get(stored.toLowerCase()) ?? stored;
 }
 
 /**
  * Hash a string (e.g. category name) to a consistent palette index.
  * Simple djb2-style hash — deterministic and fast.
  */
-export function hashToPaletteIndex(input: string): number {
+export function hashToPaletteIndex(
+  input: string,
+  themeId: ThemeId = DEFAULT_THEME_ID,
+): number {
   let hash = 5381;
   for (let i = 0; i < input.length; i++) {
     hash = ((hash << 5) + hash + input.charCodeAt(i)) >>> 0;
   }
-  return hash % CATEGORY_COLOR_LIGHT_VALUES.length;
+  return hash % getCategoryColors(themeId).length;
 }
 
 /**
@@ -109,6 +147,7 @@ export function hashToPaletteIndex(input: string): number {
 export function getCategoryColorForName(
   name: string,
   scheme: Scheme = "light",
+  themeId: ThemeId = DEFAULT_THEME_ID,
 ): string {
-  return getCategoryColorByIndex(hashToPaletteIndex(name), scheme);
+  return getCategoryColorByIndex(hashToPaletteIndex(name, themeId), scheme, themeId);
 }

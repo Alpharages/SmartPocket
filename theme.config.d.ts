@@ -95,23 +95,30 @@ export const motion: {
 /** Theme identity axis (Story 12.1, RDR-1) — orthogonal to light/dark mode. */
 export type ThemeId = "aurora" | "obsidian" | "spectrum";
 
+/** A single hero-gradient definition (ordered stops + angle), one per variant. */
 export type GradientToken = {
   colors: string[];
   angle: number;
 };
 
+/** Glass-surface parameters (blur radius, tint color, surface/border opacity). */
 export type GlassToken = {
-  blurRadius: number;
-  tintOpacity: number;
+  blur: number;
+  tint: string;
+  surfaceOpacity: number;
   borderOpacity: number;
 };
 
+/** Per-variant wrapper: each theme carries a light and dark instance. */
+export type Variants<T> = { light: T; dark: T };
+
 export type ThemeTokenSet = {
   color: typeof themeColors;
-  gradient: GradientToken;
-  glass: GlassToken;
+  gradient: Variants<GradientToken>;
+  glass: Variants<GlassToken>;
   elevation: typeof elevation;
   motion: typeof motion;
+  category: readonly CategoryColorToken[];
 };
 
 export const themes: Record<ThemeId, ThemeTokenSet>;

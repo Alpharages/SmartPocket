@@ -7,7 +7,7 @@ const themeColors = {
   foreground: { light: "#111827", dark: "#F1F5F9" }, // Near black / Soft white
   muted: { light: "#6B7280", dark: "#9CA3AF" }, // Neutral gray
   border: { light: "#E5E7EB", dark: "#2D3748" }, // Subtle borders
-  success: { light: "#047857", dark: "#34D399" }, // Forest green — semantic only (income/positive)
+  success: { light: "#047857", dark: "#6EE7B7" }, // Forest green — semantic only (income/positive)
   warning: { light: "#B45309", dark: "#FBBF24" }, // Warm amber
   error: { light: "#DC2626", dark: "#FCA5A5" }, // Clean red — semantic only (expense/destructive)
   accent: { light: "#BE185D", dark: "#F472B6" }, // Rose accent — rare, small highlights
@@ -16,12 +16,14 @@ const themeColors = {
 };
 
 /**
- * Data-driven category color token map.
+ * Data-driven category color token map (Aurora — cool indigo/violet/cyan-led).
  * Each token provides light/dark variants tuned for WCAG AA:
- * - ≥ 4.5:1 against white text (used on category chips/pills)
- * - ≥ 3:1 against light (#F8FAFC) and dark (#0B0F19) backgrounds for UI elements
+ * - ≥ 4.5:1 against its on-color text (used on category chips/pills)
+ * - ≥ 3:1 against the theme's light and dark backgrounds for UI elements
  *
- * The palette wraps when categories exceed its length.
+ * The palette wraps when categories exceed its length. This is Aurora's map and
+ * the top-level `categoryColors` alias (the default theme) — Obsidian and
+ * Spectrum own their own maps in the registry below (Story 12.2, RDR-2).
  */
 /** @type {const} */
 const categoryColors = [
@@ -114,40 +116,122 @@ const motion = {
   },
 };
 
-/**
- * Theme registry (Story 12.1, RDR-1). Each entry is a complete, swappable
- * token set (color + gradient + glass alongside the existing elevation/motion
- * dimensions). `aurora` seeds today's single "Refined Indigo" palette in as
- * the default theme; `obsidian`/`spectrum` are stubs — cloned from `aurora`
- * until Story 12.2 authors their real color/gradient/glass values.
- * @type {const}
- */
-const gradient = {
-  // ponytail: placeholder hero-gradient stops — Story 12.2 authors the real
-  // per-theme gradients (Aurora/Obsidian/Spectrum).
-  colors: [themeColors.primary.light, themeColors.secondary.light],
-  angle: 135,
+// ===========================================================================
+// Theme registry (Story 12.2, RDR-2)
+// ---------------------------------------------------------------------------
+// Each theme is a complete, swappable token set: color {light,dark} for every
+// semantic token, a hero `gradient` and `glass` params PER variant, `elevation`
+// (shared), `motion` (shared), and a per-theme `category` map. `income`/`expense`
+// (success/error) stay strictly semantic — green income, red expense — in every
+// cell. AA is verified programmatically by tests/theme-aa-contrast.test.ts.
+//
+// `aurora` reuses the shipped Refined Indigo palette (kept as the top-level
+// aliases so tailwind.config.js / shared/theme.ts / existing tests are untouched
+// — Lore: "restructure config additively, keep pre-existing exports as live
+// aliases"). Obsidian and Spectrum are authored distinctly below.
+// ===========================================================================
+
+/** Aurora Glass — indigo→violet→cyan aurora over deep void, translucent glass. */
+const auroraTheme = {
+  color: themeColors,
+  gradient: {
+    dark: { colors: ["#6366F1", "#A855F7", "#22D3EE"], angle: 135 },
+    light: { colors: ["#818CF8", "#C4B5FD", "#67E8F9"], angle: 135 },
+  },
+  glass: {
+    dark: { blur: 24, tint: "#FFFFFF", surfaceOpacity: 0.08, borderOpacity: 0.16 },
+    light: { blur: 20, tint: "#FFFFFF", surfaceOpacity: 0.6, borderOpacity: 0.4 },
+  },
+  elevation,
+  motion,
+  category: categoryColors,
+};
+
+/** Obsidian & Gold — near-black navy with gold accents (light = ivory & gold). */
+const obsidianTheme = {
+  color: {
+    primary: { light: "#854D0E", dark: "#EAB308" }, // deep gold text / bright gold on navy
+    background: { light: "#FBF7EC", dark: "#0F172A" }, // ivory / navy
+    surface: { light: "#FFFDF8", dark: "#1E293B" }, // warm white / elevated navy
+    foreground: { light: "#1E293B", dark: "#E2E8F0" }, // navy ink / soft slate
+    muted: { light: "#57534E", dark: "#94A3B8" }, // warm gray / slate
+    border: { light: "#E7E0CF", dark: "#334155" }, // warm border / slate border
+    success: { light: "#047857", dark: "#34D399" }, // income green — semantic only
+    warning: { light: "#B45309", dark: "#FBBF24" },
+    error: { light: "#DC2626", dark: "#F87171" }, // expense red — semantic only
+    accent: { light: "#A16207", dark: "#F59E0B" }, // gold accent
+    secondary: { light: "#9A3412", dark: "#FCD34D" }, // bronze / amber
+    overlay: { light: "#000000", dark: "#000000" },
+  },
+  gradient: {
+    dark: { colors: ["#16213E", "#0F172A"], angle: 135 }, // navy with gold-radial feel
+    light: { colors: ["#FDF7E8", "#F5EAD0"], angle: 135 }, // ivory & warm gold
+  },
+  glass: {
+    dark: { blur: 24, tint: "#CA8A04", surfaceOpacity: 0.06, borderOpacity: 0.2 },
+    light: { blur: 18, tint: "#CA8A04", surfaceOpacity: 0.12, borderOpacity: 0.3 },
+  },
+  elevation,
+  motion,
+  category: [
+    { name: "gold", light: "#A16207", dark: "#EAB308" },
+    { name: "amber", light: "#B45309", dark: "#FCD34D" },
+    { name: "bronze", light: "#9A3412", dark: "#F59E0B" },
+    { name: "terracotta", light: "#C2410C", dark: "#FB923C" },
+    { name: "olive", light: "#4D7C0F", dark: "#A3E635" },
+    { name: "teal", light: "#0F766E", dark: "#2DD4BF" },
+    { name: "sky", light: "#0369A1", dark: "#38BDF8" },
+    { name: "indigo", light: "#4338CA", dark: "#818CF8" },
+    { name: "plum", light: "#86198F", dark: "#E879F9" },
+    { name: "rose", light: "#BE123C", dark: "#FB7185" },
+  ],
+};
+
+/** Midnight Spectrum — vivid purple→pink→gold spectrum over a dark base. */
+const spectrumTheme = {
+  color: {
+    primary: { light: "#7C3AED", dark: "#A78BFA" }, // vivid purple
+    background: { light: "#FAF5FF", dark: "#120A24" }, // light purple tint / purple-black
+    surface: { light: "#FFFFFF", dark: "#1E1338" }, // white / elevated purple
+    foreground: { light: "#1E1B2E", dark: "#F5F3FF" }, // ink / near-white
+    muted: { light: "#6B6785", dark: "#A5A0C0" }, // purple-gray
+    border: { light: "#EDE4F5", dark: "#332648" },
+    success: { light: "#047857", dark: "#34D399" }, // income green — semantic only
+    warning: { light: "#B45309", dark: "#FBBF24" },
+    error: { light: "#DC2626", dark: "#F87171" }, // expense red — semantic only
+    accent: { light: "#BE185D", dark: "#F472B6" }, // hot pink (deepened for AA on light)
+    secondary: { light: "#A16207", dark: "#F59E0B" }, // gold
+    overlay: { light: "#000000", dark: "#000000" },
+  },
+  gradient: {
+    dark: { colors: ["#7C3AED", "#DB2777", "#F59E0B"], angle: 135 },
+    light: { colors: ["#A78BFA", "#F472B6", "#FBBF24"], angle: 135 },
+  },
+  glass: {
+    dark: { blur: 28, tint: "#A855F7", surfaceOpacity: 0.1, borderOpacity: 0.22 },
+    light: { blur: 20, tint: "#A855F7", surfaceOpacity: 0.14, borderOpacity: 0.3 },
+  },
+  elevation,
+  motion,
+  category: [
+    { name: "violet", light: "#6D28D9", dark: "#A78BFA" },
+    { name: "purple", light: "#7C3AED", dark: "#C084FC" },
+    { name: "fuchsia", light: "#A21CAF", dark: "#E879F9" },
+    { name: "pink", light: "#DB2777", dark: "#F472B6" },
+    { name: "rose", light: "#BE123C", dark: "#FB7185" },
+    { name: "amber", light: "#B45309", dark: "#FBBF24" },
+    { name: "gold", light: "#A16207", dark: "#F59E0B" },
+    { name: "cyan", light: "#0E7490", dark: "#22D3EE" },
+    { name: "blue", light: "#1D4ED8", dark: "#60A5FA" },
+    { name: "emerald", light: "#047857", dark: "#34D399" },
+  ],
 };
 
 /** @type {const} */
-const glass = {
-  // ponytail: placeholder glass params — Story 12.3 wires the GlassSurface primitive.
-  blurRadius: 24,
-  tintOpacity: 0.12,
-  borderOpacity: 0.16,
-};
-
-const auroraTheme = { color: themeColors, gradient, glass, elevation, motion };
-
-// ponytail: JSON deep-clone — tokens are plain JSON-safe data, and this keeps
-// the stubs independent objects so Story 12.2 can mutate them in place without
-// aliasing back into aurora. (structuredClone isn't guaranteed on Hermes.)
-const cloneTheme = (theme) => JSON.parse(JSON.stringify(theme));
-
 const themes = {
   aurora: auroraTheme,
-  obsidian: cloneTheme(auroraTheme),
-  spectrum: cloneTheme(auroraTheme),
+  obsidian: obsidianTheme,
+  spectrum: spectrumTheme,
 };
 
 const DEFAULT_THEME_ID = "aurora";

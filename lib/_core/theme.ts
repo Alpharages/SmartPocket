@@ -1,7 +1,12 @@
 import { Platform } from "react-native";
 
 import themeConfig from "@/theme.config";
-import type { ThemeId as ThemeIdType, ThemeTokenSet } from "@/theme.config";
+import type {
+  CategoryColorToken,
+  GlassToken,
+  GradientToken,
+  ThemeId as ThemeIdType,
+} from "@/theme.config";
 
 export type ColorScheme = "light" | "dark";
 
@@ -66,10 +71,14 @@ export type ResolvedThemeTokens = {
   themeId: ThemeId;
   colorScheme: ColorScheme;
   colors: Record<ThemeColorName, string>;
-  gradient: ThemeTokenSet["gradient"];
-  glass: ThemeTokenSet["glass"];
-  elevation: ThemeTokenSet["elevation"];
-  motion: ThemeTokenSet["motion"];
+  /** Hero gradient for the resolved variant (flattened from the theme's light/dark pair). */
+  gradient: GradientToken;
+  /** Glass params for the resolved variant. */
+  glass: GlassToken;
+  /** This theme's category color map (each token still carries light + dark). */
+  category: readonly CategoryColorToken[];
+  elevation: (typeof THEMES)[ThemeId]["elevation"];
+  motion: (typeof THEMES)[ThemeId]["motion"];
 };
 
 /** Resolves a theme identity + color scheme to its complete token set. */
@@ -83,8 +92,9 @@ export function getThemeTokens(
     themeId: resolvedId,
     colorScheme,
     colors: buildSchemePalette(theme.color)[colorScheme],
-    gradient: theme.gradient,
-    glass: theme.glass,
+    gradient: theme.gradient[colorScheme],
+    glass: theme.glass[colorScheme],
+    category: theme.category,
     elevation: theme.elevation,
     motion: theme.motion,
   };
@@ -132,6 +142,7 @@ export {
   CATEGORY_COLOR_DARK_VALUES,
   CATEGORY_DEFAULT_COLOR,
   DEFAULT_CATEGORY_ICON,
+  getCategoryColors,
   getCategoryColorByIndex,
   getCategoryColorForName,
   hashToPaletteIndex,

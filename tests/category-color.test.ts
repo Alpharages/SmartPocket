@@ -56,7 +56,7 @@ describe("Category Color Assignment", () => {
 
     it("should produce different indices for different names", () => {
       const names = ["Food", "Transport", "Housing", "Entertainment", "Health"];
-      const indices = names.map(hashToPaletteIndex);
+      const indices = names.map((n) => hashToPaletteIndex(n));
       const unique = new Set(indices);
       // Not a strict requirement, but with 5 names and 10 slots we expect variety
       expect(unique.size).toBeGreaterThanOrEqual(2);

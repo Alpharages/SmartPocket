@@ -37,14 +37,18 @@ describe("Theme registry (Story 12.1)", () => {
     expect(THEME_IDS.sort()).toEqual(["aurora", "obsidian", "spectrum"]);
   });
 
-  it("gives every theme a complete token surface", () => {
+  it("gives every theme a complete token surface (incl. per-variant gradient/glass + category)", () => {
     for (const id of THEME_IDS) {
       const theme = THEMES[id];
       expect(theme.color).toBeDefined();
-      expect(theme.gradient).toBeDefined();
-      expect(theme.glass).toBeDefined();
+      // gradient/glass carry a light AND dark variant as of Story 12.2
+      expect(theme.gradient.light).toBeDefined();
+      expect(theme.gradient.dark).toBeDefined();
+      expect(theme.glass.light.blur).toBeGreaterThan(0);
+      expect(theme.glass.dark.tint).toMatch(/^#[0-9a-fA-F]{6}$/);
       expect(theme.elevation).toBeDefined();
       expect(theme.motion).toBeDefined();
+      expect(theme.category).toHaveLength(10);
     }
   });
 
@@ -60,9 +64,13 @@ describe("Theme registry (Story 12.1)", () => {
     });
   });
 
-  it("stubs obsidian and spectrum as clones of aurora until Story 12.2", () => {
-    expect(THEMES.obsidian.color).toEqual(THEMES.aurora.color);
-    expect(THEMES.spectrum.color).toEqual(THEMES.aurora.color);
+  it("authors obsidian and spectrum as distinct token sets (Story 12.2 — no theme is a clone)", () => {
+    expect(THEMES.obsidian.color).not.toEqual(THEMES.aurora.color);
+    expect(THEMES.spectrum.color).not.toEqual(THEMES.aurora.color);
+    expect(THEMES.obsidian.color).not.toEqual(THEMES.spectrum.color);
+    // signature identities: obsidian navy bg, spectrum purple-black bg
+    expect(THEMES.obsidian.color.background.dark).toBe("#0F172A");
+    expect(THEMES.spectrum.color.background.dark).toBe("#120A24");
   });
 });
 
