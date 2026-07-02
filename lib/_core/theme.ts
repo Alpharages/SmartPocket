@@ -1,7 +1,12 @@
-import { Platform } from "react-native";
+import { Platform, type ViewStyle } from "react-native";
 
 import themeConfig from "@/theme.config";
-import type { ThemeId as ThemeIdType, ThemeTokenSet } from "@/theme.config";
+import type {
+  CategoryColorToken,
+  GlassToken,
+  GradientToken,
+  ThemeId as ThemeIdType,
+} from "@/theme.config";
 
 export type ColorScheme = "light" | "dark";
 
@@ -27,6 +32,46 @@ export const Typography = themeConfig.typography;
 export const Elevation = themeConfig.elevation;
 
 export const Motion = themeConfig.motion;
+
+type ElevationLevel = keyof typeof Elevation;
+
+// Native shadow specs per elevation tier — mirrors the ad-hoc shadow/elevation
+// literals already used across the app's cards.
+const NATIVE_ELEVATION_SHADOWS: Record<
+  ElevationLevel,
+  { offset: number; opacity: number; radius: number; elevation: number }
+> = {
+  none: { offset: 0, opacity: 0, radius: 0, elevation: 0 },
+  sm: { offset: 2, opacity: 0.04, radius: 6, elevation: 2 },
+  md: { offset: 2, opacity: 0.12, radius: 8, elevation: 4 },
+  lg: { offset: 8, opacity: 0.25, radius: 16, elevation: 8 },
+};
+
+/**
+ * Resolves a theme elevation level to a platform-appropriate shadow style —
+ * a `boxShadow` CSS string (the `Elevation` token) on web, RN shadow/elevation
+ * numeric props on native — so primitives read shadows from theme tokens
+ * instead of hardcoding shadow literals per component (Story 12.3, AC4).
+ * `shadowColor` stays caller-supplied since some surfaces want a colored glow
+ * (e.g. the StatCard hero's primary-tinted shadow) rather than a neutral one.
+ */
+export function getElevationStyle(
+  level: ElevationLevel,
+  shadowColor: string,
+): ViewStyle {
+  if (Platform.OS === "web") {
+    return level === "none" ? {} : { boxShadow: Elevation[level] };
+  }
+  const spec = NATIVE_ELEVATION_SHADOWS[level];
+  if (spec.elevation === 0) return { elevation: 0 };
+  return {
+    shadowColor,
+    shadowOffset: { width: 0, height: spec.offset },
+    shadowOpacity: spec.opacity,
+    shadowRadius: spec.radius,
+    elevation: spec.elevation,
+  };
+}
 
 // Maximum content widths (px) used to cap and center mobile-first layouts on
 // web so they don't stretch edge-to-edge. Native layouts stay unconstrained.
@@ -66,10 +111,14 @@ export type ResolvedThemeTokens = {
   themeId: ThemeId;
   colorScheme: ColorScheme;
   colors: Record<ThemeColorName, string>;
-  gradient: ThemeTokenSet["gradient"];
-  glass: ThemeTokenSet["glass"];
-  elevation: ThemeTokenSet["elevation"];
-  motion: ThemeTokenSet["motion"];
+  /** Hero gradient for the resolved variant (flattened from the theme's light/dark pair). */
+  gradient: GradientToken;
+  /** Glass params for the resolved variant. */
+  glass: GlassToken;
+  /** This theme's category color map (each token still carries light + dark). */
+  category: readonly CategoryColorToken[];
+  elevation: (typeof THEMES)[ThemeId]["elevation"];
+  motion: (typeof THEMES)[ThemeId]["motion"];
 };
 
 /** Resolves a theme identity + color scheme to its complete token set. */
@@ -83,8 +132,9 @@ export function getThemeTokens(
     themeId: resolvedId,
     colorScheme,
     colors: buildSchemePalette(theme.color)[colorScheme],
-    gradient: theme.gradient,
-    glass: theme.glass,
+    gradient: theme.gradient[colorScheme],
+    glass: theme.glass[colorScheme],
+    category: theme.category,
     elevation: theme.elevation,
     motion: theme.motion,
   };
@@ -132,6 +182,7 @@ export {
   CATEGORY_COLOR_DARK_VALUES,
   CATEGORY_DEFAULT_COLOR,
   DEFAULT_CATEGORY_ICON,
+  getCategoryColors,
   getCategoryColorByIndex,
   getCategoryColorForName,
   hashToPaletteIndex,

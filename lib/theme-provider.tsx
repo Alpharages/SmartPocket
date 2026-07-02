@@ -44,7 +44,19 @@ type ThemeContextValue = {
   isReady: boolean;
 };
 
-const ThemeContext = createContext<ThemeContextValue | null>(null);
+// Exported (not just the throwing useThemeContext() below) so purely
+// presentational primitives (GlassSurface, GradientHero) can read the active
+// theme when a ThemeProvider ancestor exists, and fall back to a sane default
+// when rendered standalone (e.g. unit tests with no ThemeProvider wrapper).
+export const ThemeContext = createContext<ThemeContextValue | null>(null);
+
+/** Active theme tokens, with a safe aurora/light default for provider-less
+ * renders (unit tests, isolated previews) — the shared read used by the
+ * presentational primitives instead of each re-implementing the fallback. */
+export function useThemeTokens(): ResolvedThemeTokens {
+  const ctx = useContext(ThemeContext);
+  return ctx?.theme ?? getThemeTokens(DEFAULT_THEME_ID, "light");
+}
 
 async function readStoredThemePreference(): Promise<ThemePreference | null> {
   try {
@@ -204,6 +216,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         "color-success": theme.colors.success,
         "color-warning": theme.colors.warning,
         "color-error": theme.colors.error,
+        // accent/secondary/overlay diverge per theme as of Story 12.2 — they MUST
+        // be in this native vars() map or they'd freeze on the build-time Tailwind
+        // fallback on iOS/Android while switching fine on web (Lore lesson: keep the
+        // native vars() map covering the same token set as the web --color-* loop).
+        "color-accent": theme.colors.accent,
+        "color-secondary": theme.colors.secondary,
+        "color-overlay": theme.colors.overlay,
       }),
     [theme],
   );

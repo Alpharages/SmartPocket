@@ -12,6 +12,8 @@ import {
   formatCurrency,
   formatCurrencyAccessibilityLabel,
 } from "@/lib/currency";
+import { resolveGradientInk } from "@/lib/_core/glass";
+import { getThemeTokens } from "@/lib/_core/theme";
 
 const mockColors = {
   primary: "#4F46E5",
@@ -120,6 +122,29 @@ describe("StatCard", () => {
       expect(
         queryText(root, formatCurrency(1240.5, "USD", { sign: "positive" })),
       ).toHaveLength(0);
+    });
+
+    it("colors hero text with the theme gradient's AA-safe ink, not hardcoded white", () => {
+      // No ThemeProvider → aurora/light, whose light stops fail AA behind
+      // white — the resolved ink (near-black) must be applied to both texts.
+      const { ink } = resolveGradientInk(
+        getThemeTokens("aurora", "light").gradient.colors,
+      );
+      const root = render(
+        <StatCard variant="hero" label="Total Balance" amount={1240.5} />,
+      );
+      const flatColor = (node: ReactTestInstance) => {
+        const flat = Array.isArray(node.props.style)
+          ? Object.assign({}, ...node.props.style.filter(Boolean))
+          : (node.props.style ?? {});
+        return flat.color;
+      };
+      expect(flatColor(getByText(root, "Total Balance"))).toBe(ink);
+      expect(
+        flatColor(
+          getByText(root, formatCurrency(1240.5, "USD", { sign: "absolute" })),
+        ),
+      ).toBe(ink);
     });
 
     it("renders compact variant with label and amount", () => {

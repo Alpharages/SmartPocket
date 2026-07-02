@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import {
   ScreenHeader,
-  StatCard,
+  BalanceHero,
   Button,
   TransactionRow,
   EmptyState,
@@ -43,20 +43,6 @@ export default function DashboardScreen() {
 
   const recentTransactions = useMemo(
     () => transactions.slice(0, 5),
-    [transactions],
-  );
-
-  // All-time net across every transaction (income − expense), for the hero card.
-  // ponytail: client-side float sum, mirrors getMonthlyStats/reduceAccountBalances.
-  // transactions.list is uncapped so this is the full history; move to a
-  // summary.allTimeStats query if that list ever becomes paginated.
-  const allTimeBalance = useMemo(
-    () =>
-      transactions.reduce((net, t) => {
-        const amount = Number(t.amount);
-        if (!Number.isFinite(amount)) return net;
-        return t.type === "income" ? net + amount : net - amount;
-      }, 0),
     [transactions],
   );
 
@@ -172,46 +158,13 @@ export default function DashboardScreen() {
           : { paddingHorizontal: Spacing["2xl"], marginTop: Spacing.sm }
       }
     >
-      {/* Hero balance card — all-time net across all transactions */}
-      <StatCard
-        variant="hero"
-        label="Total Balance"
-        amount={allTimeBalance}
-        sign="neutral"
-        loading={loadingTransactions}
+      {/* Signature balance hero — this month's net, income/expense split (Story 12.4) */}
+      <BalanceHero
+        balance={monthlyStats?.netBalance ?? 0}
+        income={monthlyStats?.totalIncome ?? 0}
+        expense={monthlyStats?.totalExpense ?? 0}
+        loading={loadingStats}
       />
-
-      {/* This Month / Income / Expense compact trio */}
-      <Animated.View
-        entering={FadeInUp.delay(150).duration(500)}
-        className="flex-row"
-        style={{ gap: Spacing.md, marginTop: Spacing.md }}
-      >
-        <StatCard
-          variant="compact"
-          label="This Month"
-          amount={monthlyStats?.netBalance ?? 0}
-          sign="neutral"
-          icon="wallet-outline"
-          loading={loadingStats}
-        />
-        <StatCard
-          variant="compact"
-          label="Income"
-          amount={monthlyStats?.totalIncome ?? 0}
-          sign="positive"
-          icon="arrow-down"
-          loading={loadingStats}
-        />
-        <StatCard
-          variant="compact"
-          label="Expenses"
-          amount={monthlyStats?.totalExpense ?? 0}
-          sign="negative"
-          icon="arrow-up"
-          loading={loadingStats}
-        />
-      </Animated.View>
 
       {/* Quick action buttons */}
       <Animated.View

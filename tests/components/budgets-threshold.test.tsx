@@ -16,6 +16,7 @@ vi.mock("@/hooks/use-colors", () => ({
 }));
 
 vi.mock("@/lib/_core/theme", () => ({
+  getElevationStyle: () => ({}),
   Typography: {
     caption: { fontSize: 12, lineHeight: 16 },
   },

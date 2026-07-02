@@ -106,6 +106,7 @@ vi.mock("@/constants/theme", () => ({
 }));
 
 vi.mock("@/lib/_core/theme", () => ({
+  getElevationStyle: () => ({}),
   ...TOKENS,
   Motion: {
     sheet: { durationMs: 300, closeDurationMs: 250 },

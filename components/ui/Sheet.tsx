@@ -33,11 +33,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/use-colors";
 import {
   ContentMaxWidth,
-  Elevation,
   Motion,
   Radius,
   Spacing,
   Typography,
+  getElevationStyle,
 } from "@/lib/_core/theme";
 
 const MIN_TOUCH_TARGET = 44;
@@ -255,7 +255,6 @@ export function Sheet({
       <Animated.View
         accessible={true}
         {...(title ? { accessibilityLabel: title } : {})}
-        className="shadow-lg"
         style={[
           {
             // Height cap lives in the style layer (not className) so it holds
@@ -263,6 +262,12 @@ export function Sheet({
             // hosts; flexShrink lets the content area compress to this cap so
             // an inner ScrollView gets a bounded height and can scroll.
             maxHeight: snapToContent ? undefined : "90%",
+            // ponytail: panel stays opaque colors.surface, not GlassSurface —
+            // GlassSurface is a plain (non-Animated) View, and this panel's
+            // translateY/drag gesture must stay on the real Animated.View to
+            // keep Reanimated's off-thread animation; revisit if a future
+            // story needs a frosted sheet panel via an Animated-compatible
+            // GlassSurface variant.
             backgroundColor: colors.surface,
             borderTopLeftRadius: Radius.lg,
             borderTopRightRadius: Radius.lg,
@@ -272,7 +277,7 @@ export function Sheet({
             width: "100%",
             maxWidth: Platform.OS === "web" ? panelMaxWidth : undefined,
             alignSelf: Platform.OS === "web" ? "center" : undefined,
-            ...(Platform.OS === "web" ? { boxShadow: Elevation.lg } : {}),
+            ...getElevationStyle("lg", colors.foreground),
           },
           panelStyle,
           panelWebProps as StyleProp<ViewStyle>,

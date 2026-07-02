@@ -20,6 +20,7 @@ export {
   CATEGORY_COLOR_DARK_VALUES,
   CATEGORY_DEFAULT_COLOR,
   DEFAULT_CATEGORY_ICON,
+  getCategoryColors,
   getCategoryColorByIndex,
   getCategoryColorForName,
   hashToPaletteIndex,
@@ -31,3 +32,7 @@ export {
   type ResolvedThemeTokens,
   type CategoryColorToken,
 } from "@/lib/_core/theme";
+
+// Per-theme token shapes (Story 12.2, RDR-2) — surfaced so glass/hero consumers
+// (Stories 12.3/12.4) import from the barrel rather than reaching into theme.config.
+export type { GradientToken, GlassToken } from "@/theme.config";

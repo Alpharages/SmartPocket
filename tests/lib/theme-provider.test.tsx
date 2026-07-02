@@ -204,7 +204,8 @@ describe("ThemeProvider", () => {
     state = JSON.parse(probe.props.accessibilityLabel);
     expect(state.themeId).toBe("obsidian");
     expect(state.colorScheme).toBe("dark");
-    expect(state.themeColors.primary).toBe("#818CF8");
+    // Obsidian's authored dark primary (gold) — distinct from aurora (Story 12.2).
+    expect(state.themeColors.primary).toBe("#EAB308");
   });
 
   it("persists preference when setThemePreference is called", async () => {

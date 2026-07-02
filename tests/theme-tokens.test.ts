@@ -113,7 +113,8 @@ describe("Theme Tokens", () => {
   describe("Semantic Color Reservation", () => {
     it("should reserve success for income/positive semantics only", () => {
       expect(ThemeColors.success.light).toBe("#047857");
-      expect(ThemeColors.success.dark).toBe("#34D399");
+      // Aurora dark income refined to #6EE7B7 in Story 12.2 (still semantic green).
+      expect(ThemeColors.success.dark).toBe("#6EE7B7");
     });
 
     it("should reserve error for expense/destructive semantics only", () => {

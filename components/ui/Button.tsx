@@ -13,7 +13,7 @@ import Animated from "react-native-reanimated";
 import { useColors } from "@/hooks/use-colors";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { readableTextOn } from "@/lib/_core/contrast";
-import { Radius } from "@/lib/_core/theme";
+import { Radius, getElevationStyle } from "@/lib/_core/theme";
 import { cn } from "@/lib/utils";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -173,8 +173,15 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
         : undefined;
       const pad = iconOnly ? undefined : SIZE_PADDING[size];
 
+      // Filled variants get a subtle theme-driven lift; outlined/transparent
+      // variants (secondary, ghost) stay flat — a shadow under a border or
+      // transparent fill reads as a rendering glitch, not elevation.
+      const elevationLevel =
+        variant === "secondary" || variant === "ghost" ? "none" : "sm";
+
       return {
         containerStyle: {
+          ...getElevationStyle(elevationLevel, colors.foreground),
           backgroundColor: bg,
           borderColor: border,
           borderWidth: border ? 1 : 0,

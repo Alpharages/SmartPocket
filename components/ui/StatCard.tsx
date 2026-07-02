@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, Text, type ViewProps } from "react-native";
+import { View, Text, StyleSheet, type ViewProps } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -16,7 +16,12 @@ import {
   formatCurrencyAccessibilityLabel,
   type CurrencyCode,
 } from "@/lib/currency";
+import { Radius, getElevationStyle } from "@/lib/_core/theme";
+import { resolveGradientInk } from "@/lib/_core/glass";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { cn } from "@/lib/utils";
+import { GlassSurface } from "./GlassSurface";
+import { GradientHero } from "./GradientHero";
 
 export type StatCardVariant = "hero" | "compact";
 export type StatSign = "positive" | "negative" | "neutral";
@@ -163,25 +168,21 @@ export function StatCard({
   const semanticColor = signColor(resolvedSign, colors);
   const semanticIcon = icon ?? signIcon(resolvedSign);
 
+  // The hero ink must follow the theme gradient it sits on — a hardcoded
+  // white fails AA on every light-variant gradient (obsidian light is ivory).
+  // resolveGradientInk picks the ink whose worst stop clears 4.5:1, matching
+  // the scrim GradientHero applies when neither ink can (Story 12.3, AC7).
+  const theme = useThemeTokens();
+  const heroInk = useMemo(
+    () => resolveGradientInk(theme.gradient.colors).ink,
+    [theme.gradient.colors],
+  );
+
   if (variant === "hero") {
-    // Gradient decision: `expo-linear-gradient` is not a project dependency, so
-    // the hero uses a solid `primary` surface (web-safe, zero new deps) as the
-    // documented fallback the story permits. Swap to a gradient here if the
-    // dependency is added later — the public API does not change.
     return (
       <View
-        className={cn("rounded-3xl p-6 overflow-hidden", className)}
-        style={[
-          {
-            backgroundColor: colors.primary,
-            shadowColor: colors.primary,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.25,
-            shadowRadius: 16,
-            elevation: 8,
-          },
-          style,
-        ]}
+        className={cn("rounded-3xl overflow-hidden", className)}
+        style={[getElevationStyle("lg", colors.primary), style]}
         // `accessible` groups the children into one element so screen readers
         // announce the composed `accessibilityLabel` instead of reading each
         // child Text node separately (required for the sign + currency AC).
@@ -190,26 +191,44 @@ export function StatCard({
         accessibilityLabel={resolvedAccessibilityLabel}
         {...viewProps}
       >
-        {showLoading ? (
-          <View className="gap-3">
-            <SkeletonPulse className="h-4 w-1/3 rounded-md" />
-            <SkeletonPulse className="h-12 w-2/3 rounded-lg" />
-          </View>
-        ) : (
-          <>
-            <Text className="text-white/70 text-sm font-medium">{label}</Text>
-            <Text
-              // `tabular-nums` (fontVariantNumeric utility) supplies tabular
-              // figures — the `number` token's defining trait — without
-              // re-literalizing the fontVariant array. The size is an
-              // intentional hero scale above the `display` (36) type token.
-              className="text-white mt-2 tracking-tight tabular-nums"
-              style={{ fontSize: 42, lineHeight: 48, fontWeight: "700" }}
-            >
-              {displayValue}
-            </Text>
-          </>
-        )}
+        {/* Backdrop: active theme's hero gradient, opaque-primary fallback
+         * when the gradient path is unavailable (Story 12.3, RDR-3). */}
+        <GradientHero style={StyleSheet.absoluteFill} />
+        <View className="p-6">
+          {showLoading ? (
+            <View className="gap-3">
+              <SkeletonPulse className="h-4 w-1/3 rounded-md" />
+              <SkeletonPulse className="h-12 w-2/3 rounded-lg" />
+            </View>
+          ) : (
+            <>
+              {/* Full-opacity ink for the label too — the old white/70 wash
+               * dropped the 14px label below 4.5:1; visual hierarchy comes
+               * from size/weight instead. 12.4's hero redesign can restyle. */}
+              <Text
+                className="text-sm font-medium"
+                style={{ color: heroInk }}
+              >
+                {label}
+              </Text>
+              <Text
+                // `tabular-nums` (fontVariantNumeric utility) supplies tabular
+                // figures — the `number` token's defining trait — without
+                // re-literalizing the fontVariant array. The size is an
+                // intentional hero scale above the `display` (36) type token.
+                className="mt-2 tracking-tight tabular-nums"
+                style={{
+                  fontSize: 42,
+                  lineHeight: 48,
+                  fontWeight: "700",
+                  color: heroInk,
+                }}
+              >
+                {displayValue}
+              </Text>
+            </>
+          )}
+        </View>
       </View>
     );
   }
@@ -217,18 +236,8 @@ export function StatCard({
   // Compact variant
   return (
     <View
-      className={cn("flex-1 rounded-2xl p-4 gap-2", className)}
-      style={[
-        {
-          backgroundColor: colors.surface,
-          shadowColor: colors.foreground,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.04,
-          shadowRadius: 6,
-          elevation: 2,
-        },
-        style,
-      ]}
+      className={cn("flex-1 rounded-2xl overflow-hidden", className)}
+      style={[getElevationStyle("sm", colors.foreground), style]}
       // See hero variant: `accessible` makes the composed label the single
       // announced element rather than the individual icon/label/amount nodes.
       accessible
@@ -236,29 +245,40 @@ export function StatCard({
       accessibilityLabel={resolvedAccessibilityLabel}
       {...viewProps}
     >
-      {showLoading ? (
-        <>
-          <SkeletonPulse className="h-8 w-8 rounded-full" />
-          <SkeletonPulse className="h-3 w-16 rounded-md mt-xs" />
-          <SkeletonPulse className="h-6 w-24 rounded-md" />
-        </>
-      ) : (
-        <>
-          <View
-            className="w-8 h-8 rounded-full items-center justify-center"
-            style={{ backgroundColor: semanticColor + "14" }}
-          >
-            <Ionicons name={semanticIcon} size={16} color={semanticColor} />
-          </View>
-          <Text className="text-xs text-muted font-medium mt-xs">{label}</Text>
-          <Text
-            className="text-lg font-bold tabular-nums"
-            style={{ color: semanticColor }}
-          >
-            {displayValue}
-          </Text>
-        </>
-      )}
+      {/* Backdrop: frosted glass surface, opaque AA-safe tint fallback when
+       * blur is unsupported/disabled (Story 12.3, RDR-3). borderRadius keeps
+       * the surface's 1px border stroke rounding with the card (rounded-2xl
+       * = Radius.lg) instead of being clipped square at the corners. */}
+      <GlassSurface
+        style={[StyleSheet.absoluteFill, { borderRadius: Radius.lg }]}
+      />
+      <View className="p-4 gap-2">
+        {showLoading ? (
+          <>
+            <SkeletonPulse className="h-8 w-8 rounded-full" />
+            <SkeletonPulse className="h-3 w-16 rounded-md mt-xs" />
+            <SkeletonPulse className="h-6 w-24 rounded-md" />
+          </>
+        ) : (
+          <>
+            <View
+              className="w-8 h-8 rounded-full items-center justify-center"
+              style={{ backgroundColor: semanticColor + "14" }}
+            >
+              <Ionicons name={semanticIcon} size={16} color={semanticColor} />
+            </View>
+            <Text className="text-xs text-muted font-medium mt-xs">
+              {label}
+            </Text>
+            <Text
+              className="text-lg font-bold tabular-nums"
+              style={{ color: semanticColor }}
+            >
+              {displayValue}
+            </Text>
+          </>
+        )}
+      </View>
     </View>
   );
 }

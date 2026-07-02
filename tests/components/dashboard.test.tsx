@@ -234,6 +234,16 @@ function render(ui: React.ReactElement): ReactTestInstance {
   return renderer!.root;
 }
 
+/** Renders and ticks BalanceHero's count-up hook to its settled value. */
+function renderSettled(ui: React.ReactElement): ReactTestInstance {
+  vi.useFakeTimers();
+  const root = render(ui);
+  act(() => {
+    vi.advanceTimersByTime(600);
+  });
+  return root;
+}
+
 function queryAllByType(
   root: ReactTestInstance,
   typeName: string,
@@ -260,6 +270,7 @@ afterEach(() => {
   });
   renderer = null;
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 // ---------------------------------------------------------------------------
@@ -347,46 +358,38 @@ describe("DashboardScreen", () => {
     });
   });
 
-  describe("Hero card label (CU-86ey42aqv)", () => {
-    it("shows both an all-time 'Total Balance' hero and a month-scoped 'This Month' card", () => {
-      const root = render(<DashboardScreen />);
-      const totalLabel = root.findAll(
-        (n) => String(n.type) === "Text" && collectText(n) === "Total Balance",
-      );
+  describe("Balance hero (Story 12.4 — supersedes CU-86ey42aqv)", () => {
+    it("shows the 'This Month' balance hero label", () => {
+      const root = renderSettled(<DashboardScreen />);
       const monthScopedLabel = root.findAll(
         (n) => String(n.type) === "Text" && collectText(n) === "This Month",
       );
-      expect(totalLabel.length).toBeGreaterThanOrEqual(1);
       expect(monthScopedLabel.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("binds the hero 'Total Balance' to the all-time net (income − expense) of all transactions", () => {
-      const root = render(<DashboardScreen />);
-      // mockTransactions: income 3000 + 500 = 3500, expense 200 + 150 + 80 = 430
-      // → all-time net 3070; hero renders its absolute value.
-      const allTimeText = root.findAll(
-        (n) =>
-          String(n.type) === "Text" &&
-          collectText(n) === formatCurrency(3070, "USD", { sign: "absolute" }),
+    it("no longer renders the old all-time 'Total Balance' hero", () => {
+      const root = renderSettled(<DashboardScreen />);
+      const totalLabel = root.findAll(
+        (n) => String(n.type) === "Text" && collectText(n) === "Total Balance",
       );
-      expect(allTimeText.length).toBeGreaterThanOrEqual(1);
+      expect(totalLabel.length).toBe(0);
     });
   });
 
   describe("AC4 — Behavior unchanged (FR-9)", () => {
-    it("passes netBalance from monthlyStats to the 'This Month' StatCard", () => {
-      const root = render(<DashboardScreen />);
-      // The "This Month" card renders "$1800.00" — the abs value of netBalance
+    it("passes netBalance from monthlyStats to the BalanceHero", () => {
+      const root = renderSettled(<DashboardScreen />);
+      // BalanceHero renders netBalance with a neutral (sign-aware) format.
       const balanceText = root.findAll(
         (n) =>
           String(n.type) === "Text" &&
-          collectText(n) === formatCurrency(1800, "USD", { sign: "absolute" }),
+          collectText(n) === formatCurrency(1800, "USD", { sign: "neutral" }),
       );
       expect(balanceText.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("passes totalIncome to a compact StatCard", () => {
-      const root = render(<DashboardScreen />);
+    it("passes totalIncome to the BalanceHero's income split", () => {
+      const root = renderSettled(<DashboardScreen />);
       const incomeText = root.findAll(
         (n) =>
           String(n.type) === "Text" &&
@@ -397,8 +400,8 @@ describe("DashboardScreen", () => {
       expect(incomeText.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("passes totalExpense to a compact StatCard", () => {
-      const root = render(<DashboardScreen />);
+    it("passes totalExpense to the BalanceHero's expense split", () => {
+      const root = renderSettled(<DashboardScreen />);
       const expenseText = root.findAll(
         (n) =>
           String(n.type) === "Text" &&
