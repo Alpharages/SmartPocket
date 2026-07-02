@@ -22,6 +22,10 @@ export { CategoryPickerGrid } from "./CategoryPickerGrid";
 export type { CategoryPickerGridProps } from "./CategoryPickerGrid";
 export { Sheet } from "./Sheet";
 export type { SheetProps } from "./Sheet";
+export { GlassSurface } from "./GlassSurface";
+export type { GlassSurfaceProps } from "./GlassSurface";
+export { GradientHero } from "./GradientHero";
+export type { GradientHeroProps } from "./GradientHero";
 export { EmptyState } from "./EmptyState";
 export type {
   EmptyStateProps,

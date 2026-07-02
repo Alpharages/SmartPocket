@@ -44,7 +44,11 @@ type ThemeContextValue = {
   isReady: boolean;
 };
 
-const ThemeContext = createContext<ThemeContextValue | null>(null);
+// Exported (not just the throwing useThemeContext() below) so purely
+// presentational primitives (GlassSurface, GradientHero) can read the active
+// theme when a ThemeProvider ancestor exists, and fall back to a sane default
+// when rendered standalone (e.g. unit tests with no ThemeProvider wrapper).
+export const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 async function readStoredThemePreference(): Promise<ThemePreference | null> {
   try {

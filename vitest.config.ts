@@ -42,8 +42,16 @@ export default defineConfig({
         __dirname,
         "./__mocks__/expo-file-system.ts",
       ),
-      "expo-file-system": path.resolve(__dirname, "./__mocks__/expo-file-system.ts"),
+      "expo-file-system": path.resolve(
+        __dirname,
+        "./__mocks__/expo-file-system.ts",
+      ),
       "expo-sharing": path.resolve(__dirname, "./__mocks__/expo-sharing.ts"),
+      "expo-blur": path.resolve(__dirname, "./__mocks__/expo-blur.ts"),
+      "expo-linear-gradient": path.resolve(
+        __dirname,
+        "./__mocks__/expo-linear-gradient.ts",
+      ),
     },
   },
   optimizeDeps: {
@@ -55,6 +63,8 @@ export default defineConfig({
       "react-native-css-interop",
       "react-native-gesture-handler",
       "react-native-chart-kit",
+      "expo-blur",
+      "expo-linear-gradient",
     ],
   },
   test: {
