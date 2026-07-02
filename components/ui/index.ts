@@ -26,6 +26,8 @@ export { GlassSurface } from "./GlassSurface";
 export type { GlassSurfaceProps } from "./GlassSurface";
 export { GradientHero } from "./GradientHero";
 export type { GradientHeroProps } from "./GradientHero";
+export { BalanceHero } from "./BalanceHero";
+export type { BalanceHeroProps } from "./BalanceHero";
 export { EmptyState } from "./EmptyState";
 export type {
   EmptyStateProps,
