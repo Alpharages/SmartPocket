@@ -1,14 +1,18 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Platform } from "react-native";
 
 import { contrastRatio } from "@/lib/_core/contrast";
 import {
   canUseBlur,
   compositeOver,
+  glassInkRequirements,
+  resolveGradientInk,
   resolveOpaqueGlassFill,
   setGlobalDisableBlur,
+  subscribeGlobalDisableBlur,
   toRgba,
 } from "@/lib/_core/glass";
+import { THEME_IDS, getThemeTokens } from "@/lib/_core/theme";
 
 afterEach(() => {
   Platform.OS = "ios";
@@ -86,7 +90,7 @@ describe("resolveOpaqueGlassFill", () => {
     const naive = compositeOver(glass.tint, glass.surfaceOpacity, surface);
     expect(contrastRatio(naive, foreground)).toBeLessThan(4.5);
 
-    const fill = resolveOpaqueGlassFill(glass, surface, foreground);
+    const fill = resolveOpaqueGlassFill(glass, surface, [[foreground, 4.5]]);
     expect(contrastRatio(fill, foreground)).toBeGreaterThanOrEqual(4.5);
   });
 
@@ -97,9 +101,110 @@ describe("resolveOpaqueGlassFill", () => {
       surfaceOpacity: 0.9,
       borderOpacity: 0.2,
     };
-    const fill = resolveOpaqueGlassFill(glass, "#FFFFFF", "#F1F5F9");
+    const fill = resolveOpaqueGlassFill(glass, "#FFFFFF", [["#F1F5F9", 4.5]]);
     expect(fill).toBe(
       compositeOver(glass.tint, glass.surfaceOpacity, "#FFFFFF"),
     );
+  });
+
+  it("falls back to a readable candidate when boosting toward the tint walks the wrong way", () => {
+    // White tint under a near-white foreground: every boost step moves the
+    // fill TOWARD the foreground, so the loop exits at opacity=1 still
+    // failing — the post-loop guard must pick the dark surface instead of
+    // silently returning an unreadable near-white fill.
+    const glass = {
+      blur: 20,
+      tint: "#FFFFFF",
+      surfaceOpacity: 0.9,
+      borderOpacity: 0.2,
+    };
+    const surface = "#0B1020";
+    const foreground = "#F1F5F9";
+    const fill = resolveOpaqueGlassFill(glass, surface, [[foreground, 4.5]]);
+    expect(contrastRatio(fill, foreground)).toBeGreaterThanOrEqual(4.5);
+    expect(fill).toBe(surface);
+  });
+
+  it("meets every consumer ink's bar for all themes × schemes", () => {
+    for (const themeId of THEME_IDS) {
+      for (const scheme of ["light", "dark"] as const) {
+        const tokens = getThemeTokens(themeId, scheme);
+        const requirements = glassInkRequirements(tokens.colors);
+        const fill = resolveOpaqueGlassFill(
+          tokens.glass,
+          tokens.colors.surface,
+          requirements,
+        );
+        for (const [ink, min] of requirements) {
+          expect(
+            contrastRatio(fill, ink),
+            `${themeId}/${scheme} ink ${ink}`,
+          ).toBeGreaterThanOrEqual(min);
+        }
+      }
+    }
+  });
+});
+
+describe("resolveGradientInk", () => {
+  /** Effective backdrop stops after the resolved scrim (if any) is applied. */
+  function effectiveStops(
+    stops: readonly string[],
+    scrim: string | null,
+  ): string[] {
+    if (!scrim) return [...stops];
+    const match = scrim.match(/^rgba\((\d+), (\d+), (\d+), ([\d.]+)\)$/);
+    if (!match) return [scrim]; // fully-opaque hex scrim covers the stops
+    const [, r, g, b, alpha] = match;
+    const hex = `#${[r, g, b]
+      .map((c) => Number(c).toString(16).padStart(2, "0"))
+      .join("")}`;
+    return stops.map((stop) => compositeOver(hex, Number(alpha), stop));
+  }
+
+  it.each(THEME_IDS)(
+    "ink clears >=4.5:1 against every (scrimmed) stop for %s in light and dark",
+    (themeId) => {
+      for (const scheme of ["light", "dark"] as const) {
+        const { colors } = getThemeTokens(themeId, scheme).gradient;
+        const { ink, scrim } = resolveGradientInk(colors);
+        for (const stop of effectiveStops(colors, scrim)) {
+          expect(
+            contrastRatio(ink, stop),
+            `${themeId}/${scheme} stop ${stop}`,
+          ).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    },
+  );
+
+  it("skips the scrim when the raw stops already clear AA", () => {
+    // Obsidian light is ivory — near-black ink passes every stop raw.
+    const { scrim } = resolveGradientInk(
+      getThemeTokens("obsidian", "light").gradient.colors,
+    );
+    expect(scrim).toBeNull();
+  });
+
+  it("adds a minimal scrim when neither ink clears every stop raw", () => {
+    // Spectrum dark's gold stop fails both inks raw — a scrim must kick in.
+    const { scrim } = resolveGradientInk(
+      getThemeTokens("spectrum", "dark").gradient.colors,
+    );
+    expect(scrim).toMatch(/^rgba\(/);
+  });
+});
+
+describe("setGlobalDisableBlur subscriptions", () => {
+  it("notifies subscribers on flips and stops after unsubscribe", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeGlobalDisableBlur(listener);
+    setGlobalDisableBlur(true);
+    expect(listener).toHaveBeenCalledTimes(1);
+    setGlobalDisableBlur(true); // no-op: unchanged value must not notify
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+    setGlobalDisableBlur(false);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 });

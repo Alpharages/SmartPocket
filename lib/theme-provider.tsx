@@ -50,6 +50,14 @@ type ThemeContextValue = {
 // when rendered standalone (e.g. unit tests with no ThemeProvider wrapper).
 export const ThemeContext = createContext<ThemeContextValue | null>(null);
 
+/** Active theme tokens, with a safe aurora/light default for provider-less
+ * renders (unit tests, isolated previews) — the shared read used by the
+ * presentational primitives instead of each re-implementing the fallback. */
+export function useThemeTokens(): ResolvedThemeTokens {
+  const ctx = useContext(ThemeContext);
+  return ctx?.theme ?? getThemeTokens(DEFAULT_THEME_ID, "light");
+}
+
 async function readStoredThemePreference(): Promise<ThemePreference | null> {
   try {
     const stored = await AsyncStorage.getItem(THEME_STORAGE_KEY);

@@ -16,7 +16,9 @@ import {
   formatCurrencyAccessibilityLabel,
   type CurrencyCode,
 } from "@/lib/currency";
-import { getElevationStyle } from "@/lib/_core/theme";
+import { Radius, getElevationStyle } from "@/lib/_core/theme";
+import { resolveGradientInk } from "@/lib/_core/glass";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { cn } from "@/lib/utils";
 import { GlassSurface } from "./GlassSurface";
 import { GradientHero } from "./GradientHero";
@@ -166,6 +168,16 @@ export function StatCard({
   const semanticColor = signColor(resolvedSign, colors);
   const semanticIcon = icon ?? signIcon(resolvedSign);
 
+  // The hero ink must follow the theme gradient it sits on — a hardcoded
+  // white fails AA on every light-variant gradient (obsidian light is ivory).
+  // resolveGradientInk picks the ink whose worst stop clears 4.5:1, matching
+  // the scrim GradientHero applies when neither ink can (Story 12.3, AC7).
+  const theme = useThemeTokens();
+  const heroInk = useMemo(
+    () => resolveGradientInk(theme.gradient.colors).ink,
+    [theme.gradient.colors],
+  );
+
   if (variant === "hero") {
     return (
       <View
@@ -190,14 +202,27 @@ export function StatCard({
             </View>
           ) : (
             <>
-              <Text className="text-white/70 text-sm font-medium">{label}</Text>
+              {/* Full-opacity ink for the label too — the old white/70 wash
+               * dropped the 14px label below 4.5:1; visual hierarchy comes
+               * from size/weight instead. 12.4's hero redesign can restyle. */}
+              <Text
+                className="text-sm font-medium"
+                style={{ color: heroInk }}
+              >
+                {label}
+              </Text>
               <Text
                 // `tabular-nums` (fontVariantNumeric utility) supplies tabular
                 // figures — the `number` token's defining trait — without
                 // re-literalizing the fontVariant array. The size is an
                 // intentional hero scale above the `display` (36) type token.
-                className="text-white mt-2 tracking-tight tabular-nums"
-                style={{ fontSize: 42, lineHeight: 48, fontWeight: "700" }}
+                className="mt-2 tracking-tight tabular-nums"
+                style={{
+                  fontSize: 42,
+                  lineHeight: 48,
+                  fontWeight: "700",
+                  color: heroInk,
+                }}
               >
                 {displayValue}
               </Text>
@@ -221,8 +246,12 @@ export function StatCard({
       {...viewProps}
     >
       {/* Backdrop: frosted glass surface, opaque AA-safe tint fallback when
-       * blur is unsupported/disabled (Story 12.3, RDR-3). */}
-      <GlassSurface style={StyleSheet.absoluteFill} />
+       * blur is unsupported/disabled (Story 12.3, RDR-3). borderRadius keeps
+       * the surface's 1px border stroke rounding with the card (rounded-2xl
+       * = Radius.lg) instead of being clipped square at the corners. */}
+      <GlassSurface
+        style={[StyleSheet.absoluteFill, { borderRadius: Radius.lg }]}
+      />
       <View className="p-4 gap-2">
         {showLoading ? (
           <>

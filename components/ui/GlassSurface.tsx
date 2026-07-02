@@ -1,10 +1,13 @@
-import React, { useContext, useMemo } from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, View, type ViewProps } from "react-native";
 import { BlurView } from "expo-blur";
 
-import { ThemeContext } from "@/lib/theme-provider";
-import { DEFAULT_THEME_ID, getThemeTokens } from "@/lib/_core/theme";
-import { resolveOpaqueGlassFill, toRgba } from "@/lib/_core/glass";
+import { useThemeTokens } from "@/lib/theme-provider";
+import {
+  glassInkRequirements,
+  resolveOpaqueGlassFill,
+  toRgba,
+} from "@/lib/_core/glass";
 import { useGlassCapability } from "@/hooks/use-glass-capability";
 
 export type GlassSurfaceProps = ViewProps & {
@@ -27,8 +30,7 @@ export function GlassSurface({
   children,
   ...rest
 }: GlassSurfaceProps) {
-  const ctx = useContext(ThemeContext);
-  const theme = ctx?.theme ?? getThemeTokens(DEFAULT_THEME_ID, "light");
+  const theme = useThemeTokens();
   const canBlur = useGlassCapability(disableBlur);
 
   const opaqueFill = useMemo(
@@ -36,15 +38,20 @@ export function GlassSurface({
       resolveOpaqueGlassFill(
         theme.glass,
         theme.colors.surface,
-        theme.colors.foreground,
+        glassInkRequirements(theme.colors),
       ),
-    [theme.glass, theme.colors.surface, theme.colors.foreground],
+    [theme.glass, theme.colors],
   );
 
   const borderColor = useMemo(
     () => toRgba(theme.glass.tint, theme.glass.borderOpacity),
     [theme.glass.tint, theme.glass.borderOpacity],
   );
+
+  // The border overlay must round with the surface or its stroke gets
+  // clipped square at the corners by the container's overflow: hidden —
+  // consumers pass borderRadius via `style` and the overlay mirrors it.
+  const borderRadius = StyleSheet.flatten(style)?.borderRadius;
 
   return (
     <View style={[styles.container, style]} {...rest}>
@@ -77,7 +84,10 @@ export function GlassSurface({
         />
       )}
       <View
-        style={[StyleSheet.absoluteFill, { borderWidth: 1, borderColor }]}
+        style={[
+          StyleSheet.absoluteFill,
+          { borderWidth: 1, borderColor, borderRadius },
+        ]}
         pointerEvents="none"
       />
       {children}

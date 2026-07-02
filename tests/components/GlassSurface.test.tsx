@@ -11,7 +11,11 @@ import { GlassSurface } from "@/components/ui/GlassSurface";
 import { ThemeContext } from "@/lib/theme-provider";
 import { THEME_IDS, getThemeTokens, type ThemeId } from "@/lib/_core/theme";
 import { contrastRatio } from "@/lib/_core/contrast";
-import { resolveOpaqueGlassFill } from "@/lib/_core/glass";
+import {
+  glassInkRequirements,
+  resolveOpaqueGlassFill,
+  setGlobalDisableBlur,
+} from "@/lib/_core/glass";
 
 let renderer: ReactTestRenderer | null = null;
 
@@ -51,6 +55,7 @@ afterEach(() => {
     renderer?.unmount();
   });
   renderer = null;
+  setGlobalDisableBlur(false);
 });
 
 describe("GlassSurface", () => {
@@ -126,20 +131,70 @@ describe("GlassSurface", () => {
     ).not.toThrow();
   });
 
+  it("switches mounted surfaces to the fallback when the global toggle flips", () => {
+    const root = render(
+      <GlassSurface testID="surface">
+        <Text>Content</Text>
+      </GlassSurface>,
+    );
+    expect(
+      root.find((n) => n.props.testID === "glass-surface-blur"),
+    ).toBeTruthy();
+
+    act(() => {
+      setGlobalDisableBlur(true);
+    });
+
+    expect(
+      root.findAll(
+        (n) =>
+          typeof n.type === "string" && n.props.testID === "glass-surface-blur",
+      ),
+    ).toHaveLength(0);
+    expect(
+      root.find((n) => n.props.testID === "glass-surface-fallback"),
+    ).toBeTruthy();
+  });
+
+  it("rounds the border overlay with the borderRadius passed via style", () => {
+    const root = render(
+      <GlassSurface testID="surface" disableBlur style={{ borderRadius: 16 }}>
+        <Text>Content</Text>
+      </GlassSurface>,
+    );
+    const bordered = root.findAll((n) => {
+      if (typeof n.type !== "string") return false;
+      const flat = Array.isArray(n.props.style)
+        ? Object.assign({}, ...n.props.style.filter(Boolean))
+        : (n.props.style ?? {});
+      return flat.borderWidth === 1;
+    });
+    expect(bordered).toHaveLength(1);
+    const flat = Object.assign(
+      {},
+      ...(bordered[0].props.style as object[]).filter(Boolean),
+    );
+    expect(flat.borderRadius).toBe(16);
+  });
+
   describe("AA on the opaque fallback (AC7)", () => {
     it.each(THEME_IDS)(
-      "meets >=4.5:1 contrast against foreground for %s in light and dark",
+      "meets every consumer ink's bar for %s in light and dark",
       (themeId) => {
         for (const scheme of ["light", "dark"] as const) {
           const tokens = getThemeTokens(themeId, scheme);
+          const requirements = glassInkRequirements(tokens.colors);
           const fill = resolveOpaqueGlassFill(
             tokens.glass,
             tokens.colors.surface,
-            tokens.colors.foreground,
+            requirements,
           );
-          expect(
-            contrastRatio(fill, tokens.colors.foreground),
-          ).toBeGreaterThanOrEqual(4.5);
+          for (const [ink, min] of requirements) {
+            expect(
+              contrastRatio(fill, ink),
+              `${themeId}/${scheme} ink ${ink}`,
+            ).toBeGreaterThanOrEqual(min);
+          }
         }
       },
     );
@@ -156,7 +211,7 @@ describe("GlassSurface", () => {
       const expectedFill = resolveOpaqueGlassFill(
         tokens.glass,
         tokens.colors.surface,
-        tokens.colors.foreground,
+        glassInkRequirements(tokens.colors),
       );
       const fallback = root.find(
         (n) => n.props.testID === "glass-surface-fallback",

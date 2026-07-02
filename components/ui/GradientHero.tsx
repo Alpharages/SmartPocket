@@ -1,9 +1,9 @@
-import React, { useContext } from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, View, type ViewProps } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
-import { ThemeContext } from "@/lib/theme-provider";
-import { DEFAULT_THEME_ID, getThemeTokens } from "@/lib/_core/theme";
+import { useThemeTokens } from "@/lib/theme-provider";
+import { resolveGradientInk } from "@/lib/_core/glass";
 
 export type GradientHeroProps = ViewProps & {
   /** Force the solid-color fallback regardless of gradient availability —
@@ -30,8 +30,11 @@ function angleToPoints(angle: number): {
  * Theme hero-gradient backdrop primitive (RDR-3). Renders the active theme's
  * hero `gradient` stops via `expo-linear-gradient`, with a solid-color
  * fallback (the first stop) when the gradient path is unavailable or
- * `disableGradient` is set. Story 12.4 builds the balance hero content on
- * top of this backdrop — 12.3 only delivers the reusable layer.
+ * `disableGradient` is set. When even the better ink can't clear AA against
+ * every stop, a minimal contrast scrim is layered over the backdrop (both
+ * branches) so text via `resolveGradientInk` stays readable (AC7). Story
+ * 12.4 builds the balance hero content on top of this backdrop — 12.3 only
+ * delivers the reusable layer.
  */
 export function GradientHero({
   disableGradient,
@@ -39,10 +42,10 @@ export function GradientHero({
   children,
   ...rest
 }: GradientHeroProps) {
-  const ctx = useContext(ThemeContext);
-  const theme = ctx?.theme ?? getThemeTokens(DEFAULT_THEME_ID, "light");
+  const theme = useThemeTokens();
   const { colors, angle } = theme.gradient;
   const useGradient = !disableGradient;
+  const { scrim } = useMemo(() => resolveGradientInk(colors), [colors]);
 
   return (
     <View style={[styles.container, style]} {...rest}>
@@ -65,6 +68,13 @@ export function GradientHero({
           pointerEvents="none"
         />
       )}
+      {scrim ? (
+        <View
+          testID="gradient-hero-scrim"
+          style={[StyleSheet.absoluteFill, { backgroundColor: scrim }]}
+          pointerEvents="none"
+        />
+      ) : null}
       {children}
     </View>
   );
