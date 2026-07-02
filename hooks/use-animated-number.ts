@@ -39,9 +39,17 @@ export function useAnimatedNumber(
 
   useEffect(() => {
     if (reducedMotion) return;
-    const id = setInterval(() => setDisplay(shared.value), SYNC_INTERVAL_MS);
+    // Poll the UI-thread value into JS state, but stop once the tween has
+    // landed on `target` — otherwise the timer fires every frame for the
+    // component's whole lifetime. Retargeting re-runs this effect (target is
+    // a dep), which restarts polling toward the new value.
+    const id = setInterval(() => {
+      const next = shared.value;
+      setDisplay(next);
+      if (next === target) clearInterval(id);
+    }, SYNC_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [reducedMotion, shared]);
+  }, [reducedMotion, shared, target]);
 
   return display;
 }

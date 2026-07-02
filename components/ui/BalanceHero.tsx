@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { View, Text, StyleSheet, type ViewProps } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { useCurrency } from "@/lib/currency-provider";
 import {
   formatCurrency,
@@ -72,7 +72,11 @@ export function BalanceHero({
   style,
   ...viewProps
 }: BalanceHeroProps) {
-  const colors = useColors();
+  // Inks come from the SAME active-theme source the surfaces use
+  // (GradientHero/GlassSurface also read useThemeTokens) — never the
+  // theme-agnostic useColors(), which is frozen to the default theme and
+  // would leave text on Aurora's palette under Obsidian/Spectrum (AC1/AC5).
+  const { colors } = useThemeTokens();
   const { currency, isReady } = useCurrency();
   const showLoading = loading || !isReady;
 

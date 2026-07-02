@@ -1,4 +1,5 @@
 import React from "react";
+import { StyleSheet } from "react-native";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TestRenderer, {
   act,
@@ -133,6 +134,11 @@ function getHeroNode(root: ReactTestInstance): ReactTestInstance {
   return root.find((n) => n.props.accessibilityRole === "text");
 }
 
+/** The `color` a node actually renders with, after flattening its style. */
+function colorOf(node: ReactTestInstance): string | undefined {
+  return StyleSheet.flatten(node.props.style)?.color as string | undefined;
+}
+
 /** Renders and ticks the count-up hook's sync interval to its settled value. */
 function renderSettled(ui: React.ReactElement): ReactTestInstance {
   vi.useFakeTimers();
@@ -242,15 +248,56 @@ describe("BalanceHero", () => {
   describe("AA over glass surface (AC5)", () => {
     for (const themeId of THEMES) {
       for (const colorScheme of SCHEMES) {
-        it(`fallback fill clears AA for foreground/success/error inks — ${themeId}/${colorScheme}`, () => {
+        it(`rendered inks clear AA over the glass fill — ${themeId}/${colorScheme}`, () => {
+          // Reduced-motion snaps the count-up to its target so the balance
+          // figure renders without advancing timers.
+          vi.spyOn(Reanimated, "useReducedMotion").mockReturnValue(true);
           const theme = getThemeTokens(themeId, colorScheme);
           const fill = resolveOpaqueGlassFill(
             theme.glass,
             theme.colors.surface,
             glassInkRequirements(theme.colors),
           );
-          for (const [ink, minRatio] of glassInkRequirements(theme.colors)) {
-            expect(contrastRatio(fill, ink)).toBeGreaterThanOrEqual(minRatio);
+          const root = renderWithTheme(
+            <BalanceHero balance={1800} income={3000} expense={1200} />,
+            themeId,
+            colorScheme,
+          );
+          // Read the color each Text actually renders with — NOT inks
+          // re-derived from theme tokens — so an ink-source mismatch (e.g.
+          // pulling colors from a theme-agnostic hook) is caught here.
+          const inks: Array<[string | undefined, number]> = [
+            [colorOf(getByText(root, "This Month")), 4.5],
+            [
+              colorOf(
+                getByText(root, formatCurrency(1800, "USD", { sign: "neutral" })),
+              ),
+              4.5,
+            ],
+            [
+              colorOf(
+                getByText(
+                  root,
+                  formatCurrency(3000, "USD", { sign: "positive" }),
+                ),
+              ),
+              3,
+            ],
+            [
+              colorOf(
+                getByText(
+                  root,
+                  formatCurrency(1200, "USD", { sign: "negative" }),
+                ),
+              ),
+              3,
+            ],
+          ];
+          for (const [ink, minRatio] of inks) {
+            expect(ink).toBeTruthy();
+            expect(contrastRatio(fill, ink as string)).toBeGreaterThanOrEqual(
+              minRatio,
+            );
           }
         });
       }
