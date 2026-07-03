@@ -8,6 +8,8 @@ import TestRenderer, {
 import { StyleSheet, Text } from "react-native";
 
 import { GlassTabBar } from "@/components/navigation/GlassTabBar";
+import { contrastRatio } from "@/lib/_core/contrast";
+import { getThemeTokens, THEME_IDS, type ColorScheme } from "@/lib/_core/theme";
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 
@@ -182,6 +184,43 @@ describe("GlassTabBar", () => {
       const style = flat(control.props.style);
       expect(style.minHeight).toBeGreaterThanOrEqual(44);
       expect(style.minWidth).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  it("does not stack routes on a rapid double-tap of the add button", () => {
+    const root = render(<GlassTabBar {...props()} />);
+    const add = root.find(
+      (n) =>
+        typeof n.type === "string" &&
+        n.props.accessibilityLabel === "Add transaction",
+    );
+
+    act(() => {
+      add.props.onPress();
+      add.props.onPress();
+    });
+
+    expect(push).toHaveBeenCalledTimes(1);
+  });
+
+  // AC8: the active `primary` and inactive `muted` tab inks must clear WCAG AA
+  // (4.5:1 for the 11pt labels) over what actually sits behind a docked bar in
+  // this app — the theme's own `background` and `surface`, which is what the blur
+  // path samples. Locked across every theme × variant so a token or glass change
+  // can't silently drop the chrome below AA. (No translucent bar can guarantee AA
+  // over arbitrary full-bleed media — out of scope; this app renders none there.)
+  it("keeps tab inks AA over the theme's real backdrops in every theme × variant", () => {
+    const schemes: ColorScheme[] = ["light", "dark"];
+
+    for (const themeId of THEME_IDS) {
+      for (const scheme of schemes) {
+        const { colors } = getThemeTokens(themeId, scheme);
+        for (const ink of [colors.primary, colors.muted]) {
+          for (const backdrop of [colors.background, colors.surface]) {
+            expect(contrastRatio(ink, backdrop)).toBeGreaterThanOrEqual(4.5);
+          }
+        }
+      }
     }
   });
 });

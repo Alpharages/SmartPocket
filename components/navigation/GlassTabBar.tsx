@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useRef } from "react";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -44,6 +44,12 @@ export function GlassTabBar({
   const routes = state.routes.filter((route) =>
     TAB_ROUTES.includes(route.name),
   );
+
+  // AC8: tab inks are the theme's active `primary` / inactive `muted` tokens,
+  // which are authored AA (>=4.6:1) over the theme's own `background`/`surface` —
+  // the only content that ever sits behind a docked bar in this app (blur samples
+  // theme-colored surfaces, not full-bleed media). GlassTabBar.test locks this in
+  // all themes x variants so a token/glass change can't silently drop below AA.
 
   return (
     <View pointerEvents="box-none" style={styles.wrap}>
@@ -139,9 +145,16 @@ function FloatingAddButton() {
   const { colors } = useThemeTokens();
   const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
   const ink = readableTextOn(colors.accent);
+  // Guard against a rapid double-tap stacking two add-transaction routes.
+  const navigating = useRef(false);
 
   const handlePress = useCallback(() => {
+    if (navigating.current) return;
+    navigating.current = true;
     router.push("/add-transaction");
+    setTimeout(() => {
+      navigating.current = false;
+    }, 600);
   }, []);
 
   return (
