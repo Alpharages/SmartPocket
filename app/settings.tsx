@@ -17,6 +17,7 @@ import { FilterChipGroup } from "@/components/ui/FilterChipGroup";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { SettingsRow } from "@/components/ui/SettingsRow";
 import { Sheet } from "@/components/ui/Sheet";
+import { ThemePickerControl } from "@/components/ui/ThemePicker";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getAppMetadata } from "@/lib/app-metadata";
 import { toTransactionCsv, transactionToExportRow } from "@/lib/csv-export";
@@ -46,8 +47,10 @@ import {
 import { useThemeContext } from "@/lib/theme-provider";
 import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
+import { useTheme } from "@/hooks/use-theme";
 import { Spacing } from "@/lib/_core/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import type { ThemeId } from "@/constants/theme";
 
 const AI_EXPLANATION =
   "Lets SmartPocket suggest categories and answer questions about your spending. Your data is only sent for AI when this is on.";
@@ -497,6 +500,7 @@ export default function SettingsScreen() {
   const { currency, setCurrency } = useCurrency();
   const { firstDayOfWeek, setFirstDayOfWeek } = useFirstDayOfWeek();
   const { themePreference, setThemePreference } = useThemeContext();
+  const { themeId, setThemeId } = useTheme();
   const { aiEnabled, setAiEnabled, isSavingAi, refreshSettings } =
     useSettings();
   const { clearAllData, refreshAll } = useExpense();
@@ -533,6 +537,13 @@ export default function SettingsScreen() {
       void setThemePreference(preference);
     },
     [setThemePreference],
+  );
+
+  const handleSelectThemeId = useCallback(
+    (id: ThemeId) => {
+      void setThemeId(id);
+    },
+    [setThemeId],
   );
 
   const handleToggleAi = useCallback(
@@ -599,6 +610,10 @@ export default function SettingsScreen() {
             onPress={() => setFirstDaySheetVisible(true)}
             accessibilityLabel={`First day of week, ${firstDayLabel}`}
           />
+        </SettingsSectionGroup>
+
+        <SettingsSectionGroup title="Appearance">
+          <ThemePickerControl value={themeId} onChange={handleSelectThemeId} />
           <SectionDivider />
           <ThemePreferenceControl
             value={themePreference}

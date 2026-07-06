@@ -12,6 +12,7 @@ const mockBack = vi.fn();
 const mockSetCurrency = vi.fn().mockResolvedValue(undefined);
 const mockSetFirstDayOfWeek = vi.fn().mockResolvedValue(undefined);
 const mockSetThemePreference = vi.fn().mockResolvedValue(undefined);
+const mockSetThemeId = vi.fn().mockResolvedValue(undefined);
 const mockClearAllData = vi.fn().mockResolvedValue(undefined);
 const mockSetAiEnabled = vi.fn().mockResolvedValue(undefined);
 
@@ -101,6 +102,9 @@ vi.mock("@/lib/theme-provider", () => ({
     themePreference: "system",
     setThemePreference: mockSetThemePreference,
     setColorScheme: vi.fn(),
+    themeId: "aurora",
+    setThemeId: mockSetThemeId,
+    theme: {},
     isReady: true,
   }),
 }));
@@ -163,6 +167,7 @@ afterEach(() => {
   mockSetCurrency.mockClear();
   mockSetFirstDayOfWeek.mockClear();
   mockSetThemePreference.mockClear();
+  mockSetThemeId.mockClear();
   mockClearAllData.mockClear();
   mockSetAiEnabled.mockClear();
 });
@@ -190,6 +195,7 @@ describe("SettingsScreen", () => {
     const root = render(<SettingsScreen />);
     const body = textOf(root);
     expect(body).toContain("Preferences");
+    expect(body).toContain("Appearance");
     expect(body).toContain("Data Management");
     expect(body).toContain("AI");
     expect(body).toContain("About");
@@ -273,10 +279,33 @@ describe("SettingsScreen", () => {
   it("renders theme preference control with Light, Dark, and System options", () => {
     const root = render(<SettingsScreen />);
     const body = textOf(root);
+    expect(body).toContain("Appearance");
     expect(body).toContain("Theme");
     expect(body).toContain("Light");
     expect(body).toContain("Dark");
     expect(body).toContain("System");
+  });
+
+  it("renders theme picker options and active state", () => {
+    const root = render(<SettingsScreen />);
+    const body = textOf(root);
+    expect(body).toContain("Theme style");
+    expect(body).toContain("Aurora Glass");
+    expect(body).toContain("Obsidian & Gold");
+    expect(body).toContain("Midnight Spectrum");
+
+    const active = findPressableByLabel(root, "Aurora Glass, selected");
+    expect(active.props.accessibilityState?.selected).toBe(true);
+  });
+
+  it("calls setThemeId when a theme style is selected", () => {
+    const root = render(<SettingsScreen />);
+
+    act(() => {
+      findPressableByLabel(root, "Obsidian & Gold").props.onPress();
+    });
+
+    expect(mockSetThemeId).toHaveBeenCalledWith("obsidian");
   });
 
   it("does not mark theme as coming soon", () => {
