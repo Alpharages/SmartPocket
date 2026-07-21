@@ -33,6 +33,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { useCurrency } from "@/lib/currency-provider";
 import { getCurrencySymbol } from "@/lib/currency";
 import { Motion, Radius, Spacing, Typography } from "@/lib/_core/theme";
+import { MAX_FONT_SCALE } from "@/lib/_core/a11y";
 import { resolveCategoryColor } from "@/constants/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
@@ -42,7 +43,7 @@ export default function AddTransactionScreen() {
   const router = useRouter();
   // Same active-theme token source the redesigned Sheet/surfaces read —
   // never the theme-agnostic useColors() (frozen to the default theme; AC3).
-  const { colors } = useThemeTokens();
+  const { colors, themeId } = useThemeTokens();
   const { type: queryType } = useLocalSearchParams();
   const scheme = (useColorScheme() ?? "light") as "light" | "dark";
   const {
@@ -133,9 +134,9 @@ export default function AddTransactionScreen() {
     () =>
       filteredCategories.map((cat) => ({
         ...cat,
-        color: resolveCategoryColor(cat.color, scheme),
+        color: resolveCategoryColor(cat.color, scheme, themeId),
       })),
-    [filteredCategories, scheme],
+    [filteredCategories, scheme, themeId],
   );
 
   return (
@@ -237,6 +238,7 @@ export default function AddTransactionScreen() {
                 fontSize: Typography.h2.fontSize,
                 fontWeight: "700",
               }}
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
             />
           </View>
         </View>

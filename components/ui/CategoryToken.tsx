@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/use-colors";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { cn } from "@/lib/utils";
 import {
   CATEGORY_DEFAULT_COLOR,
@@ -132,6 +133,12 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
   ) => {
     const colors = useColors();
     const scheme = (useColorScheme() ?? "light") as "light" | "dark";
+    // themeId comes from the SAME active-theme source the surface primitives
+    // read (useThemeTokens, falls back to aurora when no ThemeProvider is
+    // mounted) — resolveCategoryColor defaults to aurora's map when this is
+    // omitted, which silently renders Aurora's category swatches under
+    // Obsidian/Spectrum (Lore lesson 6248c582).
+    const { themeId } = useThemeTokens();
     const reducedMotion = useReducedMotion();
     const scale = useSharedValue(1);
 
@@ -143,8 +150,8 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
     // scheme-appropriate variant in one place so all callers stay consistent.
     const resolvedColor = useMemo(() => {
       const safe = isHex6(color) ? color : CATEGORY_DEFAULT_COLOR;
-      return resolveCategoryColor(safe, scheme);
-    }, [color, scheme]);
+      return resolveCategoryColor(safe, scheme, themeId);
+    }, [color, scheme, themeId]);
 
     const animatedStyle = useAnimatedStyle(() => ({
       transform: [{ scale: scale.value }],

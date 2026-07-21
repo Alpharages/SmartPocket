@@ -10,6 +10,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useExpense } from "@/lib/expense-context";
 import AddTransactionScreen from "@/app/add-transaction";
 import { Motion } from "@/lib/_core/theme";
+import { MAX_FONT_SCALE } from "@/lib/_core/a11y";
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -294,6 +295,13 @@ describe("AddTransactionScreen", () => {
       const inputs = root.findAllByType("TextInput" as any);
       const amountInput = inputs[0];
       expect(amountInput.props.keyboardType).toBe("decimal-pad");
+    });
+
+    it("amount TextInput caps dynamic-type scaling at MAX_FONT_SCALE (Story 12.10, AC5)", () => {
+      const root = render(<AddTransactionScreen />);
+      const inputs = root.findAllByType("TextInput" as any);
+      const amountInput = inputs[0];
+      expect(amountInput.props.maxFontSizeMultiplier).toBe(MAX_FONT_SCALE);
     });
   });
 
