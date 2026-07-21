@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import {
+  Easing,
   useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 
-const DEFAULT_DURATION_MS = 500;
+import { Motion } from "@/lib/_core/theme";
+
+const DEFAULT_DURATION_MS = Motion.countUp.durationMs;
 /** ~60fps mirror of the UI-thread shared value into JS state — Reanimated has
  * no first-class "animated numeric text" primitive, so Text content is kept
  * in sync by polling `.value` rather than driving a native style. */
@@ -34,7 +37,10 @@ export function useAnimatedNumber(
       setDisplay(target);
       return;
     }
-    shared.value = withTiming(target, { duration: durationMs });
+    shared.value = withTiming(target, {
+      duration: durationMs,
+      easing: Easing.out(Easing.cubic),
+    });
   }, [target, reducedMotion, durationMs, shared]);
 
   useEffect(() => {

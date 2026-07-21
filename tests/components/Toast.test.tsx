@@ -5,6 +5,7 @@ import TestRenderer, {
   type ReactTestInstance,
   type ReactTestRenderer,
 } from "react-test-renderer";
+import * as Reanimated from "react-native-reanimated";
 
 import { Toast } from "@/components/ui/Toast";
 import { ToastProvider, useToast } from "@/components/ui/ToastProvider";
@@ -64,7 +65,16 @@ afterEach(() => {
     renderer?.unmount();
   });
   renderer = null;
+  vi.restoreAllMocks();
 });
+
+/** Extract the `scale` transform value from a node's flattened style, if present. */
+function scaleOf(node: ReactTestInstance): number | undefined {
+  const transform = flatStyle(node).transform as
+    | { scale?: number }[]
+    | undefined;
+  return transform?.find((t) => "scale" in t)?.scale;
+}
 
 function findByTestId(root: ReactTestInstance, id: string): ReactTestInstance {
   return root.find((n) => n.props.testID === id);
@@ -214,6 +224,29 @@ describe("Toast item", () => {
     expect(findByTestId(root, "toast-t-lr").props.accessibilityLiveRegion).toBe(
       "polite",
     );
+  });
+
+  // Story 12.9 (AC5): success toasts get a subtle scale-in "celebration" pop.
+  it("AC5 (12.9): success toast starts scaled down for its celebration pop", () => {
+    const root = render(
+      <Toast id="t-cel" type="success" message="Saved!" onDismiss={vi.fn()} />,
+    );
+    expect(scaleOf(findByTestId(root, "toast-t-cel"))).toBeLessThan(1);
+  });
+
+  it("AC5 (12.9): non-success toasts never get the celebration pop", () => {
+    const root = render(
+      <Toast id="t-info2" type="info" message="hi" onDismiss={vi.fn()} />,
+    );
+    expect(scaleOf(findByTestId(root, "toast-t-info2"))).toBe(1);
+  });
+
+  it("AC6 (12.9): reduced motion — success toast has no pop, no layout shift", () => {
+    vi.spyOn(Reanimated, "useReducedMotion").mockReturnValue(true);
+    const root = render(
+      <Toast id="t-rm" type="success" message="Saved!" onDismiss={vi.fn()} />,
+    );
+    expect(scaleOf(findByTestId(root, "toast-t-rm"))).toBe(1);
   });
 });
 

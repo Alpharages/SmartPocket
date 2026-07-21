@@ -105,14 +105,44 @@ const tailwindBoxShadow = {
   lg: "0 10px 15px -3px rgba(17, 24, 39, 0.12), 0 4px 6px -4px rgba(17, 24, 39, 0.10)",
 };
 
-/** Sheet / modal motion — ~250ms fade + slide (Story 1.9). */
+/**
+ * Full micro-interaction motion surface (Story 12.9, RDR-8). Single source of
+ * truth for every timing/easing/spring token — no component hardcodes a
+ * duration/easing/scale literal. `sheet` predates this story (Story 1.9) and
+ * keeps its shape; `press`/`screen`/`countUp`/`celebration` are new here.
+ */
 const motion = {
+  /** Press micro-interaction: scale-down + light haptic (usePressFeedback). */
+  press: {
+    scale: 0.97,
+    durationMs: 120,
+  },
+  /** Sheet / modal motion — ~250ms fade + slide (Story 1.9). */
   sheet: {
     durationMs: 250,
     /** Maps to Reanimated Easing.out(Easing.cubic) in Sheet.tsx */
     easing: "easeOutCubic",
     backdropOpacity: 0.65,
     dragDismissThreshold: 0.35,
+  },
+  /** Full-screen route transitions (e.g. budget-form's slide-up panel). */
+  screen: {
+    durationMs: 280,
+    /** Maps to Reanimated Easing.out(Easing.cubic). */
+    easing: "easeOutCubic",
+  },
+  /** Balance/figure count-up tween (e.g. BalanceHero). */
+  countUp: {
+    durationMs: 700,
+    /** Maps to Reanimated Easing.out(Easing.cubic). */
+    easing: "easeOut",
+  },
+  /** Subtle save-confirmation pop (e.g. success Toast). */
+  celebration: {
+    durationMs: 220,
+    scaleFrom: 0.85,
+    /** Maps to Reanimated Easing.out(Easing.back(1.7)). */
+    easing: "easeOutBack",
   },
 };
 
@@ -139,8 +169,18 @@ const auroraTheme = {
     light: { colors: ["#818CF8", "#C4B5FD", "#67E8F9"], angle: 135 },
   },
   glass: {
-    dark: { blur: 24, tint: "#FFFFFF", surfaceOpacity: 0.08, borderOpacity: 0.16 },
-    light: { blur: 20, tint: "#FFFFFF", surfaceOpacity: 0.6, borderOpacity: 0.4 },
+    dark: {
+      blur: 24,
+      tint: "#FFFFFF",
+      surfaceOpacity: 0.08,
+      borderOpacity: 0.16,
+    },
+    light: {
+      blur: 20,
+      tint: "#FFFFFF",
+      surfaceOpacity: 0.6,
+      borderOpacity: 0.4,
+    },
   },
   elevation,
   motion,
@@ -168,8 +208,18 @@ const obsidianTheme = {
     light: { colors: ["#FDF7E8", "#F5EAD0"], angle: 135 }, // ivory & warm gold
   },
   glass: {
-    dark: { blur: 24, tint: "#CA8A04", surfaceOpacity: 0.06, borderOpacity: 0.2 },
-    light: { blur: 18, tint: "#CA8A04", surfaceOpacity: 0.12, borderOpacity: 0.3 },
+    dark: {
+      blur: 24,
+      tint: "#CA8A04",
+      surfaceOpacity: 0.06,
+      borderOpacity: 0.2,
+    },
+    light: {
+      blur: 18,
+      tint: "#CA8A04",
+      surfaceOpacity: 0.12,
+      borderOpacity: 0.3,
+    },
   },
   elevation,
   motion,
@@ -208,8 +258,18 @@ const spectrumTheme = {
     light: { colors: ["#A78BFA", "#F472B6", "#FBBF24"], angle: 135 },
   },
   glass: {
-    dark: { blur: 28, tint: "#A855F7", surfaceOpacity: 0.1, borderOpacity: 0.22 },
-    light: { blur: 20, tint: "#A855F7", surfaceOpacity: 0.14, borderOpacity: 0.3 },
+    dark: {
+      blur: 28,
+      tint: "#A855F7",
+      surfaceOpacity: 0.1,
+      borderOpacity: 0.22,
+    },
+    light: {
+      blur: 20,
+      tint: "#A855F7",
+      surfaceOpacity: 0.14,
+      borderOpacity: 0.3,
+    },
   },
   elevation,
   motion,

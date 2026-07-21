@@ -99,7 +99,11 @@ vi.mock("@/lib/_core/theme", () => ({
   getElevationStyle: () => ({}),
   ...TOKENS,
   Motion: {
+    press: { scale: 0.97, durationMs: 120 },
     sheet: { durationMs: 300, closeDurationMs: 250 },
+    screen: { durationMs: 280, easing: "easeOutCubic" },
+    countUp: { durationMs: 700, easing: "easeOut" },
+    celebration: { durationMs: 220, scaleFrom: 0.85, easing: "easeOutBack" },
     fade: { durationMs: 200 },
   },
   Elevation: {
