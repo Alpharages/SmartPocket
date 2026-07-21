@@ -14,7 +14,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { cn } from "@/lib/utils";
 
@@ -61,7 +61,9 @@ export const Pill = forwardRef<PillRef, PillProps>(
     },
     ref,
   ) => {
-    const colors = useColors();
+    // Same active-theme token source the surface primitives read — never
+    // the theme-agnostic useColors() (frozen to the default theme; AC3).
+    const { colors } = useThemeTokens();
     const reducedMotion = useReducedMotion();
     const scale = useSharedValue(1);
 

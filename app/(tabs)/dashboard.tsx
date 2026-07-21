@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import {
   RefreshControl,
   ScrollView,
+  StyleSheet,
   View,
   Text,
   Pressable,
@@ -11,7 +12,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { ResponsiveContent } from "@/components/responsive-content";
 import { useExpense } from "@/lib/expense-context";
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { useBreakpoints } from "@/hooks/use-breakpoint";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,13 +23,22 @@ import {
   Button,
   TransactionRow,
   EmptyState,
+  GlassSurface,
 } from "@/components/ui";
-import { ContentMaxWidth, Spacing } from "@/lib/_core/theme";
+import {
+  ContentMaxWidth,
+  Radius,
+  Spacing,
+  getElevationStyle,
+} from "@/lib/_core/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const colors = useColors();
+  // Same active-theme token source the surfaces (BalanceHero/GlassSurface)
+  // read — never the theme-agnostic useColors() (frozen to the default
+  // theme; AC1/AC3).
+  const { colors } = useThemeTokens();
   const { isLg } = useBreakpoints();
   const {
     transactions,
@@ -95,16 +105,16 @@ export default function DashboardScreen() {
         </View>
       ) : recentTransactions.length > 0 ? (
         <View
-          className="rounded-3xl overflow-hidden"
-          style={{
-            backgroundColor: colors.surface,
-            shadowColor: colors.foreground,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
-            elevation: 2,
-          }}
+          className="rounded-2xl overflow-hidden"
+          style={getElevationStyle("sm", colors.foreground)}
         >
+          {/* Frosted glass surface, opaque AA-safe tint fallback when blur is
+           * unsupported/disabled (Story 12.3, RDR-3) — borderRadius matches
+           * the rounded-2xl container so the surface's 1px border stroke
+           * rounds with the card instead of being clipped square. */}
+          <GlassSurface
+            style={[StyleSheet.absoluteFill, { borderRadius: Radius.lg }]}
+          />
           <FlatList
             data={recentTransactions}
             keyExtractor={(item) => item.id.toString()}

@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import Animated from "react-native-reanimated";
 
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { Radius, getElevationStyle } from "@/lib/_core/theme";
@@ -104,7 +104,11 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
     },
     ref,
   ) => {
-    const colors = useColors();
+    // Inks/fills come from the active-theme token source (same one the
+    // surface primitives read) — never the theme-agnostic useColors(),
+    // which is frozen to the default theme and would leave every button
+    // on Aurora's palette under Obsidian/Spectrum (AC3).
+    const { colors } = useThemeTokens();
 
     // Dev-time guard: icon-only must have accessibilityLabel
     if (__DEV__ && variant === "icon-only" && !accessibilityLabel) {

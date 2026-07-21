@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Swipeable } from "react-native-gesture-handler";
 import * as Haptics from "expo-haptics";
 
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { useCurrency } from "@/lib/currency-provider";
 import { formatSignedCurrency } from "@/lib/currency";
 import { Typography } from "@/lib/_core/theme";
@@ -135,7 +135,9 @@ export function TransactionRow({
   className,
   style,
 }: TransactionRowProps) {
-  const colors = useColors();
+  // Same active-theme token source the surface primitives read — never
+  // the theme-agnostic useColors() (frozen to the default theme; AC3).
+  const { colors } = useThemeTokens();
   const { currency, isReady } = useCurrency();
   const reducedMotion = useReducedMotion();
   const scale = useSharedValue(1);

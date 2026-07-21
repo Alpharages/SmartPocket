@@ -9,6 +9,7 @@ import TestRenderer, {
 import { useLocalSearchParams } from "expo-router";
 import { useExpense } from "@/lib/expense-context";
 import AddTransactionScreen from "@/app/add-transaction";
+import { Motion } from "@/lib/_core/theme";
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -155,16 +156,6 @@ vi.mock("@/constants/theme", async (importActual) => ({
   resolveCategoryColor: (color: string) => color,
 }));
 
-vi.mock("react-native/Libraries/Modal/Modal", () => ({
-  default: ({
-    children,
-    visible,
-  }: {
-    children: React.ReactNode;
-    visible: boolean;
-  }) => (visible ? React.createElement("Modal", {}, children) : null),
-}));
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -227,16 +218,17 @@ describe("AddTransactionScreen", () => {
   });
 
   describe("AC1 — Primitive composition", () => {
-    it("renders the inline bottom sheet container and panel", () => {
+    it("renders the redesigned Sheet container and panel (noModal, absoluteFill)", () => {
       const root = render(<AddTransactionScreen />);
-      // add-transaction renders its own absoluteFill overlay (no Sheet/Modal)
-      const screen = root.findAll(
-        (n) => (n.props as any).testID === "add-transaction-screen",
+      // add-transaction now re-hosts its form onto the shared <Sheet noModal>
+      // (Story 12.7) instead of a bespoke absoluteFill overlay.
+      const container = root.findAll(
+        (n) => (n.props as any).testID === "add-transaction",
       );
       const panel = root.findAll(
         (n) => (n.props as any).testID === "add-transaction-panel",
       );
-      expect(screen.length).toBeGreaterThanOrEqual(1);
+      expect(container.length).toBeGreaterThanOrEqual(1);
       expect(panel.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -429,8 +421,13 @@ describe("AddTransactionScreen", () => {
       expect(payload.description).toBeUndefined();
       expect(payload.date).toBeInstanceOf(Date);
 
-      // close() → withTiming(0, ..., callback) → callback calls router.back()
-      // withTiming mock calls callback synchronously, so back() is called immediately.
+      // close() hides the Sheet (setVisible(false)); the route waits for the
+      // Sheet's own close animation (Motion.sheet.durationMs) before popping
+      // via router.back().
+      expect(mockBack).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(Motion.sheet.durationMs);
+      });
       expect(mockBack).toHaveBeenCalledOnce();
     });
 
@@ -475,6 +472,7 @@ describe("AddTransactionScreen", () => {
     });
 
     it("Cancel button triggers close and calls router.back()", () => {
+      vi.useFakeTimers();
       const root = render(<AddTransactionScreen />);
       const cancelBtn = findAllByRole(root, "button").find(
         (b) => collectText(b) === "Cancel",
@@ -482,7 +480,11 @@ describe("AddTransactionScreen", () => {
       act(() => {
         cancelBtn!.props.onPress();
       });
-      // withTiming mock calls callback synchronously → router.back() is immediate.
+      // Cancel hides the Sheet; router.back() fires after its close animation.
+      expect(mockBack).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(Motion.sheet.durationMs);
+      });
       expect(mockBack).toHaveBeenCalledOnce();
     });
 
