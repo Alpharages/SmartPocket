@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { View, Text, type StyleProp, type ViewStyle } from "react-native";
 
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { cn } from "@/lib/utils";
 import { Radius, Spacing } from "@/constants/theme";
 import { CategoryToken } from "./CategoryToken";
@@ -69,7 +69,9 @@ export function CategoryPickerGrid({
   className,
   style,
 }: CategoryPickerGridProps) {
-  const colors = useColors();
+  // Same active-theme token source the surface primitives read — never
+  // the theme-agnostic useColors() (frozen to the default theme; AC3).
+  const { colors } = useThemeTokens();
 
   const orderedCategories = useMemo(() => {
     if (

@@ -1,7 +1,7 @@
 import React from "react";
 import { Text, View } from "react-native";
 
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { Radius, Spacing, Typography } from "@/lib/_core/theme";
 import { Button } from "./Button";
 
@@ -46,7 +46,9 @@ export function EmptyState({
   variant: _variant = "no-data",
   testID = "empty-state",
 }: EmptyStateProps) {
-  const colors = useColors();
+  // Same active-theme token source the surface primitives read — never
+  // the theme-agnostic useColors() (frozen to the default theme; AC3).
+  const { colors } = useThemeTokens();
   const titleTypo = Typography.h3;
   const bodyTypo = Typography.label;
 

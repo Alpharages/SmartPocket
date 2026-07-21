@@ -67,6 +67,10 @@ vi.mock("@/hooks/use-colors", () => ({
   useColors: () => mockColors,
 }));
 
+vi.mock("@/lib/theme-provider", () => ({
+  useThemeTokens: () => ({ colors: mockColors }),
+}));
+
 vi.mock("@/hooks/use-color-scheme", () => ({
   useColorScheme: () => "light",
 }));
@@ -137,7 +141,7 @@ const mockLoan = {
 const mockAddLoan = vi.fn().mockResolvedValue(undefined);
 
 const baseExpenseContext = {
-  loans: [] as typeof mockLoan[],
+  loans: [] as (typeof mockLoan)[],
   loadingLoans: false,
   addLoan: mockAddLoan,
   refreshLoans: vi.fn(),
@@ -165,9 +169,7 @@ function findByTestId(
 }
 
 function findAllTextInputs(root: ReactTestInstance): ReactTestInstance[] {
-  return root.findAll(
-    (n) => String(n.type) === "TextInput",
-  );
+  return root.findAll((n) => String(n.type) === "TextInput");
 }
 
 describe("LoansScreen", () => {
@@ -187,8 +189,7 @@ describe("LoansScreen", () => {
     const root = renderer.root;
     expect(findByTestId(root, "new-loan-button")).toBeDefined();
     const emptyTitle = root.find(
-      (n) =>
-        String(n.type) === "Text" && n.props.children === "No loans yet",
+      (n) => String(n.type) === "Text" && n.props.children === "No loans yet",
     );
     expect(emptyTitle).toBeDefined();
   });
@@ -361,9 +362,7 @@ describe("LoansScreen", () => {
   it("navigates to loan detail when a list item is pressed", () => {
     const renderer = renderScreen({ loans: [mockLoan] });
     const item = findByTestId(renderer.root, "loan-item-0");
-    const pressable = item.find(
-      (n) => n.props.accessibilityRole === "button",
-    );
+    const pressable = item.find((n) => n.props.accessibilityRole === "button");
     act(() => {
       pressable.props.onPress();
     });

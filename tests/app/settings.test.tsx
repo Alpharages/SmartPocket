@@ -103,6 +103,7 @@ vi.mock("@/lib/theme-provider", () => ({
     setColorScheme: vi.fn(),
     isReady: true,
   }),
+  useThemeTokens: () => ({ colors: mockColors }),
 }));
 
 vi.mock("@/components/ui/ToastProvider", () => ({
