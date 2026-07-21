@@ -2,6 +2,7 @@ import React, { useCallback, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
+  StyleSheet,
   View,
   Text,
   Pressable,
@@ -13,17 +14,21 @@ import {
 } from "react-native";
 import { ResponsiveContent } from "@/components/responsive-content";
 import { ScreenContainer } from "@/components/screen-container";
-import { ContentMaxWidth } from "@/lib/_core/theme";
+import { ContentMaxWidth, getElevationStyle } from "@/lib/_core/theme";
 import { useExpense, type Category } from "@/lib/expense-context";
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
-import { CATEGORY_COLOR_LIGHT_VALUES, DEFAULT_CATEGORY_ICON } from "@/constants/theme";
+import {
+  CATEGORY_COLOR_LIGHT_VALUES,
+  DEFAULT_CATEGORY_ICON,
+} from "@/constants/theme";
 import {
   Button,
   CategoryToken,
   ConfirmSheet,
   EmptyState,
+  GlassSurface,
   Sheet,
 } from "@/components/ui";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -103,11 +108,18 @@ function CategoryRow({
 }
 
 export default function CategoriesScreen() {
-  const colors = useColors();
+  // Same active-theme token source the surface primitives read — never
+  // the theme-agnostic useColors() (frozen to the default theme; AC2).
+  const { colors } = useThemeTokens();
   const desktopActionStyle: ViewStyle | undefined =
     Platform.OS === "web" ? { alignSelf: "flex-start" } : undefined;
-  const { categories, loadingCategories, addCategory, deleteCategory, refreshCategories } =
-    useExpense();
+  const {
+    categories,
+    loadingCategories,
+    addCategory,
+    deleteCategory,
+    refreshCategories,
+  } = useExpense();
   const {
     visible: confirmVisible,
     options: confirmOptions,
@@ -201,15 +213,15 @@ export default function CategoriesScreen() {
       {data.length > 0 ? (
         <View
           className="rounded-3xl overflow-hidden"
-          style={{
-            backgroundColor: colors.surface,
-            shadowColor: colors.foreground,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
-            elevation: 2,
-          }}
+          style={getElevationStyle("sm", colors.foreground)}
         >
+          {/* Frosted glass surface, opaque AA-safe tint fallback when blur is
+           * unsupported/disabled (Story 12.3, RDR-3) — borderRadius matches
+           * the rounded-3xl container so the surface's 1px border stroke
+           * rounds with the card instead of being clipped square. */}
+          <GlassSurface
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          />
           <FlatList
             data={data}
             keyExtractor={(item) => item.id.toString()}
@@ -226,10 +238,10 @@ export default function CategoriesScreen() {
           />
         </View>
       ) : (
-        <View
-          className="rounded-3xl overflow-hidden"
-          style={{ backgroundColor: colors.surface }}
-        >
+        <View className="rounded-3xl overflow-hidden">
+          <GlassSurface
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          />
           <EmptyState
             variant="no-data"
             icon={

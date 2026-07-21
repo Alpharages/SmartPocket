@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import {
   RefreshControl,
   ScrollView,
+  StyleSheet,
   View,
   Text,
   Pressable,
@@ -18,7 +19,7 @@ import {
   useExpense,
   type CreditCard as CreditCardRecord,
 } from "@/lib/expense-context";
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import {
@@ -26,12 +27,13 @@ import {
   ConfirmSheet,
   CreditCard,
   EmptyState,
+  GlassSurface,
   ScreenHeader,
   Sheet,
 } from "@/components/ui";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/hooks/use-confirm";
-import { ContentMaxWidth } from "@/lib/_core/theme";
+import { ContentMaxWidth, getElevationStyle } from "@/lib/_core/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import {
   isCardFormValid,
@@ -79,7 +81,9 @@ function CardFormFields({
   onChange: (patch: Partial<CardFormValues>) => void;
   onSelectColor: (color: string) => void;
 }) {
-  const colors = useColors();
+  // Same active-theme token source the surface primitives read — never
+  // the theme-agnostic useColors() (frozen to the default theme; AC4).
+  const { colors } = useThemeTokens();
 
   return (
     <>
@@ -318,7 +322,9 @@ function CardFormFields({
 
 export default function CardsScreen() {
   const router = useRouter();
-  const colors = useColors();
+  // Same active-theme token source the surface primitives read — never
+  // the theme-agnostic useColors() (frozen to the default theme; AC4).
+  const { colors } = useThemeTokens();
   const {
     creditCards,
     loadingCards,
@@ -557,8 +563,16 @@ export default function CardsScreen() {
               <Animated.View
                 entering={FadeInUp.delay(150).duration(500)}
                 className="rounded-3xl overflow-hidden"
-                style={{ backgroundColor: colors.surface }}
+                style={getElevationStyle("sm", colors.foreground)}
               >
+                {/* Frosted glass surface, opaque AA-safe tint fallback when blur
+                 * is unsupported/disabled (Story 12.3, RDR-3) — borderRadius
+                 * matches the rounded-3xl container so the surface's 1px
+                 * border stroke rounds with the card instead of being
+                 * clipped square. */}
+                <GlassSurface
+                  style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+                />
                 <EmptyState
                   variant="no-data"
                   icon={
