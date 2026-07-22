@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { useThemeTokens } from "@/lib/theme-provider";
 import { resolveGradientInk } from "@/lib/_core/glass";
+import { useGlassCapability } from "@/hooks/use-glass-capability";
 
 export type GradientHeroProps = ViewProps & {
   /** Force the solid-color fallback regardless of gradient availability —
@@ -44,7 +45,11 @@ export function GradientHero({
 }: GradientHeroProps) {
   const theme = useThemeTokens();
   const { colors, angle } = theme.gradient;
-  const useGradient = !disableGradient;
+  const { gradientComplexity } = useGlassCapability();
+  // The per-instance prop always wins (mirrors GlassSurface's disableBlur
+  // contract); otherwise the 12.11 capability gate's device-tier/
+  // reduced-motion signal decides whether the full gradient renders.
+  const useGradient = !(disableGradient ?? gradientComplexity === "reduced");
   const { scrim } = useMemo(() => resolveGradientInk(colors), [colors]);
 
   return (

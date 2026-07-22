@@ -118,8 +118,12 @@ function formatDate(date: string | Date): string {
  *   typography, elevation) and never hardcodes px/hex.
  * - Colors come from useColors() / constants/theme.ts.
  * - Presentational only — screens pass data in via props.
+ *
+ * Wrapped in `React.memo` (Story 12.11, AC1) — skips re-rendering rows whose
+ * props are referentially unchanged, e.g. when a sibling row's press state
+ * updates during Activity/Insights list scrolling.
  */
-export function TransactionRow({
+function TransactionRowImpl({
   title,
   date,
   amount,
@@ -355,3 +359,6 @@ export function TransactionRow({
 
   return rowContent;
 }
+
+export const TransactionRow = React.memo(TransactionRowImpl);
+TransactionRow.displayName = "TransactionRow";
