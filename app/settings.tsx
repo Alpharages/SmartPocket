@@ -12,6 +12,7 @@ import { useRouter, type Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { ScreenContainer } from "@/components/screen-container";
+import { AiConsentCard, AI_EXPLANATION } from "@/components/ui/AiConsentCard";
 import { Button } from "@/components/ui/Button";
 import { FilterChipGroup } from "@/components/ui/FilterChipGroup";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
@@ -38,6 +39,7 @@ import {
 } from "@/lib/first-day-of-week";
 import { useFirstDayOfWeek } from "@/lib/first-day-of-week-provider";
 import { useSettings } from "@/lib/settings-provider";
+import { useAiConsent } from "@/hooks/use-ai-consent";
 import { shareFile } from "@/lib/share-file";
 import {
   THEME_PREFERENCE_OPTIONS,
@@ -48,9 +50,6 @@ import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { Spacing } from "@/lib/_core/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-
-const AI_EXPLANATION =
-  "Lets SmartPocket suggest categories and answer questions about your spending. Your data is only sent for AI when this is on.";
 
 function SettingsSectionGroup({
   title,
@@ -499,6 +498,7 @@ export default function SettingsScreen() {
   const { themePreference, setThemePreference } = useThemeContext();
   const { aiEnabled, setAiEnabled, isSavingAi, refreshSettings } =
     useSettings();
+  const aiConsent = useAiConsent();
   const { clearAllData, refreshAll } = useExpense();
   const [currencySheetVisible, setCurrencySheetVisible] = useState(false);
   const [firstDaySheetVisible, setFirstDaySheetVisible] = useState(false);
@@ -537,9 +537,13 @@ export default function SettingsScreen() {
 
   const handleToggleAi = useCallback(
     (enabled: boolean) => {
-      void setAiEnabled(enabled);
+      if (enabled) {
+        aiConsent.requestConsent();
+        return;
+      }
+      void setAiEnabled(false);
     },
-    [setAiEnabled],
+    [aiConsent, setAiEnabled],
   );
 
   const firstDayLabel = getFirstDayOfWeekLabel(firstDayOfWeek);
@@ -654,7 +658,7 @@ export default function SettingsScreen() {
         <SettingsSectionGroup title="AI">
           <AiToggleControl
             enabled={aiEnabled}
-            disabled={isSavingAi}
+            disabled={isSavingAi || aiConsent.enabling}
             onChange={handleToggleAi}
           />
         </SettingsSectionGroup>
@@ -700,6 +704,12 @@ export default function SettingsScreen() {
         onClose={() => setExportJsonSheetVisible(false)}
         format="json"
         currency={currency}
+      />
+      <AiConsentCard
+        visible={aiConsent.visible}
+        onEnable={aiConsent.enable}
+        onDismiss={aiConsent.dismiss}
+        enabling={aiConsent.enabling}
       />
     </ScreenContainer>
   );

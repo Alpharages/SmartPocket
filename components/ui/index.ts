@@ -42,6 +42,8 @@ export { ToastProvider, useToast } from "./ToastProvider";
 export type { ShowToastOptions } from "./ToastProvider";
 export { ConfirmSheet } from "./ConfirmSheet";
 export type { ConfirmOptions, ConfirmSheetProps } from "./ConfirmSheet";
+export { AiConsentCard, AI_EXPLANATION } from "./AiConsentCard";
+export type { AiConsentCardProps } from "./AiConsentCard";
 export { TwoPaneLayout } from "./TwoPaneLayout";
 export type { TwoPaneLayoutProps } from "./TwoPaneLayout";
 export { SettingsRow } from "./SettingsRow";
