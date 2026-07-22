@@ -5,7 +5,8 @@ Audience: human QA tester, black-box only (no code access required).
 
 This is the manual verification pass for the automated AA gate in
 `tests/a11y/contrast-themes.test.ts`, `tests/lib/glass.test.ts`,
-`tests/theme-aa-contrast.test.ts`, and `tests/a11y/touch-targets.test.tsx`.
+`tests/theme-aa-contrast.test.ts`, `tests/a11y/touch-targets.test.tsx`, and
+`tests/a11y/color-independence.test.tsx`.
 Automated tests prove the _tokens_ and _primitives_ clear WCAG 2.1 AA math;
 this checklist is where a human confirms it _looks and behaves_ right on a
 real device, and covers what code alone can't (real blur rendering, VoiceOver
@@ -39,7 +40,7 @@ behavior, actual OS dynamic-type scaling).
 
 | #   | Theme × Variant           | Contrast (body/secondary/icons/category/on-glass/on-gradient) | Touch targets ≥44×44pt | Screen-reader labels | Dynamic type to 200% | Color-independent income/expense | Status                                                                                                                                                       |
 | --- | ------------------------- | ------------------------------------------------------------- | ---------------------- | -------------------- | -------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Aurora Glass · Dark       | ☐                                                             | ☐                      | ☐                    | ☐                    | ☐                                | **Verified** — `tests/a11y/contrast-themes.test.ts`, `tests/lib/glass.test.ts`, `tests/a11y/touch-targets.test.tsx`, `tests/components/BalanceHero.test.tsx` |
+| 1   | Aurora Glass · Dark       | ☐                                                             | ☐                      | ☐                    | ☐                    | ☐                                | **Verified** — `tests/a11y/contrast-themes.test.ts`, `tests/lib/glass.test.ts`, `tests/a11y/touch-targets.test.tsx`, `tests/a11y/color-independence.test.tsx`, `tests/components/BalanceHero.test.tsx` |
 | 2   | Aurora Glass · Light      | ☐                                                             | ☐                      | ☐                    | ☐                    | ☐                                | **Verified** — same suites as above                                                                                                                          |
 | 3   | Obsidian & Gold · Dark    | ☐                                                             | ☐                      | ☐                    | ☐                    | ☐                                | **Verified** (registry/primitives level) — Settings has no theme picker yet (Story 12.6), so this can only be exercised via `app/dev/theme-lab.tsx` today    |
 | 4   | Obsidian & Gold · Light   | ☐                                                             | ☐                      | ☐                    | ☐                    | ☐                                | **Verified** (registry/primitives level) — same caveat as #3                                                                                                 |
@@ -49,10 +50,17 @@ behavior, actual OS dynamic-type scaling).
 "Verified" above means: the theme registry's semantic tokens, category
 colors, on-glass fill (`GlassSurface`), and on-gradient text (`GradientHero`,
 `BalanceHero`, `StatCard` hero) all clear WCAG 2.1 AA for this combination,
-and the shared `components/ui/*` primitives (Button, Pill, CategoryToken,
+the shared `components/ui/*` primitives (Button, Pill, CategoryToken,
 TransactionRow, Sheet, Toast, Skeleton, EmptyState) keep their ≥44pt touch
-targets under this theme. Check the boxes above once a human has confirmed
-the same on a real device/build.
+targets under this theme, and `BalanceHero`'s income/expense split is
+distinguished by icon shape (arrow-down vs arrow-up) and sign (+/-), not
+color alone (`tests/a11y/color-independence.test.tsx` — added this session;
+prior to this the "Color-independent income/expense" column was marked
+Verified on inherited Story 1.19 behavior with no assertion in this change).
+`TransactionRow`'s sign-prefix behavior (also color-independent, via its
+category icon + explicit +/- text) is separately covered by the pre-existing
+`tests/components/a11y-audit.test.tsx`. Check the boxes above once a human
+has confirmed the same on a real device/build.
 
 ## Per-screen coverage
 
