@@ -7,20 +7,15 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { Swipeable } from "react-native-gesture-handler";
-import * as Haptics from "expo-haptics";
 
 import { useThemeTokens } from "@/lib/theme-provider";
 import { useCurrency } from "@/lib/currency-provider";
 import { formatSignedCurrency } from "@/lib/currency";
 import { Typography } from "@/lib/_core/theme";
+import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { cn } from "@/lib/utils";
 import { CategoryToken } from "./CategoryToken";
 
@@ -118,8 +113,12 @@ function formatDate(date: string | Date): string {
  *   typography, elevation) and never hardcodes px/hex.
  * - Colors come from useColors() / constants/theme.ts.
  * - Presentational only — screens pass data in via props.
+ *
+ * Wrapped in `React.memo` (Story 12.11, AC1) — skips re-rendering rows whose
+ * props are referentially unchanged, e.g. when a sibling row's press state
+ * updates during Activity/Insights list scrolling.
  */
-export function TransactionRow({
+function TransactionRowImpl({
   title,
   date,
   amount,
@@ -139,29 +138,17 @@ export function TransactionRow({
   // the theme-agnostic useColors() (frozen to the default theme; AC3).
   const { colors } = useThemeTokens();
   const { currency, isReady } = useCurrency();
-  const reducedMotion = useReducedMotion();
-  const scale = useSharedValue(1);
+  const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
 
   const hasSwipeActions = Boolean(onEdit || onDelete);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
   const handlePressIn = useCallback(() => {
-    if (!reducedMotion) {
-      scale.value = withTiming(0.97, { duration: 120 });
-    }
-    if (process.env.EXPO_OS === "ios") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    }
-  }, [reducedMotion, scale]);
+    onPressIn();
+  }, [onPressIn]);
 
   const handlePressOut = useCallback(() => {
-    if (!reducedMotion) {
-      scale.value = withTiming(1, { duration: 120 });
-    }
-  }, [reducedMotion, scale]);
+    onPressOut();
+  }, [onPressOut]);
 
   const handlePress = useCallback(() => {
     onPress?.();
@@ -355,3 +342,6 @@ export function TransactionRow({
 
   return rowContent;
 }
+
+export const TransactionRow = React.memo(TransactionRowImpl);
+TransactionRow.displayName = "TransactionRow";

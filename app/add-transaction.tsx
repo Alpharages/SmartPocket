@@ -123,6 +123,7 @@ export default function AddTransactionScreen() {
       date,
       accountId: selectedAccount ?? undefined,
     });
+    toast.show({ type: "success", message: "Transaction saved" });
     close();
   };
 

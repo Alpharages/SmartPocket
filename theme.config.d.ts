@@ -84,11 +84,28 @@ export const tailwindBoxShadow: {
 };
 
 export const motion: {
+  press: {
+    scale: number;
+    durationMs: number;
+  };
   sheet: {
     durationMs: number;
     easing: string;
     backdropOpacity: number;
     dragDismissThreshold: number;
+  };
+  screen: {
+    durationMs: number;
+    easing: string;
+  };
+  countUp: {
+    durationMs: number;
+    easing: string;
+  };
+  celebration: {
+    durationMs: number;
+    scaleFrom: number;
+    easing: string;
   };
 };
 

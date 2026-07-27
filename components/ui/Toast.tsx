@@ -54,13 +54,21 @@ export function Toast({
 }: ToastProps) {
   const colors = useColors();
   const reducedMotion = useReducedMotion();
+  // Success toasts get a subtle scale-in "celebration" pop (AC5) on top of the
+  // existing fade+slide; error/info toasts are unaffected. Settles at 1 either
+  // way, so reduced-motion and motion-on land on the identical final scale —
+  // no layout shift (AC6).
+  const isCelebration = type === "success";
 
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(-8);
+  const scale = useSharedValue(
+    isCelebration && !reducedMotion ? Motion.celebration.scaleFrom : 1,
+  );
 
   const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
+    transform: [{ translateY: translateY.value }, { scale: scale.value }],
   }));
 
   // Announce to iOS screen readers imperatively on mount (Android handled by accessibilityLiveRegion).
@@ -82,6 +90,14 @@ export function Toast({
       duration: animDur,
       easing: Easing.out(Easing.cubic),
     });
+    if (isCelebration) {
+      scale.value = reducedMotion
+        ? 1
+        : withTiming(1, {
+            duration: Motion.celebration.durationMs,
+            easing: Easing.out(Easing.back(1.7)),
+          });
+    }
 
     let exitTimer: ReturnType<typeof setTimeout>;
     const timer = setTimeout(() => {

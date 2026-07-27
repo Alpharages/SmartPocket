@@ -189,6 +189,11 @@ export const Dimensions = {
   addEventListener: () => ({ remove: () => {} }),
 };
 
+export const PixelRatio = {
+  get: () => 2,
+  getFontScale: () => 1,
+};
+
 export const useColorScheme = () => "light";
 
 export const Appearance = {

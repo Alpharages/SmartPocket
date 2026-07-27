@@ -1,15 +1,23 @@
-import { ScrollView, View, Text, Pressable, FlatList, RefreshControl } from "react-native";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  Text,
+  Pressable,
+  FlatList,
+  RefreshControl,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   getCategoryColorByIndex,
   resolveCategoryColor,
 } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useState, useMemo } from "react";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import {
   Button,
@@ -17,6 +25,7 @@ import {
   CategoryPieChart,
   CategoryToken,
   EmptyState,
+  GlassSurface,
   MonthlyTrendChart,
   MonthEndForecastCard,
   ScreenHeader,
@@ -27,7 +36,7 @@ import {
 } from "@/components/ui";
 import { hasMonthlyTrendHistory } from "@/components/ui/MonthlyTrendChart";
 import { useBreakpoints } from "@/hooks/use-breakpoint";
-import { Spacing, Typography } from "@/lib/_core/theme";
+import { Spacing, Typography, getElevationStyle } from "@/lib/_core/theme";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { useCurrency } from "@/lib/currency-provider";
 import { formatCurrency } from "@/lib/currency";
@@ -37,7 +46,9 @@ import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 export default function SummaryScreen() {
   const router = useRouter();
-  const colors = useColors();
+  // Same active-theme token source the surface primitives read — never
+  // the theme-agnostic useColors() (frozen to the default theme; AC3).
+  const { colors, themeId } = useThemeTokens();
   const { currency, isReady } = useCurrency();
   const scheme = (useColorScheme() ?? "light") as "light" | "dark";
   const {
@@ -164,9 +175,9 @@ export default function SummaryScreen() {
     [categories, selectedCategoryId],
   );
   const selectedCategoryColor = selectedCategory?.color
-    ? resolveCategoryColor(selectedCategory.color, scheme)
+    ? resolveCategoryColor(selectedCategory.color, scheme, themeId)
     : selectedCategory
-      ? getCategoryColorByIndex(selectedCategory.id, scheme)
+      ? getCategoryColorByIndex(selectedCategory.id, scheme, themeId)
       : colors.muted;
 
   // Clear the selection if the selected category no longer exists (e.g. deleted).
@@ -310,17 +321,23 @@ export default function SummaryScreen() {
 
       {trendQuery.isLoading ? (
         <View
-          className="rounded-3xl p-4"
-          style={{ backgroundColor: colors.surface }}
+          className="rounded-3xl overflow-hidden p-4"
+          style={getElevationStyle("sm", colors.foreground)}
           accessibilityLabel="Loading spending trend"
         >
+          <GlassSurface
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          />
           <Skeleton variant="line" width="100%" height={180} radius={12} />
         </View>
       ) : !hasMonthlyTrendHistory(trendData) ? (
         <View
-          className="rounded-3xl p-8 items-center"
-          style={{ backgroundColor: colors.surface }}
+          className="rounded-3xl overflow-hidden p-8 items-center"
+          style={getElevationStyle("sm", colors.foreground)}
         >
+          <GlassSurface
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          />
           <Ionicons name="analytics-outline" size={36} color={colors.muted} />
           <Text className="text-muted font-medium mt-3 text-sm">
             No spending history
@@ -332,15 +349,15 @@ export default function SummaryScreen() {
       ) : (
         <View
           className="rounded-3xl overflow-hidden"
-          style={{
-            backgroundColor: colors.surface,
-            shadowColor: colors.foreground,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
-            elevation: 2,
-          }}
+          style={getElevationStyle("sm", colors.foreground)}
         >
+          {/* Frosted glass surface, opaque AA-safe tint fallback when blur is
+           * unsupported/disabled (Story 12.3, RDR-3) — borderRadius matches
+           * the rounded-3xl container so the surface's 1px border stroke
+           * rounds with the card instead of being clipped square. */}
+          <GlassSurface
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          />
           <MonthlyTrendChart
             data={trendData}
             incomeColor={colors.success}
@@ -377,14 +394,14 @@ export default function SummaryScreen() {
           total,
           categoryName: category?.name ?? `Category ${categoryId}`,
           categoryColor: category?.color
-            ? resolveCategoryColor(category.color, scheme)
-            : getCategoryColorByIndex(categoryId, scheme),
+            ? resolveCategoryColor(category.color, scheme, themeId)
+            : getCategoryColorByIndex(categoryId, scheme, themeId),
           categoryIcon: category?.icon ?? "pricetag-outline",
           type: category?.type ?? "expense",
         };
       })
       .sort((a, b) => b.total - a.total);
-  }, [monthTransactions, categories, scheme]);
+  }, [monthTransactions, categories, scheme, themeId]);
 
   const totalExpenses = useMemo(
     () => categoryExpenses.reduce((sum, item) => sum + item.total, 0),
@@ -412,10 +429,13 @@ export default function SummaryScreen() {
 
       {loadingTransactions && categoryExpenses.length === 0 ? (
         <View
-          className="rounded-3xl p-4"
-          style={{ backgroundColor: colors.surface }}
+          className="rounded-3xl overflow-hidden p-4"
+          style={getElevationStyle("sm", colors.foreground)}
           accessibilityLabel="Loading spending breakdown"
         >
+          <GlassSurface
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          />
           {[0, 1, 2, 3].map((i) => (
             <View key={i} className="py-2">
               <View className="flex-row items-center justify-between mb-2">
@@ -428,9 +448,12 @@ export default function SummaryScreen() {
         </View>
       ) : categoryExpenses.length === 0 ? (
         <View
-          className="rounded-3xl p-8 items-center"
-          style={{ backgroundColor: colors.surface }}
+          className="rounded-3xl overflow-hidden p-8 items-center"
+          style={getElevationStyle("sm", colors.foreground)}
         >
+          <GlassSurface
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          />
           <Ionicons name="pie-chart-outline" size={36} color={colors.muted} />
           <Text className="text-muted font-medium mt-3 text-sm">
             No spending data
@@ -442,15 +465,15 @@ export default function SummaryScreen() {
       ) : (
         <View
           className="rounded-3xl overflow-hidden"
-          style={{
-            backgroundColor: colors.surface,
-            shadowColor: colors.foreground,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
-            elevation: 2,
-          }}
+          style={getElevationStyle("sm", colors.foreground)}
         >
+          {/* Frosted glass surface, opaque AA-safe tint fallback when blur is
+           * unsupported/disabled (Story 12.3, RDR-3) — borderRadius matches
+           * the rounded-3xl container so the surface's 1px border stroke
+           * rounds with the card instead of being clipped square. */}
+          <GlassSurface
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          />
           <CategoryPieChart
             slices={categoryExpenses.map((item) => ({
               name: item.categoryName,
@@ -632,8 +655,8 @@ export default function SummaryScreen() {
               {selectedCategoryTransactions.map((t) => {
                 const cat = categoryById.get(t.categoryId);
                 const categoryColor = cat?.color
-                  ? resolveCategoryColor(cat.color, scheme)
-                  : getCategoryColorByIndex(t.categoryId, scheme);
+                  ? resolveCategoryColor(cat.color, scheme, themeId)
+                  : getCategoryColorByIndex(t.categoryId, scheme, themeId);
 
                 return (
                   <TransactionRow

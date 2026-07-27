@@ -26,13 +26,13 @@ import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import {
   ContentMaxWidth,
+  Motion,
   Radius,
   Spacing,
   Typography,
 } from "@/lib/_core/theme";
 
-const OPEN_DURATION = 250;
-const CLOSE_DURATION = 220;
+const SCREEN_DURATION = Motion.screen.durationMs;
 const SLIDE_DISTANCE = 700;
 const SCRIM_COLOR = "rgba(0, 0, 0, 0.6)";
 
@@ -66,7 +66,7 @@ export default function BudgetFormScreen() {
     Keyboard.dismiss();
     progress.value = reducedMotion
       ? 0
-      : withTiming(0, { duration: CLOSE_DURATION }, (finished) => {
+      : withTiming(0, { duration: SCREEN_DURATION }, (finished) => {
           if (finished) runOnJS(goBack)();
         });
   }, [progress, goBack, reducedMotion]);
@@ -74,7 +74,7 @@ export default function BudgetFormScreen() {
   useEffect(() => {
     progress.value = reducedMotion
       ? 1
-      : withTiming(1, { duration: OPEN_DURATION });
+      : withTiming(1, { duration: SCREEN_DURATION });
   }, [progress, reducedMotion]);
 
   const panelAnimStyle = useAnimatedStyle(() => ({

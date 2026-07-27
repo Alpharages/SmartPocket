@@ -6,6 +6,7 @@ import {
   RefreshControl,
   ScrollView,
   SectionList,
+  StyleSheet,
   Text,
   TextInput,
   View,
@@ -15,12 +16,13 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { useExpense } from "@/lib/expense-context";
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { useBreakpoints } from "@/hooks/use-breakpoint";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   EmptyState,
   FilterChipGroup,
+  GlassSurface,
   ScreenHeader,
   TransactionRow,
   TwoPaneLayout,
@@ -31,7 +33,13 @@ import { useCurrency } from "@/lib/currency-provider";
 import { formatSignedCurrency } from "@/lib/currency";
 import { getStartOfWeek } from "@/lib/date-utils";
 import { useFirstDayOfWeek } from "@/lib/first-day-of-week-provider";
-import { Spacing, Typography, resolveCategoryColor } from "@/lib/_core/theme";
+import {
+  Radius,
+  Spacing,
+  Typography,
+  getElevationStyle,
+  resolveCategoryColor,
+} from "@/lib/_core/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 // ---------------------------------------------------------------------------
@@ -132,7 +140,9 @@ function TransactionDetailPane({
   transaction: ExpenseTransaction;
   refreshControlProps?: ReturnType<typeof usePullToRefresh>;
 }) {
-  const colors = useColors();
+  // Same active-theme token source the surface primitives read — never
+  // the theme-agnostic useColors() (frozen to the default theme; AC1).
+  const { colors, themeId } = useThemeTokens();
   const { currency } = useCurrency();
   const { categories, deleteTransaction } = useExpense();
 
@@ -140,10 +150,11 @@ function TransactionDetailPane({
   const isIncome = transaction.type === "income";
   const accent = isIncome ? colors.success : colors.error;
   const category = categories.find((c) => c.id === transaction.categoryId);
-  // Resolve the scheme-appropriate swatch so the on-color icon contrast is
-  // computed against what actually renders (mirrors the Insights detail pane).
+  // Resolve the scheme- and theme-appropriate swatch (active theme's category
+  // map, Story 12.2) so the on-color icon contrast is computed against what
+  // actually renders (mirrors the Insights detail pane).
   const categorySwatchColor = category
-    ? resolveCategoryColor(category.color, scheme)
+    ? resolveCategoryColor(category.color, scheme, themeId)
     : undefined;
 
   const handleDelete = () => {
@@ -209,12 +220,15 @@ function TransactionDetailPane({
       {/* Details card */}
       <View
         className="mx-6 mt-8 rounded-2xl overflow-hidden"
-        style={{
-          backgroundColor: colors.surface,
-          borderWidth: 0.5,
-          borderColor: colors.border,
-        }}
+        style={getElevationStyle("sm", colors.foreground)}
       >
+        {/* Frosted glass surface, opaque AA-safe tint fallback when blur is
+         * unsupported/disabled (Story 12.3, RDR-3) — borderRadius matches
+         * the rounded-2xl container so the surface's 1px border stroke
+         * rounds with the card instead of being clipped square. */}
+        <GlassSurface
+          style={[StyleSheet.absoluteFill, { borderRadius: Radius.lg }]}
+        />
         {/* Category */}
         <View className="flex-row items-center justify-between px-5 py-4">
           <Text className="text-sm font-medium text-muted">Category</Text>
@@ -272,14 +286,21 @@ function TransactionDetailPane({
 
 export default function TransactionsScreen() {
   const router = useRouter();
-  const { transactions, categories, loadingTransactions, deleteTransaction, refreshTransactions } =
-    useExpense();
+  const {
+    transactions,
+    categories,
+    loadingTransactions,
+    deleteTransaction,
+    refreshTransactions,
+  } = useExpense();
   const [searchText, setSearchText] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [selectedTransactionId, setSelectedTransactionId] = useState<
     number | null
   >(null);
-  const colors = useColors();
+  // Same active-theme token source the surface primitives read — never
+  // the theme-agnostic useColors() (frozen to the default theme; AC1).
+  const { colors } = useThemeTokens();
   const { isLg } = useBreakpoints();
   const { firstDayOfWeek } = useFirstDayOfWeek();
 

@@ -7,18 +7,13 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
+import Animated from "react-native-reanimated";
 
 import { useColors } from "@/hooks/use-colors";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useThemeTokens } from "@/lib/theme-provider";
+import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { cn } from "@/lib/utils";
 import {
   CATEGORY_DEFAULT_COLOR,
@@ -139,8 +134,7 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
     // omitted, which silently renders Aurora's category swatches under
     // Obsidian/Spectrum (Lore lesson 6248c582).
     const { themeId } = useThemeTokens();
-    const reducedMotion = useReducedMotion();
-    const scale = useSharedValue(1);
+    const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
 
     const isSelected = state === "selected";
     const isDisabled = state === "disabled";
@@ -153,25 +147,14 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
       return resolveCategoryColor(safe, scheme, themeId);
     }, [color, scheme, themeId]);
 
-    const animatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: scale.value }],
-    }));
-
     const handlePressIn = useCallback(() => {
       if (isDisabled || !hasPressHandler) return;
-      if (!reducedMotion) {
-        scale.value = withTiming(0.97, { duration: 120 });
-      }
-      if (process.env.EXPO_OS === "ios") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      }
-    }, [isDisabled, hasPressHandler, reducedMotion, scale]);
+      onPressIn();
+    }, [isDisabled, hasPressHandler, onPressIn]);
 
     const handlePressOut = useCallback(() => {
-      if (!reducedMotion) {
-        scale.value = withTiming(1, { duration: 120 });
-      }
-    }, [reducedMotion, scale]);
+      onPressOut();
+    }, [onPressOut]);
 
     const handlePress = useCallback(() => {
       if (!isDisabled) {

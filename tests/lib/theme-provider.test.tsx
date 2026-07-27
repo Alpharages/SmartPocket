@@ -2,7 +2,10 @@ import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
 
-import { THEME_ID_STORAGE_KEY, THEME_STORAGE_KEY } from "@/lib/theme-preference";
+import {
+  THEME_ID_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+} from "@/lib/theme-preference";
 import {
   ThemeProvider,
   loadThemeId,
@@ -240,5 +243,58 @@ describe("ThemeProvider", () => {
     const state = JSON.parse(probe.props.accessibilityLabel);
     expect(state.themePreference).toBe("light");
     expect(state.colorScheme).toBe("light");
+  });
+
+  it("does not remount the subtree on a themeId/mode switch (Story 12.11 AC: cheap theme switching)", async () => {
+    let mountCount = 0;
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    let setThemeId:
+      | ((id: "aurora" | "obsidian" | "spectrum") => Promise<void>)
+      | undefined;
+    let setThemePreference:
+      | ((preference: "light" | "dark" | "system") => Promise<void>)
+      | undefined;
+
+    function MountCounterProbe() {
+      const ctx = useThemeContext();
+      setThemeId = ctx.setThemeId;
+      setThemePreference = ctx.setThemePreference;
+      React.useEffect(() => {
+        mountCount += 1;
+      }, []);
+      return React.createElement(Probe);
+    }
+
+    await act(async () => {
+      renderer = TestRenderer.create(
+        React.createElement(
+          ThemeProvider,
+          null,
+          React.createElement(MountCounterProbe),
+        ),
+      );
+      await Promise.resolve();
+    });
+
+    expect(mountCount).toBe(1);
+
+    await act(async () => {
+      await setThemeId!("spectrum");
+    });
+    await act(async () => {
+      await setThemePreference!("dark");
+    });
+    await act(async () => {
+      await setThemeId!("obsidian");
+    });
+
+    // A remount would re-run the mount-only effect — switching themeId and
+    // mode repeatedly must only update the memoized context value, never
+    // unmount/remount the provider's children.
+    expect(mountCount).toBe(1);
+    const probe = renderer!.root.findByProps({ testID: "probe" });
+    const state = JSON.parse(probe.props.accessibilityLabel);
+    expect(state.themeId).toBe("obsidian");
+    expect(state.colorScheme).toBe("dark");
   });
 });
