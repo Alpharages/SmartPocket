@@ -105,10 +105,11 @@ describe("getCategoryAnomalies", () => {
     expect(result.find((r) => r.categoryId === DINING)?.isAnomaly).toBe(true);
   });
 
-  it("returns an empty array when the query fails", async () => {
+  it("propagates a query failure instead of reporting no anomalies", async () => {
+    // SP-014: silently returning [] made an outage look like clean spending.
     callDataApi.mockRejectedValue(new Error("db down"));
 
-    await expect(getCategoryAnomalies(1, 2026, 4)).resolves.toEqual([]);
+    await expect(getCategoryAnomalies(1, 2026, 4)).rejects.toThrow("db down");
   });
 
   it("scopes the query to the user and date window", async () => {

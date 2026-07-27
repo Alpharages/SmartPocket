@@ -106,10 +106,11 @@ describe("getMonthlyTrend", () => {
     });
   });
 
-  it("returns an empty array when the query fails", async () => {
+  it("propagates a query failure instead of reporting no history", async () => {
+    // SP-014: silently returning [] rendered "No spending history".
     callDataApi.mockRejectedValue(new Error("db down"));
 
-    await expect(getMonthlyTrend(1, 2026, 6, 6)).resolves.toEqual([]);
+    await expect(getMonthlyTrend(1, 2026, 6, 6)).rejects.toThrow("db down");
   });
 
   it("scopes the query to the user and date window", async () => {

@@ -52,28 +52,35 @@ function CategoryRow({
   item,
   index,
   mutedColor,
+  errorColor,
+  onEdit,
   onRequestDelete,
 }: {
   item: Category;
   index: number;
   mutedColor: string;
+  errorColor: string;
+  onEdit: (item: Category) => void;
   onRequestDelete: (item: Category) => void;
 }) {
   const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
   return (
     <Animated.View entering={FadeInDown.delay(index * 30).duration(400)}>
       <AnimatedPressable
+        onPress={() => onEdit(item)}
         onLongPress={() => onRequestDelete(item)}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         accessibilityRole="button"
         accessibilityLabel={`${item.name}, ${item.type} category`}
-        accessibilityHint="Long press to delete"
+        accessibilityHint="Opens edit. Long press to delete."
         accessibilityActions={[
+          { name: "edit", label: `Edit ${item.name}` },
           { name: "delete", label: `Delete ${item.name}` },
         ]}
         onAccessibilityAction={(e) => {
           if (e.nativeEvent.actionName === "delete") onRequestDelete(item);
+          if (e.nativeEvent.actionName === "edit") onEdit(item);
         }}
         style={[
           {
@@ -103,6 +110,17 @@ function CategoryRow({
           </Text>
         </View>
         <Ionicons name="pencil" size={16} color={mutedColor} />
+        {/* SP-037: delete was long-press-only with no visual affordance. */}
+        <Pressable
+          onPress={() => onRequestDelete(item)}
+          accessibilityRole="button"
+          accessibilityLabel={`Delete ${item.name}`}
+          hitSlop={8}
+          className="items-center justify-center"
+          style={{ minWidth: 44, minHeight: 44 }}
+        >
+          <Ionicons name="trash-outline" size={16} color={errorColor} />
+        </Pressable>
       </AnimatedPressable>
     </Animated.View>
   );
@@ -118,6 +136,7 @@ export default function CategoriesScreen() {
     categories,
     loadingCategories,
     addCategory,
+    updateCategory,
     deleteCategory,
     refreshCategories,
   } = useExpense();
@@ -129,6 +148,8 @@ export default function CategoriesScreen() {
     onCancel,
   } = useConfirm();
   const [showModal, setShowModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [saving, setSaving] = useState(false);
   const [categoryType, setCategoryType] = useState<"income" | "expense">(
     "expense",
   );
@@ -145,27 +166,62 @@ export default function CategoriesScreen() {
   }, [refreshCategories]);
   const refreshProps = usePullToRefresh(onRefresh);
 
-  const handleAddCategory = async () => {
-    if (!categoryName.trim()) return;
+  const openCreateSheet = useCallback(
+    (type: "income" | "expense" = "expense") => {
+      setEditingCategory(null);
+      setCategoryName("");
+      setCategoryType(type);
+      setSelectedColor(CATEGORY_COLOR_LIGHT_VALUES[0]);
+      setShowModal(true);
+    },
+    [],
+  );
 
+  // SP-016: categories could be created and deleted but never edited, so
+  // renaming one meant delete + re-create, which orphaned every transaction
+  // in it.
+  const openEditSheet = useCallback((item: Category) => {
+    setEditingCategory(item);
+    setCategoryName(item.name);
+    setCategoryType(item.type);
+    setSelectedColor(item.color || CATEGORY_COLOR_LIGHT_VALUES[0]);
+    setShowModal(true);
+  }, []);
+
+  const handleSaveCategory = async () => {
+    const name = categoryName.trim();
+    if (!name || saving) return;
+
+    setSaving(true);
     try {
-      await addCategory({
-        name: categoryName,
-        type: categoryType,
-        color: selectedColor,
-        icon: DEFAULT_CATEGORY_ICON,
-        isDefault: false,
-      });
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, {
+          name,
+          type: categoryType,
+          color: selectedColor,
+          icon: editingCategory.icon || DEFAULT_CATEGORY_ICON,
+        });
+      } else {
+        await addCategory({
+          name,
+          type: categoryType,
+          color: selectedColor,
+          icon: DEFAULT_CATEGORY_ICON,
+          isDefault: false,
+        });
+      }
     } catch {
-      // addCategory already rolled back and showed an error toast before
-      // re-throwing; swallow here so the failure doesn't surface as an
-      // unhandled rejection. Keep the sheet open so the user can retry.
+      // The context rolled back and showed an error toast before re-throwing.
+      // Keep the sheet open so the entry is not lost.
       return;
+    } finally {
+      setSaving(false);
     }
 
     setCategoryName("");
     setCategoryType("expense");
     setSelectedColor(CATEGORY_COLOR_LIGHT_VALUES[0]);
+    setEditingCategory(null);
     setShowModal(false);
   };
 
@@ -197,6 +253,8 @@ export default function CategoriesScreen() {
       item={item}
       index={index}
       mutedColor={colors.muted}
+      errorColor={colors.error}
+      onEdit={openEditSheet}
       onRequestDelete={requestDelete}
     />
   );
@@ -252,7 +310,12 @@ export default function CategoriesScreen() {
             description={`Add your first ${title.toLowerCase().replace(" categories", "")} category`}
             action={{
               label: "Add Category",
-              onPress: () => setShowModal(true),
+              // SP-049: this opened the sheet defaulted to Expense even under
+              // the "Income Categories" heading.
+              onPress: () =>
+                openCreateSheet(
+                  title.toLowerCase().includes("income") ? "income" : "expense",
+                ),
             }}
           />
         </View>
@@ -329,8 +392,11 @@ export default function CategoriesScreen() {
 
       <Sheet
         visible={showModal}
-        onClose={() => setShowModal(false)}
-        title="New Category"
+        onClose={() => {
+          setEditingCategory(null);
+          setShowModal(false);
+        }}
+        title={editingCategory ? "Edit Category" : "New Category"}
         testID="add-category-sheet"
       >
         <ScrollView
@@ -427,7 +493,10 @@ export default function CategoriesScreen() {
           {/* Action Buttons */}
           <View className="flex-row gap-3 mt-2">
             <Pressable
-              onPress={() => setShowModal(false)}
+              onPress={() => {
+                setEditingCategory(null);
+                setShowModal(false);
+              }}
               accessibilityRole="button"
               accessibilityLabel="Cancel"
               className="flex-1 py-3.5 rounded-xl items-center"
@@ -441,10 +510,12 @@ export default function CategoriesScreen() {
               <Text className="text-foreground font-semibold">Cancel</Text>
             </Pressable>
             <Pressable
-              onPress={handleAddCategory}
+              onPress={handleSaveCategory}
               disabled={!categoryName.trim()}
               accessibilityRole="button"
-              accessibilityLabel="Add Category"
+              accessibilityLabel={
+                editingCategory ? "Save Category" : "Add Category"
+              }
               accessibilityState={{ disabled: !categoryName.trim() }}
               className="flex-1 py-3.5 rounded-xl items-center"
               style={{
@@ -454,7 +525,9 @@ export default function CategoriesScreen() {
                 minHeight: 44,
               }}
             >
-              <Text className="text-white font-semibold">Add Category</Text>
+              <Text className="text-white font-semibold">
+                {editingCategory ? "Save" : "Add Category"}
+              </Text>
             </Pressable>
           </View>
         </ScrollView>

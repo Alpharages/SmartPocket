@@ -149,6 +149,19 @@ export async function updateAiEnabled(
 // CATEGORIES
 // ============================================================================
 
+/**
+ * QA report SP-014: nearly every read here ended `catch { return [] }`, so a
+ * database outage, a bad credential or a malformed query was indistinguishable
+ * from a genuinely empty account — a user with three years of history was told
+ * they had none, and might then re-enter data. Reads now log and rethrow so the
+ * tRPC layer surfaces a real error and the client can show a retry instead of
+ * an empty state.
+ */
+function rethrowReadFailure(operation: string, error: unknown): never {
+  console.error(`[db] ${operation} failed:`, error);
+  throw error instanceof Error ? error : new Error(`${operation} failed`);
+}
+
 export async function getUserCategories(
   userId: number,
   type?: "income" | "expense",
@@ -163,8 +176,8 @@ export async function getUserCategories(
       body: { query, params },
     });
     return Array.isArray(result) ? result : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getUserCategories", error);
   }
 }
 
@@ -300,8 +313,8 @@ export async function getCategoryById(id: number, userId: number) {
       },
     });
     return Array.isArray(result) ? (result[0] ?? null) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    rethrowReadFailure("getCategoryById", error);
   }
 }
 
@@ -332,8 +345,8 @@ export async function getUserCreditCards(
     });
     const rows = Array.isArray(result) ? result : [];
     return rows.map((row) => toSafeCreditCard(row as CreditCard));
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getUserCreditCards", error);
   }
 }
 
@@ -420,8 +433,8 @@ export async function getCreditCardById(
     });
     const row = Array.isArray(result) ? result[0] : null;
     return row ? toSafeCreditCard(row as CreditCard) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    rethrowReadFailure("getCreditCardById", error);
   }
 }
 
@@ -438,8 +451,8 @@ export async function getUserAccounts(userId: number): Promise<Account[]> {
       },
     });
     return Array.isArray(result) ? (result as Account[]) : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getUserAccounts", error);
   }
 }
 
@@ -517,8 +530,8 @@ export async function getAccountById(
     });
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Account) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    rethrowReadFailure("getAccountById", error);
   }
 }
 
@@ -600,8 +613,8 @@ export async function getTransferById(
     });
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Transfer) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    rethrowReadFailure("getTransferById", error);
   }
 }
 
@@ -615,8 +628,8 @@ export async function getUserTransfers(userId: number): Promise<Transfer[]> {
       },
     });
     return Array.isArray(result) ? (result as Transfer[]) : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getUserTransfers", error);
   }
 }
 
@@ -755,8 +768,8 @@ export async function getUserTransactions(
       body: { query, params },
     });
     return Array.isArray(result) ? result : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getUserTransactions", error);
   }
 }
 
@@ -774,8 +787,8 @@ export async function getTransactionsByDateRange(
       },
     });
     return Array.isArray(result) ? result : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getTransactionsByDateRange", error);
   }
 }
 
@@ -792,8 +805,8 @@ export async function getTransactionsByCategory(
       },
     });
     return Array.isArray(result) ? result : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getTransactionsByCategory", error);
   }
 }
 
@@ -810,8 +823,8 @@ export async function getTransactionsByCreditCard(
       },
     });
     return Array.isArray(result) ? result : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getTransactionsByCreditCard", error);
   }
 }
 
@@ -944,8 +957,8 @@ export async function getTransactionById(id: number, userId: number) {
       },
     });
     return Array.isArray(result) ? result[0] : null;
-  } catch {
-    return null;
+  } catch (error) {
+    rethrowReadFailure("getTransactionById", error);
   }
 }
 
@@ -965,8 +978,8 @@ export async function getUserRecurringTransactions(
       },
     });
     return Array.isArray(result) ? (result as RecurringTransaction[]) : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getUserRecurringTransactions", error);
   }
 }
 
@@ -1058,8 +1071,8 @@ export async function getRecurringTransactionById(
     });
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as RecurringTransaction) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    rethrowReadFailure("getRecurringTransactionById", error);
   }
 }
 
@@ -1075,8 +1088,8 @@ export async function getDueRecurringTransactions(
       },
     });
     return Array.isArray(result) ? (result as RecurringTransaction[]) : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getDueRecurringTransactions", error);
   }
 }
 
@@ -1118,8 +1131,8 @@ export async function getUserBudgets(userId: number): Promise<Budget[]> {
       },
     });
     return Array.isArray(result) ? (result as Budget[]) : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getUserBudgets", error);
   }
 }
 
@@ -1189,8 +1202,8 @@ export async function getBudgetById(
     });
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Budget) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    rethrowReadFailure("getBudgetById", error);
   }
 }
 
@@ -1289,8 +1302,8 @@ export async function findActiveBudget(
     });
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Budget) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    rethrowReadFailure("findActiveBudget", error);
   }
 }
 
@@ -1312,8 +1325,8 @@ export async function getMonthlySummary(
       },
     });
     return Array.isArray(result) ? result[0] : null;
-  } catch {
-    return null;
+  } catch (error) {
+    rethrowReadFailure("getMonthlySummary", error);
   }
 }
 
@@ -1394,8 +1407,8 @@ export async function getAccountBalances(
         amount: String(transfer.amount),
       })),
     );
-  } catch {
-    return {};
+  } catch (error) {
+    rethrowReadFailure("getAccountBalances", error);
   }
 }
 
@@ -1438,8 +1451,8 @@ export async function getMonthlyStats(
       totalExpense,
       netBalance: totalIncome - totalExpense,
     };
-  } catch {
-    return { totalIncome: 0, totalExpense: 0, netBalance: 0 };
+  } catch (error) {
+    rethrowReadFailure("getMonthlyStats", error);
   }
 }
 
@@ -1510,8 +1523,8 @@ export async function getMonthlyTrend(
         ...item,
         netBalance: item.totalIncome - item.totalExpense,
       }));
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getMonthlyTrend", error);
   }
 }
 
@@ -1606,8 +1619,8 @@ export async function getCategoryAnomalies(
     }
 
     return results;
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getCategoryAnomalies", error);
   }
 }
 
@@ -1649,8 +1662,8 @@ export async function getExpensesByCategory(
       total: data.total,
       count: data.count,
     }));
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getExpensesByCategory", error);
   }
 }
 
@@ -1667,8 +1680,8 @@ export async function getRecentTransactions(userId: number, limit: number = 7) {
       },
     });
     return Array.isArray(result) ? result : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getRecentTransactions", error);
   }
 }
 
@@ -1708,8 +1721,8 @@ export async function getUserLoans(userId: number): Promise<Loan[]> {
       },
     });
     return Array.isArray(result) ? (result as Loan[]) : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getUserLoans", error);
   }
 }
 
@@ -1761,8 +1774,8 @@ export async function getLoanById(
     });
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Loan) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    rethrowReadFailure("getLoanById", error);
   }
 }
 
@@ -1913,8 +1926,8 @@ export async function getRepaymentById(
     });
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Repayment) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    rethrowReadFailure("getRepaymentById", error);
   }
 }
 
@@ -1931,8 +1944,8 @@ export async function getRepaymentsByLoan(
       },
     });
     return Array.isArray(result) ? (result as Repayment[]) : [];
-  } catch {
-    return [];
+  } catch (error) {
+    rethrowReadFailure("getRepaymentsByLoan", error);
   }
 }
 

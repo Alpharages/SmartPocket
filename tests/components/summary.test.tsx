@@ -298,18 +298,42 @@ describe("SummaryScreen", () => {
     expect(refreshMonthlyStats).toHaveBeenCalledWith(2026, 5);
   });
 
-  it("navigating to the next month calls refreshMonthlyStats with the new year/month", () => {
+  it("cannot navigate past the current month (SP-045)", () => {
+    // "Next" used to be unbounded, so a user could page indefinitely into
+    // empty future months with no shortcut back to today.
     const refreshMonthlyStats = vi.fn();
     setup({ refreshMonthlyStats });
     const root = render(<SummaryScreen />);
     const nextButton = root.root.find(
       (n) => n.props.accessibilityLabel === "Next month",
     );
+    expect(nextButton.props.accessibilityState?.disabled).toBe(true);
+
     act(() => {
       nextButton.props.onPress();
     });
-    // NOW is 2026-06-15 → next month is July 2026.
-    expect(refreshMonthlyStats).toHaveBeenCalledWith(2026, 7);
+    expect(refreshMonthlyStats).not.toHaveBeenCalled();
+  });
+
+  it("navigating back then forward calls refreshMonthlyStats with the new year/month", () => {
+    const refreshMonthlyStats = vi.fn();
+    setup({ refreshMonthlyStats });
+    const root = render(<SummaryScreen />);
+
+    // NOW is 2026-06-15. Step back to May, then forward again to June.
+    act(() => {
+      root.root
+        .find((n) => n.props.accessibilityLabel === "Previous month")
+        .props.onPress();
+    });
+    expect(refreshMonthlyStats).toHaveBeenCalledWith(2026, 5);
+
+    act(() => {
+      root.root
+        .find((n) => n.props.accessibilityLabel === "Next month")
+        .props.onPress();
+    });
+    expect(refreshMonthlyStats).toHaveBeenLastCalledWith(2026, 6);
   });
 
   it("renders the settings action button that navigates to /settings", () => {

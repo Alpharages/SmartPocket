@@ -84,28 +84,40 @@ vi.mock("@/lib/trpc", () => ({
       },
     }),
     categories: {
-      list: { useQuery: () => ({ refetch: mocks.categoriesRefetch, data: [] }) },
+      list: {
+        useQuery: () => ({ refetch: mocks.categoriesRefetch, data: [] }),
+      },
       create: { useMutation: mocks.useMutation },
       update: { useMutation: mocks.useMutation },
       delete: { useMutation: mocks.useMutation },
     },
     creditCards: {
-      list: { useQuery: () => ({ refetch: mocks.creditCardsRefetch, data: [] }) },
+      list: {
+        useQuery: () => ({ refetch: mocks.creditCardsRefetch, data: [] }),
+      },
       create: { useMutation: mocks.useMutation },
       update: { useMutation: mocks.useMutation },
       delete: { useMutation: mocks.useMutation },
     },
     transactions: {
-      list: { useQuery: () => ({ refetch: mocks.transactionsRefetch, data: [] }) },
+      list: {
+        useQuery: () => ({ refetch: mocks.transactionsRefetch, data: [] }),
+      },
       create: {
-        useMutation: () => ({ mutateAsync: mocks.createTransactionMutateAsync }),
+        useMutation: () => ({
+          mutateAsync: mocks.createTransactionMutateAsync,
+        }),
       },
       createMany: { useMutation: mocks.useMutation },
       update: {
-        useMutation: () => ({ mutateAsync: mocks.updateTransactionMutateAsync }),
+        useMutation: () => ({
+          mutateAsync: mocks.updateTransactionMutateAsync,
+        }),
       },
       delete: {
-        useMutation: () => ({ mutateAsync: mocks.deleteTransactionMutateAsync }),
+        useMutation: () => ({
+          mutateAsync: mocks.deleteTransactionMutateAsync,
+        }),
       },
     },
     data: {
@@ -133,6 +145,9 @@ vi.mock("@/lib/trpc", () => ({
       list: { useQuery: () => ({ refetch: mocks.loansRefetch, data: [] }) },
       create: { useMutation: mocks.useMutation },
       recordRepayment: { useMutation: mocks.useMutation },
+      // SP-018: loans can now be edited and deleted from the UI.
+      update: { useMutation: mocks.useMutation },
+      delete: { useMutation: mocks.useMutation },
     },
     accounts: {
       list: { useQuery: () => ({ refetch: mocks.accountsRefetch, data: [] }) },
@@ -152,7 +167,10 @@ vi.mock("@/lib/trpc", () => ({
     },
     recurringTransactions: {
       list: {
-        useQuery: () => ({ refetch: mocks.recurringTransactionsRefetch, data: [] }),
+        useQuery: () => ({
+          refetch: mocks.recurringTransactionsRefetch,
+          data: [],
+        }),
       },
       create: { useMutation: mocks.useMutation },
       update: { useMutation: mocks.useMutation },

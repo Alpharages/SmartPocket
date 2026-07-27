@@ -334,18 +334,32 @@ export default function TransactionsScreen() {
       filtered = filtered.filter((t) => new Date(t.date) >= startOfWeek);
     }
 
-    if (searchText) {
-      filtered = filtered.filter(
-        (t) =>
-          t.description?.toLowerCase().includes(searchText.toLowerCase()) ||
-          t.amount.includes(searchText),
-      );
+    if (searchText.trim()) {
+      // SP-027: `t.amount.includes(searchText)` was a raw substring test, so
+      // "5" matched 15.00, 500.00 and 0.55; and the category name — the value
+      // actually rendered as each row's title — was not searched at all.
+      const needle = searchText.trim().toLowerCase();
+      const numeric = Number(needle.replace(/[^0-9.]/g, ""));
+      const hasNumber = needle.replace(/[^0-9.]/g, "").length > 0;
+
+      filtered = filtered.filter((t) => {
+        if (t.description?.toLowerCase().includes(needle)) return true;
+        const categoryName = categoryById.get(t.categoryId)?.name;
+        if (categoryName?.toLowerCase().includes(needle)) return true;
+        if (hasNumber && Number.isFinite(numeric)) {
+          return Number(t.amount) === numeric;
+        }
+        return false;
+      });
     }
 
-    return filtered.sort(
+    // SP-028: `.sort()` mutates in place, and when no filter is active
+    // `filtered` *is* the provider's `transactions` array — so this reordered
+    // shared state during render.
+    return [...filtered].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
     );
-  }, [transactions, filterType, searchText, firstDayOfWeek]);
+  }, [transactions, filterType, searchText, firstDayOfWeek, categoryById]);
 
   // Group into SectionList sections after filtering.
   const sections = useMemo(
@@ -559,7 +573,11 @@ export default function TransactionsScreen() {
         const categoryColor = category?.color ?? colors.muted;
         const categoryIcon = (category?.icon ??
           "pricetag-outline") as keyof typeof Ionicons.glyphMap;
-        const title = category?.name ?? "Uncategorized";
+        const categoryName = category?.name ?? "Uncategorized";
+        // SP-050: the title was always the category, so every row in a category
+        // read identically. Lead with the description when there is one — the
+        // coloured category token already conveys the category.
+        const title = item.description?.trim() || categoryName;
 
         return (
           <TransactionRow
@@ -569,12 +587,12 @@ export default function TransactionsScreen() {
             type={item.type}
             categoryColor={categoryColor}
             categoryIcon={categoryIcon}
-            note={item.description ?? undefined}
+            note={item.description?.trim() ? categoryName : undefined}
             // SP-064: the SectionList header above already states this date.
             hideDate
             selected={selectedTransactionId === item.id}
             onPress={() => handleTransactionPress(item.id)}
-            onDelete={() => void handleDelete(item.id, title)}
+            onDelete={() => void handleDelete(item.id, categoryName)}
             style={{ backgroundColor: colors.surface }}
           />
         );

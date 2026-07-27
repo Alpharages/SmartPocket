@@ -335,6 +335,8 @@ interface ExpenseContextType {
   loadingLoans: boolean;
   refreshLoans: () => Promise<void>;
   addLoan: (data: CreateLoanInput) => Promise<void>;
+  updateLoan: (id: number, data: Partial<CreateLoanInput>) => Promise<void>;
+  deleteLoan: (id: number) => Promise<void>;
   recordRepayment: (data: RecordRepaymentInput) => Promise<LoanDetail>;
 
   /** Refetch all expense-tracker data (categories, cards, transactions, etc.). */
@@ -780,6 +782,8 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   // Loans
   const loansQuery = trpc.loans.list.useQuery();
   const createLoanMutation = trpc.loans.create.useMutation();
+  const updateLoanMutation = trpc.loans.update.useMutation();
+  const deleteLoanMutation = trpc.loans.delete.useMutation();
   const recordRepaymentMutation = trpc.loans.recordRepayment.useMutation();
   const settingsQuery = trpc.settings.get.useQuery();
   const remindersEnabled = settingsQuery.data?.remindersEnabled ?? false;
@@ -847,6 +851,51 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [createLoanMutation, refreshLoans, loans, toast],
+  );
+
+  const updateLoan = useCallback(
+    async (id: number, data: Partial<CreateLoanInput>) => {
+      const snapshot = snapshotList(loans);
+      setLoans((prev) =>
+        applyOptimistic(prev, {
+          type: "update",
+          id,
+          data: data as Partial<Loan>,
+        }),
+      );
+      try {
+        await updateLoanMutation.mutateAsync({ id, ...data });
+        await refreshLoans();
+        toast.show({ type: "success", message: "Loan updated" });
+      } catch (err) {
+        setLoans(snapshot);
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to update loan"),
+        });
+        throw new Error("updateLoan failed");
+      }
+    },
+    [updateLoanMutation, refreshLoans, loans, toast],
+  );
+
+  const deleteLoan = useCallback(
+    async (id: number) => {
+      const snapshot = snapshotList(loans);
+      setLoans((prev) => applyOptimistic(prev, { type: "delete", id }));
+      try {
+        await deleteLoanMutation.mutateAsync({ id });
+        toast.show({ type: "success", message: "Loan deleted" });
+      } catch (err) {
+        setLoans(snapshot);
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to delete loan"),
+        });
+        throw new Error("deleteLoan failed");
+      }
+    },
+    [deleteLoanMutation, loans, toast],
   );
 
   const recordRepayment = useCallback(
@@ -1475,6 +1524,8 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     loadingLoans,
     refreshLoans,
     addLoan,
+    updateLoan,
+    deleteLoan,
     recordRepayment,
 
     refreshAll,

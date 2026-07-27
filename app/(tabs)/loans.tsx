@@ -346,7 +346,13 @@ function LoanListItem({ loan, index }: { loan: Loan; index: number }) {
   const router = useRouter();
   const colors = useColors();
   const { currency } = useCurrency();
-  const label = loan.counterparty?.trim() || "No counterparty";
+  // SP-054: "No counterparty" was used as a display name, so several such
+  // loans produced a list of identical rows.
+  const label =
+    loan.counterparty?.trim() ||
+    `${loan.direction === "lend" ? "Lent" : "Borrowed"} · ${new Date(
+      loan.createdAt,
+    ).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
   const amount = formatCurrency(Number(loan.principal), currency);
 
   return (

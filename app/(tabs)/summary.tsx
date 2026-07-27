@@ -127,7 +127,16 @@ export default function SummaryScreen() {
     setSelectedCategoryId(null);
   };
 
+  const isCurrentMonth =
+    currentDate.getMonth() === new Date().getMonth() &&
+    currentDate.getFullYear() === new Date().getFullYear();
+
+  // SP-045: "next" had no ceiling, so a user could page indefinitely into
+  // empty future months with no shortcut back to today.
+  const canGoToNextMonth = !isCurrentMonth;
+
   const handleNextMonth = () => {
+    if (!canGoToNextMonth) return;
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() + 1);
     setCurrentDate(newDate);
@@ -135,14 +144,17 @@ export default function SummaryScreen() {
     setSelectedCategoryId(null);
   };
 
+  const handleGoToCurrentMonth = () => {
+    const now = new Date();
+    setCurrentDate(now);
+    refreshMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+    setSelectedCategoryId(null);
+  };
+
   const monthLabel = currentDate.toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
   });
-
-  const isCurrentMonth =
-    currentDate.getMonth() === new Date().getMonth() &&
-    currentDate.getFullYear() === new Date().getFullYear();
 
   const today = new Date();
   const calendarDayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
@@ -221,7 +233,18 @@ export default function SummaryScreen() {
           <Ionicons name="chevron-back" size={20} color={colors.foreground} />
         </Pressable>
 
-        <View className="items-center">
+        <Pressable
+          onPress={handleGoToCurrentMonth}
+          disabled={isCurrentMonth}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isCurrentMonth
+              ? `${monthLabel}, current month`
+              : `${monthLabel}, tap to return to this month`
+          }
+          className="items-center"
+          style={{ minHeight: 44, justifyContent: "center" }}
+        >
           <Text className="text-base font-bold text-foreground">
             {monthLabel}
           </Text>
@@ -242,14 +265,17 @@ export default function SummaryScreen() {
               </Text>
             </View>
           )}
-        </View>
+        </Pressable>
 
         <Pressable
           onPress={handleNextMonth}
+          disabled={!canGoToNextMonth}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Next month"
+          accessibilityState={{ disabled: !canGoToNextMonth }}
           style={{
+            opacity: canGoToNextMonth ? 1 : 0.4,
             backgroundColor: colors.surface,
             borderWidth: 0.5,
             borderColor: colors.border,

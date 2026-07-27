@@ -134,6 +134,9 @@ vi.mock("@/lib/trpc", () => ({
       list: { useQuery: () => ({ refetch: mocks.loansRefetch, data: [] }) },
       create: { useMutation: mocks.useMutation },
       recordRepayment: { useMutation: mocks.useMutation },
+      // SP-018: loans can now be edited and deleted from the UI.
+      update: { useMutation: mocks.useMutation },
+      delete: { useMutation: mocks.useMutation },
     },
     accounts: {
       list: { useQuery: () => ({ refetch: mocks.accountsRefetch, data: [] }) },
