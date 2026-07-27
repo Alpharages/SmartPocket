@@ -81,7 +81,16 @@ vi.mock("@/hooks/use-colors", () => ({
 }));
 
 vi.mock("@/lib/theme-provider", () => ({
-  useThemeTokens: () => ({ colors: mockColors }),
+  useThemeTokens: () => ({
+    colors: mockColors,
+    colorScheme: "light",
+    glass: {
+      blur: 20,
+      tint: "#FFFFFF",
+      surfaceOpacity: 0.6,
+      borderOpacity: 0.4,
+    },
+  }),
 }));
 
 vi.mock("@/hooks/use-color-scheme", () => ({
