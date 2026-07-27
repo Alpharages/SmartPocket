@@ -4,8 +4,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
-  Platform,
   RefreshControl,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
@@ -17,6 +15,7 @@ import { useCurrency } from "@/lib/currency-provider";
 import { formatSignedCurrency } from "@/lib/currency";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { confirmDestructive } from "@/lib/confirm-dialog";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -117,29 +116,14 @@ export default function TransactionDetailScreen() {
   const accent = isIncome ? colors.success : colors.error;
   const category = categories.find((c) => c.id === transaction.categoryId);
 
-  const handleDelete = () => {
-    const remove = async () => {
-      await deleteTransaction(transaction.id);
-      router.back();
-    };
-
-    if (Platform.OS === "web") {
-      // Alert.alert buttons are no-ops on web; use confirm for a real prompt.
-      if (window.confirm("Delete this transaction? This cannot be undone.")) {
-        void remove();
-      }
-      return;
-    }
-
-    Alert.alert(
-      "Delete transaction",
-      "This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => void remove() },
-      ],
-      { cancelable: true },
-    );
+  const handleDelete = async () => {
+    const confirmed = await confirmDestructive({
+      title: "Delete transaction",
+      message: "This cannot be undone.",
+    });
+    if (!confirmed) return;
+    await deleteTransaction(transaction.id);
+    router.back();
   };
 
   return (
@@ -165,7 +149,7 @@ export default function TransactionDetailScreen() {
           </Pressable>
           <Text className="text-h1 text-foreground">Details</Text>
           <Pressable
-            onPress={handleDelete}
+            onPress={() => void handleDelete()}
             hitSlop={8}
             accessibilityLabel="Delete transaction"
             className="w-10 h-10 rounded-full items-center justify-center"

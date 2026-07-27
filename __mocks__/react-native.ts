@@ -15,6 +15,7 @@ import React from "react";
  */
 
 const hostComponent = (hostName: string) =>
+  // eslint-disable-next-line react/display-name -- test double, never rendered by name
   React.forwardRef<any, any>(({ children, ...props }, ref) =>
     React.createElement(hostName, { ref, ...props }, children),
   );
@@ -42,6 +43,7 @@ export const Modal = hostComponent("Modal");
 export const KeyboardAvoidingView = hostComponent("KeyboardAvoidingView");
 (KeyboardAvoidingView as any).displayName = "KeyboardAvoidingView";
 
+// eslint-disable-next-line react/display-name -- test double, never rendered by name
 export const Pressable = React.forwardRef<any, any>(
   ({ children, ...props }, ref) => {
     // Pressable supports a render-prop child; resolve it to the default
@@ -62,6 +64,7 @@ export const Switch = hostComponent("Switch");
 export const TouchableOpacity = Pressable;
 export const TouchableHighlight = Pressable;
 
+// eslint-disable-next-line react/display-name -- test double, never rendered by name
 export const ActivityIndicator = React.forwardRef<any, any>((props, ref) =>
   // Default `testID` gives tests a stable hook; callers can still override it.
   React.createElement("ActivityIndicator", {
@@ -72,6 +75,7 @@ export const ActivityIndicator = React.forwardRef<any, any>((props, ref) =>
 );
 (ActivityIndicator as any).displayName = "ActivityIndicator";
 
+// eslint-disable-next-line react/display-name -- test double, never rendered by name
 export const FlatList = React.forwardRef<any, any>(
   ({ data, renderItem, ...props }, ref) =>
     React.createElement(
@@ -88,6 +92,7 @@ export const FlatList = React.forwardRef<any, any>(
 );
 (FlatList as any).displayName = "FlatList";
 
+// eslint-disable-next-line react/display-name -- test double, never rendered by name
 export const SectionList = React.forwardRef<any, any>(
   (
     {

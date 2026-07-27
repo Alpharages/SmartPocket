@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   ActivityIndicator,
   Pressable,
   RefreshControl,
@@ -42,6 +41,7 @@ import {
 } from "@/lib/_core/theme";
 import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { confirmDestructive } from "@/lib/confirm-dialog";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -158,20 +158,16 @@ function TransactionDetailPane({
     ? resolveCategoryColor(category.color, scheme, themeId)
     : undefined;
 
-  const handleDelete = () => {
-    Alert.alert(
-      "Delete transaction",
-      "This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteTransaction(transaction.id),
-        },
-      ],
-      { cancelable: true },
-    );
+  const handleDelete = async () => {
+    // SP-040: Alert.alert buttons are inert on web, so this was a dead action
+    // in the desktop two-pane layout.
+    const confirmed = await confirmDestructive({
+      title: "Delete transaction",
+      message: "This cannot be undone.",
+    });
+    if (confirmed) {
+      await deleteTransaction(transaction.id);
+    }
   };
 
   return (
@@ -188,7 +184,7 @@ function TransactionDetailPane({
       <View className="flex-row items-center justify-between px-6 pt-6 pb-2">
         <Text className="text-h1 text-foreground">Details</Text>
         <Pressable
-          onPress={handleDelete}
+          onPress={() => void handleDelete()}
           hitSlop={8}
           accessibilityLabel="Delete transaction"
           className="w-10 h-10 rounded-full items-center justify-center"
@@ -358,19 +354,16 @@ export default function TransactionsScreen() {
   );
 
   const handleDelete = useCallback(
-    (id: number, title: string) => {
-      Alert.alert(
-        "Delete Transaction",
-        `Delete "${title}"? This cannot be undone.`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: () => deleteTransaction(id),
-          },
-        ],
-      );
+    async (id: number, title: string) => {
+      // SP-007: this used Alert.alert, whose buttons never fire on web — the
+      // affordance was present, labelled, and completely inert.
+      const confirmed = await confirmDestructive({
+        title: "Delete Transaction",
+        message: `Delete "${title}"? This cannot be undone.`,
+      });
+      if (confirmed) {
+        await deleteTransaction(id);
+      }
     },
     [deleteTransaction],
   );
@@ -581,7 +574,7 @@ export default function TransactionsScreen() {
             hideDate
             selected={selectedTransactionId === item.id}
             onPress={() => handleTransactionPress(item.id)}
-            onDelete={() => handleDelete(item.id, title)}
+            onDelete={() => void handleDelete(item.id, title)}
             style={{ backgroundColor: colors.surface }}
           />
         );

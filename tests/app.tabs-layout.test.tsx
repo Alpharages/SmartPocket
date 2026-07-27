@@ -5,6 +5,7 @@ import TestRenderer, { act } from "react-test-renderer";
 vi.mock("expo-router", () => {
   const Tabs = ({ children }: { children?: React.ReactNode }) =>
     React.createElement("Tabs", {}, children);
+  // eslint-disable-next-line react/display-name -- test double, never rendered by name
   (Tabs as any).Screen = (props: Record<string, unknown>) =>
     React.createElement("TabsScreen", props);
   return { Tabs };

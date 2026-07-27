@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 import {
+  Platform,
   Pressable,
   Text,
   View,
@@ -147,6 +148,11 @@ function TransactionRowImpl({
   const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
 
   const hasSwipeActions = Boolean(onEdit || onDelete);
+  // QA report SP-007: edit/delete lived only inside `renderRightActions`, so on
+  // web they rendered off-screen (measured at x = -9638) with no swipe gesture
+  // to bring them in — the actions were physically unreachable. Render them
+  // inline wherever swipe is not an input method.
+  const usesInlineActions = Platform.OS === "web" && hasSwipeActions;
 
   const handlePressIn = useCallback(() => {
     onPressIn();
@@ -298,10 +304,41 @@ function TransactionRowImpl({
           {displayAmount}
         </Text>
       </View>
+
+      {usesInlineActions ? (
+        <View className="flex-row items-center ml-2">
+          {onEdit ? (
+            <Pressable
+              onPress={onEdit}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${title}`}
+              className="items-center justify-center"
+              style={{ minWidth: 44, minHeight: 44 }}
+            >
+              <Ionicons
+                name="create-outline"
+                size={18}
+                color={colors.primary}
+              />
+            </Pressable>
+          ) : null}
+          {onDelete ? (
+            <Pressable
+              onPress={onDelete}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${title}`}
+              className="items-center justify-center"
+              style={{ minWidth: 44, minHeight: 44 }}
+            >
+              <Ionicons name="trash-outline" size={18} color={colors.error} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </AnimatedPressable>
   );
 
-  if (hasSwipeActions) {
+  if (hasSwipeActions && !usesInlineActions) {
     return (
       <Swipeable
         friction={2}
