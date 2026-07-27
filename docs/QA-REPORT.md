@@ -137,12 +137,13 @@ What blocks release:
 | --- | --- |
 | 🔴 Critical | 6 |
 | 🟠 High | 19 |
-| 🟡 Medium | 26 |
-| 🔵 Low | 13 |
-| **Total** | **64** |
+| 🟡 Medium | 33 |
+| 🔵 Low | 14 |
+| **Total** | **72** |
 
-Of these, **11 were reproduced live in a browser** (see Appendix A) and **8 were discoverable
-only by running the app** (SP-057 … SP-064).
+Of these, **11 were reproduced live in a browser** (see Appendix A) and **16 were discoverable
+only by running the app** (SP-057 … SP-072). **UI/visual defects are the largest single
+category at 21 issues** — see §7 for the systemic audit and §A.11 for the measured pass.
 
 ### 1.4 Production readiness
 
@@ -298,14 +299,22 @@ eslint .       67 problems (9 errors, 58 warnings)
 | SP-054 | Low | UX | Loans | `/loans` | **"No counterparty" is used as a display name.** `loans.tsx:340` falls back to the literal string `"No counterparty"` as the loan's title. Several such loans produce a list of identical rows. | Create two loans with no counterparty. | Distinguishable rows. | Two rows both titled "No counterparty". | Fall back to something identifying — e.g. "Lent · 12 Mar" — or make counterparty required. | Open |
 | SP-055 | Low | Accessibility | Insights | `/summary` | **Category rows are non-interactive below the `lg` breakpoint but still carry an `accessibilityLabel`.** `summary.tsx:566-573` renders a plain `View` (not `Pressable`) on phones, so screen readers announce a rich, actionable-sounding label for something that cannot be activated. Drill-down into a category's transactions is desktop-only. | VoiceOver on a phone → Insights → swipe to a category row. | Either interactive on all sizes, or announced as static. | Announced richly, does nothing. | Make the row navigate to a filtered Activity view on phones — the feature is valuable and currently withheld from the primary platform. | Open |
 | SP-056 | Low | Code Quality | Codebase | n/a | **Untranslated non-English comments in shipped source.** `constants/oauth.ts:180, :188` contain Chinese comments ("可考虑抛出错误或返回错误状态，让调用方处理") in an otherwise English codebase, in the OAuth module. Also: `todo.md` at the repository root contradicts the shipped state in ~15 places (it lists Settings, theming and export as not started; all are implemented). | Read `constants/oauth.ts`. | Consistent English. | Mixed-language comments; a stale root TODO that misleads onboarding. | Translate the comments; retire or regenerate `todo.md` — `docs/prd.md` and `docs/epics.md` are the maintained sources of truth. | Open |
-| SP-057 | High | UI | Design system | (all) | **`className` layout is silently dropped on every `Button` and `TransactionRow`, so they render as columns instead of rows.** `Button` (`components/ui/Button.tsx:19`) and `TransactionRow` are built on `AnimatedPressable = Animated.createAnimatedComponent(Pressable)`. `lib/_core/nativewind-pressable.ts` registers `cssInterop` for `Animated.View/ScrollView/Text/Image` and for plain `Pressable` — **but not for the animated Pressable wrapper**. The `className="flex-row items-center justify-center"` on `Button` (`:263`) is therefore discarded. Measured live: `flexDirection: column, alignItems: stretch, justifyContent: normal`. The component's own comment at `:178` shows the team hit this for `borderRadius` and patched only that one property into `style`. | Open `/dashboard` and inspect the "Budgets" button, or run `getComputedStyle` on `[data-testid="dashboard-budgets-button"]`. | `flexDirection: row`, icon inline with label, 48 px tall. | `flexDirection: column` — the pie icon renders **above** the label, left-aligned, and the button is **74 px tall instead of 48**. Affects every icon-bearing button in the app (Dashboard Budgets, Cards "Add New Card", Categories "Add New Category", Loans "New loan", Accounts "Add account"/"Transfer") and every `TransactionRow` (amount pushed onto its own line instead of vertically centred; rows 88 px tall). | Add `cssInterop(AnimatedPressable, { className: "style" })` in `lib/_core/nativewind-pressable.ts`, **or** move the flex layout onto the `style` prop in `Button`/`TransactionRow` as was already done for `borderRadius`. Add a render test asserting `flexDirection: "row"`. | **Confirmed (runtime)** — measured |
-| SP-058 | High | Accessibility | Design system | Dashboard, Insights, Settings, Budgets, Accounts, Import | **Icon-only buttons render a near-black glyph on an indigo fill at 2.82:1 — below the 3:1 WCAG minimum for UI components.** `Button` variant `icon-only` sets `bg = colors.primary` and computes `fg = readableTextOn(bg)` (`Button.tsx:161-163`) — but the icon is supplied by the **caller** with its own colour, e.g. `<Ionicons name="settings-outline" color={colors.foreground} />` (`dashboard.tsx:243`), so the computed readable ink is never applied. Measured live: background `rgb(79,70,229)`, glyph `rgb(17,24,39)` → **2.82:1** (white would give 6.29:1). | Open `/dashboard`; inspect the settings button top-right. | ≥3:1 (ideally ≥4.5:1). | 2.82:1 — a dark gear on a saturated indigo square. Same defect on the Insights settings button and every `variant="icon-only"` back button. | Have `Button` pass its computed `textColor` down (e.g. clone the icon element with the resolved colour, or expose a render-prop), so callers cannot override it with a failing colour. Extend the contrast tests to cover rendered composites, not just tokens. | **Confirmed (runtime)** — measured |
+| SP-057 | High | UI | Design system | (all) | **`className` layout is silently dropped on every `Button` and `TransactionRow`, so they render as columns instead of rows.** `Button` (`components/ui/Button.tsx:19`) and `TransactionRow` are built on `AnimatedPressable = Animated.createAnimatedComponent(Pressable)`. `lib/_core/nativewind-pressable.ts` registers `cssInterop` for `Animated.View/ScrollView/Text/Image` and for plain `Pressable` — **but not for the animated Pressable wrapper**. The `className="flex-row items-center justify-center"` on `Button` (`:263`) is therefore discarded. Measured live: `flexDirection: column, alignItems: stretch, justifyContent: normal`. The component's own comment at `:178` shows the team hit this for `borderRadius` and patched only that one property into `style`. | Open `/dashboard` and inspect the "Budgets" button, or run `getComputedStyle` on `[data-testid="dashboard-budgets-button"]`. | `flexDirection: row`, icon inline with label, 48 px tall. | `flexDirection: column` — the pie icon renders **above** the label, left-aligned, and the button is **74 px tall instead of 48**. Measured on every button in the app — **100% report `flexDirection: column`**. Two distinct symptoms: **(a) icon buttons are 20–26 px too tall** because the icon stacks above the label — Budgets 74 px (design 48), Add New Card 72 px (48), Add account 72 px (48), Add New Category 68 px (44); buttons *without* icons measure correctly (Add Income 52, Add budget 52), which isolates the cause exactly. **(b) `className="flex-1"` is also discarded**, so paired buttons no longer share the row: in the Add-Transaction sheet at 430 px, Cancel is 94 px and Save is 77 px, together occupying 183 px of a 430 px row — **54% of the row is empty** and the two buttons are *unequal widths* despite carrying identical `flex-1`. `TransactionRow` is affected too (amount pushed onto its own line instead of vertically centred; rows 88 px tall). | Add `cssInterop(AnimatedPressable, { className: "style" })` in `lib/_core/nativewind-pressable.ts`, **or** move the flex layout onto the `style` prop in `Button`/`TransactionRow` as was already done for `borderRadius`. Add a render test asserting `flexDirection: "row"`. | **Confirmed (runtime)** — measured |
+| SP-058 | High | Accessibility | Design system | Dashboard, Insights, Settings, Budgets, Accounts, Import | **Icon-only buttons render a near-black glyph on an indigo fill at 2.82:1 — below the 3:1 WCAG minimum for UI components.** `Button` variant `icon-only` sets `bg = colors.primary` and computes `fg = readableTextOn(bg)` (`Button.tsx:161-163`) — but the icon is supplied by the **caller** with its own colour, e.g. `<Ionicons name="settings-outline" color={colors.foreground} />` (`dashboard.tsx:243`), so the computed readable ink is never applied. Measured live: background `rgb(79,70,229)`, glyph `rgb(17,24,39)` → **2.82:1** (white would give 6.29:1). | Open `/dashboard`; inspect the settings button top-right. | ≥3:1 (ideally ≥4.5:1). | **Fails in both colour schemes**: light 2.82:1 (glyph `#111827` on fill `#4F46E5`), dark **2.72:1** (glyph `#F1F5F9` on fill `#818CF8`). The caller's `colors.foreground` flips with the scheme but always lands near the fill's luminance, so the button is never readable. Affects the Dashboard and Insights settings buttons and every `variant="icon-only"` back button. | Have `Button` pass its computed `textColor` down (e.g. clone the icon element with the resolved colour, or expose a render-prop), so callers cannot override it with a failing colour. Extend the contrast tests to cover rendered composites, not just tokens. | **Confirmed (runtime)** — measured |
 | SP-059 | High | UI | Navigation chrome | (all, dark mode) | **In dark mode the bottom navigation band renders light, and the tab labels drop to 2.27:1.** With `prefers-color-scheme: dark` the app body is `#0B0F19` but the region behind the tab bar computes to `rgb(242,242,242)` and `[data-testid="glass-surface-tint"]` computes to `rgb(255,255,255)` — pure white. The inactive tab label is `rgb(156,163,175)`, giving **2.27:1** against that band (AA text requires 4.5:1). Visually it is a light strip across the bottom of an otherwise dark app. | Set the OS/browser to dark mode and open any tab. | Tab bar follows the dark palette. | A light band across the bottom; "Activity / Categories / Insights / Cards" are barely legible. | Make the `GlassSurface` fallback tint scheme-aware and ensure the root/safe-area background uses the theme background token in dark mode. Note this slipped past `tests/theme-aa-contrast.test.ts` because that suite validates **tokens**, not **rendered composites** — add a rendered-contrast check for the tab bar. | **Confirmed (runtime)** — measured |
 | SP-060 | Medium | UI | Insights | `/summary` | **Amounts wrap mid-number in the compact `StatCard`.** At 430 px the Income card renders `+$3,200.0` on line 1 and `0` on line 2, splitting a currency value across lines. | Open `/summary` on a 430 px viewport with an income ≥ $1,000. | The amount fits, or shrinks/truncates gracefully. | The number breaks between the last two digits — briefly readable as `$3,200.0`. | Add `numberOfLines={1}` plus `adjustsFontSizeToFit` (or `minimumFontScale`) to the `StatCard` amount, and reduce the font size at the `compact` variant's width. | **Confirmed (runtime)** |
 | SP-061 | Medium | Accessibility | Navigation | (all) | **The configured `tabBarAccessibilityLabel` values never reach the DOM.** `app/(tabs)/_layout.tsx` sets `tabBarAccessibilityLabel: "Home tab"`, `"Activity tab"`, etc., but the custom `GlassTabBar` renders `accessibilityLabel={label}` where `label = options.title` (`GlassTabBar.tsx:74-75, :128`), ignoring the configured value. Measured live: the rendered tabs expose `aria-label="Home"`, not `"Home tab"`. The config is dead, and `tests/app.tabs-layout.test.tsx` asserts the **options object** rather than the rendered output, so it cannot catch this. | Inspect `[role="tab"]` elements in the DOM. | `aria-label="Home tab"`. | `aria-label="Home"`. | Read `options.tabBarAccessibilityLabel ?? options.title` in `GlassTabBar`, and change the test to assert rendered output. | **Confirmed (runtime)** |
 | SP-062 | Medium | UI | Dashboard, lists | `/dashboard` and others | **Scrollable content is clipped behind the floating tab bar.** The tab bar surface occupies y 845–931 and the FAB y 814–872 in a 932 px viewport, while `dashboard.tsx:225` sets only `contentContainerStyle={{ paddingBottom: 32 }}`. Measured live, the last row ("Salary", y 772–860) sits underneath both. | Open `/dashboard` and scroll to the bottom. | The last row clears the tab bar. | The final transaction row is partially hidden behind the tab bar and FAB. | Derive the bottom inset from the tab-bar height (`useBottomTabBarHeight()` or a shared constant) rather than the hard-coded `32`, and apply it on every tabbed screen. | **Confirmed (runtime)** |
 | SP-063 | Medium | UI | Transactions | `/transactions` (desktop) | **Transaction rows are flush to the viewport edge on desktop while the rest of the screen is inset.** At 1440 px the header, search field and filter chips inset to x = 24, but the row surface spans x = 0 → 800 with no horizontal margin, so rows visibly break the left alignment of the master pane. | Open `/transactions` at ≥1024 px. | Rows share the 24 px inset. | Rows start at x = 0. | Apply the pane's horizontal padding to `SectionList`'s `contentContainerStyle` (or wrap rows in `ResponsiveContent`) so the inset is uniform. | **Confirmed (runtime)** |
 | SP-064 | Low | UX | Transactions | `/transactions` | **Each row repeats a date that its own section header already states.** Under the "Yesterday" section header, the row still renders "Jul 26"; under "Jul 25", the row renders "Jul 25" again. | Open `/transactions`. | The row shows differentiating detail, not the section's own date. | The date is duplicated on every row. | Drop the per-row date inside a dated section (or show a time), and promote the description to the row title (see SP-050). | **Confirmed (runtime)** |
+| SP-065 | Medium | UI | Categories | `/categories` | **The Categories screen is the only tab screen that bypasses the shared `ScreenHeader`, and its title is visibly misaligned.** `categories.tsx:271-281` hand-rolls the header as `<Animated.View className="px-6 pt-6 pb-2">` instead of using `<ScreenHeader>`. Measured title origin: Categories **(x 24, y 24)**; Home, Activity, Insights, Cards, Budgets and Accounts all **(x 16, y 12)**. | Switch between the Categories tab and any other tab. | Title in the same place on every tab. | The title jumps 8 px right and 12 px down when Categories is selected. | Replace the hand-rolled header with `<ScreenHeader title="Categories" subtitle={…} />`, matching the other six screens. | **Confirmed (runtime)** — measured |
+| SP-066 | Medium | UI | Layout | Multiple | **Screen content insets differ by 8 px between screens.** Measured left edge of primary content: Dashboard, Categories and Cards inset **24 px** (`px-6`); Accounts and Budgets inset **16 px** (`px-lg`). Both idioms are in use for the same role. | Compare `/cards` and `/budgets` side by side. | One inset token used consistently. | Two different insets, so the content column shifts as the user navigates. | Standardise on one spacing token for screen gutters and remove the raw `px-6` usages. | **Confirmed (runtime)** — measured |
+| SP-067 | Medium | UX | Accounts | `/accounts` | **The Accounts screen renders the same primary action twice, in two different visual forms.** Measured: a full-width banner-style "Add account" at **398 × 72 px** (x 16) at the top, and the empty-state CTA "Add account" at **129 × 48 px** (x 151) in the centre. Identical label, identical handler, two completely different presentations on one screen. | Open `/accounts` with no accounts. | One clear primary action. | Two competing indigo "Add account" buttons; the top one is a 72 px-tall banner (see SP-057). | Suppress the top button while the empty state is showing (the empty state already carries the CTA), and fix the banner sizing via SP-057. | **Confirmed (runtime)** — measured |
+| SP-068 | Medium | UX | Settings | `/settings` | **Two adjacent controls are named "Theme style" and "Theme".** The first picks the palette (Aurora Glass / Obsidian & Gold / Midnight Spectrum); the second picks the mode (Light / Dark / System). The names are near-identical and sit inside the same "APPEARANCE" card, so nothing distinguishes them. | Settings → Appearance. | Distinct, self-explanatory labels. | "Theme style" and "Theme" — a user cannot tell which does what without trying both. | Rename to "Colour theme" and "Appearance" (or "Light / Dark mode"), and add one line of helper text to each. | **Confirmed (runtime)** |
+| SP-069 | Medium | UI | Navigation | Settings, Budgets, Accounts, Import | **Back buttons sit in the top-*right* corner and use two different icons.** Every stack screen puts its back control in `ScreenHeader`'s right-hand `action` slot: measured at x 370 of a 430 px viewport. Both iOS and Android place back at top-left, and the platform back gesture originates from the left edge. The icon is also inconsistent — `chevron-back` on Settings and Import CSV, `arrow-back` on Budgets and Accounts. | Open `/settings`, then `/budgets`. | Back at top-left, one icon. | Back at top-right, two different glyphs. | Move the back control to a leading slot in `ScreenHeader` and standardise on one icon. | **Confirmed (runtime)** — measured |
+| SP-070 | Medium | UI | Categories | `/categories` | **Every category row restates the section heading it sits under, and shows a chevron that does nothing.** Rows under "Expense Categories" have the subtitle "Expense"; the row under "Income Categories" reads "Income". The subtitle carries zero information. Each row also renders `chevron-forward` (`categories.tsx:104`) while having no `onPress` (SP-016). | Open `/categories`. | Rows show differentiating information; affordances match behaviour. | Four rows of redundant type labels and four dead chevrons. | Drop the redundant subtitle (or replace it with the category's spend total), and either wire the row to an edit sheet (SP-016) or remove the chevron. | **Confirmed (runtime)** |
+| SP-071 | Medium | Accessibility | Forms | `/add-transaction` and all forms | **Focused inputs render the raw browser focus ring — a hard black rectangle — because no focus style is defined.** The autofocused Amount field shows a thick black outline that clashes with the sheet's rounded, hairline-bordered input. This is the concrete manifestation of the §9.2 finding: the app defines no `:focus-visible` treatment and inherits the UA default. | Open `/add-transaction` on web. | A themed focus ring using the primary token. | A heavy black rectangle inside the styled input container. | Define a token-driven focus style (e.g. 2 px primary ring + offset) for inputs and pressables on web, and suppress the UA default. Needed anyway for SP-032/keyboard navigation. | **Confirmed (runtime)** |
+| SP-072 | Low | UI | Credit Cards | `/cards` | **Two cosmetic defects on the card art.** (a) The decorative circles behind the card render with a visible hard seam — a diagonal edge is plainly visible across the card face where the overlapping circle layers meet. (b) The masked number renders inconsistently: the `••••` groups and the trailing `1234` differ noticeably in weight and tracking, so the mask and the digits look like two different typefaces. | Open `/cards`. | A clean card face; a uniform masked number. | A visible seam across the card; mismatched mask/digit rendering. | Clip the decorative layers to the card's border radius (`overflow: hidden`) and set one `fontVariant`/`letterSpacing` for the whole masked string. | **Confirmed (runtime)** |
 
 ---
 
@@ -1340,8 +1349,8 @@ Things that should be removed, gated, or deferred — each with a reason.
 | TypeScript compilation | **Clean** (0 errors) |
 | ESLint | **67 problems** (9 errors, 58 warnings) |
 | Live browser screenshots captured | **29** (430×932, 1440×900, light + dark) |
-| Issues reproduced in the running app | **11** |
-| Issues found *only* by running the app | **8** (SP-057 … SP-064) |
+| Issues reproduced in the running app | **27** |
+| Issues found *only* by running the app | **16** (SP-057 … SP-072) |
 | Blocked verifications | **4** — items still requiring a physical iOS/Android device: native `Alert.alert` behaviour, real cold-start timing on a mid-range handset, blur performance on low-tier devices, and VoiceOver/TalkBack announcement order. See §0. |
 
 ### 15.2 Issue summary
@@ -1350,10 +1359,11 @@ Things that should be removed, gated, or deferred — each with a reason.
 | --- | --- | --- |
 | 🔴 **Critical** | **6** | SP-001, SP-002, SP-003, SP-004, SP-005, SP-006 |
 | 🟠 **High** | **19** | SP-007 … SP-022, SP-057, SP-058, SP-059 |
-| 🟡 **Medium** | **26** | SP-023 … SP-048, SP-060 … SP-063 |
-| 🔵 **Low** | **13** | SP-049 … SP-056, SP-064 |
-| **Total** | **64** | |
-| *of which reproduced live* | **11** | SP-001/002/003/004/007/008/010/026/041/047 + all of SP-057…SP-064 |
+| 🟡 **Medium** | **33** | SP-023 … SP-048, SP-060 … SP-063, SP-065 … SP-071 |
+| 🔵 **Low** | **14** | SP-049 … SP-056, SP-064, SP-072 |
+| **Total** | **72** | |
+| *of which reproduced live* | **27** | SP-001/002/003/004/007/008/010/026/041/047 + all of SP-057 … SP-072 |
+| *of which are UI/visual* | **21** | the largest single category |
 
 By category: Security 12 · Functional 14 · Business Logic 5 · UI 8 · UX 7 ·
 Validation 5 · Navigation 3 · Performance 3 · Accessibility 3 · Product Scope 5 ·
@@ -1561,6 +1571,78 @@ These eight could not have been found by reading the source, and are logged as S
 | SP-062 | Content clipped behind the tab bar | last row y 772–860 vs tab bar y 845–931, FAB y 814–872 |
 | SP-063 | Desktop rows flush to x = 0 while the pane insets to 24 | measured at 1440 px |
 | SP-064 | Row date duplicates its own section header | "Yesterday" header above a row reading "Jul 26" |
+
+### A.11 Focused UI pass — measured layout and colour
+
+After the functional sweep, all 29 screenshots were reviewed individually and the geometry was
+measured in the live DOM rather than estimated. This pass produced eight further UI defects
+(SP-065 … SP-072) and hardened two existing ones.
+
+**Button geometry — every button in the app (measured at 430 px):**
+
+| Button | Rendered | Design token | Δ | `flexDirection` |
+| --- | --- | --- | --- | --- |
+| Dashboard "Budgets" (icon) | 382 × **74** | 48 (`lg`) | **+26** | column |
+| Cards "Add New Card" (icon) | 149 × **72** | 48 (`lg`) | **+24** | column |
+| Accounts "Add account" (icon) | 398 × **72** | 48 (`lg`) | **+24** | column |
+| Categories "Add New Category" (icon) | 174 × **68** | 44 (`md`) | **+24** | column |
+| Dashboard "Add Income" (no icon) | 132 × 52 | 48 (`lg`) | +4 | column |
+| Budgets "Add budget" (no icon) | 398 × 52 | 48 (`lg`) | +4 | column |
+
+Only the icon-bearing buttons are oversized — which isolates the cause to the dropped
+`flex-row` precisely (SP-057).
+
+![Add Transaction sheet: Cancel and Save huddled left, half the row empty](qa-evidence/sp-057-flex1-dropped-buttons.png)
+
+**Paired buttons no longer share their row.** In the Add-Transaction sheet, `Cancel` and `Save`
+both carry `className="flex-1"`:
+
+```
+viewport 430px    Cancel  x=16  w=94       Save  x=122  w=77
+                  combined 183px of 430px  →  54% of the row is empty
+                  and the two "flex-1" buttons are unequal widths
+```
+
+**Screen title alignment (measured origin of each screen's h1):**
+
+```
+Home        (16, 12)      Cards      (16, 12)
+Activity    (16, 12)      Budgets    (16, 12)
+Insights    (16, 12)      Accounts   (16, 12)
+Categories  (24, 24)   ← the only screen not using ScreenHeader
+```
+
+**Contrast, measured on rendered composites (not tokens):**
+
+| Element | Foreground | Background | Ratio | Required |
+| --- | --- | --- | --- | --- |
+| Icon-only button, light | `#111827` | `#4F46E5` | **2.82:1** | 3.0 |
+| Icon-only button, dark | `#F1F5F9` | `#818CF8` | **2.72:1** | 3.0 |
+| Tab label, dark mode | `#9CA3AF` | `#F2F2F2` | **2.27:1** | 4.5 |
+| Swatch check mark on `#10B981` | `#FFFFFF` | `#10B981` | **2.54:1** | 3.0 |
+| Swatch check mark on `#F59E0B` | `#FFFFFF` | `#F59E0B` | **2.15:1** | 3.0 |
+| Swatch check mark on `#06B6D4` | `#FFFFFF` | `#06B6D4` | **2.43:1** | 3.0 |
+| Swatch check mark on `#14B8A6` | `#FFFFFF` | `#14B8A6` | **2.49:1** | 3.0 |
+
+Seven measured failures, none of which the existing `theme-aa-contrast.test.ts` can catch,
+because that suite validates palette **tokens** in isolation and never a rendered pairing.
+
+**Redundant and misleading UI observed:**
+
+- Accounts shows the same "Add account" action twice, at 398 × 72 and 129 × 48 (SP-067) —
+  [screenshot](qa-evidence/sp-067-duplicate-add-account.png).
+- Categories rows restate their own section heading — "Expense" under "Expense Categories" —
+  and carry a chevron with no handler (SP-070).
+- Activity rows restate their own section's date — "Jul 26" under a "Yesterday" header (SP-064).
+- Settings offers "Theme style" and "Theme" as adjacent, near-identically named controls (SP-068).
+- The disabled "Backup — Coming soon" row still renders a chevron, implying navigation.
+
+**Verdict on the UI dimension.** The static audit read the design system as strong but applied
+inconsistently. Running it inverts that judgement in one important respect: the *system* is
+fine, but its most-reused primitive has been rendering incorrectly on every screen. The visible
+result — oversized buttons, stacked icons, half-empty button rows, misaligned list rows — is
+not a set of small polish items; it is the dominant visual impression of the app. That is why
+the UI rating moved 7 → 5.
 
 ### A.9 What running the app *changed* about the assessment
 
