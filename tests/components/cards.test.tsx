@@ -122,7 +122,20 @@ vi.mock("@/constants/theme", () => ({
   ...TOKENS,
 }));
 
+// The card form now renders the user's currency symbol beside Credit Limit
+// instead of a hard-coded "$" (SP-029).
+vi.mock("@/lib/currency-provider", () => ({
+  useCurrency: () => ({ currency: "USD", isReady: true, setCurrency: vi.fn() }),
+}));
+
+vi.mock("@/lib/currency", () => ({
+  getCurrencySymbol: () => "$",
+  formatCurrency: (n: number) => `$${n.toFixed(2)}`,
+}));
+
 vi.mock("@/lib/_core/theme", () => ({
+  // Bottom clearance for the floating tab bar (SP-062).
+  TAB_BAR_CLEARANCE: 128,
   getElevationStyle: () => ({}),
   ...TOKENS,
   Motion: {

@@ -13,6 +13,8 @@ export type ScreenHeaderProps = {
   title: string;
   subtitle?: string;
   count?: number;
+  /** Rendered before the title — use for back/close controls (SP-069). */
+  leading?: React.ReactNode;
   action?: React.ReactNode;
   accessibilityLabel?: string;
   headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
@@ -24,6 +26,7 @@ export function ScreenHeader({
   title,
   subtitle,
   count,
+  leading,
   action,
   accessibilityLabel,
   headingLevel = 1,
@@ -63,6 +66,7 @@ export function ScreenHeader({
       accessibilityLabel={accessibilityLabel}
       {...viewProps}
     >
+      {leading && <View className="mr-md justify-center">{leading}</View>}
       <View className="flex-1">
         <Text
           className="text-h1 text-foreground"

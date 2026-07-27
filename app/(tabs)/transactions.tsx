@@ -40,6 +40,7 @@ import {
   getElevationStyle,
   resolveCategoryColor,
 } from "@/lib/_core/theme";
+import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 // ---------------------------------------------------------------------------
@@ -176,7 +177,7 @@ function TransactionDetailPane({
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+      contentContainerStyle={{ paddingBottom: TAB_BAR_CLEARANCE }}
       refreshControl={
         refreshControlProps ? (
           <RefreshControl {...refreshControlProps} />
@@ -536,7 +537,12 @@ export default function TransactionsScreen() {
       ListEmptyComponent={listEmpty}
       stickySectionHeadersEnabled={false}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+      // SP-063: rows rendered flush to x=0 while the header/search/chips inset
+      // to 24, breaking the master pane's left alignment on desktop.
+      contentContainerStyle={{
+        paddingBottom: TAB_BAR_CLEARANCE,
+        paddingHorizontal: Spacing.lg,
+      }}
       refreshControl={<RefreshControl {...refreshProps} />}
       renderSectionHeader={({ section }) => (
         <View
@@ -571,6 +577,8 @@ export default function TransactionsScreen() {
             categoryColor={categoryColor}
             categoryIcon={categoryIcon}
             note={item.description ?? undefined}
+            // SP-064: the SectionList header above already states this date.
+            hideDate
             selected={selectedTransactionId === item.id}
             onPress={() => handleTransactionPress(item.id)}
             onDelete={() => handleDelete(item.id, title)}

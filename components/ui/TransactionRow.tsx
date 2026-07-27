@@ -7,7 +7,6 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import Animated from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { Swipeable } from "react-native-gesture-handler";
 
@@ -19,7 +18,8 @@ import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { cn } from "@/lib/utils";
 import { CategoryToken } from "./CategoryToken";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+// Registered for NativeWind interop in lib/_core/nativewind-pressable (SP-057).
+import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 
 export interface TransactionRowProps {
   title: string;
@@ -35,6 +35,11 @@ export interface TransactionRowProps {
   onEdit?: () => void;
   onDelete?: () => void;
   className?: string;
+  /**
+   * Hide the per-row date. Set by lists that already group rows under a dated
+   * section header, where repeating it is pure noise (SP-064).
+   */
+  hideDate?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -132,6 +137,7 @@ function TransactionRowImpl({
   onEdit,
   onDelete,
   className,
+  hideDate = false,
   style,
 }: TransactionRowProps) {
   // Same active-theme token source the surface primitives read — never
@@ -272,7 +278,9 @@ function TransactionRowImpl({
               </View>
             ) : null}
           </View>
-          <Text className="text-xs text-muted mt-0.5">{displayDate}</Text>
+          {hideDate ? null : (
+            <Text className="text-xs text-muted mt-0.5">{displayDate}</Text>
+          )}
           {note ? (
             <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
               {note}

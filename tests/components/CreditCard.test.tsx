@@ -62,26 +62,43 @@ function renderCard(
 // Tests
 // ---------------------------------------------------------------------------
 
+/**
+ * Flatten a Text tree to its rendered string. The masked number nests a Text
+ * for the bullet segment so it can be sized independently while still
+ * resolving to a single accessible string (SP-072).
+ */
+function joinText(children: unknown): string {
+  if (typeof children === "string") return children;
+  if (typeof children === "number") return String(children);
+  if (Array.isArray(children)) return children.map(joinText).join("");
+  if (children && typeof children === "object" && "props" in children) {
+    return joinText(
+      (children as { props: { children?: unknown } }).props.children,
+    );
+  }
+  return "";
+}
+
 describe("CreditCard", () => {
   describe("Card number masking", () => {
     it("shows only the last 4 digits masked as '•••• •••• •••• XXXX'", () => {
       const root = renderCard();
       const maskedText = root.find(
         (n) =>
-          typeof n.props.children === "string" &&
-          (n.props.children as string).startsWith("•••• •••• ••••"),
+          String(n.type) === "Text" &&
+          joinText(n.props.children).startsWith("•••• •••• ••••"),
       );
-      expect(maskedText.props.children).toBe("•••• •••• •••• 3456");
+      expect(joinText(maskedText.props.children)).toBe("•••• •••• •••• 3456");
     });
 
     it("renders last4 directly when cardNumberLast4 is exactly 4 chars", () => {
       const root = renderCard({ cardNumberLast4: "9999" });
       const maskedText = root.find(
         (n) =>
-          typeof n.props.children === "string" &&
-          (n.props.children as string).startsWith("•••• •••• ••••"),
+          String(n.type) === "Text" &&
+          joinText(n.props.children).startsWith("•••• •••• ••••"),
       );
-      expect(maskedText.props.children).toBe("•••• •••• •••• 9999");
+      expect(joinText(maskedText.props.children)).toBe("•••• •••• •••• 9999");
     });
   });
 

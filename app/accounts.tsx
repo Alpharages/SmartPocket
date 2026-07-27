@@ -892,14 +892,14 @@ export default function AccountsScreen() {
             title="Accounts"
             subtitle={`${accounts.length} account${accounts.length !== 1 ? "s" : ""}`}
             accessibilityLabel="Accounts screen"
-            action={
+            leading={
               <Button
                 variant="icon-only"
                 accessibilityLabel="Go back"
                 onPress={() => router.back()}
                 leftIcon={
                   <Ionicons
-                    name="arrow-back"
+                    name="chevron-back"
                     size={22}
                     color={colors.foreground}
                   />
@@ -909,14 +909,19 @@ export default function AccountsScreen() {
           />
 
           <View className="px-lg mt-md gap-md">
-            <Button
-              variant="primary"
-              label="Add account"
-              leftIcon={<Ionicons name="add" size={18} color="white" />}
-              onPress={openAddSheet}
-              size="lg"
-              testID="add-account-button"
-            />
+            {/* SP-067: the empty state already carries an "Add account" CTA, so
+             * showing this one too put the same action on screen twice in two
+             * different sizes. Only show it once there is a list to act on. */}
+            {accounts.length > 0 ? (
+              <Button
+                variant="primary"
+                label="Add account"
+                leftIcon={<Ionicons name="add" size={18} color="white" />}
+                onPress={openAddSheet}
+                size="lg"
+                testID="add-account-button"
+              />
+            ) : null}
             {canTransfer ? (
               <Button
                 variant="secondary"

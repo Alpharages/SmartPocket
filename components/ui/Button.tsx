@@ -1,14 +1,12 @@
 import React, { forwardRef, useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   Text,
   View,
   type PressableProps,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import Animated from "react-native-reanimated";
 
 import { useThemeTokens } from "@/lib/theme-provider";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
@@ -16,7 +14,8 @@ import { readableTextOn } from "@/lib/_core/contrast";
 import { Radius, getElevationStyle } from "@/lib/_core/theme";
 import { cn } from "@/lib/utils";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+// Registered for NativeWind interop in lib/_core/nativewind-pressable (SP-057).
+import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 
 type ButtonRef = React.ComponentRef<typeof AnimatedPressable>;
 
@@ -220,17 +219,33 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
     const resolvedAccessibilityLabel =
       accessibilityLabel ?? (typeof label === "string" ? label : undefined);
 
+    // SP-058: the caller supplies the icon, and every call site passed its own
+    // `color` (usually `colors.foreground`), overriding the readable ink this
+    // component computes for the fill. Re-colour the icon here so an icon-only
+    // button can never render below the 3:1 contrast minimum.
+    const tintIcon = (icon: React.ReactNode): React.ReactNode => {
+      if (!React.isValidElement(icon)) return icon;
+      const props = icon.props as { color?: unknown };
+      if (typeof props.color !== "string") return icon;
+      return React.cloneElement(
+        icon as React.ReactElement<{ color?: string }>,
+        { color: textColor },
+      );
+    };
+
     const content = isIconOnly ? (
       <>
         {loading ? (
           <ActivityIndicator size="small" color={textColor} />
         ) : (
-          (leftIcon ?? rightIcon)
+          tintIcon(leftIcon ?? rightIcon)
         )}
       </>
     ) : (
       <>
-        {leftIcon && !loading && <View className="mr-2">{leftIcon}</View>}
+        {leftIcon && !loading && (
+          <View className="mr-2">{tintIcon(leftIcon)}</View>
+        )}
         {loading ? (
           <ActivityIndicator size="small" color={textColor} className="mr-2" />
         ) : (
@@ -242,7 +257,9 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
             {label}
           </Text>
         )}
-        {rightIcon && !loading && <View className="ml-2">{rightIcon}</View>}
+        {rightIcon && !loading && (
+          <View className="ml-2">{tintIcon(rightIcon)}</View>
+        )}
       </>
     );
 

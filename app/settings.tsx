@@ -591,7 +591,7 @@ export default function SettingsScreen() {
       <ScreenHeader
         title="Settings"
         accessibilityLabel="Settings screen"
-        action={
+        leading={
           <Button
             variant="icon-only"
             accessibilityLabel="Go back"

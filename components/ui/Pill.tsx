@@ -1,19 +1,11 @@
 import React, { forwardRef, useCallback, useMemo } from "react";
-import {
-  Pressable,
-  Text,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
-import Animated from "react-native-reanimated";
+import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { useThemeTokens } from "@/lib/theme-provider";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { cn } from "@/lib/utils";
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 
 type PillRef = React.ComponentRef<typeof AnimatedPressable>;
 

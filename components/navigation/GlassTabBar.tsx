@@ -2,14 +2,7 @@ import React, { useCallback, useRef } from "react";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type ViewStyle,
-} from "react-native";
-import Animated from "react-native-reanimated";
+import { StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { usePressFeedback } from "@/hooks/use-press-feedback";
@@ -17,17 +10,12 @@ import { getElevationStyle } from "@/lib/_core/theme";
 import { useThemeTokens } from "@/lib/theme-provider";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { GlassSurface } from "@/components/ui/GlassSurface";
+import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 
 // Routes rendered in the bar, in order. NOTE: adding a `Tabs.Screen` is not
 // enough — a route missing from this list is silently invisible, which is how
 // the entire Loans module became unreachable (QA report SP-004).
-const TAB_ROUTES = [
-  "dashboard",
-  "transactions",
-  "summary",
-  "loans",
-  "cards",
-];
+const TAB_ROUTES = ["dashboard", "transactions", "summary", "loans", "cards"];
 const MIN_TARGET = 44;
 const FAB_SIZE = 58;
 
@@ -55,7 +43,14 @@ export function GlassTabBar({
   // all themes x variants so a token/glass change can't silently drop below AA.
 
   return (
-    <View pointerEvents="box-none" style={styles.wrap}>
+    // SP-059: the band behind the docked bar had no background of its own, so
+    // in dark mode it fell through to a light container and rendered as a
+    // near-white strip across the bottom of an otherwise dark app — dropping
+    // the inactive tab labels to 2.27:1. Anchor it to the theme background.
+    <View
+      pointerEvents="box-none"
+      style={[styles.wrap, { backgroundColor: theme.colors.background }]}
+    >
       <GlassSurface
         disableBlur={disableBlur}
         style={[
@@ -188,8 +183,6 @@ function FloatingAddButton() {
     </AnimatedPressable>
   );
 }
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const styles = StyleSheet.create({
   wrap: {

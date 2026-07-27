@@ -36,7 +36,12 @@ import {
 } from "@/components/ui";
 import { hasMonthlyTrendHistory } from "@/components/ui/MonthlyTrendChart";
 import { useBreakpoints } from "@/hooks/use-breakpoint";
-import { Spacing, Typography, getElevationStyle } from "@/lib/_core/theme";
+import {
+  Spacing,
+  TAB_BAR_CLEARANCE,
+  Typography,
+  getElevationStyle,
+} from "@/lib/_core/theme";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { useCurrency } from "@/lib/currency-provider";
 import { formatCurrency } from "@/lib/currency";
@@ -617,7 +622,7 @@ export default function SummaryScreen() {
       {selectedCategory ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+          contentContainerStyle={{ paddingBottom: TAB_BAR_CLEARANCE }}
           refreshControl={<RefreshControl {...refreshProps} />}
         >
           {/* Detail header */}
@@ -721,7 +726,7 @@ export default function SummaryScreen() {
         master={
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+            contentContainerStyle={{ paddingBottom: TAB_BAR_CLEARANCE }}
             refreshControl={<RefreshControl {...refreshProps} />}
           >
             {header}

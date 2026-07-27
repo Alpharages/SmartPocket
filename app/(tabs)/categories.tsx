@@ -15,6 +15,7 @@ import {
 import { ResponsiveContent } from "@/components/responsive-content";
 import { ScreenContainer } from "@/components/screen-container";
 import { ContentMaxWidth, getElevationStyle } from "@/lib/_core/theme";
+import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
 import { useExpense, type Category } from "@/lib/expense-context";
 import { useThemeTokens } from "@/lib/theme-provider";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,13 +30,14 @@ import {
   ConfirmSheet,
   EmptyState,
   GlassSurface,
+  ScreenHeader,
   Sheet,
 } from "@/components/ui";
 import { useConfirm } from "@/hooks/use-confirm";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
+import { readableTextOn } from "@/lib/_core/contrast";
 
 /**
  * A single category row. Extracted into its own component so it can use the
@@ -94,14 +96,13 @@ function CategoryRow({
           size="md"
         />
         <View className="flex-1">
+          {/* SP-070: the type subtitle repeated the section heading this row
+           * already sits under ("Expense" under "Expense Categories"). */}
           <Text className="text-foreground font-semibold text-sm">
             {item.name}
           </Text>
-          <Text className="text-xs text-muted capitalize mt-0.5">
-            {item.type}
-          </Text>
         </View>
-        <Ionicons name="chevron-forward" size={16} color={mutedColor} />
+        <Ionicons name="pencil" size={16} color={mutedColor} />
       </AnimatedPressable>
     </Animated.View>
   );
@@ -263,27 +264,27 @@ export default function CategoriesScreen() {
     <ScreenContainer className="flex-1 bg-background">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: TAB_BAR_CLEARANCE }}
         refreshControl={<RefreshControl {...refreshProps} />}
       >
         <ResponsiveContent maxWidth={ContentMaxWidth.screen}>
-          {/* Header */}
-          <Animated.View
-            entering={FadeInDown.duration(500)}
-            className="px-6 pt-6 pb-2"
-          >
-            <Text className="text-h1 font-bold text-foreground">
-              Categories
-            </Text>
-            <Text className="text-sm text-muted font-medium mt-xs">
-              {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
-            </Text>
+          {/* SP-065: use the shared ScreenHeader — hand-rolling it here put the
+           * title at (24,24) while every other screen sits at (16,12), so the
+           * heading visibly jumped when switching to this screen. */}
+          <Animated.View entering={FadeInDown.duration(500)}>
+            <ScreenHeader
+              title="Categories"
+              subtitle={`${categories.length} categor${
+                categories.length !== 1 ? "ies" : "y"
+              }`}
+              accessibilityLabel="Categories screen"
+            />
           </Animated.View>
 
           {/* Add Category Button — proper Button primitive, not a full-width banner */}
           <Animated.View
             entering={FadeInUp.delay(100).duration(500)}
-            className="px-6 mt-5"
+            className="px-lg mt-5"
           >
             <Button
               variant="primary"
@@ -296,7 +297,7 @@ export default function CategoriesScreen() {
           </Animated.View>
 
           {/* Categories Lists */}
-          <View className="px-6 mt-6">
+          <View className="px-lg mt-6">
             {loadingCategories ? (
               <View className="items-center justify-center py-20">
                 <ActivityIndicator size="large" color={colors.primary} />
@@ -411,7 +412,12 @@ export default function CategoriesScreen() {
                   }}
                 >
                   {selectedColor === color && (
-                    <Ionicons name="checkmark" size={20} color="white" />
+                    // SP-047: was hard-coded white — 2.15:1 on #F59E0B.
+                    <Ionicons
+                      name="checkmark"
+                      size={20}
+                      color={readableTextOn(color)}
+                    />
                   )}
                 </Pressable>
               ))}

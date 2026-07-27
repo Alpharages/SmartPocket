@@ -1,12 +1,14 @@
 import React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInUp } from "react-native-reanimated";
 
 import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { Radius, Spacing } from "@/lib/_core/theme";
+import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const MASK_PREFIX = "•••• •••• •••• ";
 
 type CardBrand = "visa" | "mastercard" | "amex" | null;
 
@@ -128,7 +130,7 @@ export function CreditCard({
   onPress,
   onEdit,
 }: CreditCardProps) {
-  const maskedNumber = `•••• •••• •••• ${cardNumberLast4}`;
+  const maskedNumber = `${MASK_PREFIX}${cardNumberLast4}`;
   const expiry = `${String(expiryMonth).padStart(2, "0")}/${String(expiryYear).slice(-2)}`;
   const brand = detectBrand(cardNumberLast4);
 
@@ -144,34 +146,22 @@ export function CreditCard({
           overflow: "hidden",
         }}
       >
-        {/* Decorative depth circles, hidden from assistive tech. */}
-        <View
+        {/* SP-072: this was two hard-edged translucent circles, whose arcs
+         * read as a seam across the card rather than as depth. A single soft
+         * gradient gives the same lift with no visible edge. */}
+        <LinearGradient
           pointerEvents="none"
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
-          style={{
-            position: "absolute",
-            top: -60,
-            right: -40,
-            width: 180,
-            height: 180,
-            borderRadius: 90,
-            backgroundColor: "rgba(255,255,255,0.08)",
-          }}
-        />
-        <View
-          pointerEvents="none"
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={{
-            position: "absolute",
-            bottom: -80,
-            left: -50,
-            width: 200,
-            height: 200,
-            borderRadius: 100,
-            backgroundColor: "rgba(0,0,0,0.08)",
-          }}
+          colors={[
+            "rgba(255,255,255,0.14)",
+            "rgba(255,255,255,0.02)",
+            "rgba(0,0,0,0.10)",
+          ]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={StyleSheet.absoluteFill}
         />
         {onEdit && (
           <Pressable
@@ -212,11 +202,21 @@ export function CreditCard({
           <View className="mb-4">
             <CardChip />
           </View>
+          {/* SP-072: bullet glyphs read heavier and wider than the digits at a
+           * shared font size. Size the mask segment down with a *nested* Text
+           * so the value still resolves to one accessible string
+           * ("•••• •••• •••• 3456") rather than two fragments. */}
           <Text
             className="text-white/90 mb-4"
-            style={{ fontSize: 17, letterSpacing: 2.5 }}
+            style={{
+              fontSize: 17,
+              letterSpacing: 2.5,
+              fontVariant: ["tabular-nums"],
+            }}
+            accessibilityLabel={`Card ending in ${cardNumberLast4}`}
           >
-            {maskedNumber}
+            <Text style={{ fontSize: 13 }}>{MASK_PREFIX}</Text>
+            {cardNumberLast4}
           </Text>
           <View className="flex-row justify-between items-end">
             <View>

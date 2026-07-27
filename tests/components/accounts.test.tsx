@@ -114,6 +114,8 @@ vi.mock("@/constants/theme", () => ({
 }));
 
 vi.mock("@/lib/_core/theme", () => ({
+  // Bottom clearance for the floating tab bar (SP-062).
+  TAB_BAR_CLEARANCE: 128,
   getElevationStyle: () => ({}),
   ...TOKENS,
   Motion: {

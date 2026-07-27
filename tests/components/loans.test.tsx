@@ -81,6 +81,9 @@ vi.mock("@/lib/currency-provider", () => ({
 
 vi.mock("@/lib/currency", () => ({
   formatCurrency: (amount: number) => `$${amount.toFixed(2)}`,
+  // The principal field now shows the user's currency symbol instead of a
+  // hard-coded "$" (SP-029).
+  getCurrencySymbol: () => "$",
 }));
 
 const TOKENS = vi.hoisted(() => ({
@@ -95,6 +98,8 @@ const TOKENS = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/_core/theme", () => ({
+  // Bottom clearance for the floating tab bar (SP-062).
+  TAB_BAR_CLEARANCE: 128,
   getElevationStyle: () => ({}),
   ...TOKENS,
   Motion: {

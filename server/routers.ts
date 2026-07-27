@@ -64,7 +64,6 @@ const creditCardFields = {
   cardType: z.string().max(50).optional(),
 };
 
-
 const categorySchema = z.object({
   // SP-031: the client submitted the untrimmed value, so " Food " and "Food"
   // could coexist as visually identical categories.
@@ -338,7 +337,7 @@ async function assertCategoryNameAvailable(
   if (clash) {
     throw new TRPCError({
       code: "CONFLICT",
-      message: `A ${type} category named "${name}" already exists.`,
+      message: `${type === "expense" ? "An" : "A"} ${type} category named "${name}" already exists.`,
     });
   }
 }

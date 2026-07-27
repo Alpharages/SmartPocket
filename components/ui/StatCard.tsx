@@ -273,6 +273,13 @@ export function StatCard({
               className="text-lg font-bold tabular-nums"
               style={{ color: semanticColor }}
               maxFontSizeMultiplier={MAX_FONT_SCALE}
+              // SP-060: the compact card is ~1/3 of the viewport, so a value
+              // like "+$3,200.00" wrapped between its last two digits and read
+              // momentarily as "$3,200.0". Keep it on one line and let it
+              // shrink instead.
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
             >
               {displayValue}
             </Text>

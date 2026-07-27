@@ -4,7 +4,6 @@ import {
   RefreshControl,
   ScrollView,
   FlatList,
-  Pressable,
   Text,
   View,
 } from "react-native";
@@ -32,10 +31,10 @@ import { useColors } from "@/hooks/use-colors";
 import { useCurrency } from "@/lib/currency-provider";
 import { formatCurrency } from "@/lib/currency";
 import { ContentMaxWidth, Typography } from "@/lib/_core/theme";
+import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 
 function BudgetRow({
   budget,
@@ -163,95 +162,95 @@ export default function BudgetsScreen() {
     <ScreenContainer className="flex-1 bg-background">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: TAB_BAR_CLEARANCE }}
         refreshControl={<RefreshControl {...refreshProps} />}
       >
-      <ResponsiveContent maxWidth={ContentMaxWidth.screen}>
-        <ScreenHeader
-          title="Budgets"
-          subtitle="Set spending limits by category"
-          accessibilityLabel="Budgets screen"
-          action={
-            <Button
-              variant="icon-only"
-              accessibilityLabel="Go back"
-              onPress={() => router.back()}
-              leftIcon={
-                <Ionicons
-                  name="arrow-back"
-                  size={22}
-                  color={colors.foreground}
-                />
-              }
-            />
-          }
-        />
-
-        <View className="px-lg mt-md">
-          <Button
-            variant="primary"
-            label="Add budget"
-            onPress={() => router.push("/budget-form")}
-            size="lg"
-            testID="add-budget-button"
-          />
-        </View>
-
-        {loadingBudgets || loadingBudgetProgress ? (
-          <View className="py-xl items-center">
-            <ActivityIndicator color={colors.primary} />
-          </View>
-        ) : budgets.length === 0 ? (
-          <EmptyState
-            icon={
-              <Ionicons
-                name="pie-chart-outline"
-                size={28}
-                color={colors.muted}
+        <ResponsiveContent maxWidth={ContentMaxWidth.screen}>
+          <ScreenHeader
+            title="Budgets"
+            subtitle="Set spending limits by category"
+            accessibilityLabel="Budgets screen"
+            leading={
+              <Button
+                variant="icon-only"
+                accessibilityLabel="Go back"
+                onPress={() => router.back()}
+                leftIcon={
+                  <Ionicons
+                    name="chevron-back"
+                    size={22}
+                    color={colors.foreground}
+                  />
+                }
               />
             }
-            title="No budgets yet"
-            description="Create a budget to cap spending in a category."
           />
-        ) : (
-          <View
-            className="mx-lg mt-lg rounded-2xl overflow-hidden"
-            style={{
-              backgroundColor: colors.surface,
-              borderWidth: 0.5,
-              borderColor: colors.border,
-            }}
-          >
-            <FlatList
-              data={budgets}
-              keyExtractor={(item) => item.id.toString()}
-              scrollEnabled={false}
-              renderItem={({ item, index }) => {
-                const category = categoriesById.get(item.categoryId);
-                return (
-                  <BudgetRow
-                    budget={item}
-                    progress={progressByBudgetId.get(item.id)}
-                    categoryName={
-                      category?.name ?? `Category ${item.categoryId}`
-                    }
-                    categoryColor={category?.color ?? colors.muted}
-                    categoryIcon={category?.icon ?? DEFAULT_CATEGORY_ICON}
-                    index={index}
-                    onPress={() => router.push(`/budget-form?id=${item.id}`)}
-                  />
-                );
-              }}
-              ItemSeparatorComponent={() => (
-                <View
-                  className="mx-lg"
-                  style={{ height: 0.5, backgroundColor: colors.border }}
-                />
-              )}
+
+          <View className="px-lg mt-md">
+            <Button
+              variant="primary"
+              label="Add budget"
+              onPress={() => router.push("/budget-form")}
+              size="lg"
+              testID="add-budget-button"
             />
           </View>
-        )}
-      </ResponsiveContent>
+
+          {loadingBudgets || loadingBudgetProgress ? (
+            <View className="py-xl items-center">
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : budgets.length === 0 ? (
+            <EmptyState
+              icon={
+                <Ionicons
+                  name="pie-chart-outline"
+                  size={28}
+                  color={colors.muted}
+                />
+              }
+              title="No budgets yet"
+              description="Create a budget to cap spending in a category."
+            />
+          ) : (
+            <View
+              className="mx-lg mt-lg rounded-2xl overflow-hidden"
+              style={{
+                backgroundColor: colors.surface,
+                borderWidth: 0.5,
+                borderColor: colors.border,
+              }}
+            >
+              <FlatList
+                data={budgets}
+                keyExtractor={(item) => item.id.toString()}
+                scrollEnabled={false}
+                renderItem={({ item, index }) => {
+                  const category = categoriesById.get(item.categoryId);
+                  return (
+                    <BudgetRow
+                      budget={item}
+                      progress={progressByBudgetId.get(item.id)}
+                      categoryName={
+                        category?.name ?? `Category ${item.categoryId}`
+                      }
+                      categoryColor={category?.color ?? colors.muted}
+                      categoryIcon={category?.icon ?? DEFAULT_CATEGORY_ICON}
+                      index={index}
+                      onPress={() => router.push(`/budget-form?id=${item.id}`)}
+                    />
+                  );
+                }}
+                ItemSeparatorComponent={() => (
+                  <View
+                    className="mx-lg"
+                    style={{ height: 0.5, backgroundColor: colors.border }}
+                  />
+                )}
+              />
+            </View>
+          )}
+        </ResponsiveContent>
       </ScrollView>
     </ScreenContainer>
   );
