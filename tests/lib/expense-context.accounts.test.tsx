@@ -84,6 +84,15 @@ vi.mock("@/lib/loan-reminders", () => ({
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     useUtils: () => ({
+      summary: {
+        monthlyStats: {
+          fetch: vi.fn().mockResolvedValue({
+            totalIncome: 0,
+            totalExpense: 0,
+            netBalance: 0,
+          }),
+        },
+      },
       accounts: {
         transactionCount: {
           fetch: mocks.transactionCountFetch,

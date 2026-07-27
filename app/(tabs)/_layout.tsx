@@ -69,6 +69,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="loans"
+        options={{
+          title: "Loans",
+          tabBarAccessibilityLabel: "Loans tab",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "cash" : "cash-outline"}
+              size={22}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="cards"
         options={{
           title: "Cards",
@@ -82,7 +96,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="loans" options={{ href: null }} />
     </Tabs>
   );
 }

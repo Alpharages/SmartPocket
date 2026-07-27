@@ -12,8 +12,63 @@ import {
 // VALIDATION SCHEMAS
 // ============================================================================
 
-const categorySchema = z.object({
+/** Luhn checksum used by every major card scheme (SP-012). */
+export function isLuhnValid(cardNumber: string): boolean {
+  let sum = 0;
+  let double = false;
+  for (let i = cardNumber.length - 1; i >= 0; i--) {
+    let digit = cardNumber.charCodeAt(i) - 48;
+    if (digit < 0 || digit > 9) return false;
+    if (double) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    double = !double;
+  }
+  return sum > 0 && sum % 10 === 0;
+}
+
+/** True when the card is still valid at the end of its expiry month (SP-033). */
+export function isExpiryInFuture(
+  month: number,
+  year: number,
+  now: Date = new Date(),
+): boolean {
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  if (year > currentYear) return true;
+  if (year < currentYear) return false;
+  return month >= currentMonth;
+}
+
+/** Unwrapped card fields — `creditCardSchema` is a ZodEffects and has no `.shape`. */
+const creditCardFields = {
   name: z.string().min(1).max(100),
+  cardNumber: z
+    .string()
+    .regex(/^\d{13,19}$/, "Card number must be 13-19 digits")
+    .refine(isLuhnValid, { message: "Card number failed the Luhn check" }),
+  cardholderName: z.string().min(1).max(100),
+  expiryMonth: z.number().int().min(1).max(12),
+  expiryYear: z
+    .number()
+    .int()
+    .min(new Date().getFullYear())
+    .max(new Date().getFullYear() + 30),
+  creditLimit: z.string().regex(/^\d+(\.\d{1,2})?$/),
+  color: z
+    .string()
+    .regex(/^#[0-9A-F]{6}$/i)
+    .optional(),
+  cardType: z.string().max(50).optional(),
+};
+
+
+const categorySchema = z.object({
+  // SP-031: the client submitted the untrimmed value, so " Food " and "Food"
+  // could coexist as visually identical categories.
+  name: z.string().trim().min(1).max(100),
   type: z.enum(["income", "expense"]),
   color: z
     .string()
@@ -22,19 +77,40 @@ const categorySchema = z.object({
   icon: z.string().max(50).optional(),
 });
 
-const creditCardSchema = z.object({
-  name: z.string().min(1).max(100),
-  cardNumber: z.string().min(13).max(19),
-  cardholderName: z.string().min(1).max(100),
-  expiryMonth: z.number().min(1).max(12),
-  expiryYear: z.number().min(2024).max(2099),
-  creditLimit: z.string().regex(/^\d+(\.\d{1,2})?$/),
-  color: z
-    .string()
-    .regex(/^#[0-9A-F]{6}$/i)
-    .optional(),
-  cardType: z.string().max(50).optional(),
-});
+const creditCardSchema = z
+  .object({
+    name: z.string().min(1).max(100),
+    // SP-012: was `min(13).max(19)` with no digit or checksum constraint, so
+    // "abcdefghijklm" was accepted, encrypted and stored.
+    cardNumber: z
+      .string()
+      .regex(/^\d{13,19}$/, "Card number must be 13-19 digits")
+      .refine(isLuhnValid, { message: "Card number failed the Luhn check" }),
+    cardholderName: z.string().min(1).max(100),
+    expiryMonth: z.number().int().min(1).max(12),
+    // SP-033: the hard-coded 2024 floor accepted already-expired cards and
+    // grows more wrong every year. Bounded relative to today instead.
+    expiryYear: z
+      .number()
+      .int()
+      .min(new Date().getFullYear())
+      .max(new Date().getFullYear() + 30),
+    creditLimit: z.string().regex(/^\d+(\.\d{1,2})?$/),
+    color: z
+      .string()
+      .regex(/^#[0-9A-F]{6}$/i)
+      .optional(),
+    cardType: z.string().max(50).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!isExpiryInFuture(value.expiryMonth, value.expiryYear)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Card has already expired",
+        path: ["expiryMonth"],
+      });
+    }
+  });
 
 const accountSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -62,7 +138,14 @@ const transferSchema = z
 const transactionSchema = z.object({
   categoryId: z.number(),
   type: z.enum(["income", "expense"]),
-  amount: z.string().regex(/^\d+(\.\d{1,2})?$/),
+  // SP-041: was `regex` only, which accepts "0" and "0.00". Every other money
+  // field in this file already refines to > 0; transactions were the outlier.
+  amount: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/)
+    .refine((v) => Number(v) > 0, {
+      message: "Amount must be greater than zero",
+    }),
   description: z.string().max(500).optional(),
   date: z.date(),
   creditCardId: z.number().optional(),
@@ -222,6 +305,56 @@ const recurringTransactionSchema = recurringTransactionSchemaBase.superRefine(
 );
 
 // ============================================================================
+// OWNERSHIP GUARDS
+// ============================================================================
+
+/**
+ * Every procedure that accepts a client-supplied row id must prove the row
+ * belongs to the caller before touching it. The DB layer is also scoped by
+ * `userId`, so these guards exist to turn a silent no-op into an explicit
+ * NOT_FOUND — and to keep single-row writes consistent with the bulk paths.
+ */
+async function assertOwnedCategory(id: number, userId: number) {
+  const category = await db.getCategoryById(id, userId);
+  if (!category) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Category not found" });
+  }
+  return category;
+}
+
+/** Case-insensitive uniqueness for category names within a user + type (SP-031). */
+async function assertCategoryNameAvailable(
+  name: string,
+  type: "income" | "expense",
+  userId: number,
+  excludeId?: number,
+) {
+  const existing = await db.getUserCategories(userId, type);
+  const clash = existing.find(
+    (category: { id: number; name: string }) =>
+      category.id !== excludeId &&
+      category.name.trim().toLowerCase() === name.trim().toLowerCase(),
+  );
+  if (clash) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `A ${type} category named "${name}" already exists.`,
+    });
+  }
+}
+
+async function assertOwnedCard(id: number, userId: number) {
+  const card = await db.getCreditCardById(id, userId);
+  if (!card) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Credit card not found",
+    });
+  }
+  return card;
+}
+
+// ============================================================================
 // CATEGORIES ROUTER
 // ============================================================================
 
@@ -236,7 +369,8 @@ const categoriesRouter = router({
 
   create: protectedProcedure
     .input(categorySchema)
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertCategoryNameAvailable(input.name, input.type, ctx.user.id);
       return db.createCategory({
         userId: ctx.user.id,
         ...input,
@@ -249,21 +383,24 @@ const categoriesRouter = router({
 
   update: protectedProcedure
     .input(z.object({ id: z.number(), ...categorySchema.shape }))
-    .mutation(({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
-      return db.updateCategory(id, data);
+      await assertOwnedCategory(id, ctx.user.id);
+      await assertCategoryNameAvailable(data.name, data.type, ctx.user.id, id);
+      return db.updateCategory(id, ctx.user.id, data);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(({ input }) => {
-      return db.deleteCategory(input.id);
+    .mutation(async ({ ctx, input }) => {
+      await assertOwnedCategory(input.id, ctx.user.id);
+      return db.deleteCategory(input.id, ctx.user.id);
     }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(({ input }) => {
-      return db.getCategoryById(input.id);
+    .query(({ ctx, input }) => {
+      return db.getCategoryById(input.id, ctx.user.id);
     }),
 });
 
@@ -294,21 +431,32 @@ const creditCardsRouter = router({
 
   update: protectedProcedure
     .input(
-      z.object({
-        id: z.number(),
-        name: creditCardSchema.shape.name,
-        cardNumber: creditCardSchema.shape.cardNumber.optional(),
-        cardholderName: creditCardSchema.shape.cardholderName,
-        expiryMonth: creditCardSchema.shape.expiryMonth,
-        expiryYear: creditCardSchema.shape.expiryYear,
-        creditLimit: creditCardSchema.shape.creditLimit,
-        color: creditCardSchema.shape.color,
-        cardType: creditCardSchema.shape.cardType,
-      }),
+      z
+        .object({
+          id: z.number(),
+          name: creditCardFields.name,
+          cardNumber: creditCardFields.cardNumber.optional(),
+          cardholderName: creditCardFields.cardholderName,
+          expiryMonth: creditCardFields.expiryMonth,
+          expiryYear: creditCardFields.expiryYear,
+          creditLimit: creditCardFields.creditLimit,
+          color: creditCardFields.color,
+          cardType: creditCardFields.cardType,
+        })
+        .superRefine((value, ctx) => {
+          if (!isExpiryInFuture(value.expiryMonth, value.expiryYear)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Card has already expired",
+              path: ["expiryMonth"],
+            });
+          }
+        }),
     )
-    .mutation(({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { id, cardNumber, ...data } = input;
-      return db.updateCreditCard(id, {
+      await assertOwnedCard(id, ctx.user.id);
+      return db.updateCreditCard(id, ctx.user.id, {
         ...data,
         creditLimit: data.creditLimit,
         ...(cardNumber !== undefined ? { cardNumber } : {}),
@@ -317,14 +465,15 @@ const creditCardsRouter = router({
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(({ input }) => {
-      return db.deleteCreditCard(input.id);
+    .mutation(async ({ ctx, input }) => {
+      await assertOwnedCard(input.id, ctx.user.id);
+      return db.deleteCreditCard(input.id, ctx.user.id);
     }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(({ input }) => {
-      return db.getCreditCardById(input.id);
+    .query(({ ctx, input }) => {
+      return db.getCreditCardById(input.id, ctx.user.id);
     }),
 });
 
@@ -570,6 +719,12 @@ const transactionsRouter = router({
           });
         }
       }
+      // Parity with createMany: a client must not be able to reference another
+      // user's category or card by id (QA report SP-023).
+      await assertOwnedCategory(input.categoryId, ctx.user.id);
+      if (input.creditCardId != null) {
+        await assertOwnedCard(input.creditCardId, ctx.user.id);
+      }
       return db.createTransaction({
         userId: ctx.user.id,
         categoryId: input.categoryId,
@@ -606,13 +761,7 @@ const transactionsRouter = router({
         new Set(input.map((row) => row.categoryId)),
       );
       for (const categoryId of categoryIds) {
-        const category = await db.getCategoryById(categoryId);
-        if (!category || category.userId !== ctx.user.id) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Category not found",
-          });
-        }
+        await assertOwnedCategory(categoryId, ctx.user.id);
       }
 
       const creditCardIds = Array.from(
@@ -623,13 +772,7 @@ const transactionsRouter = router({
         ),
       );
       for (const creditCardId of creditCardIds) {
-        const card = await db.getCreditCardById(creditCardId);
-        if (!card || card.userId !== ctx.user.id) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Credit card not found",
-          });
-        }
+        await assertOwnedCard(creditCardId, ctx.user.id);
       }
 
       return db.createTransactionsBulk(
@@ -657,6 +800,12 @@ const transactionsRouter = router({
             message: "Account not found",
           });
         }
+      }
+      if (input.categoryId != null) {
+        await assertOwnedCategory(input.categoryId, ctx.user.id);
+      }
+      if (input.creditCardId != null) {
+        await assertOwnedCard(input.creditCardId, ctx.user.id);
       }
       const { id, ...data } = input;
       return db.updateTransaction(id, ctx.user.id, data);

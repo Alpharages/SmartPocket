@@ -18,11 +18,14 @@ import { useThemeTokens } from "@/lib/theme-provider";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 
+// Routes rendered in the bar, in order. NOTE: adding a `Tabs.Screen` is not
+// enough — a route missing from this list is silently invisible, which is how
+// the entire Loans module became unreachable (QA report SP-004).
 const TAB_ROUTES = [
   "dashboard",
   "transactions",
-  "categories",
   "summary",
+  "loans",
   "cards",
 ];
 const MIN_TARGET = 44;
@@ -73,12 +76,20 @@ export function GlassTabBar({
             const options = descriptors[route.key]?.options ?? {};
             const label =
               typeof options.title === "string" ? options.title : route.name;
+            // SP-061: `tabBarAccessibilityLabel` was configured on every tab in
+            // app/(tabs)/_layout.tsx and then ignored here, so the rendered
+            // a11y name was just the visible title.
+            const accessibilityLabel =
+              typeof options.tabBarAccessibilityLabel === "string"
+                ? options.tabBarAccessibilityLabel
+                : label;
             const color = focused ? theme.colors.primary : theme.colors.muted;
 
             return (
               <TabButton
                 key={route.key}
                 label={label}
+                accessibilityLabel={accessibilityLabel}
                 focused={focused}
                 color={color}
                 icon={options.tabBarIcon?.({ focused, color, size: 22 })}
@@ -107,6 +118,7 @@ export function GlassTabBar({
 
 function TabButton({
   label,
+  accessibilityLabel,
   focused,
   color,
   icon,
@@ -114,6 +126,7 @@ function TabButton({
   onLongPress,
 }: {
   label: string;
+  accessibilityLabel: string;
   focused: boolean;
   color: string;
   icon: React.ReactNode;
@@ -125,7 +138,7 @@ function TabButton({
   return (
     <AnimatedPressable
       accessibilityRole="tab"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected: focused }}
       onPress={onPress}
       onLongPress={onLongPress}

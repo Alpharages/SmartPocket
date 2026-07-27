@@ -52,7 +52,7 @@ describe("credit card response masking", () => {
     ]);
 
     const { getCreditCardById } = await import("@/server/db");
-    const card = await getCreditCardById(1);
+    const card = await getCreditCardById(1, 1);
 
     expect(card?.cardNumberLast4).toBe("4444");
     expect(card && "cardNumber" in card).toBe(false);
@@ -90,7 +90,7 @@ describe("credit card response masking", () => {
       ]);
 
     const { updateCreditCard } = await import("@/server/db");
-    const updated = await updateCreditCard(1, { name: "Renamed" });
+    const updated = await updateCreditCard(1, 1, { name: "Renamed" });
 
     expect(updated?.cardNumberLast4).toBe("0005");
     expect(updated && "cardNumber" in updated).toBe(false);

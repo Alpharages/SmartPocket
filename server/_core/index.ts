@@ -31,16 +31,90 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+/** Origins permitted to make credentialed cross-origin requests (SP-005). */
+function buildAllowedOrigins(): Set<string> {
+  const configured = (process.env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+
+  const origins = new Set(configured);
+
+  if (!ENV.isProduction) {
+    // Local development hosts only — never added in production.
+    for (const port of [8081, 3000, 19006]) {
+      origins.add(`http://localhost:${port}`);
+      origins.add(`http://127.0.0.1:${port}`);
+    }
+  }
+
+  return origins;
+}
+
+function isOriginAllowed(origin: string, allowed: Set<string>): boolean {
+  const normalized = origin.replace(/\/$/, "");
+  if (allowed.has(normalized)) return true;
+
+  // Sandbox preview topology: the API (3000-*) and the web client (8081-*)
+  // are sibling subdomains of one preview host. Allow a sibling only when the
+  // parent host is itself allowlisted.
+  for (const entry of allowed) {
+    try {
+      const a = new URL(entry);
+      const b = new URL(normalized);
+      if (
+        a.protocol === b.protocol &&
+        a.hostname.replace(/^\d+-/, "") === b.hostname.replace(/^\d+-/, "")
+      ) {
+        return true;
+      }
+    } catch {
+      // ignore malformed allowlist entries
+    }
+  }
+  return false;
+}
+
+/** Authorize the recurring-generation cron endpoint (SP-011). */
+async function isCronRequestAuthorized(req: express.Request): Promise<boolean> {
+  const secret = process.env.CRON_SECRET;
+  if (secret) {
+    const header = req.headers.authorization;
+    if (typeof header === "string" && header === `Bearer ${secret}`) {
+      return true;
+    }
+  }
+
+  try {
+    const user = await sdk.authenticateRequest(req);
+    return user?.isCron === true;
+  } catch {
+    return false;
+  }
+}
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // Enable CORS for all routes - reflect the request origin to support credentials
+  // CORS.
+  //
+  // QA report SP-005: this previously reflected *any* Origin back with
+  // `Allow-Credentials: true`, which let any third-party page make credentialed
+  // requests to the API and read the responses. Origins now come from an
+  // explicit allowlist. In development the local Metro/preview hosts are
+  // permitted so the web client keeps working; in production only
+  // ALLOWED_ORIGINS is honoured.
+  const allowedOrigins = buildAllowedOrigins();
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin) {
+
+    if (origin && isOriginAllowed(origin, allowedOrigins)) {
       res.header("Access-Control-Allow-Origin", origin);
+      res.header("Access-Control-Allow-Credentials", "true");
+      res.header("Vary", "Origin");
     }
+
     res.header(
       "Access-Control-Allow-Methods",
       "GET, POST, PUT, DELETE, OPTIONS",
@@ -49,18 +123,22 @@ async function startServer() {
       "Access-Control-Allow-Headers",
       "Origin, X-Requested-With, Content-Type, Accept, Authorization",
     );
-    res.header("Access-Control-Allow-Credentials", "true");
 
-    // Handle preflight requests
     if (req.method === "OPTIONS") {
-      res.sendStatus(200);
+      // Never 200 a preflight for a disallowed origin — without the
+      // Allow-Origin header the browser blocks it anyway, but failing loudly
+      // makes misconfiguration obvious instead of silent.
+      res.sendStatus(origin && !isOriginAllowed(origin, allowedOrigins) ? 403 : 204);
       return;
     }
     next();
   });
 
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // SP-044: 50mb on every route was an easy memory-exhaustion vector. Normal
+  // payloads are a few KB; only the bulk-import path needs headroom, and that
+  // is bounded to 1000 rows by `transactions.createMany`.
+  app.use(express.json({ limit: "1mb" }));
+  app.use(express.urlencoded({ limit: "1mb", extended: true }));
 
   registerStorageProxy(app);
   registerOAuthRoutes(app);
@@ -69,7 +147,15 @@ async function startServer() {
     res.json({ ok: true, timestamp: Date.now() });
   });
 
-  app.post("/api/scheduled/generate-recurring", async (_req, res) => {
+  // SP-011: this ran recurring generation for *every* user with no auth at
+  // all. It now requires either the platform's cron identity (which
+  // `sdk.authenticateRequest` already recognises) or a shared CRON_SECRET.
+  app.post("/api/scheduled/generate-recurring", async (req, res) => {
+    const authorized = await isCronRequestAuthorized(req);
+    if (!authorized) {
+      res.status(401).json({ ok: false, error: "Unauthorized" });
+      return;
+    }
     try {
       const result = await generateDueTransactions();
       res.json({ ok: true, ...result });

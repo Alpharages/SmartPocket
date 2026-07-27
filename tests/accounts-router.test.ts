@@ -46,6 +46,18 @@ const sampleAccount: Account = {
   updatedAt: now,
 };
 
+const sampleCategory = {
+  id: 1,
+  userId: 1,
+  name: "Groceries",
+  type: "expense",
+  color: "#10B981",
+  icon: "cart",
+  isDefault: false,
+  createdAt: now,
+  updatedAt: now,
+};
+
 describe("accounts router", () => {
   beforeEach(() => {
     callDataApi.mockReset();
@@ -127,7 +139,10 @@ describe("accounts router", () => {
   });
 
   it("allows transactions.create without accountId", async () => {
-    callDataApi.mockResolvedValueOnce({ insertId: 99 });
+    callDataApi
+      // SP-023: category ownership is verified before the insert.
+      .mockResolvedValueOnce([sampleCategory])
+      .mockResolvedValueOnce({ insertId: 99 });
 
     const caller = appRouter.createCaller(createUserContext(1));
     const id = await caller.transactions.create({
@@ -148,6 +163,7 @@ describe("accounts router", () => {
   it("persists accountId on transactions.create after ownership check", async () => {
     callDataApi
       .mockResolvedValueOnce([sampleAccount])
+      .mockResolvedValueOnce([sampleCategory])
       .mockResolvedValueOnce({ insertId: 100 });
 
     const caller = appRouter.createCaller(createUserContext(1));
@@ -192,6 +208,8 @@ describe("accounts router", () => {
   });
 
   it("persists null accountId on user-scoped transactions.update", async () => {
+    // SP-023: a categoryId in the patch is ownership-checked before the UPDATE.
+    callDataApi.mockResolvedValueOnce([sampleCategory]);
     const caller = appRouter.createCaller(createUserContext(1));
     await caller.transactions.update({
       id: 7,

@@ -123,6 +123,15 @@ vi.mock("@/lib/trpc", () => ({
       clearAll: { useMutation: mocks.useMutation },
     },
     useUtils: () => ({
+      summary: {
+        monthlyStats: {
+          fetch: vi.fn().mockResolvedValue({
+            totalIncome: 0,
+            totalExpense: 0,
+            netBalance: 0,
+          }),
+        },
+      },
       accounts: {
         transactionCount: {
           fetch: vi.fn().mockResolvedValue(0),

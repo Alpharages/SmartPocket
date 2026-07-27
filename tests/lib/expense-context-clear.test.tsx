@@ -7,9 +7,11 @@ const mocks = vi.hoisted(() => {
   const categoriesRefetch = vi.fn().mockResolvedValue({ data: [] });
   const creditCardsRefetch = vi.fn().mockResolvedValue({ data: [] });
   const transactionsRefetch = vi.fn().mockResolvedValue({ data: [] });
-  const monthlyStatsRefetch = vi.fn().mockResolvedValue({
-    data: { totalIncome: 0, totalExpense: 0, netBalance: 0 },
-  });
+  // Resolves the payload directly: this now stands in for
+  // `utils.summary.monthlyStats.fetch()`, not a query `.refetch()` (SP-003).
+  const monthlyStatsRefetch = vi
+    .fn()
+    .mockResolvedValue({ totalIncome: 0, totalExpense: 0, netBalance: 0 });
   const budgetsRefetch = vi.fn().mockResolvedValue({ data: [] });
   const budgetProgressRefetch = vi.fn().mockResolvedValue({ data: [] });
   const loansRefetch = vi.fn().mockResolvedValue({ data: [] });
@@ -66,6 +68,11 @@ vi.mock("@/lib/loan-reminders", () => ({
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     useUtils: () => ({
+      summary: {
+        // SP-003: monthly stats are fetched for an explicit period via utils,
+        // not refetched from a query whose key is frozen to the current month.
+        monthlyStats: { fetch: mocks.monthlyStatsRefetch },
+      },
       accounts: {
         transactionCount: {
           fetch: vi.fn().mockResolvedValue(0),
@@ -107,7 +114,7 @@ vi.mock("@/lib/trpc", () => ({
     },
     summary: {
       monthlyStats: {
-        useQuery: () => ({ refetch: mocks.monthlyStatsRefetch, data: null }),
+        useQuery: () => ({ refetch: vi.fn(), data: null }),
       },
     },
     budgets: {

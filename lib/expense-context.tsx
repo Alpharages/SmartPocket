@@ -314,7 +314,8 @@ interface ExpenseContextType {
   // Summary
   monthlyStats: MonthlyStats | null;
   loadingStats: boolean;
-  refreshMonthlyStats: (year: number, month: number) => Promise<void>;
+  /** Omit the period to re-fetch whichever month is currently displayed. */
+  refreshMonthlyStats: (year?: number, month?: number) => Promise<void>;
 
   // Recurring transactions
   recurringTransactions: RecurringTransaction[];
@@ -880,24 +881,44 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const deleteTransactionMutation = trpc.transactions.delete.useMutation();
   const clearAllMutation = trpc.data.clearAll.useMutation();
 
-  const statsQuery = trpc.summary.monthlyStats.useQuery({
+  // The period currently reflected in `monthlyStats`. Mutations refresh
+  // *this* period, not "now" — a user editing while viewing June must see
+  // June's totals update, not July's.
+  const statsPeriodRef = React.useRef<{ year: number; month: number }>({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
   });
 
+  /**
+   * Fetch monthly stats for an explicit period.
+   *
+   * QA report SP-003: this previously accepted `year`/`month` and ignored
+   * both, calling `.refetch()` on a query whose key was frozen to the current
+   * month. Every month the user navigated to on Insights re-displayed the
+   * current month's totals while the category breakdown below (computed
+   * client-side) correctly followed the selection — so the screen showed two
+   * contradictory answers. Now the arguments are honoured; omitting them
+   * re-fetches whichever period is currently displayed.
+   */
   const refreshMonthlyStats = useCallback(
-    async (year: number, month: number) => {
+    async (year?: number, month?: number) => {
+      const period =
+        year != null && month != null
+          ? { year, month }
+          : statsPeriodRef.current;
+      statsPeriodRef.current = period;
+
       setLoadingStats(true);
       try {
-        const data = await statsQuery.refetch();
-        if (data.data) {
-          setMonthlyStats(data.data);
+        const data = await trpcUtils.summary.monthlyStats.fetch(period);
+        if (data) {
+          setMonthlyStats(data);
         }
       } finally {
         setLoadingStats(false);
       }
     },
-    [statsQuery],
+    [trpcUtils],
   );
 
   const budgetsQuery = trpc.budgets.list.useQuery();
@@ -1055,7 +1076,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         await refreshTransactions();
         await refreshBudgetProgress();
         await refreshAccountBalances();
-        await refreshMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+        await refreshMonthlyStats();
         toast.show({ type: "success", message: "Transaction added" });
       } catch {
         setTransactions(snapshot);
@@ -1112,12 +1133,11 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
           data: data as Partial<Transaction>,
         }),
       );
-      const now = new Date();
       try {
         await updateTransactionMutation.mutateAsync({ id, ...data });
         await refreshBudgetProgress();
         await refreshAccountBalances();
-        await refreshMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+        await refreshMonthlyStats();
         toast.show({ type: "success", message: "Transaction updated" });
       } catch {
         setTransactions(snapshot);
@@ -1139,12 +1159,11 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     async (id: number) => {
       const snapshot = snapshotList(transactions);
       setTransactions((prev) => applyOptimistic(prev, { type: "delete", id }));
-      const now = new Date();
       try {
         await deleteTransactionMutation.mutateAsync({ id });
         await refreshBudgetProgress();
         await refreshAccountBalances();
-        await refreshMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+        await refreshMonthlyStats();
         toast.show({ type: "success", message: "Transaction deleted" });
       } catch {
         setTransactions(snapshot);
@@ -1304,7 +1323,6 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const refreshAll = useCallback(async () => {
-    const now = new Date();
     await Promise.all([
       refreshCategories(),
       refreshCreditCards(),
@@ -1316,7 +1334,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       refreshBudgetProgress(),
       refreshRecurringTransactions(),
       refreshLoans(),
-      refreshMonthlyStats(now.getFullYear(), now.getMonth() + 1),
+      refreshMonthlyStats(),
     ]);
   }, [
     refreshCategories,
@@ -1333,7 +1351,6 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   ]);
 
   const clearAllData = useCallback(async () => {
-    const now = new Date();
     try {
       await clearAllMutation.mutateAsync();
       await Promise.all([
@@ -1347,7 +1364,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         refreshBudgetProgress(),
         refreshRecurringTransactions(),
         refreshLoans(),
-        refreshMonthlyStats(now.getFullYear(), now.getMonth() + 1),
+        refreshMonthlyStats(),
       ]);
       toast.show({ type: "success", message: "All data cleared" });
     } catch {

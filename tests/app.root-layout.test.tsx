@@ -15,6 +15,11 @@ import { Platform } from "react-native";
 const auth = vi.hoisted(() => ({
   getSessionToken: vi.fn(),
   setSessionToken: vi.fn(),
+  // AuthGate -> useAuth reads cached user info on native (SP-006).
+  getUserInfo: vi.fn().mockResolvedValue(null),
+  setUserInfo: vi.fn(),
+  clearUserInfo: vi.fn(),
+  removeSessionToken: vi.fn(),
 }));
 
 const runtime = vi.hoisted(() => ({
@@ -63,7 +68,10 @@ vi.mock("@/lib/settings-provider", () => providers);
 vi.mock("@/lib/expense-context", () => providers);
 vi.mock("@/components/ui/ToastProvider", () => providers);
 vi.mock("expo-router", () => ({
-  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn() }),
+  // AuthGate (SP-006) reads the active segment to decide whether the current
+  // route is public.
+  useSegments: () => ["(tabs)"],
   Stack: Object.assign(
     ({ children }: { children: React.ReactNode }) =>
       React.createElement("Stack", {}, children),

@@ -12,7 +12,8 @@ import { Platform } from "react-native";
 import type { Metrics } from "react-native-safe-area-context";
 
 // Debug logging with timestamps
-const DEBUG = true;
+// SP-021: was hard-coded `true`, so this logged on every production web load.
+const DEBUG = __DEV__;
 const log = (msg: string) => {
   if (!DEBUG) return;
   const ts = new Date().toISOString();

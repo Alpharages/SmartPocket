@@ -222,41 +222,84 @@ export async function seedDefaultCategories(userId: number): Promise<void> {
   }
 }
 
+/**
+ * Columns a client-supplied patch is allowed to write, per table.
+ *
+ * The UPDATE builders below interpolate column names into SQL (values stay
+ * parameterised). Zod strips unknown keys today, so injection is not reachable
+ * through the router — this allowlist is defence in depth so a future
+ * `.passthrough()` or a looser input schema cannot turn a patch into column
+ * injection. Anything not listed here is dropped.
+ */
+const UPDATABLE_COLUMNS = {
+  categories: ["name", "type", "color", "icon", "isDefault"],
+  creditCards: [
+    "name",
+    "cardNumber",
+    "cardholderName",
+    "expiryMonth",
+    "expiryYear",
+    "creditLimit",
+    "currentBalance",
+    "color",
+    "cardType",
+    "isActive",
+  ],
+} as const;
+
+function buildUpdate(
+  table: keyof typeof UPDATABLE_COLUMNS,
+  data: Record<string, unknown>,
+): { clause: string; values: unknown[] } {
+  const allowed = UPDATABLE_COLUMNS[table] as readonly string[];
+  const entries = Object.entries(data).filter(
+    ([key, value]) => allowed.includes(key) && value !== undefined,
+  );
+  return {
+    clause: entries.map(([key]) => `${key} = ?`).join(", "),
+    values: entries.map(([, value]) => value),
+  };
+}
+
+/**
+ * All three of these are scoped by `userId`. They were previously keyed on
+ * `id` alone, which let any authenticated user read, modify or delete another
+ * user's categories (QA report SP-001).
+ */
 export async function updateCategory(
   id: number,
+  userId: number,
   data: Partial<InsertCategory>,
 ) {
-  const updates = Object.entries(data)
-    .map(([key]) => `${key} = ?`)
-    .join(", ");
-  const values = Object.values(data);
+  const { clause, values } = buildUpdate("categories", data);
+  if (!clause) return;
 
   await callDataApi("Database/query", {
     body: {
-      query: `UPDATE categories SET ${updates} WHERE id = ?`,
-      params: [...values, id],
+      query: `UPDATE categories SET ${clause} WHERE id = ? AND userId = ?`,
+      params: [...values, id, userId],
     },
   });
 }
 
-export async function deleteCategory(id: number) {
+export async function deleteCategory(id: number, userId: number) {
   await callDataApi("Database/query", {
     body: {
-      query: "DELETE FROM categories WHERE id = ?",
-      params: [id],
+      query: "DELETE FROM categories WHERE id = ? AND userId = ?",
+      params: [id, userId],
     },
   });
 }
 
-export async function getCategoryById(id: number) {
+export async function getCategoryById(id: number, userId: number) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM categories WHERE id = ?",
-        params: [id],
+        query: "SELECT * FROM categories WHERE id = ? AND userId = ?",
+        params: [id, userId],
       },
     });
-    return Array.isArray(result) ? result[0] : null;
+    return Array.isArray(result) ? (result[0] ?? null) : null;
   } catch {
     return null;
   }
@@ -323,11 +366,17 @@ export async function createCreditCard(
   if (!insertId) {
     return null;
   }
-  return getCreditCardById(insertId);
+  return getCreditCardById(insertId, data.userId);
 }
 
+/**
+ * Scoped by `userId` — previously keyed on `id` alone, which let any
+ * authenticated user read another user's card metadata and even overwrite
+ * their stored PAN (QA report SP-002).
+ */
 export async function updateCreditCard(
   id: number,
+  userId: number,
   data: Partial<InsertCreditCard>,
 ): Promise<SafeCreditCard | null> {
   const payload: Partial<InsertCreditCard> = { ...data };
@@ -335,40 +384,38 @@ export async function updateCreditCard(
     payload.cardNumber = encryptCardNumber(payload.cardNumber);
   }
 
-  const updates = Object.entries(payload)
-    .map(([key]) => `${key} = ?`)
-    .join(", ");
-  const values = Object.values(payload);
+  const { clause, values } = buildUpdate("creditCards", payload);
 
-  if (updates.length > 0) {
+  if (clause) {
     await callDataApi("Database/query", {
       body: {
-        query: `UPDATE creditCards SET ${updates} WHERE id = ?`,
-        params: [...values, id],
+        query: `UPDATE creditCards SET ${clause} WHERE id = ? AND userId = ?`,
+        params: [...values, id, userId],
       },
     });
   }
 
-  return getCreditCardById(id);
+  return getCreditCardById(id, userId);
 }
 
-export async function deleteCreditCard(id: number) {
+export async function deleteCreditCard(id: number, userId: number) {
   await callDataApi("Database/query", {
     body: {
-      query: "DELETE FROM creditCards WHERE id = ?",
-      params: [id],
+      query: "DELETE FROM creditCards WHERE id = ? AND userId = ?",
+      params: [id, userId],
     },
   });
 }
 
 export async function getCreditCardById(
   id: number,
+  userId: number,
 ): Promise<SafeCreditCard | null> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM creditCards WHERE id = ?",
-        params: [id],
+        query: "SELECT * FROM creditCards WHERE id = ? AND userId = ?",
+        params: [id, userId],
       },
     });
     const row = Array.isArray(result) ? result[0] : null;
