@@ -143,8 +143,10 @@ vi.mock("@/lib/currency-provider", () => ({
   useCurrency: () => ({ currency: "USD", setCurrency: vi.fn() }),
 }));
 
+const mockToastShow = vi.fn();
+
 vi.mock("@/components/ui/ToastProvider", () => ({
-  useToast: () => ({ show: vi.fn() }),
+  useToast: () => ({ show: mockToastShow }),
 }));
 
 vi.mock("@/hooks/use-color-scheme", () => ({
@@ -420,6 +422,13 @@ describe("AddTransactionScreen", () => {
       expect(payload.amount).toBe("99.99");
       expect(payload.description).toBeUndefined();
       expect(payload.date).toBeInstanceOf(Date);
+
+      // AC5 (Story 12.9): a successful save fires the celebration toast
+      // exactly once, before the Sheet starts closing.
+      expect(mockToastShow).toHaveBeenCalledOnce();
+      expect(mockToastShow).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "success" }),
+      );
 
       // close() hides the Sheet (setVisible(false)); the route waits for the
       // Sheet's own close animation (Motion.sheet.durationMs) before popping
