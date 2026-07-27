@@ -16,6 +16,7 @@ import { formatSignedCurrency } from "@/lib/currency";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { confirmDestructive } from "@/lib/confirm-dialog";
+import { TransactionEditSheet } from "@/components/ui/TransactionEditSheet";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -57,6 +58,7 @@ export default function TransactionDetailScreen() {
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
     currentAccountId,
   );
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     setSelectedAccountId(transaction?.accountId ?? null);
@@ -148,15 +150,34 @@ export default function TransactionDetailScreen() {
             <Ionicons name="chevron-back" size={22} color={colors.foreground} />
           </Pressable>
           <Text className="text-h1 text-foreground">Details</Text>
-          <Pressable
-            onPress={() => void handleDelete()}
-            hitSlop={8}
-            accessibilityLabel="Delete transaction"
-            className="w-10 h-10 rounded-full items-center justify-center"
-            style={{ backgroundColor: colors.error + "14" }}
-          >
-            <Ionicons name="trash-outline" size={20} color={colors.error} />
-          </Pressable>
+          <View className="flex-row items-center gap-2">
+            {/* SP-009: the screen exposed exactly one mutable field (Account);
+             * amount, type, category, date and note were render-only. */}
+            <Pressable
+              onPress={() => setEditing(true)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Edit transaction"
+              testID="edit-transaction-button"
+              className="w-10 h-10 rounded-full items-center justify-center"
+              style={{ backgroundColor: colors.primary + "14" }}
+            >
+              <Ionicons
+                name="create-outline"
+                size={20}
+                color={colors.primary}
+              />
+            </Pressable>
+            <Pressable
+              onPress={() => void handleDelete()}
+              hitSlop={8}
+              accessibilityLabel="Delete transaction"
+              className="w-10 h-10 rounded-full items-center justify-center"
+              style={{ backgroundColor: colors.error + "14" }}
+            >
+              <Ionicons name="trash-outline" size={20} color={colors.error} />
+            </Pressable>
+          </View>
         </View>
 
         {/* Amount */}
@@ -348,6 +369,16 @@ export default function TransactionDetailScreen() {
           ) : null}
         </Animated.View>
       </ScrollView>
+
+      {/* Mounted only while open: the sheet pulls in theme/currency/toast
+       * hooks that a closed sheet has no use for. */}
+      {editing ? (
+        <TransactionEditSheet
+          visible
+          transaction={transaction}
+          onClose={() => setEditing(false)}
+        />
+      ) : null}
     </ScreenContainer>
   );
 }

@@ -41,10 +41,19 @@ import {
   parseMoneyAmount,
 } from "@/lib/loan-detail";
 import {
+  formatDateInput,
+  parseDateInput,
+} from "@/lib/recurring-form-validation";
+import {
   canSubmitRepayment,
   repaymentAmountError,
 } from "@/lib/repayment-form-validation";
-import { ContentMaxWidth, Radius, Spacing, Typography } from "@/lib/_core/theme";
+import {
+  ContentMaxWidth,
+  Radius,
+  Spacing,
+  Typography,
+} from "@/lib/_core/theme";
 
 const OPEN_DURATION = 250;
 const CLOSE_DURATION = 220;
@@ -65,7 +74,10 @@ export default function RecordRepaymentScreen() {
 
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
-  const [date] = useState(new Date());
+  // SP-036: this was fixed to today while being rendered under a "Date" label,
+  // so a payment made last week could not be recorded accurately.
+  const [dateInput, setDateInput] = useState(() => formatDateInput(new Date()));
+  const parsedDate = parseDateInput(dateInput);
   const [saving, setSaving] = useState(false);
   const closingRef = useRef(false);
 
@@ -93,10 +105,11 @@ export default function RecordRepaymentScreen() {
 
   const remainingBalance = loanDetail?.remainingBalance ?? "0.00";
   const amountError = repaymentAmountError(amount, remainingBalance);
-  const isFormValid = canSubmitRepayment(amount, remainingBalance);
+  const isFormValid =
+    canSubmitRepayment(amount, remainingBalance) && parsedDate != null;
 
   const handleSave = async () => {
-    if (!loanDetail || !isFormValid || saving) {
+    if (!loanDetail || !isFormValid || !parsedDate || saving) {
       return;
     }
 
@@ -105,7 +118,7 @@ export default function RecordRepaymentScreen() {
       await recordRepayment({
         loanId: loanDetail.id,
         amount: amount.trim(),
-        date,
+        date: parsedDate!,
         note: note.trim() || null,
       });
       await refreshLoanDetail();
@@ -133,9 +146,15 @@ export default function RecordRepaymentScreen() {
   );
 
   return (
-    <View style={StyleSheet.absoluteFillObject} testID="record-repayment-screen">
+    <View
+      style={StyleSheet.absoluteFillObject}
+      testID="record-repayment-screen"
+    >
       <Pressable
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: SCRIM_COLOR }]}
+        style={[
+          StyleSheet.absoluteFillObject,
+          { backgroundColor: SCRIM_COLOR },
+        ]}
         onPress={close}
         accessibilityRole="button"
         accessibilityLabel="Dismiss"
@@ -270,13 +289,30 @@ export default function RecordRepaymentScreen() {
                   >
                     Date
                   </Text>
-                  <Text className="text-base text-foreground">
-                    {date.toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </Text>
+                  <TextInput
+                    value={dateInput}
+                    onChangeText={setDateInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors.muted}
+                    autoCapitalize="none"
+                    className="rounded-xl px-4 py-3 text-base text-foreground"
+                    style={{
+                      backgroundColor: colors.background,
+                      borderWidth: 1,
+                      borderColor: parsedDate ? colors.border : colors.error,
+                      minHeight: 52,
+                    }}
+                    accessibilityLabel="Repayment date"
+                    testID="record-repayment-date"
+                  />
+                  {!parsedDate ? (
+                    <Text
+                      className="text-sm mt-1"
+                      style={{ color: colors.error }}
+                    >
+                      Use YYYY-MM-DD
+                    </Text>
+                  ) : null}
                 </View>
 
                 <View>

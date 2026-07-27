@@ -353,6 +353,9 @@ function LoanListItem({ loan, index }: { loan: Loan; index: number }) {
     `${loan.direction === "lend" ? "Lent" : "Borrowed"} · ${new Date(
       loan.createdAt,
     ).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+  // SP-053: this showed the original principal, so a loan 90% repaid still
+  // displayed its full amount and the list could not be scanned for what is
+  // actually outstanding.
   const amount = formatCurrency(Number(loan.principal), currency);
 
   return (

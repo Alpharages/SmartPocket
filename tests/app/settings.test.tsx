@@ -382,15 +382,18 @@ describe("SettingsScreen", () => {
   it("renders Export rows as tappable", () => {
     const root = render(<SettingsScreen />);
     const body = textOf(root);
-    expect(body).toContain("Export to CSV");
-    expect(body).toContain("Export to JSON");
+    expect(body).toContain("Export transactions (CSV)");
+    expect(body).toContain("Export transactions (JSON)");
 
     // Export to CSV is now functional — not disabled
-    const exportRow = findPressableByLabel(root, "Export to CSV");
+    const exportRow = findPressableByLabel(root, "Export transactions to CSV");
     expect(exportRow).toBeTruthy();
     expect(exportRow.props.disabled).toBeFalsy();
 
-    const jsonExportRow = findPressableByLabel(root, "Export to JSON");
+    const jsonExportRow = findPressableByLabel(
+      root,
+      "Export transactions to JSON",
+    );
     expect(jsonExportRow).toBeTruthy();
     expect(jsonExportRow.props.disabled).toBeFalsy();
 
@@ -401,7 +404,7 @@ describe("SettingsScreen", () => {
   it("opens the export CSV sheet when Export to CSV is tapped", () => {
     const root = render(<SettingsScreen />);
     act(() => {
-      findPressableByLabel(root, "Export to CSV").props.onPress();
+      findPressableByLabel(root, "Export transactions to CSV").props.onPress();
     });
     const sheet = root.find((n) => n.props?.testID === "export-csv-sheet");
     expect(sheet).toBeTruthy();
@@ -410,7 +413,7 @@ describe("SettingsScreen", () => {
   it("opens the export JSON sheet when Export to JSON is tapped", () => {
     const root = render(<SettingsScreen />);
     act(() => {
-      findPressableByLabel(root, "Export to JSON").props.onPress();
+      findPressableByLabel(root, "Export transactions to JSON").props.onPress();
     });
     const sheet = root.find((n) => n.props?.testID === "export-json-sheet");
     expect(sheet).toBeTruthy();

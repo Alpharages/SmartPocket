@@ -423,6 +423,9 @@ function ClearDataConfirmationSheet({
         <Text className="mb-lg text-body text-muted">
           This permanently deletes all transactions, categories, accounts, and
           credit cards. This action cannot be undone.
+          {"\n\n"}
+          Note: export only covers transactions — it is not a full backup, so
+          categories, cards, accounts, budgets and loans cannot be restored.
         </Text>
         <View className="flex-row gap-md">
           <View className="flex-1">
@@ -672,9 +675,9 @@ export default function SettingsScreen() {
         <SettingsSectionGroup title="Data Management">
           <SettingsRow
             icon="download-outline"
-            label="Export to CSV"
+            label="Export transactions (CSV)"
             onPress={() => setExportCsvSheetVisible(true)}
-            accessibilityLabel="Export to CSV"
+            accessibilityLabel="Export transactions to CSV"
           />
           <SectionDivider />
           <SettingsRow
@@ -686,9 +689,9 @@ export default function SettingsScreen() {
           <SectionDivider />
           <SettingsRow
             icon="download-outline"
-            label="Export to JSON"
+            label="Export transactions (JSON)"
             onPress={() => setExportJsonSheetVisible(true)}
-            accessibilityLabel="Export to JSON"
+            accessibilityLabel="Export transactions to JSON"
           />
 
           <SectionDivider />

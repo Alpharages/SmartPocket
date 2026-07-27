@@ -59,6 +59,9 @@ export default function CardDetailScreen() {
   );
 
   const total = sumCardTransactionTotal(cardTransactions);
+  const limitAmount = card ? Number(card.creditLimit) : 0;
+  const utilisation = limitAmount > 0 ? Math.max(0, total) / limitAmount : 0;
+  const overLimit = utilisation > 1;
 
   if (Number.isNaN(cardId) || !card) {
     return (
@@ -136,6 +139,35 @@ export default function CardDetailScreen() {
         <Text className="text-white/70 text-xs font-medium mt-1 uppercase tracking-wide">
           Total on this card
         </Text>
+
+        {/* SP-034: the credit limit was collected, validated and stored, then
+         * displayed nowhere — the field existed purely as an unused input. */}
+        {limitAmount > 0 ? (
+          <View className="mt-3">
+            <View
+              className="h-1.5 rounded-full overflow-hidden"
+              style={{ backgroundColor: "rgba(255,255,255,0.25)" }}
+            >
+              <View
+                className="h-full rounded-full"
+                style={{
+                  width: `${Math.min(100, utilisation * 100)}%`,
+                  backgroundColor: overLimit
+                    ? colors.error
+                    : "rgba(255,255,255,0.9)",
+                }}
+              />
+            </View>
+            <Text
+              className="text-white/80 text-xs font-medium mt-1.5"
+              accessibilityLabel={`${Math.round(utilisation * 100)} percent of your ${formatMoney(limitAmount, currency)} limit used`}
+            >
+              {Math.round(utilisation * 100)}% of{" "}
+              {formatMoney(limitAmount, currency)} limit
+              {overLimit ? " — over limit" : ""}
+            </Text>
+          </View>
+        ) : null}
       </Animated.View>
 
       <View className="flex-1 px-6 mt-6">

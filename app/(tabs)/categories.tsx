@@ -135,6 +135,7 @@ export default function CategoriesScreen() {
   const {
     categories,
     loadingCategories,
+    transactions,
     addCategory,
     updateCategory,
     deleteCategory,
@@ -226,9 +227,26 @@ export default function CategoriesScreen() {
   };
 
   const requestDelete = async (item: Category) => {
+    // SP-032: the confirmation named the category but never said how many
+    // transactions would be orphaned — they silently became "Uncategorized"
+    // and dropped out of the Insights breakdown.
+    const affected = transactions.filter(
+      (t) => t.categoryId === item.id,
+    ).length;
+    const message =
+      affected > 0
+        ? `"${item.name}" is used by ${affected} transaction${
+            affected === 1 ? "" : "s"
+          }. Deleting it leaves ${
+            affected === 1 ? "it" : "them"
+          } uncategorised and removes ${
+            affected === 1 ? "it" : "them"
+          } from your spending breakdown.`
+        : `Are you sure you want to delete "${item.name}"?`;
+
     const confirmed = await confirm({
       title: "Delete Category",
-      message: `Are you sure you want to delete "${item.name}"?`,
+      message,
       destructive: true,
       confirmLabel: "Delete",
     });
