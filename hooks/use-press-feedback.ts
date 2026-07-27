@@ -7,9 +7,11 @@ import {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 
-const PRESS_SCALE = 0.97;
-const PRESS_IN_DURATION = 120;
-const PRESS_OUT_DURATION = 120;
+import { Motion } from "@/lib/_core/theme";
+
+const PRESS_SCALE = Motion.press.scale;
+const PRESS_IN_DURATION = Motion.press.durationMs;
+const PRESS_OUT_DURATION = Motion.press.durationMs;
 
 export type PressFeedbackOptions = {
   /** Scale factor on press. Default 0.97. */

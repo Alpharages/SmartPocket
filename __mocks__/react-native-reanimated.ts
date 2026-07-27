@@ -35,6 +35,7 @@ export const Easing = {
   ease: (t: number) => t,
   quad: (t: number) => t * t,
   cubic: (t: number) => t * t * t,
+  back: (_s?: number) => (t: number) => t,
   out: (fn: (t: number) => number) => fn,
   in: (fn: (t: number) => number) => fn,
   inOut: (fn: (t: number) => number) => fn,

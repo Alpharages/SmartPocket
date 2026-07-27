@@ -7,17 +7,13 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
+import Animated from "react-native-reanimated";
 
 import { useColors } from "@/hooks/use-colors";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useThemeTokens } from "@/lib/theme-provider";
+import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { cn } from "@/lib/utils";
 import {
   CATEGORY_DEFAULT_COLOR,
@@ -132,8 +128,13 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
   ) => {
     const colors = useColors();
     const scheme = (useColorScheme() ?? "light") as "light" | "dark";
-    const reducedMotion = useReducedMotion();
-    const scale = useSharedValue(1);
+    // themeId comes from the SAME active-theme source the surface primitives
+    // read (useThemeTokens, falls back to aurora when no ThemeProvider is
+    // mounted) — resolveCategoryColor defaults to aurora's map when this is
+    // omitted, which silently renders Aurora's category swatches under
+    // Obsidian/Spectrum (Lore lesson 6248c582).
+    const { themeId } = useThemeTokens();
+    const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
 
     const isSelected = state === "selected";
     const isDisabled = state === "disabled";
@@ -143,28 +144,17 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
     // scheme-appropriate variant in one place so all callers stay consistent.
     const resolvedColor = useMemo(() => {
       const safe = isHex6(color) ? color : CATEGORY_DEFAULT_COLOR;
-      return resolveCategoryColor(safe, scheme);
-    }, [color, scheme]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: scale.value }],
-    }));
+      return resolveCategoryColor(safe, scheme, themeId);
+    }, [color, scheme, themeId]);
 
     const handlePressIn = useCallback(() => {
       if (isDisabled || !hasPressHandler) return;
-      if (!reducedMotion) {
-        scale.value = withTiming(0.97, { duration: 120 });
-      }
-      if (process.env.EXPO_OS === "ios") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      }
-    }, [isDisabled, hasPressHandler, reducedMotion, scale]);
+      onPressIn();
+    }, [isDisabled, hasPressHandler, onPressIn]);
 
     const handlePressOut = useCallback(() => {
-      if (!reducedMotion) {
-        scale.value = withTiming(1, { duration: 120 });
-      }
-    }, [reducedMotion, scale]);
+      onPressOut();
+    }, [onPressOut]);
 
     const handlePress = useCallback(() => {
       if (!isDisabled) {

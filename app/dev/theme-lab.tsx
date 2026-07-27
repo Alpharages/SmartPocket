@@ -13,8 +13,11 @@ import { ScreenContainer } from "@/components/screen-container";
 import { ThemedView } from "@/components/themed-view";
 import { Button } from "@/components/ui/Button";
 import { FilterChipGroup, Pill, ScreenHeader } from "@/components/ui";
+import { GlassSurface } from "@/components/ui/GlassSurface";
+import { GradientHero } from "@/components/ui/GradientHero";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { useFpsMonitor } from "@/hooks/use-fps-monitor";
 import {
   SchemeColors,
   THEME_IDS,
@@ -22,6 +25,11 @@ import {
   type ColorScheme,
   type ThemeId,
 } from "@/constants/theme";
+import {
+  getDeviceTier,
+  setDeviceTierOverride,
+  type DeviceTier,
+} from "@/lib/_core/perf";
 import { useColors } from "@/hooks/use-colors";
 import { useTheme } from "@/hooks/use-theme";
 import { useThemeContext } from "@/lib/theme-provider";
@@ -116,7 +124,9 @@ function ThemeCell({
         gap: 8,
       }}
     >
-      <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "700" }}>
+      <Text
+        style={{ color: colors.foreground, fontSize: 14, fontWeight: "700" }}
+      >
         {themeId} · {scheme}
       </Text>
       <Text style={{ color: colors.muted, fontSize: 11 }}>
@@ -128,7 +138,12 @@ function ThemeCell({
         {gradient.colors.map((stop) => (
           <View
             key={stop}
-            style={{ flex: 1, height: 18, borderRadius: 6, backgroundColor: stop }}
+            style={{
+              flex: 1,
+              height: 18,
+              borderRadius: 6,
+              backgroundColor: stop,
+            }}
           />
         ))}
       </View>
@@ -165,6 +180,97 @@ function ThemeCell({
         ))}
       </View>
     </View>
+  );
+}
+
+const TIER_OVERRIDE_OPTIONS: (DeviceTier | "auto")[] = [
+  "auto",
+  "high",
+  "mid",
+  "low",
+];
+
+/**
+ * Story 12.11 dev instrumentation — an FPS overlay plus a device-tier
+ * override so the low-cost fallback (no blur / solid gradient) can be
+ * exercised on any development machine, without a physical constrained
+ * device. Forcing "low" here should visibly flip the preview surfaces below
+ * to their opaque/solid fallback.
+ */
+function PerfInstrumentationPanel() {
+  const [selectedTier, setSelectedTier] = useState<DeviceTier | "auto">("auto");
+  const fps = useFpsMonitor();
+  const activeTier = getDeviceTier();
+
+  return (
+    <ThemedView className="rounded-2xl border border-border p-4">
+      <Text className="text-lg font-bold text-foreground">
+        Story 12.11: Render & blur performance
+      </Text>
+      <Text className="mt-1 text-sm text-muted">
+        Dev-only FPS overlay + device-tier override for exercising the low-cost
+        fallback path
+      </Text>
+
+      <View className="mt-3 flex-row items-center gap-4">
+        <Text className="text-sm font-semibold text-foreground">
+          FPS: {fps || "—"}
+        </Text>
+        <Text className="text-sm text-muted">Active tier: {activeTier}</Text>
+      </View>
+
+      <View className="mt-3 flex-row flex-wrap gap-2">
+        {TIER_OVERRIDE_OPTIONS.map((option) => (
+          <Pressable
+            key={option}
+            accessibilityRole="button"
+            accessibilityLabel={`Force device tier: ${option}`}
+            className={
+              selectedTier === option
+                ? "rounded-full bg-primary px-4 py-2"
+                : "rounded-full border border-border px-4 py-2"
+            }
+            onPress={() => {
+              setSelectedTier(option);
+              setDeviceTierOverride(option === "auto" ? null : option);
+            }}
+          >
+            <Text
+              className={
+                selectedTier === option
+                  ? "text-sm font-semibold text-background"
+                  : "text-sm font-semibold text-foreground"
+              }
+            >
+              {option}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <View className="mt-4 flex-row gap-3">
+        <GlassSurface
+          testID="perf-glass-preview"
+          style={{ flex: 1, height: 96, borderRadius: 16 }}
+        >
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-xs font-semibold text-foreground">
+              GlassSurface
+            </Text>
+          </View>
+        </GlassSurface>
+        <GradientHero
+          testID="perf-gradient-preview"
+          style={{ flex: 1, height: 96, borderRadius: 16 }}
+        >
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-xs font-semibold text-foreground">
+              GradientHero
+            </Text>
+          </View>
+        </GradientHero>
+      </View>
+    </ThemedView>
   );
 }
 
@@ -250,8 +356,8 @@ export default function ThemeLabScreen() {
               Story 12.2: Three themes × light/dark
             </Text>
             <Text className="mt-1 text-sm text-muted">
-              Each tile renders on its own theme — semantic tokens, category map,
-              and hero gradient for side-by-side AA spot-checking
+              Each tile renders on its own theme — semantic tokens, category
+              map, and hero gradient for side-by-side AA spot-checking
             </Text>
             <View className="mt-3 gap-3">
               {THEME_IDS.map((id) => (
@@ -262,6 +368,8 @@ export default function ThemeLabScreen() {
               ))}
             </View>
           </ThemedView>
+
+          <PerfInstrumentationPanel />
 
           <View className="flex-row gap-2">
             {(["light", "dark"] as ColorScheme[]).map((scheme) => (

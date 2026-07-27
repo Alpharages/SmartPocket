@@ -409,4 +409,10 @@ describe("TransactionRow", () => {
       expect(textOf(icon)).toContain("#DC2626");
     });
   });
+
+  describe("memoization (Story 12.11 AC1: memoized rows)", () => {
+    it("is wrapped in React.memo so unchanged props skip re-render", () => {
+      expect(TransactionRow.$$typeof).toBe(Symbol.for("react.memo"));
+    });
+  });
 });

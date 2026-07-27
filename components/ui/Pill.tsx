@@ -6,16 +6,11 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
+import Animated from "react-native-reanimated";
 
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { readableTextOn } from "@/lib/_core/contrast";
+import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { cn } from "@/lib/utils";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -61,29 +56,19 @@ export const Pill = forwardRef<PillRef, PillProps>(
     },
     ref,
   ) => {
-    const colors = useColors();
-    const reducedMotion = useReducedMotion();
-    const scale = useSharedValue(1);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: scale.value }],
-    }));
+    // Same active-theme token source the surface primitives read — never
+    // the theme-agnostic useColors() (frozen to the default theme; AC3).
+    const { colors } = useThemeTokens();
+    const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
 
     const handlePressIn = useCallback(() => {
       if (disabled) return;
-      if (!reducedMotion) {
-        scale.value = withTiming(0.97, { duration: 120 });
-      }
-      if (process.env.EXPO_OS === "ios") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    }, [disabled, reducedMotion, scale]);
+      onPressIn();
+    }, [disabled, onPressIn]);
 
     const handlePressOut = useCallback(() => {
-      if (!reducedMotion) {
-        scale.value = withTiming(1, { duration: 120 });
-      }
-    }, [reducedMotion, scale]);
+      onPressOut();
+    }, [onPressOut]);
 
     const handlePress = useCallback(() => {
       if (!disabled) {

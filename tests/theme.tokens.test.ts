@@ -78,6 +78,46 @@ describe("Theme Tokens", () => {
     });
   });
 
+  describe("motion tokens (Story 12.9)", () => {
+    it("should expose the full motion surface: press, sheet, screen, countUp, celebration", async () => {
+      const themeConfig = await import("@/theme.config");
+      expect(themeConfig.motion.press).toEqual({
+        scale: 0.97,
+        durationMs: 120,
+      });
+      expect(themeConfig.motion.sheet).toEqual({
+        durationMs: 250,
+        easing: "easeOutCubic",
+        backdropOpacity: 0.65,
+        dragDismissThreshold: 0.35,
+      });
+      expect(themeConfig.motion.screen).toEqual({
+        durationMs: 280,
+        easing: "easeOutCubic",
+      });
+      expect(themeConfig.motion.countUp).toEqual({
+        durationMs: 700,
+        easing: "easeOut",
+      });
+      expect(themeConfig.motion.celebration).toEqual({
+        durationMs: 220,
+        scaleFrom: 0.85,
+        easing: "easeOutBack",
+      });
+    });
+
+    it("should keep motion.sheet unchanged so Sheet.tsx's existing behavior is untouched", async () => {
+      const themeConfig = await import("@/theme.config");
+      expect(themeConfig.motion.sheet.durationMs).toBe(250);
+    });
+
+    it("should surface the same motion object on lib/_core/theme.ts's Motion export", async () => {
+      const themeConfig = await import("@/theme.config");
+      const theme = await import("@/lib/_core/theme");
+      expect(theme.Motion).toBe(themeConfig.motion);
+    });
+  });
+
   describe("lib/_core/theme.ts runtime exports", () => {
     it("should export Spacing runtime tokens", async () => {
       const theme = await import("@/lib/_core/theme");
