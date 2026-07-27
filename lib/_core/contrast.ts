@@ -65,3 +65,13 @@ export function readableTextOn(
   if (!HEX_RE.test(fill)) return light;
   return contrastRatio(light, fill) >= contrastRatio(dark, fill) ? light : dark;
 }
+
+/**
+ * WCAG 2.1 AA predicate: `fg` on `bg` clears 4.5:1 (normal text) or 3:1
+ * (large text / UI components / icons) when `large` is true. Single source
+ * of truth for the AA bar so tests assert the same threshold the primitives
+ * are tuned against instead of re-deriving `>= 4.5` / `>= 3` inline.
+ */
+export function meetsAA(fg: string, bg: string, large = false): boolean {
+  return contrastRatio(fg, bg) >= (large ? 3 : 4.5);
+}

@@ -11,9 +11,16 @@ import * as Reanimated from "react-native-reanimated";
 import { BalanceHero } from "@/components/ui/BalanceHero";
 import { ThemeContext } from "@/lib/theme-provider";
 import { getThemeTokens, type ThemeId } from "@/lib/_core/theme";
-import { formatCurrency, formatCurrencyAccessibilityLabel } from "@/lib/currency";
-import { resolveOpaqueGlassFill, glassInkRequirements } from "@/lib/_core/glass";
+import {
+  formatCurrency,
+  formatCurrencyAccessibilityLabel,
+} from "@/lib/currency";
+import {
+  resolveOpaqueGlassFill,
+  glassInkRequirements,
+} from "@/lib/_core/glass";
 import { contrastRatio } from "@/lib/_core/contrast";
+import { MAX_FONT_SCALE } from "@/lib/_core/a11y";
 
 const mockColors = {
   primary: "#4F46E5",
@@ -270,7 +277,10 @@ describe("BalanceHero", () => {
             [colorOf(getByText(root, "This Month")), 4.5],
             [
               colorOf(
-                getByText(root, formatCurrency(1800, "USD", { sign: "neutral" })),
+                getByText(
+                  root,
+                  formatCurrency(1800, "USD", { sign: "neutral" }),
+                ),
               ),
               4.5,
             ],
@@ -341,6 +351,19 @@ describe("BalanceHero", () => {
     });
   });
 
+  describe("dynamic type (Story 12.10, AC5 — MAX_FONT_SCALE cap)", () => {
+    it("caps the balance figure's font scaling at MAX_FONT_SCALE", () => {
+      const root = renderSettled(
+        <BalanceHero balance={1800} income={3000} expense={1200} />,
+      );
+      const balanceNode = getByText(
+        root,
+        formatCurrency(1800, "USD", { sign: "neutral" }),
+      );
+      expect(balanceNode.props.maxFontSizeMultiplier).toBe(MAX_FONT_SCALE);
+    });
+  });
+
   describe("loading state (AC7)", () => {
     it("renders skeleton placeholders instead of figures while loading", () => {
       const root = render(
@@ -349,9 +372,9 @@ describe("BalanceHero", () => {
       expect(
         queryText(root, formatCurrency(1800, "USD", { sign: "neutral" })),
       ).toHaveLength(0);
-      expect(root.findAll((n) => n.props.testID === "skeleton")).not.toHaveLength(
-        0,
-      );
+      expect(
+        root.findAll((n) => n.props.testID === "skeleton"),
+      ).not.toHaveLength(0);
     });
 
     it("shows skeleton while the currency preference is loading", () => {

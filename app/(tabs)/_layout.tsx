@@ -1,3 +1,4 @@
+import React from "react";
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HapticTab } from "@/components/haptic-tab";
@@ -44,6 +45,7 @@ export default function TabLayout() {
         name="dashboard"
         options={{
           title: "Home",
+          tabBarAccessibilityLabel: "Home tab",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "home" : "home-outline"}
@@ -57,6 +59,7 @@ export default function TabLayout() {
         name="transactions"
         options={{
           title: "Activity",
+          tabBarAccessibilityLabel: "Activity tab",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "receipt" : "receipt-outline"}
@@ -70,6 +73,7 @@ export default function TabLayout() {
         name="categories"
         options={{
           title: "Categories",
+          tabBarAccessibilityLabel: "Categories tab",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "grid" : "grid-outline"}
@@ -83,6 +87,7 @@ export default function TabLayout() {
         name="summary"
         options={{
           title: "Insights",
+          tabBarAccessibilityLabel: "Insights tab",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "pie-chart" : "pie-chart-outline"}
@@ -96,6 +101,7 @@ export default function TabLayout() {
         name="cards"
         options={{
           title: "Cards",
+          tabBarAccessibilityLabel: "Cards tab",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "card" : "card-outline"}
@@ -109,6 +115,7 @@ export default function TabLayout() {
         name="loans"
         options={{
           title: "Loans",
+          tabBarAccessibilityLabel: "Loans tab",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "cash" : "cash-outline"}

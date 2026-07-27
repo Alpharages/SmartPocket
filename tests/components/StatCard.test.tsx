@@ -14,6 +14,7 @@ import {
 } from "@/lib/currency";
 import { resolveGradientInk } from "@/lib/_core/glass";
 import { getThemeTokens } from "@/lib/_core/theme";
+import { MAX_FONT_SCALE } from "@/lib/_core/a11y";
 
 const mockColors = {
   primary: "#4F46E5",
@@ -328,6 +329,30 @@ describe("StatCard", () => {
         formatCurrency(100, "USD", { sign: "positive" }),
       );
       expect(amountNode.props.className).toContain("tabular-nums");
+    });
+  });
+
+  describe("dynamic type (AC5, MAX_FONT_SCALE cap)", () => {
+    it("caps the hero amount's font scaling at MAX_FONT_SCALE", () => {
+      const root = render(
+        <StatCard variant="hero" label="Total Balance" amount={100} />,
+      );
+      const amountNode = getByText(
+        root,
+        formatCurrency(100, "USD", { sign: "absolute" }),
+      );
+      expect(amountNode.props.maxFontSizeMultiplier).toBe(MAX_FONT_SCALE);
+    });
+
+    it("caps the compact amount's font scaling at MAX_FONT_SCALE", () => {
+      const root = render(
+        <StatCard variant="compact" label="Income" amount={100} />,
+      );
+      const amountNode = getByText(
+        root,
+        formatCurrency(100, "USD", { sign: "positive" }),
+      );
+      expect(amountNode.props.maxFontSizeMultiplier).toBe(MAX_FONT_SCALE);
     });
   });
 

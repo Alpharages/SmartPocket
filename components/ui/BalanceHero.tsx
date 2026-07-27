@@ -10,6 +10,7 @@ import {
   type CurrencySign,
 } from "@/lib/currency";
 import { Radius, getElevationStyle } from "@/lib/_core/theme";
+import { MAX_FONT_SCALE } from "@/lib/_core/a11y";
 import { useAnimatedNumber } from "@/hooks/use-animated-number";
 import { cn } from "@/lib/utils";
 import { GlassSurface } from "./GlassSurface";
@@ -113,10 +114,7 @@ export function BalanceHero({
     >
       <GradientHero style={StyleSheet.absoluteFill} />
       <View className="p-5">
-        <GlassSurface
-          style={{ borderRadius: Radius.lg }}
-          className="p-5"
-        >
+        <GlassSurface style={{ borderRadius: Radius.lg }} className="p-5">
           {showLoading ? (
             <View className="gap-3">
               <Skeleton variant="line" width="40%" height={16} />
@@ -144,6 +142,7 @@ export function BalanceHero({
                   fontWeight: "700",
                   color: colors.foreground,
                 }}
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
               >
                 {displayBalance}
               </Text>

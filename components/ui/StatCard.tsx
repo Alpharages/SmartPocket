@@ -18,6 +18,7 @@ import {
 } from "@/lib/currency";
 import { Radius, getElevationStyle } from "@/lib/_core/theme";
 import { resolveGradientInk } from "@/lib/_core/glass";
+import { MAX_FONT_SCALE } from "@/lib/_core/a11y";
 import { useThemeTokens } from "@/lib/theme-provider";
 import { cn } from "@/lib/utils";
 import { GlassSurface } from "./GlassSurface";
@@ -205,10 +206,7 @@ export function StatCard({
               {/* Full-opacity ink for the label too — the old white/70 wash
                * dropped the 14px label below 4.5:1; visual hierarchy comes
                * from size/weight instead. 12.4's hero redesign can restyle. */}
-              <Text
-                className="text-sm font-medium"
-                style={{ color: heroInk }}
-              >
+              <Text className="text-sm font-medium" style={{ color: heroInk }}>
                 {label}
               </Text>
               <Text
@@ -223,6 +221,7 @@ export function StatCard({
                   fontWeight: "700",
                   color: heroInk,
                 }}
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
               >
                 {displayValue}
               </Text>
@@ -273,6 +272,7 @@ export function StatCard({
             <Text
               className="text-lg font-bold tabular-nums"
               style={{ color: semanticColor }}
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
             >
               {displayValue}
             </Text>
