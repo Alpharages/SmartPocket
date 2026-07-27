@@ -8,6 +8,7 @@
 | **Build under test** | `1.0.0` — Expo SDK 54 / React Native 0.81 / React 19 / Expo Router 6 |
 | **Report date** | 2026-07-27 |
 | **Audit type** | Full-application QA: functional, UI/UX, navigation, validation, security, accessibility, performance, product scope |
+| **Execution** | Static source audit **+ live browser session** (Chromium, app running against the in-memory dev DB) |
 | **Release recommendation** | 🔴 **Not Ready for Production** |
 
 ---
@@ -28,17 +29,32 @@ containerised CI environment. It combines three evidence streams:
    (FR-/NFR- requirement IDs), `docs/concept note.md`, `docs/ARCHITECTURE.md`, and the
    root `todo.md`, so that "missing" is distinguished from "never intended".
 
-**Explicit limitation — no live device/browser session was possible.** The application is
-server-backed: it requires a MySQL instance reached through the Manus Data API
-(`callDataApi`) plus a Manus OAuth issuer. Neither is reachable from this environment, and
-`.env.example` shows no offline fallback for the data layer. Consequently **no runtime
-screenshots, no device matrix, and no rendered-pixel measurements are included, and none are
-claimed.** Every defect below is anchored to a file and line number so it can be verified
-without re-running the app. Where a defect's *visual severity* (e.g. exact contrast ratio at
-render time) could not be measured, this is stated in that row rather than guessed.
+4. **Live browser session.** The application was installed, built and run, and was exercised
+   interactively in Chromium via Playwright at three viewports and in both colour schemes.
+   `server/_core/dataApi.ts` falls back to an in-memory dev database (`devDb.ts`, seeded with
+   sample data) whenever `DATABASE_URL` is unset, so **no MySQL or Manus OAuth issuer was
+   required**; `POST /api/dev/login` supplied the session. 29 screenshots were captured and
+   computed styles and contrast ratios were measured against the live DOM.
 
-Reviewers who want to reproduce the runtime behaviour should run `pnpm dev` against a local
-MySQL (`DATABASE_URL`) and use `POST /api/dev/login`, which the server exposes in non-production.
+   ```
+   API      NODE_ENV=development npx tsx server/_core/index.ts   → :3000  (dev DB, seeded)
+   Client   EXPO_OFFLINE=1 npx expo start --web --port 8081      → :8081  (Metro, web)
+   Browser  /opt/pw-browsers/chromium-1194  via playwright-core
+   Viewports 430×932 (phone) · 1440×900 (desktop) · light + dark
+   ```
+
+**Runtime findings are reported in Appendix A, and every affected row in the Issues Log carries a
+`Status` of `Confirmed (runtime)` where it was reproduced live.** Eight defects were found that
+static review could not have surfaced — including a component-level layout bug affecting every
+button in the app, and a dark-mode contrast failure. These are logged as SP-057 … SP-064.
+
+**Remaining limitation.** No physical iOS or Android device was available, so native-only
+behaviour (`Alert.alert` on native, `expo-secure-store`, notification delivery, real blur
+performance, VoiceOver/TalkBack announcement order) was reviewed at source level only and is
+not claimed as runtime-verified.
+
+Reviewers can reproduce the entire session with the two commands above — no database setup
+is needed.
 
 ---
 
@@ -85,6 +101,11 @@ What is genuinely good, and should be said plainly:
   envelope (`server/_core/crypto.ts`); full PANs are never serialised to the client
   (`toSafeCreditCard`).
 
+Every blocking defect below was **reproduced in a running browser session** (Appendix A) —
+none rests on code reading alone. Running the app also surfaced eight defects that source
+review could not have found, including a broken core UI primitive and two measured WCAG
+failures.
+
 What blocks release:
 
 - **Two confirmed IDOR (broken object-level authorization) vulnerabilities.** Any authenticated
@@ -115,10 +136,13 @@ What blocks release:
 | Severity | Count |
 | --- | --- |
 | 🔴 Critical | 6 |
-| 🟠 High | 16 |
-| 🟡 Medium | 22 |
-| 🔵 Low | 12 |
-| **Total** | **56** |
+| 🟠 High | 19 |
+| 🟡 Medium | 26 |
+| 🔵 Low | 13 |
+| **Total** | **64** |
+
+Of these, **11 were reproduced live in a browser** (see Appendix A) and **8 were discoverable
+only by running the app** (SP-057 … SP-064).
 
 ### 1.4 Production readiness
 
@@ -218,16 +242,16 @@ eslint .       67 problems (9 errors, 58 warnings)
 
 | ID | Severity | Category | Module | Screen | Description | Steps to Reproduce | Expected Result | Actual Result | Recommended Fix | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SP-001 | Critical | Security | Categories API | n/a (API) | **Broken object-level authorization on categories.** `categories.update`, `categories.delete` and `categories.getById` (`server/routers.ts:250-267`) pass only `input.id` to the DB layer. `db.updateCategory` (`server/db.ts:225`), `db.deleteCategory` (`:242`) and `db.getCategoryById` (`:251`) all run `WHERE id = ?` with **no `userId` predicate**. Any authenticated user can read, rename, recolour, retype, or delete any other user's category. | As user A, note a category id. As user B, call `categories.delete({id: <A's id>})` over `/api/trpc`. | Request rejected with `NOT_FOUND`/`FORBIDDEN`; A's data untouched. | A's category is deleted; A's transactions in it silently become "Uncategorized" (`app/(tabs)/transactions.tsx:563`). | Add `userId` to all three DB signatures and append `AND userId = ?` to every statement, mirroring the correct pattern already used by `db.updateAccount`/`db.deleteTransaction`. Add a regression test per procedure asserting cross-user access returns `NOT_FOUND`. | Open |
-| SP-002 | Critical | Security | Credit Cards API | n/a (API) | **Broken object-level authorization on credit cards, including PAN overwrite.** `creditCards.update`, `.delete`, `.getById` (`server/routers.ts:295-328`) are unscoped; `db.updateCreditCard` (`server/db.ts:329`), `db.deleteCreditCard` (`:355`) and `db.getCreditCardById` (`:364`) use `WHERE id = ?`. An attacker can enumerate ids to read any user's cardholder name, expiry, limit, colour and **last-4 (decrypted from the stored PAN by `toSafeCreditCard`)**, and can **write a new `cardNumber` onto another user's card**. | As user B, call `creditCards.getById({id: n})` for arbitrary `n`; then `creditCards.update({id: n, cardNumber: "4111111111111111", ...})`. | `NOT_FOUND`. | Full card metadata returned; PAN overwritten on a stranger's record. | Same fix as SP-001: thread `ctx.user.id` into all three DB calls and add `AND userId = ?`. Given this touches PAN data, treat as a security incident candidate and audit access logs before release. | Open |
-| SP-003 | Critical | Business Logic | Insights | `/summary` | **Month navigation reports the wrong month's totals.** `refreshMonthlyStats(year, month)` in `lib/expense-context.tsx:868-882` accepts `year`/`month` but **ignores both** — it calls `statsQuery.refetch()`, and `statsQuery` is bound at `:874` to `useQuery({year: new Date().getFullYear(), month: new Date().getMonth() + 1})`, permanently the current month. The Balance/Income/Expenses `StatCard`s (`app/(tabs)/summary.tsx:272-295`) therefore never change. The "Spending by Category" list below them *is* filtered correctly client-side (`:157-164`), so the two halves of the screen disagree. | Open Insights → tap "Previous month" (`chevron-back`). | Stat cards show the selected month's income/expense/net. | Stat cards still show the **current** month; the category list and its percentages show the **previous** month. Totals do not reconcile. | Make the query key dynamic: hoist `year`/`month` into state that feeds `trpc.summary.monthlyStats.useQuery({year, month})`, or accept the arguments in `refreshMonthlyStats` and call `utils.summary.monthlyStats.fetch({year, month})`. Also fixes the month-end forecast at `app/(tabs)/summary.tsx:145-154`, which reads the same stale value. | Open |
-| SP-004 | Critical | Navigation | Loans | `/loans` | **The entire Loans module is unreachable from the UI.** `app/(tabs)/_layout.tsx:85` sets `<Tabs.Screen name="loans" options={{ href: null }} />`, hiding it from the tab bar. A repo-wide search for `push("/loans")` / `href="/loans"` returns **zero** call sites. Settings links to Accounts and Import CSV but not Loans; the Dashboard links to Budgets but not Loans. Three screens, the `loansRouter` (12 procedures), `lib/loan-schedule.ts`, `lib/loan-reminders.ts` and `lib/loan-detail.ts` are all dead to the user. Only a loan *notification* deep link (`lib/notification-routing.ts`) can reach `/loan/[id]` — and no loan can exist to generate one. | Launch app → traverse every tab, header action, settings row and empty-state CTA. | A "Loans" entry point exists. | No path to `/loans` exists. | Restore Loans as a sixth tab (add `"loans"` to `TAB_ROUTES` in `components/navigation/GlassTabBar.tsx:21` — the custom tab bar filters by this hard-coded list, so `_layout.tsx` alone is not sufficient), **or** add a Loans row to the Settings "Data Management" group plus a Dashboard shortcut. Re-enable `tests/app.tabs-layout.test.tsx`, which currently fails because of exactly this change (see SP-020). | Open |
+| SP-001 | Critical | Security | Categories API | n/a (API) | **Broken object-level authorization on categories.** `categories.update`, `categories.delete` and `categories.getById` (`server/routers.ts:250-267`) pass only `input.id` to the DB layer. `db.updateCategory` (`server/db.ts:225`), `db.deleteCategory` (`:242`) and `db.getCategoryById` (`:251`) all run `WHERE id = ?` with **no `userId` predicate**. Any authenticated user can read, rename, recolour, retype, or delete any other user's category. | As user A, note a category id. As user B, call `categories.delete({id: <A's id>})` over `/api/trpc`. | Request rejected with `NOT_FOUND`/`FORBIDDEN`; A's data untouched. | A's category is deleted; A's transactions in it silently become "Uncategorized" (`app/(tabs)/transactions.tsx:563`). | Add `userId` to all three DB signatures and append `AND userId = ?` to every statement, mirroring the correct pattern already used by `db.updateAccount`/`db.deleteTransaction`. Add a regression test per procedure asserting cross-user access returns `NOT_FOUND`. | **Confirmed (runtime)** — 5/5 cross-tenant ops succeeded |
+| SP-002 | Critical | Security | Credit Cards API | n/a (API) | **Broken object-level authorization on credit cards, including PAN overwrite.** `creditCards.update`, `.delete`, `.getById` (`server/routers.ts:295-328`) are unscoped; `db.updateCreditCard` (`server/db.ts:329`), `db.deleteCreditCard` (`:355`) and `db.getCreditCardById` (`:364`) use `WHERE id = ?`. An attacker can enumerate ids to read any user's cardholder name, expiry, limit, colour and **last-4 (decrypted from the stored PAN by `toSafeCreditCard`)**, and can **write a new `cardNumber` onto another user's card**. | As user B, call `creditCards.getById({id: n})` for arbitrary `n`; then `creditCards.update({id: n, cardNumber: "4111111111111111", ...})`. | `NOT_FOUND`. | Full card metadata returned; PAN overwritten on a stranger's record. | Same fix as SP-001: thread `ctx.user.id` into all three DB calls and add `AND userId = ?`. Given this touches PAN data, treat as a security incident candidate and audit access logs before release. | **Confirmed (runtime)** — PAN overwritten cross-user |
+| SP-003 | Critical | Business Logic | Insights | `/summary` | **Month navigation reports the wrong month's totals.** `refreshMonthlyStats(year, month)` in `lib/expense-context.tsx:868-882` accepts `year`/`month` but **ignores both** — it calls `statsQuery.refetch()`, and `statsQuery` is bound at `:874` to `useQuery({year: new Date().getFullYear(), month: new Date().getMonth() + 1})`, permanently the current month. The Balance/Income/Expenses `StatCard`s (`app/(tabs)/summary.tsx:272-295`) therefore never change. The "Spending by Category" list below them *is* filtered correctly client-side (`:157-164`), so the two halves of the screen disagree. | Open Insights → tap "Previous month" (`chevron-back`). | Stat cards show the selected month's income/expense/net. | Stat cards still show the **current** month; the category list and its percentages show the **previous** month. Totals do not reconcile. | Make the query key dynamic: hoist `year`/`month` into state that feeds `trpc.summary.monthlyStats.useQuery({year, month})`, or accept the arguments in `refreshMonthlyStats` and call `utils.summary.monthlyStats.fetch({year, month})`. Also fixes the month-end forecast at `app/(tabs)/summary.tsx:145-154`, which reads the same stale value. | **Confirmed (runtime)** — see §A.2, screenshot |
+| SP-004 | Critical | Navigation | Loans | `/loans` | **The entire Loans module is unreachable from the UI.** `app/(tabs)/_layout.tsx:85` sets `<Tabs.Screen name="loans" options={{ href: null }} />`, hiding it from the tab bar. A repo-wide search for `push("/loans")` / `href="/loans"` returns **zero** call sites. Settings links to Accounts and Import CSV but not Loans; the Dashboard links to Budgets but not Loans. Three screens, the `loansRouter` (12 procedures), `lib/loan-schedule.ts`, `lib/loan-reminders.ts` and `lib/loan-detail.ts` are all dead to the user. Only a loan *notification* deep link (`lib/notification-routing.ts`) can reach `/loan/[id]` — and no loan can exist to generate one. | Launch app → traverse every tab, header action, settings row and empty-state CTA. | A "Loans" entry point exists. | No path to `/loans` exists. | Restore Loans as a sixth tab (add `"loans"` to `TAB_ROUTES` in `components/navigation/GlassTabBar.tsx:21` — the custom tab bar filters by this hard-coded list, so `_layout.tsx` alone is not sufficient), **or** add a Loans row to the Settings "Data Management" group plus a Dashboard shortcut. Re-enable `tests/app.tabs-layout.test.tsx`, which currently fails because of exactly this change (see SP-020). | **Confirmed (runtime)** — /loans renders, no tab |
 | SP-005 | Critical | Security | API / Server | n/a (API) | **Fully permissive CORS combined with `SameSite=None` session cookies and no CSRF defence.** `server/_core/index.ts:38-58` reflects *any* `Origin` back in `Access-Control-Allow-Origin` and sets `Access-Control-Allow-Credentials: true`, with no allowlist, for every route including `/api/trpc`. `server/_core/cookies.ts:57` sets the session cookie `sameSite: "none"`. There is no CSRF token, no origin check, and no double-submit cookie. Any third-party page can issue credentialed cross-origin requests to the API **and read the responses**. | Host `fetch("https://<api>/api/trpc/transactions.list", {credentials:"include"})` on an unrelated origin and open it in a browser with a live SmartPocket session. | Browser blocks the cross-origin credentialed read. | Request succeeds; the victim's full transaction history is returned to the attacker's page. | Replace origin reflection with an explicit allowlist from env (`ALLOWED_ORIGINS`). Prefer `sameSite: "lax"` for the session cookie; if `none` is genuinely required for the sandbox preview topology, gate it to non-production and add CSRF tokens for all mutations. | Open |
 | SP-006 | Critical | Functional | Auth | (all) | **There is no sign-in screen and the OAuth entry point is dead code.** `startOAuthLogin()` and `getLoginUrl()` (`constants/oauth.ts:158-196`) have zero call sites outside their own module. `hooks/use-auth.ts` — which holds `isAuthenticated`, `user` and the only `logout()` implementation — is imported by **no** screen or component. `app/_layout.tsx:104-159` auto-logs-in via `POST /api/dev/login`, but that block is wrapped in `if (!__DEV__) return`, and the server only registers that route when `!ENV.isProduction`. A release build therefore has no way to obtain a session. | Build with `NODE_ENV=production` and launch. | A login screen appears, or the app redirects to the OAuth portal. | App renders the Dashboard; every tRPC call fails auth; screens show empty states (masked further by SP-014). No login UI exists. | Add a `/login` route that calls `startOAuthLogin()`, and an auth gate in `app/_layout.tsx` that redirects unauthenticated users there. Wire `useAuth()` into the gate and add a "Sign out" row to Settings (SP-024). | Open |
-| SP-007 | High | Functional | Transactions | `/transactions` | **Deleting a transaction from the Activity list does nothing on web.** `app/(tabs)/transactions.tsx:361` uses `Alert.alert` with button callbacks. On react-native-web, `Alert.alert`'s buttons are not wired to a real dialog, so the destructive `onPress` never fires. The standalone detail screen already knows this and branches to `window.confirm` (`app/transaction/[id].tsx:126-132`), but the list row and the two-pane detail pane (`:161`) were never given the same branch. Web is a declared target (`app.config.ts` `web.bundler: "metro"`). | On web, open Activity → swipe/press a row's delete affordance. | Confirmation dialog appears; on confirm the row is removed. | Nothing happens — no dialog, no deletion, no feedback. | Extract the web-aware confirm from `app/transaction/[id].tsx:120-143` into a shared helper (or reuse the existing `useConfirm()` + `ConfirmSheet`, already used on Categories and Cards) and apply it to both `Alert.alert` sites in `transactions.tsx`. | Open |
-| SP-008 | High | Functional | Transactions | `/add-transaction` | **The transaction date cannot be set — it is always "now".** `app/add-transaction.tsx:69` declares `const [date] = useState(new Date())` with no setter, and no date field is rendered. `todo.md` confirms "Add date picker (defaults to today)" is still unchecked. PRD FR-1 requires create-with-date and is tagged **[built]**. | Add Transaction → look for a date field. | A date field defaulting to today, editable to any past date. | No date control at all; every entry is stamped at the moment of saving. Yesterday's spending cannot be recorded. | Add a date picker (or the same `YYYY-MM-DD` text field the Recurring/Loan/Transfer forms already use, for consistency) and pass it through. Note the plumbing already exists — `transactionSchema.date` and `db.createTransaction` accept an arbitrary date. | Open |
+| SP-007 | High | Functional | Transactions | `/transactions` | **Deleting a transaction from the Activity list does nothing on web.** `app/(tabs)/transactions.tsx:361` uses `Alert.alert` with button callbacks. On react-native-web, `Alert.alert`'s buttons are not wired to a real dialog, so the destructive `onPress` never fires. The standalone detail screen already knows this and branches to `window.confirm` (`app/transaction/[id].tsx:126-132`), but the list row and the two-pane detail pane (`:161`) were never given the same branch. Web is a declared target (`app.config.ts` `web.bundler: "metro"`). | On web, open Activity → swipe/press a row's delete affordance. | Confirmation dialog appears; on confirm the row is removed. | Nothing happens — no dialog, no deletion, no feedback. | Extract the web-aware confirm from `app/transaction/[id].tsx:120-143` into a shared helper (or reuse the existing `useConfirm()` + `ConfirmSheet`, already used on Categories and Cards) and apply it to both `Alert.alert` sites in `transactions.tsx`. | **Confirmed (runtime)** — no dialog, no deletion |
+| SP-008 | High | Functional | Transactions | `/add-transaction` | **The transaction date cannot be set — it is always "now".** `app/add-transaction.tsx:69` declares `const [date] = useState(new Date())` with no setter, and no date field is rendered. `todo.md` confirms "Add date picker (defaults to today)" is still unchecked. PRD FR-1 requires create-with-date and is tagged **[built]**. | Add Transaction → look for a date field. | A date field defaulting to today, editable to any past date. | No date control at all; every entry is stamped at the moment of saving. Yesterday's spending cannot be recorded. | Add a date picker (or the same `YYYY-MM-DD` text field the Recurring/Loan/Transfer forms already use, for consistency) and pass it through. Note the plumbing already exists — `transactionSchema.date` and `db.createTransaction` accept an arbitrary date. | **Confirmed (runtime)** — no date field rendered |
 | SP-009 | High | Functional | Transactions | `/transaction/[id]` | **Transactions cannot be edited.** The detail screen exposes exactly one mutable field — Account (`app/transaction/[id].tsx:241-337`). Amount, type, category, date and description are render-only. `updateTransaction` in the context supports partial updates of all of them, but no UI calls it with anything except `{accountId}`. `todo.md` "Implement edit transaction functionality" is unchecked; PRD FR-1 claims edit is **[built]**. | Open any transaction → attempt to correct the amount. | An edit affordance for every field. | Only the Account radio group is editable. To fix a typo the user must delete and re-create — which also loses the original date (SP-008). | Add an edit mode reusing the Add Transaction form pre-filled from the record, submitting via the existing `updateTransaction`. | Open |
-| SP-010 | High | Product Scope | Credit Cards | `/add-transaction`, `/card/[id]` | **A transaction can never be linked to a credit card, so the whole Cards module is inert.** `app/add-transaction.tsx` imports and refreshes `creditCards` (`:56, :83`) but renders **no card picker** — only Category and Account. A repo-wide search shows `creditCardId` is used in exactly one UI file: `components/ui/RecurringTransactionSheet.tsx`. The card detail screen (`app/card/card-detail-screen.tsx`) is therefore permanently empty for anyone who does not use recurring rules or CSV import. PRD FR-2 ("optionally link an expense to a credit card") is tagged **[built]**. | Cards → add a card → Add Transaction → look for a card selector → open the card's detail. | Card selector present; the expense appears under the card. | No selector. Card detail shows "No transactions for this card yet" forever. | Add the same card `Pill` row already implemented in `RecurringTransactionSheet.tsx:361-385` to `add-transaction.tsx`, and surface the card on the transaction detail screen. | Open |
+| SP-010 | High | Product Scope | Credit Cards | `/add-transaction`, `/card/[id]` | **A transaction can never be linked to a credit card, so the whole Cards module is inert.** `app/add-transaction.tsx` imports and refreshes `creditCards` (`:56, :83`) but renders **no card picker** — only Category and Account. A repo-wide search shows `creditCardId` is used in exactly one UI file: `components/ui/RecurringTransactionSheet.tsx`. The card detail screen (`app/card/card-detail-screen.tsx`) is therefore permanently empty for anyone who does not use recurring rules or CSV import. PRD FR-2 ("optionally link an expense to a credit card") is tagged **[built]**. | Cards → add a card → Add Transaction → look for a card selector → open the card's detail. | Card selector present; the expense appears under the card. | No selector. Card detail shows "No transactions for this card yet" forever. | Add the same card `Pill` row already implemented in `RecurringTransactionSheet.tsx:361-385` to `add-transaction.tsx`, and surface the card on the transaction detail screen. | **Confirmed (runtime)** — no card picker rendered |
 | SP-011 | High | Security | Server | n/a (API) | **Unauthenticated privileged endpoint.** `POST /api/scheduled/generate-recurring` (`server/_core/index.ts:70-78`) runs `generateDueTransactions()` across **all users** with no authentication, no shared secret, and no rate limit. | `curl -X POST https://<api>/api/scheduled/generate-recurring` from anywhere. | 401/403. | 200 — recurring generation is executed for every user in the database. | Require a bearer secret (`CRON_SECRET`) or restrict to the platform's cron identity, which `sdk.authenticateRequest` already recognises via `CRON_OPEN_ID_PREFIX` (`server/_core/sdk.ts:280`). Add rate limiting. | Open |
 | SP-012 | High | Validation | Credit Cards | `/cards` | **Card numbers are accepted with no format validation.** Server schema is `cardNumber: z.string().min(13).max(19)` (`server/routers.ts:27`) — no digits-only constraint, no Luhn check. Client `isCardFormValid` (`lib/card-form-validation.ts:36-38`) only checks non-empty. The numeric keyboard is a hint, not a constraint, and is bypassed by paste and by direct API calls. | Add a card with number `abcdefghijklm` (13 chars). | Rejected: "Enter a valid card number". | Accepted, encrypted, and stored; "last 4" renders as `jklm`. | Add `.regex(/^\d{13,19}$/)` server-side plus a Luhn check, and mirror both in `isCardFormValid` with an inline field error. | Open |
 | SP-013 | High | Security | Auth | `/oauth/callback` | **Session tokens travel in URL query strings and are stored in `localStorage` on web.** `app/oauth/callback.tsx:36-38` reads `params.sessionToken` from the route query and persists it; `lib/_core/auth.ts:34-40` stores it in `localStorage` on web — the file's own comment concedes this is "readable by any JS on the page… exposed to XSS". PRD NFR-4 mandates an HTTP-only cookie for web. Tokens in URLs leak into browser history, `Referer` headers, proxy logs and analytics. | Complete the web OAuth flow and inspect the address bar and `localStorage`. | Token only ever in an HTTP-only, `Secure` cookie. | Token visible in the URL and readable by any script. | Use the existing `POST /api/auth/session` handshake (`server/_core/oauth.ts:158-183`) to convert to an HTTP-only cookie and stop persisting the raw JWT in `localStorage` for web. | Open |
@@ -243,7 +267,7 @@ eslint .       67 problems (9 errors, 58 warnings)
 | SP-023 | Medium | Security | Transactions API | n/a (API) | **`transactions.create` does not verify category/card ownership**, while `transactions.createMany` does. `createMany` explicitly checks `category.userId !== ctx.user.id` and the same for cards (`server/routers.ts:576-604`); the single-row `create` (`:546-573`) checks only `accountId`. | Call `transactions.create({categoryId: <another user's id>, ...})`. | `NOT_FOUND`. | Accepted; the row stores a cross-tenant `categoryId` and renders as "Uncategorized". | Lift the ownership checks from `createMany` into a shared helper used by both procedures. Do the same in `transactions.update`. | Open |
 | SP-024 | Medium | UX / Security | Settings | `/settings` | **There is no way to sign out.** `POST /api/auth/logout` exists server-side and `useAuth().logout()` exists client-side, but neither is reachable. Settings has Preferences / Appearance / Data Management / AI / About and no account section at all — no user identity, no email, no sign-out. | Settings → look for Sign Out. | A sign-out action. | Absent. On a shared or lost device the session (valid for **one year**, SP-025) cannot be ended from the app. | Add an "Account" section to Settings showing the signed-in identity and a destructive "Sign out" row calling `useAuth().logout()`. | Open |
 | SP-025 | Medium | Security | Auth | n/a | **One-year sessions with no rotation and no client-side 401 recovery.** `server/_core/oauth.ts` issues session tokens with `expiresInMs: ONE_YEAR_MS` at three call sites. There is no refresh, no idle timeout, and no re-auth prompt. The tRPC client (`lib/trpc.ts`) has no `onError` link, so an expired/revoked token produces silent query failures that surface as empty states (SP-014). | Revoke/expire a session, then use the app. | Redirect to login with a clear message. | Requests 401; screens render as if the account were empty. | Shorten session lifetime, add refresh, and add a tRPC error link that clears the session and routes to login on `UNAUTHORIZED`. | Open |
-| SP-026 | Medium | Product Scope | Dev tooling | `/dev/theme-lab` | **An internal 786-line design lab ships in production.** `app/dev/theme-lab.tsx` has no `__DEV__` guard and no redirect; because Expo Router is file-based, `/dev/theme-lab` is a real, navigable route in a release build. It exposes the full palette, device-tier overrides (`setDeviceTierOverride`) and an FPS monitor. | Navigate to `/dev/theme-lab` on web, or deep-link on native. | 404 / redirect in production. | The internal design lab renders. | Guard with `if (!__DEV__) return <Redirect href="/dashboard" />`, or exclude the `app/dev/` directory from production builds. | Open |
+| SP-026 | Medium | Product Scope | Dev tooling | `/dev/theme-lab` | **An internal 786-line design lab ships in production.** `app/dev/theme-lab.tsx` has no `__DEV__` guard and no redirect; because Expo Router is file-based, `/dev/theme-lab` is a real, navigable route in a release build. It exposes the full palette, device-tier overrides (`setDeviceTierOverride`) and an FPS monitor. | Navigate to `/dev/theme-lab` on web, or deep-link on native. | 404 / redirect in production. | The internal design lab renders. | Guard with `if (!__DEV__) return <Redirect href="/dashboard" />`, or exclude the `app/dev/` directory from production builds. | **Confirmed (runtime)** — /dev/theme-lab renders |
 | SP-027 | Medium | Functional | Transactions | `/transactions` | **Search produces false matches and misses the obvious field.** `app/(tabs)/transactions.tsx:340-346` matches `description` **or** `t.amount.includes(searchText)` — a raw substring test on the amount string. Searching `5` matches `15.00`, `500.00` and `0.55`. Category name — the value actually displayed as each row's title — is **not** searched. | Type `5` in the Activity search box; then type a category name. | `5` matches amounts equal to 5; category names are searchable. | `5` matches almost everything; searching "Groceries" returns nothing despite every Groceries row being labelled "Groceries". | Search category name and description; for amounts, parse the query as a number and match numerically (with an optional range/prefix rule), not by substring. | Open |
 | SP-028 | Medium | Code Quality | Transactions | `/transactions` | **Context state is mutated during render.** `app/(tabs)/transactions.tsx:348-350` calls `filtered.sort(...)` inside a `useMemo`. When the filter is "All" and search is empty, `filtered` **is** the `transactions` array owned by `ExpenseProvider`, so `.sort()` reorders provider state in place without a state update. With React 19 + the React Compiler enabled (`app.config.ts` `experiments.reactCompiler: true`), in-place mutation of shared state during render is a real correctness hazard. | Static analysis; may manifest as stale/inconsistent ordering across screens. | Pure derivation. | Shared state mutated during render. | `return [...filtered].sort(...)`. | Open |
 | SP-029 | Medium | UI | Cards, Loans | `/cards`, `/loans` | **Hard-coded `$` ignores the user's currency setting.** `app/(tabs)/cards.tsx:247` renders a literal `$` prefix on Credit Limit, and `app/(tabs)/loans.tsx:142` does the same on Principal — while the very same screens format displayed values with `formatCurrency(..., currency)`. Every other money input (`add-transaction:228`, `budget-form:165`, `record-repayment:242`, `RecurringTransactionSheet:316`) correctly uses `getCurrencySymbol(currency)`. | Settings → set currency to PKR → Cards → Add New Card. | Input prefixed `₨`. | Prefixed `$`, while the card list shows `₨` values. | Replace both literals with `getCurrencySymbol(currency)`. | Open |
@@ -258,13 +282,13 @@ eslint .       67 problems (9 errors, 58 warnings)
 | SP-038 | Medium | Business Logic | Loans | `/loans`, `/loan/[id]` | **Interest rate is captured but never applied.** `rate` is collected, validated (`loanSchema.rate`) and stored, and the detail screen prints `"{rate}%"` — but no calculation uses it. `remainingBalance` = principal − repayments; "Repaid" = principal − remaining (`loan-detail-screen.tsx:241-246`). A 12%-interest loan behaves identically to a 0% one. | Create a loan: principal 1000, rate 12%, 12 monthly instalments. | Interest reflected in balance or schedule. | Balance is a plain principal minus payments; the rate is decorative. | Either implement interest accrual and an amortisation schedule, or remove the Rate field and the `rate` column until it is implemented. Shipping a finance feature that displays a rate it does not honour is worse than not offering it. | Open |
 | SP-039 | Medium | Product Scope | Import/Export | `/settings` | **"Export to JSON" implies a backup but only exports transactions**, and the real "Backup" row is a dead "coming soon" stub. `ExportSheet` (`settings.tsx:204-399`) serialises transactions only — categories, cards, accounts, budgets, recurring rules and loans are all omitted. Import is CSV-transactions-only. Yet "Clear all data" wipes everything. | Settings → Export to JSON → then Clear all data → then try to restore. | Round-trippable backup. | Only transactions come back — and their categories no longer exist, so they import as uncategorised (or fail the `createMany` ownership check). Effectively unrecoverable data loss. | Make JSON export a full-account dump with a matching import, or rename it "Export transactions (JSON)" and add an explicit warning to the Clear-all-data sheet that export is not a backup. | Open |
 | SP-040 | Medium | Functional | Transactions | `/transactions` (two-pane) | **Delete in the desktop two-pane detail is also a web no-op.** `TransactionDetailPane.handleDelete` (`transactions.tsx:160-174`) uses the same unbranched `Alert.alert` as SP-007. This is the ≥1024 px web layout — i.e. the desktop path, where the bug is most likely to be hit. | On web ≥1024 px: Activity → select a row → trash icon in the detail pane. | Confirm → delete. | Nothing happens. | Same fix as SP-007. | Open |
-| SP-041 | Medium | Validation | Transactions | `/add-transaction` | **Zero-value transactions are accepted.** Client gate is `!!amount && !!selectedCategory` (`add-transaction.tsx:131`) — the string `"0"` is truthy. Server `transactionSchema.amount` is `/^\d+(\.\d{1,2})?$/`, which matches `"0"` and `"0.00"`. Note that budgets, transfers, loan principals and repayments **all** correctly add `.refine(v => Number(v) > 0)`; only transactions omit it. | Add Transaction → amount `0` → pick a category → Save. | "Amount must be greater than zero". | Saved; a 0.00 row pollutes the ledger and the category breakdown. | Add the same `.refine(Number(v) > 0)` used by `positiveMoneySchema`, and mirror it client-side with an inline error. | Open |
+| SP-041 | Medium | Validation | Transactions | `/add-transaction` | **Zero-value transactions are accepted.** Client gate is `!!amount && !!selectedCategory` (`add-transaction.tsx:131`) — the string `"0"` is truthy. Server `transactionSchema.amount` is `/^\d+(\.\d{1,2})?$/`, which matches `"0"` and `"0.00"`. Note that budgets, transfers, loan principals and repayments **all** correctly add `.refine(v => Number(v) > 0)`; only transactions omit it. | Add Transaction → amount `0` → pick a category → Save. | "Amount must be greater than zero". | Saved; a 0.00 row pollutes the ledger and the category breakdown. | Add the same `.refine(Number(v) > 0)` used by `positiveMoneySchema`, and mirror it client-side with an inline error. | **Confirmed (runtime)** — −$0.00 saved |
 | SP-042 | Medium | Navigation | IA | (all) | **Four major features have exactly one obscure entry point each.** Budgets → only a secondary button on the Dashboard. Recurring → only an unlabelled `repeat` icon in the Activity header. Accounts → only a row buried in Settings › Data Management. Loans → none at all (SP-004). Meanwhile Categories — a configuration screen — occupies a permanent primary tab. | Ask a first-time user to find Recurring Transactions. | Discoverable IA. | Recurring lives behind an unlabelled icon; Accounts is filed under "Data Management" alongside CSV export, which is a filing error — an account is a domain object, not a data-management chore. | Rebalance the IA: promote Loans and Budgets, demote Categories into Settings (it is configuration, edited rarely), and move Accounts out of "Data Management" into its own section. See §8.3. | Open |
 | SP-043 | Medium | Performance | Accounts | `/accounts` | **Account balances re-download the full transaction table on every refresh.** `db.getAccountBalances` (`server/db.ts:1319-1353`) issues `SELECT id, accountId, type, amount FROM transactions WHERE userId = ?` for **all** rows, then folds them in JavaScript, then separately fetches all transfers. It is called on mount, on pull-to-refresh, and after every add/update/delete of a transaction (`expense-context.tsx:1057, :1116, :1145`). | Seed 10k transactions → add one transaction. | An indexed `GROUP BY`. | Four full-table reads per single add (list + balances + budget progress + stats). | Replace the JS fold with `SELECT accountId, type, SUM(amount) … GROUP BY accountId, type` and combine the transfer legs in the same query. | Open |
 | SP-044 | Medium | Security | Server | n/a | **50 MB request body limit on every route.** `server/_core/index.ts:60-61` sets `express.json({limit: "50mb"})` and the same for urlencoded, with no rate limiting anywhere in the stack. Combined with the unauthenticated endpoint in SP-011, this is an easy memory-exhaustion vector. | POST a 50 MB body repeatedly. | Rejected at a sane threshold. | Accepted and buffered in memory. | Reduce to ~1 MB globally, raise it only on the specific route that needs bulk import, and add rate limiting (`express-rate-limit`). | Open |
 | SP-045 | Medium | UX | Insights | `/summary` | **Month navigation is unbounded in both directions.** `handleNextMonth` (`summary.tsx:125-131`) has no ceiling; a user can page indefinitely into the future through empty months. There is no "jump to current month" control, so returning from December 2029 costs 41 taps. | Insights → tap next-month 40 times. | Next disabled at the current month (or at the last month with data). | Endless empty future months; the "Current" badge is the only cue, and no shortcut returns to it. | Disable "next" at the current month, disable "previous" before the first transaction, and make the month label tappable to reset to today. | Open |
 | SP-046 | Medium | Functional | Transactions | `/add-transaction` | **Success toast fires without confirming success, and save failures reject unhandled.** `handleSave` (`add-transaction.tsx:110-128`) `await`s `addTransaction` and then unconditionally shows `"Transaction saved"`. There is no `try/catch`, so when `addTransaction` throws (it re-throws after rollback, by design) the whole handler rejects — an unhandled promise rejection from an `onPress`. Every other save handler in the app (`cards.tsx:433`, `loans.tsx:469`, `accounts.tsx:753`) correctly wraps this in `try/catch`. | Save a transaction while the API is failing. | Error toast; sheet stays open with data intact. | Context's error toast fires, the success toast does not, the sheet does not close, and an unhandled rejection is logged. Inconsistent, confusing feedback. | Wrap in `try/catch`, show success only after resolution, and keep the sheet open on failure — matching the established pattern. | Open |
-| SP-047 | Medium | Accessibility | Categories, Cards | `/categories`, `/cards` | **Colour is the only differentiator in the colour pickers, and the selected-state check mark is hard-coded white.** `categories.tsx:399-417` and `cards.tsx:298-316` render colour swatches whose only label is `accessibilityLabel="Select color #6366F1"` — a hex code, not a name. The confirmation check mark is `color="white"` regardless of swatch luminance, so it can fall below AA on light swatches (`#F59E0B`, `#14B8A6`). Notably, the codebase already has `readableTextOn()` for exactly this and uses it correctly elsewhere (`transactions.tsx:447`, `GlassTabBar.tsx:147`). | VoiceOver over the palette; select a light swatch. | Human-readable colour names; a contrast-safe check mark. | "Select color #F59E0B"; a white tick on amber. | Give each swatch a human name, and use `readableTextOn(color)` for the check mark. | Open |
+| SP-047 | Medium | Accessibility | Categories, Cards | `/categories`, `/cards` | **Colour is the only differentiator in the colour pickers, and the selected-state check mark is hard-coded white.** `categories.tsx:399-417` and `cards.tsx:298-316` render colour swatches whose only label is `accessibilityLabel="Select color #6366F1"` — a hex code, not a name. The confirmation check mark is `color="white"` regardless of swatch luminance, so it can fall below AA on light swatches (`#F59E0B`, `#14B8A6`). Notably, the codebase already has `readableTextOn()` for exactly this and uses it correctly elsewhere (`transactions.tsx:447`, `GlassTabBar.tsx:147`). | VoiceOver over the palette; select a light swatch. | Human-readable colour names; a contrast-safe check mark. | "Select color #F59E0B"; a white tick on amber. | Give each swatch a human name, and use `readableTextOn(color)` for the check mark. | **Confirmed (runtime)** — 4/8 swatches <3:1 |
 | SP-048 | Medium | Code Quality | Build | n/a | **ESLint reports 9 errors and 58 warnings.** Errors: 8 × `react/display-name` in `__mocks__/` and `tests/`, 1 × `import/no-unresolved` for `playwright` in `scripts/visual-qa-story-2.2.mjs` (a QA script referencing an uninstalled dependency). Warnings include unused variables in `server/_core/context.ts:18` and `import/first` violations across 11 test files. | `npx eslint .` | Clean. | `✖ 67 problems (9 errors, 58 warnings)`. | Fix the 9 errors, gate CI on `--max-warnings`, and either install `playwright` or delete the orphaned script. | Open |
 | SP-049 | Low | Functional | Categories | `/categories` | **Empty-state CTA opens the wrong form state.** The "Income Categories" empty state's "Add Category" button (`categories.tsx:252-255`) opens the sheet with `categoryType` defaulted to `"expense"`. A user who taps "add your first income category" lands on an expense form. | Delete all income categories → tap the CTA under "Income Categories". | Sheet pre-set to Income. | Sheet pre-set to Expense. | Pass the section's type into `setShowModal`. | Open |
 | SP-050 | Low | UI | Transactions | `/transactions`, `/dashboard` | **Every row's title is the category name, not the description**, so lists of same-category spending are visually indistinguishable. `TransactionRow` receives `title={category?.name}` and `note={item.description}` (`transactions.tsx:566-578`). Ten Groceries entries render ten identical "Groceries" titles. | Add several transactions in one category with different notes. | The note (the distinguishing information) leads. | The category leads; the note is secondary. | Use `description || category.name` as the title and show the category as the secondary line — the category colour/icon token already conveys category identity. | Open |
@@ -274,6 +298,14 @@ eslint .       67 problems (9 errors, 58 warnings)
 | SP-054 | Low | UX | Loans | `/loans` | **"No counterparty" is used as a display name.** `loans.tsx:340` falls back to the literal string `"No counterparty"` as the loan's title. Several such loans produce a list of identical rows. | Create two loans with no counterparty. | Distinguishable rows. | Two rows both titled "No counterparty". | Fall back to something identifying — e.g. "Lent · 12 Mar" — or make counterparty required. | Open |
 | SP-055 | Low | Accessibility | Insights | `/summary` | **Category rows are non-interactive below the `lg` breakpoint but still carry an `accessibilityLabel`.** `summary.tsx:566-573` renders a plain `View` (not `Pressable`) on phones, so screen readers announce a rich, actionable-sounding label for something that cannot be activated. Drill-down into a category's transactions is desktop-only. | VoiceOver on a phone → Insights → swipe to a category row. | Either interactive on all sizes, or announced as static. | Announced richly, does nothing. | Make the row navigate to a filtered Activity view on phones — the feature is valuable and currently withheld from the primary platform. | Open |
 | SP-056 | Low | Code Quality | Codebase | n/a | **Untranslated non-English comments in shipped source.** `constants/oauth.ts:180, :188` contain Chinese comments ("可考虑抛出错误或返回错误状态，让调用方处理") in an otherwise English codebase, in the OAuth module. Also: `todo.md` at the repository root contradicts the shipped state in ~15 places (it lists Settings, theming and export as not started; all are implemented). | Read `constants/oauth.ts`. | Consistent English. | Mixed-language comments; a stale root TODO that misleads onboarding. | Translate the comments; retire or regenerate `todo.md` — `docs/prd.md` and `docs/epics.md` are the maintained sources of truth. | Open |
+| SP-057 | High | UI | Design system | (all) | **`className` layout is silently dropped on every `Button` and `TransactionRow`, so they render as columns instead of rows.** `Button` (`components/ui/Button.tsx:19`) and `TransactionRow` are built on `AnimatedPressable = Animated.createAnimatedComponent(Pressable)`. `lib/_core/nativewind-pressable.ts` registers `cssInterop` for `Animated.View/ScrollView/Text/Image` and for plain `Pressable` — **but not for the animated Pressable wrapper**. The `className="flex-row items-center justify-center"` on `Button` (`:263`) is therefore discarded. Measured live: `flexDirection: column, alignItems: stretch, justifyContent: normal`. The component's own comment at `:178` shows the team hit this for `borderRadius` and patched only that one property into `style`. | Open `/dashboard` and inspect the "Budgets" button, or run `getComputedStyle` on `[data-testid="dashboard-budgets-button"]`. | `flexDirection: row`, icon inline with label, 48 px tall. | `flexDirection: column` — the pie icon renders **above** the label, left-aligned, and the button is **74 px tall instead of 48**. Affects every icon-bearing button in the app (Dashboard Budgets, Cards "Add New Card", Categories "Add New Category", Loans "New loan", Accounts "Add account"/"Transfer") and every `TransactionRow` (amount pushed onto its own line instead of vertically centred; rows 88 px tall). | Add `cssInterop(AnimatedPressable, { className: "style" })` in `lib/_core/nativewind-pressable.ts`, **or** move the flex layout onto the `style` prop in `Button`/`TransactionRow` as was already done for `borderRadius`. Add a render test asserting `flexDirection: "row"`. | **Confirmed (runtime)** — measured |
+| SP-058 | High | Accessibility | Design system | Dashboard, Insights, Settings, Budgets, Accounts, Import | **Icon-only buttons render a near-black glyph on an indigo fill at 2.82:1 — below the 3:1 WCAG minimum for UI components.** `Button` variant `icon-only` sets `bg = colors.primary` and computes `fg = readableTextOn(bg)` (`Button.tsx:161-163`) — but the icon is supplied by the **caller** with its own colour, e.g. `<Ionicons name="settings-outline" color={colors.foreground} />` (`dashboard.tsx:243`), so the computed readable ink is never applied. Measured live: background `rgb(79,70,229)`, glyph `rgb(17,24,39)` → **2.82:1** (white would give 6.29:1). | Open `/dashboard`; inspect the settings button top-right. | ≥3:1 (ideally ≥4.5:1). | 2.82:1 — a dark gear on a saturated indigo square. Same defect on the Insights settings button and every `variant="icon-only"` back button. | Have `Button` pass its computed `textColor` down (e.g. clone the icon element with the resolved colour, or expose a render-prop), so callers cannot override it with a failing colour. Extend the contrast tests to cover rendered composites, not just tokens. | **Confirmed (runtime)** — measured |
+| SP-059 | High | UI | Navigation chrome | (all, dark mode) | **In dark mode the bottom navigation band renders light, and the tab labels drop to 2.27:1.** With `prefers-color-scheme: dark` the app body is `#0B0F19` but the region behind the tab bar computes to `rgb(242,242,242)` and `[data-testid="glass-surface-tint"]` computes to `rgb(255,255,255)` — pure white. The inactive tab label is `rgb(156,163,175)`, giving **2.27:1** against that band (AA text requires 4.5:1). Visually it is a light strip across the bottom of an otherwise dark app. | Set the OS/browser to dark mode and open any tab. | Tab bar follows the dark palette. | A light band across the bottom; "Activity / Categories / Insights / Cards" are barely legible. | Make the `GlassSurface` fallback tint scheme-aware and ensure the root/safe-area background uses the theme background token in dark mode. Note this slipped past `tests/theme-aa-contrast.test.ts` because that suite validates **tokens**, not **rendered composites** — add a rendered-contrast check for the tab bar. | **Confirmed (runtime)** — measured |
+| SP-060 | Medium | UI | Insights | `/summary` | **Amounts wrap mid-number in the compact `StatCard`.** At 430 px the Income card renders `+$3,200.0` on line 1 and `0` on line 2, splitting a currency value across lines. | Open `/summary` on a 430 px viewport with an income ≥ $1,000. | The amount fits, or shrinks/truncates gracefully. | The number breaks between the last two digits — briefly readable as `$3,200.0`. | Add `numberOfLines={1}` plus `adjustsFontSizeToFit` (or `minimumFontScale`) to the `StatCard` amount, and reduce the font size at the `compact` variant's width. | **Confirmed (runtime)** |
+| SP-061 | Medium | Accessibility | Navigation | (all) | **The configured `tabBarAccessibilityLabel` values never reach the DOM.** `app/(tabs)/_layout.tsx` sets `tabBarAccessibilityLabel: "Home tab"`, `"Activity tab"`, etc., but the custom `GlassTabBar` renders `accessibilityLabel={label}` where `label = options.title` (`GlassTabBar.tsx:74-75, :128`), ignoring the configured value. Measured live: the rendered tabs expose `aria-label="Home"`, not `"Home tab"`. The config is dead, and `tests/app.tabs-layout.test.tsx` asserts the **options object** rather than the rendered output, so it cannot catch this. | Inspect `[role="tab"]` elements in the DOM. | `aria-label="Home tab"`. | `aria-label="Home"`. | Read `options.tabBarAccessibilityLabel ?? options.title` in `GlassTabBar`, and change the test to assert rendered output. | **Confirmed (runtime)** |
+| SP-062 | Medium | UI | Dashboard, lists | `/dashboard` and others | **Scrollable content is clipped behind the floating tab bar.** The tab bar surface occupies y 845–931 and the FAB y 814–872 in a 932 px viewport, while `dashboard.tsx:225` sets only `contentContainerStyle={{ paddingBottom: 32 }}`. Measured live, the last row ("Salary", y 772–860) sits underneath both. | Open `/dashboard` and scroll to the bottom. | The last row clears the tab bar. | The final transaction row is partially hidden behind the tab bar and FAB. | Derive the bottom inset from the tab-bar height (`useBottomTabBarHeight()` or a shared constant) rather than the hard-coded `32`, and apply it on every tabbed screen. | **Confirmed (runtime)** |
+| SP-063 | Medium | UI | Transactions | `/transactions` (desktop) | **Transaction rows are flush to the viewport edge on desktop while the rest of the screen is inset.** At 1440 px the header, search field and filter chips inset to x = 24, but the row surface spans x = 0 → 800 with no horizontal margin, so rows visibly break the left alignment of the master pane. | Open `/transactions` at ≥1024 px. | Rows share the 24 px inset. | Rows start at x = 0. | Apply the pane's horizontal padding to `SectionList`'s `contentContainerStyle` (or wrap rows in `ResponsiveContent`) so the inset is uniform. | **Confirmed (runtime)** |
+| SP-064 | Low | UX | Transactions | `/transactions` | **Each row repeats a date that its own section header already states.** Under the "Yesterday" section header, the row still renders "Jul 26"; under "Jul 25", the row renders "Jul 25" again. | Open `/transactions`. | The row shows differentiating detail, not the section's own date. | The date is duplicated on every row. | Drop the per-row date inside a dated section (or show a time), and promote the description to the row title (see SP-050). | **Confirmed (runtime)** |
 
 ---
 
@@ -1307,17 +1339,21 @@ Things that should be removed, gated, or deferred — each with a reason.
 | — Skipped | **1** (`tests/auth.logout.test.ts`, `describe.skip`) |
 | TypeScript compilation | **Clean** (0 errors) |
 | ESLint | **67 problems** (9 errors, 58 warnings) |
-| Blocked verifications | **6** — items requiring a live device/browser session: rendered contrast on dynamic backgrounds, actual cold-start timing, real p95 API latency, blur performance on low-tier devices, keyboard-focus behaviour on web, and screen-reader announcement order. See §0. |
+| Live browser screenshots captured | **29** (430×932, 1440×900, light + dark) |
+| Issues reproduced in the running app | **11** |
+| Issues found *only* by running the app | **8** (SP-057 … SP-064) |
+| Blocked verifications | **4** — items still requiring a physical iOS/Android device: native `Alert.alert` behaviour, real cold-start timing on a mid-range handset, blur performance on low-tier devices, and VoiceOver/TalkBack announcement order. See §0. |
 
 ### 15.2 Issue summary
 
 | Severity | Count | IDs |
 | --- | --- | --- |
 | 🔴 **Critical** | **6** | SP-001, SP-002, SP-003, SP-004, SP-005, SP-006 |
-| 🟠 **High** | **16** | SP-007 … SP-022 |
-| 🟡 **Medium** | **22** | SP-023 … SP-048 (excl. those listed as Low) |
-| 🔵 **Low** | **12** | SP-049 … SP-056 and related |
-| **Total** | **56** | |
+| 🟠 **High** | **19** | SP-007 … SP-022, SP-057, SP-058, SP-059 |
+| 🟡 **Medium** | **26** | SP-023 … SP-048, SP-060 … SP-063 |
+| 🔵 **Low** | **13** | SP-049 … SP-056, SP-064 |
+| **Total** | **64** | |
+| *of which reproduced live* | **11** | SP-001/002/003/004/007/008/010/026/041/047 + all of SP-057…SP-064 |
 
 By category: Security 12 · Functional 14 · Business Logic 5 · UI 8 · UX 7 ·
 Validation 5 · Navigation 3 · Performance 3 · Accessibility 3 · Product Scope 5 ·
@@ -1327,13 +1363,13 @@ Code Quality 4 *(issues may span categories)*.
 
 | Dimension | Rating | Justification |
 | --- | --- | --- |
-| **UI** | **7 / 10** | A genuinely well-built, token-driven design system with multi-theme and AA-tested palettes. Loses three points for real fragmentation: 9 screens outside the theme system, three modal implementations, two category palettes, no shared input component, and six hard-coded-white contrast risks. |
+| **UI** | **5 / 10** | The token system, multi-theme support and AA-tested palettes are genuinely well built — on paper this is an 8. Runtime measurement dropped it: the shared `Button` primitive renders with the wrong flex direction everywhere (SP-057), and dark mode's navigation chrome renders light (SP-059). On top of that sit the fragmentation issues — 9 screens outside the theme system, three modal implementations, two category palettes, and no shared input component. |
 | **UX** | **5 / 10** | Individual flows are thoughtfully designed — the account-deletion reassignment, the transfer form's progressive disclosure, the recurring-stop explanation, and the CSV import are all above industry norm. But the information architecture hides four features behind single obscure entry points, one feature entirely, and the primary flow is missing two required fields. |
 | **Functionality** | **4 / 10** | The breadth is impressive and most modules work. But the core transaction flow cannot set a date or be edited, the Cards module cannot be used at all, Loans cannot be reached, delete is dead on web, and Insights reports incorrect figures. Five of eleven modules are incomplete on their primary path. |
 | **Performance** | **5 / 10** | Rendering craft is good — skeletons, anti-flicker loading states, device-tier blur fallbacks. The data layer does no pagination and no SQL aggregation, so the app degrades sharply exactly as a user's history becomes valuable. |
-| **Accessibility** | **7 / 10** | The strongest non-functional dimension. Near-universal labels, correct roles/states, enforced 44 pt targets, automated contrast tests, gesture alternatives, and reduced-motion support. Held back by absent web focus management, unannounced errors and toasts, and unmarked required fields. |
+| **Accessibility** | **6 / 10** | Still the strongest non-functional dimension: near-universal labels, correct roles/states, enforced 44 pt targets, gesture alternatives, reduced-motion support. Revised down from 7 because the contrast tests validate tokens but never a rendered composite — live measurement found 2.82:1 on icon-only buttons (SP-058), 2.27:1 on dark-mode tab labels (SP-059), and 4 of 8 category swatches below 3:1 (SP-047). Also: absent web focus management, unannounced errors/toasts, unmarked required fields, and configured tab labels that never reach the DOM (SP-061). |
 | **Code Quality** | **6 / 10** | Clean TypeScript (compiles with zero errors), 1,309 tests, a disciplined optimistic-mutation layer, careful Zod validation, and unusually good explanatory comments. Deducted for: a red test suite on the delivery branch, 9 lint errors, 102 shipped `console` statements, three duplicated modal implementations, ~25 duplicated input wrappers, and — most tellingly — an authorization pattern applied correctly in 7 of 9 routers and forgotten in 2. |
-| **Overall Product Quality** | **4.5 / 10** | Strong foundations, an ambitious and largely-built feature set, and demonstrably careful engineering in places. Not shippable: two cross-tenant data-access vulnerabilities, a financial reporting screen that displays wrong numbers, an unreachable flagship feature, and a primary flow missing required fields. |
+| **Overall Product Quality** | **4 / 10** | Strong foundations, an ambitious and largely-built feature set, and demonstrably careful engineering in places. Not shippable: two cross-tenant data-access vulnerabilities (reproduced), a financial reporting screen that displays wrong numbers (reproduced), an unreachable flagship feature (reproduced), a primary flow missing required fields (reproduced), and a core UI primitive that renders incorrectly app-wide. |
 
 ---
 
@@ -1400,5 +1436,168 @@ this build would be a credible **🟡 Ready After Minor Fixes**.
 
 ---
 
-*Prepared by: QA Engineering · Static and automated audit of branch `claude/qa-report-requirements-akhj10` · 2026-07-27*
+---
+
+## Appendix A — Runtime Verification (Live Browser Session)
+
+The application was installed, built and driven interactively in Chromium. This section records
+what was **observed**, distinct from what was **inferred** in §§3–15. 29 screenshots were
+captured; computed styles and contrast ratios were read from the live DOM.
+
+### A.1 Environment actually used
+
+| Component | Command / value | Result |
+| --- | --- | --- |
+| Dependencies | `pnpm install` | OK |
+| Database | none — `DATABASE_URL` unset, so `dataApi.ts` fell through to the seeded in-memory `devDb.ts` | OK, 4 transactions / 4 categories / 1 card seeded |
+| API | `NODE_ENV=development npx tsx server/_core/index.ts` | `[api] server listening on port 3000` |
+| Session | `POST /api/dev/login` | JWT issued |
+| Client | `EXPO_OFFLINE=1 npx expo start --web --port 8081` | HTTP 200 (`EXPO_OFFLINE` is required — the Expo CLI's dependency-version check cannot reach its API through the sandbox proxy and aborts startup without it) |
+| Browser | `/opt/pw-browsers/chromium-1194` via `playwright-core` | 430×932, 1440×900, light + dark |
+
+The app booted successfully and rendered the seeded dashboard. **No page errors were thrown**
+(`pageerror` count: 0). Console output contained one repeated 500 and a stream of benign
+react-native-web `Unknown event handler property` warnings.
+
+### A.2 SP-003 — Insights reports the wrong month (visual proof)
+
+![Insights showing June 2026 with July's totals and "No spending data"](qa-evidence/sp-003-insights-wrong-month.png)
+
+Navigating from July to **June 2026** produced this state on one screen:
+
+| Element | Rendered value |
+| --- | --- |
+| Month label | **June 2026** |
+| Balance | **$3,049.75** ← July's figure |
+| Income | **+$3,200.00** ← July's figure |
+| Expenses | **−$150.25** ← July's figure |
+| Trends | "No spending history" |
+| Spending by Category | **"No spending data — Add transactions to see breakdown"** |
+
+The screen simultaneously asserts that June had **−$150.25 of expenses** and that June has
+**no spending data**. Both halves are rendered within 400 px of each other. This is the
+single most damaging defect found, and it is worse in practice than the static analysis
+predicted: the contradiction is immediate and unmissable.
+
+### A.3 SP-001 / SP-002 — IDOR reproduced end to end
+
+A script drove the **real `appRouter` against the real `server/db.ts`** with two distinct
+users sharing one datastore (no application code was modified):
+
+```
+victim.id=2  attacker.id=3
+
+FAIL SP-001a  attacker READ victim category -> "Victim Secret Category" (userId=2)
+FAIL SP-001b  attacker RENAMED victim category -> "PWNED"
+FAIL SP-002a  attacker READ victim card -> name="Victim Amex" holder="Victim Real Name"
+                                           last4=0005 limit=9000.00
+FAIL SP-002b  attacker OVERWROTE victim PAN -> last4 now 1111 (was 0005)
+FAIL SP-001c  attacker DELETED victim category
+
+CONTROL accounts.getById cross-user -> correctly blocked (null)
+
+=== 5 of 5 cross-tenant operations SUCCEEDED for the attacker ===
+```
+
+The control is the important line: `accounts.getById`, which **is** user-scoped, correctly
+returned `null` for the same attack. This confirms the defect is a localised omission in two
+routers, not a systemic design choice — and that the fix is mechanical.
+
+### A.4 SP-007 — delete is dead on web
+
+On `/transactions`, every row exposes a working affordance
+(`aria-label="Delete Groceries"`, `"Delete Dining"`, …). Clicking it produced:
+
+```
+amount-tokens before = 4
+amount-tokens after  = 4
+native dialogs captured: []
+```
+
+**No confirmation dialog appeared and no row was removed.** The affordance is present,
+labelled, and completely inert — the worst combination, because it looks functional.
+
+### A.5 SP-041 — a zero-value transaction was saved
+
+Entering `0`, selecting "Groceries" and pressing Save: the Save button was **enabled**
+(opacity 1), the save succeeded, and the ledger went from 4 to 5 transactions. The dashboard
+and Activity list now both display a row reading **`Groceries · Jul 27 · −$0.00`**.
+
+### A.6 SP-008 / SP-010 — Add Transaction's rendered fields
+
+The full visible text of `/add-transaction`:
+
+```
+Add Transaction · Transaction Type · Expense · Income · Amount · $ ·
+Category · Groceries · Dining · Transport · Note (Optional) · Cancel · Save
+```
+
+There is **no Date field** and **no Card field** — confirmed against the rendered
+`aria-label` set as well. (The Account picker is correctly absent here only because the seeded
+user has no accounts.)
+
+### A.7 SP-004 / SP-026 — routes that render but cannot be reached
+
+![/loans renders fully, with no Loans tab in the tab bar](qa-evidence/sp-004-loans-unreachable.png)
+
+`/loans` renders a complete, working Loans screen — header, "New loan" button, empty state —
+**above a tab bar showing Home · Activity · Categories · Insights · Cards**. The screen exists
+and functions; nothing in the UI links to it.
+
+`/dev/theme-lab` also renders fully, exposing the internal palette matrix and device-tier
+overrides.
+
+### A.8 Defects found *only* by running the app
+
+These eight could not have been found by reading the source, and are logged as SP-057 … SP-064:
+
+| ID | Defect | Measured evidence |
+| --- | --- | --- |
+| SP-057 | `className` dropped on `AnimatedPressable` → every Button/TransactionRow is a **column** ([screenshot](qa-evidence/sp-057-button-layout-desktop.png)) | `flexDirection: column, alignItems: stretch, justifyContent: normal`; Budgets button 74 px tall vs 48 designed |
+| SP-058 | Icon-only buttons: dark glyph on indigo | fill `rgb(79,70,229)`, glyph `rgb(17,24,39)` → **2.82:1** (needs 3:1; white would be 6.29:1) |
+| SP-059 | Dark mode tab bar renders light ([screenshot](qa-evidence/sp-059-dark-mode-tabbar.png)) | backdrop `rgb(242,242,242)`, glass tint `rgb(255,255,255)`, label `rgb(156,163,175)` → **2.27:1** |
+| SP-060 | `$3,200.00` wraps mid-number in `StatCard` | rendered as `+$3,200.0` / `0` at 430 px |
+| SP-061 | `tabBarAccessibilityLabel` never reaches the DOM | rendered `aria-label="Home"`, configured `"Home tab"` |
+| SP-062 | Content clipped behind the tab bar | last row y 772–860 vs tab bar y 845–931, FAB y 814–872 |
+| SP-063 | Desktop rows flush to x = 0 while the pane insets to 24 | measured at 1440 px |
+| SP-064 | Row date duplicates its own section header | "Yesterday" header above a row reading "Jul 26" |
+
+### A.9 What running the app *changed* about the assessment
+
+Two revisions to §§3–15 are warranted, and both are corrections in the **less favourable**
+direction:
+
+1. **§7 (Design consistency) understated the problem.** I recorded the design system as
+   strong but fragmented in its *application*. In fact the shared `Button` primitive — the most
+   reused component in the app — has been rendering with the wrong flex direction everywhere
+   (SP-057). The system is not merely applied inconsistently; its core primitive is broken at
+   runtime.
+
+2. **§9 (Accessibility, 7/10) credited "contrast is tested, not assumed".** That credit stands
+   for *tokens*, but the tests validate palette values in isolation and never assert a rendered
+   composite. Two real AA failures were measured live (SP-058 at 2.82:1, SP-059 at 2.27:1),
+   plus four of eight category swatches failing the white-check-mark check (SP-047, now
+   measured rather than suspected). The accessibility rating is revised **7/10 → 6/10**.
+
+Everything else held: no finding from the static audit was contradicted, and no critical or
+high issue proved to be a false positive.
+
+### A.10 Revised ratings after runtime verification
+
+| Dimension | Static | Post-runtime | Reason for change |
+| --- | --- | --- | --- |
+| UI | 7/10 | **5/10** | SP-057 breaks the layout of every button and list row app-wide; SP-059 breaks dark mode's navigation chrome |
+| UX | 5/10 | 5/10 | unchanged |
+| Functionality | 4/10 | 4/10 | unchanged — every functional defect reproduced exactly as predicted |
+| Performance | 5/10 | 5/10 | unchanged (no load testing performed; seeded dataset is small) |
+| Accessibility | 7/10 | **6/10** | two measured AA failures in rendered composites |
+| Code Quality | 6/10 | 6/10 | unchanged |
+| **Overall** | 4.5/10 | **4/10** | |
+
+The release decision is **unchanged: 🔴 Not Ready for Production** — now supported by
+reproduction evidence rather than code reading alone.
+
+---
+
+*Prepared by: QA Engineering · Static, automated and live-browser audit of branch `claude/qa-report-requirements-akhj10` · 2026-07-27*
 *All findings are anchored to file and line references and are independently verifiable from source. Runtime limitations are disclosed in §0.*
