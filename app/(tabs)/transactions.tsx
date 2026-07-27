@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   ActivityIndicator,
   Pressable,
   RefreshControl,
@@ -40,7 +39,9 @@ import {
   getElevationStyle,
   resolveCategoryColor,
 } from "@/lib/_core/theme";
+import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { confirmDestructive } from "@/lib/confirm-dialog";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -157,26 +158,22 @@ function TransactionDetailPane({
     ? resolveCategoryColor(category.color, scheme, themeId)
     : undefined;
 
-  const handleDelete = () => {
-    Alert.alert(
-      "Delete transaction",
-      "This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteTransaction(transaction.id),
-        },
-      ],
-      { cancelable: true },
-    );
+  const handleDelete = async () => {
+    // SP-040: Alert.alert buttons are inert on web, so this was a dead action
+    // in the desktop two-pane layout.
+    const confirmed = await confirmDestructive({
+      title: "Delete transaction",
+      message: "This cannot be undone.",
+    });
+    if (confirmed) {
+      await deleteTransaction(transaction.id);
+    }
   };
 
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+      contentContainerStyle={{ paddingBottom: TAB_BAR_CLEARANCE }}
       refreshControl={
         refreshControlProps ? (
           <RefreshControl {...refreshControlProps} />
@@ -187,7 +184,7 @@ function TransactionDetailPane({
       <View className="flex-row items-center justify-between px-6 pt-6 pb-2">
         <Text className="text-h1 text-foreground">Details</Text>
         <Pressable
-          onPress={handleDelete}
+          onPress={() => void handleDelete()}
           hitSlop={8}
           accessibilityLabel="Delete transaction"
           className="w-10 h-10 rounded-full items-center justify-center"
@@ -337,18 +334,32 @@ export default function TransactionsScreen() {
       filtered = filtered.filter((t) => new Date(t.date) >= startOfWeek);
     }
 
-    if (searchText) {
-      filtered = filtered.filter(
-        (t) =>
-          t.description?.toLowerCase().includes(searchText.toLowerCase()) ||
-          t.amount.includes(searchText),
-      );
+    if (searchText.trim()) {
+      // SP-027: `t.amount.includes(searchText)` was a raw substring test, so
+      // "5" matched 15.00, 500.00 and 0.55; and the category name — the value
+      // actually rendered as each row's title — was not searched at all.
+      const needle = searchText.trim().toLowerCase();
+      const numeric = Number(needle.replace(/[^0-9.]/g, ""));
+      const hasNumber = needle.replace(/[^0-9.]/g, "").length > 0;
+
+      filtered = filtered.filter((t) => {
+        if (t.description?.toLowerCase().includes(needle)) return true;
+        const categoryName = categoryById.get(t.categoryId)?.name;
+        if (categoryName?.toLowerCase().includes(needle)) return true;
+        if (hasNumber && Number.isFinite(numeric)) {
+          return Number(t.amount) === numeric;
+        }
+        return false;
+      });
     }
 
-    return filtered.sort(
+    // SP-028: `.sort()` mutates in place, and when no filter is active
+    // `filtered` *is* the provider's `transactions` array — so this reordered
+    // shared state during render.
+    return [...filtered].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
     );
-  }, [transactions, filterType, searchText, firstDayOfWeek]);
+  }, [transactions, filterType, searchText, firstDayOfWeek, categoryById]);
 
   // Group into SectionList sections after filtering.
   const sections = useMemo(
@@ -357,19 +368,16 @@ export default function TransactionsScreen() {
   );
 
   const handleDelete = useCallback(
-    (id: number, title: string) => {
-      Alert.alert(
-        "Delete Transaction",
-        `Delete "${title}"? This cannot be undone.`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: () => deleteTransaction(id),
-          },
-        ],
-      );
+    async (id: number, title: string) => {
+      // SP-007: this used Alert.alert, whose buttons never fire on web — the
+      // affordance was present, labelled, and completely inert.
+      const confirmed = await confirmDestructive({
+        title: "Delete Transaction",
+        message: `Delete "${title}"? This cannot be undone.`,
+      });
+      if (confirmed) {
+        await deleteTransaction(id);
+      }
     },
     [deleteTransaction],
   );
@@ -536,7 +544,12 @@ export default function TransactionsScreen() {
       ListEmptyComponent={listEmpty}
       stickySectionHeadersEnabled={false}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: Spacing["2xl"] }}
+      // SP-063: rows rendered flush to x=0 while the header/search/chips inset
+      // to 24, breaking the master pane's left alignment on desktop.
+      contentContainerStyle={{
+        paddingBottom: TAB_BAR_CLEARANCE,
+        paddingHorizontal: Spacing.lg,
+      }}
       refreshControl={<RefreshControl {...refreshProps} />}
       renderSectionHeader={({ section }) => (
         <View
@@ -560,7 +573,11 @@ export default function TransactionsScreen() {
         const categoryColor = category?.color ?? colors.muted;
         const categoryIcon = (category?.icon ??
           "pricetag-outline") as keyof typeof Ionicons.glyphMap;
-        const title = category?.name ?? "Uncategorized";
+        const categoryName = category?.name ?? "Uncategorized";
+        // SP-050: the title was always the category, so every row in a category
+        // read identically. Lead with the description when there is one — the
+        // coloured category token already conveys the category.
+        const title = item.description?.trim() || categoryName;
 
         return (
           <TransactionRow
@@ -570,10 +587,12 @@ export default function TransactionsScreen() {
             type={item.type}
             categoryColor={categoryColor}
             categoryIcon={categoryIcon}
-            note={item.description ?? undefined}
+            note={item.description?.trim() ? categoryName : undefined}
+            // SP-064: the SectionList header above already states this date.
+            hideDate
             selected={selectedTransactionId === item.id}
             onPress={() => handleTransactionPress(item.id)}
-            onDelete={() => handleDelete(item.id, title)}
+            onDelete={() => void handleDelete(item.id, categoryName)}
             style={{ backgroundColor: colors.surface }}
           />
         );

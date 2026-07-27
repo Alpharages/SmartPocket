@@ -215,6 +215,7 @@ describe("AddTransactionScreen", () => {
     (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
       categories: mockCategories,
       accounts: mockAccounts,
+      creditCards: [],
       transactions: [],
       addTransaction: mockAddTransaction,
     });
@@ -265,6 +266,7 @@ describe("AddTransactionScreen", () => {
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
         categories: [],
         accounts: mockAccounts,
+        creditCards: [],
         transactions: [],
         addTransaction: mockAddTransaction,
       });
@@ -523,7 +525,11 @@ describe("AddTransactionScreen", () => {
         foodChip!.props.onPress();
       });
 
-      const descInput = root.findAllByType("TextInput" as any)[1];
+      // Select by label, not index: a Date field now sits between Amount and
+      // Note (SP-008), so positional lookup silently targeted the wrong input.
+      const descInput = root
+        .findAllByType("TextInput" as any)
+        .find((n: any) => n.props.accessibilityLabel === "Note")!;
       act(() => {
         descInput.props.onChangeText("Lunch at work");
       });
@@ -590,6 +596,7 @@ describe("AddTransactionScreen", () => {
           },
         ],
         accounts: mockAccounts,
+        creditCards: [],
         transactions: [],
         addTransaction: mockAddTransaction,
       });

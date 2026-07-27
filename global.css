@@ -1,3 +1,20 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * SP-071: react-native-web renders text inputs and pressables without any
+ * focus styling of its own, so the browser's default outline showed through —
+ * a hard black rectangle inside the app's rounded, hairline-bordered inputs.
+ * Replace it with a token-driven ring. Keyboard-only (`:focus-visible`) so a
+ * pointer tap does not paint a ring.
+ */
+:where(input, textarea, select, [tabindex]):focus {
+  outline: none;
+}
+
+:where(input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-primary, #4f46e5);
+  outline-offset: 2px;
+  border-radius: 6px;
+}

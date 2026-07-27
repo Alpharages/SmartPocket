@@ -84,6 +84,15 @@ vi.mock("@/lib/loan-reminders", () => ({
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     useUtils: () => ({
+      summary: {
+        monthlyStats: {
+          fetch: vi.fn().mockResolvedValue({
+            totalIncome: 0,
+            totalExpense: 0,
+            netBalance: 0,
+          }),
+        },
+      },
       accounts: {
         transactionCount: {
           fetch: mocks.transactionCountFetch,
@@ -182,6 +191,9 @@ vi.mock("@/lib/trpc", () => ({
       list: { useQuery: mocks.useQuery },
       create: { useMutation: mocks.useMutation },
       recordRepayment: { useMutation: mocks.useMutation },
+      // SP-018: loans can now be edited and deleted from the UI.
+      update: { useMutation: mocks.useMutation },
+      delete: { useMutation: mocks.useMutation },
     },
     settings: {
       get: {

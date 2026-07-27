@@ -1,13 +1,6 @@
 import React, { forwardRef, useCallback, useMemo } from "react";
-import {
-  Pressable,
-  Text,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
+import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Animated from "react-native-reanimated";
 
 import { useColors } from "@/hooks/use-colors";
 import { readableTextOn } from "@/lib/_core/contrast";
@@ -24,8 +17,7 @@ import {
   resolveCategoryColor,
   resolveCategoryIcon,
 } from "@/constants/theme";
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 
 type CategoryTokenRef = React.ComponentRef<typeof AnimatedPressable>;
 

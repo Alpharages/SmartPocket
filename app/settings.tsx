@@ -46,6 +46,7 @@ import {
 } from "@/lib/theme-preference";
 import { useThemeContext } from "@/lib/theme-provider";
 import { useExpense } from "@/lib/expense-context";
+import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
 import { useTheme } from "@/hooks/use-theme";
 import { Spacing } from "@/lib/_core/theme";
@@ -150,7 +151,9 @@ function ThemePreferenceControl({
 }) {
   return (
     <View className="px-lg py-md" accessibilityLabel="Theme options">
-      <Text className="mb-sm text-body font-medium text-foreground">Theme</Text>
+      <Text className="mb-sm text-body font-medium text-foreground">
+        Appearance mode
+      </Text>
       <FilterChipGroup
         mode="single"
         value={value}
@@ -420,6 +423,9 @@ function ClearDataConfirmationSheet({
         <Text className="mb-lg text-body text-muted">
           This permanently deletes all transactions, categories, accounts, and
           credit cards. This action cannot be undone.
+          {"\n\n"}
+          Note: export only covers transactions — it is not a full backup, so
+          categories, cards, accounts, budgets and loans cannot be restored.
         </Text>
         <View className="flex-row gap-md">
           <View className="flex-1">
@@ -504,12 +510,15 @@ export default function SettingsScreen() {
   const { aiEnabled, setAiEnabled, isSavingAi, refreshSettings } =
     useSettings();
   const { clearAllData, refreshAll } = useExpense();
+  const { user, logout } = useAuth();
   const [currencySheetVisible, setCurrencySheetVisible] = useState(false);
   const [firstDaySheetVisible, setFirstDaySheetVisible] = useState(false);
   const [clearDataSheetVisible, setClearDataSheetVisible] = useState(false);
   const [clearingData, setClearingData] = useState(false);
   const [exportCsvSheetVisible, setExportCsvSheetVisible] = useState(false);
   const [exportJsonSheetVisible, setExportJsonSheetVisible] = useState(false);
+  const [signOutSheetVisible, setSignOutSheetVisible] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const { name: appName, version: appVersion } = getAppMetadata();
 
@@ -568,12 +577,24 @@ export default function SettingsScreen() {
     }
   }, [clearAllData, clearingData]);
 
+  const handleConfirmSignOut = useCallback(async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await logout();
+      setSignOutSheetVisible(false);
+      router.replace("/login");
+    } finally {
+      setSigningOut(false);
+    }
+  }, [logout, router, signingOut]);
+
   return (
     <ScreenContainer className="flex-1 bg-background">
       <ScreenHeader
         title="Settings"
         accessibilityLabel="Settings screen"
-        action={
+        leading={
           <Button
             variant="icon-only"
             accessibilityLabel="Go back"
@@ -621,7 +642,7 @@ export default function SettingsScreen() {
           />
         </SettingsSectionGroup>
 
-        <SettingsSectionGroup title="Data Management">
+        <SettingsSectionGroup title="Manage">
           <SettingsRow
             icon="wallet-outline"
             label="Accounts"
@@ -630,10 +651,33 @@ export default function SettingsScreen() {
           />
           <SectionDivider />
           <SettingsRow
+            icon="grid-outline"
+            label="Categories"
+            onPress={() => router.push("/categories")}
+            accessibilityLabel="Categories"
+          />
+          <SectionDivider />
+          <SettingsRow
+            icon="pie-chart-outline"
+            label="Budgets"
+            onPress={() => router.push("/budgets")}
+            accessibilityLabel="Budgets"
+          />
+          <SectionDivider />
+          <SettingsRow
+            icon="repeat-outline"
+            label="Recurring transactions"
+            onPress={() => router.push("/recurring")}
+            accessibilityLabel="Recurring transactions"
+          />
+        </SettingsSectionGroup>
+
+        <SettingsSectionGroup title="Data Management">
+          <SettingsRow
             icon="download-outline"
-            label="Export to CSV"
+            label="Export transactions (CSV)"
             onPress={() => setExportCsvSheetVisible(true)}
-            accessibilityLabel="Export to CSV"
+            accessibilityLabel="Export transactions to CSV"
           />
           <SectionDivider />
           <SettingsRow
@@ -645,17 +689,11 @@ export default function SettingsScreen() {
           <SectionDivider />
           <SettingsRow
             icon="download-outline"
-            label="Export to JSON"
+            label="Export transactions (JSON)"
             onPress={() => setExportJsonSheetVisible(true)}
-            accessibilityLabel="Export to JSON"
+            accessibilityLabel="Export transactions to JSON"
           />
-          <SectionDivider />
-          <SettingsRow
-            icon="cloud-upload-outline"
-            label="Backup"
-            comingSoon
-            accessibilityLabel="Backup, coming soon"
-          />
+
           <SectionDivider />
           <SettingsRow
             icon="trash-outline"
@@ -671,6 +709,29 @@ export default function SettingsScreen() {
             enabled={aiEnabled}
             disabled={isSavingAi}
             onChange={handleToggleAi}
+          />
+        </SettingsSectionGroup>
+
+        <SettingsSectionGroup title="Account">
+          {user ? (
+            <>
+              <SettingsRow
+                icon="person-circle-outline"
+                label={user.name ?? "Signed in"}
+                trailingValue={user.email ?? undefined}
+                showChevron={false}
+                disabled
+                accessibilityLabel={`Signed in as ${user.name ?? user.email ?? "user"}`}
+              />
+              <SectionDivider />
+            </>
+          ) : null}
+          <SettingsRow
+            icon="log-out-outline"
+            label="Sign out"
+            destructive
+            onPress={() => setSignOutSheetVisible(true)}
+            accessibilityLabel="Sign out"
           />
         </SettingsSectionGroup>
 
@@ -710,6 +771,40 @@ export default function SettingsScreen() {
         format="csv"
         currency={currency}
       />
+      <Sheet
+        visible={signOutSheetVisible}
+        onClose={() => setSignOutSheetVisible(false)}
+        title="Sign out?"
+        testID="sign-out-sheet"
+      >
+        <View className="px-lg pb-lg">
+          <Text className="mb-lg text-body text-muted">
+            You will need to sign in again to reach your data. Nothing is
+            deleted.
+          </Text>
+          <View className="flex-row gap-md">
+            <View className="flex-1">
+              <Button
+                variant="secondary"
+                label="Cancel"
+                onPress={() => setSignOutSheetVisible(false)}
+                disabled={signingOut}
+              />
+            </View>
+            <View className="flex-1">
+              <Button
+                variant="destructive"
+                label="Sign out"
+                onPress={handleConfirmSignOut}
+                loading={signingOut}
+                disabled={signingOut}
+                accessibilityLabel="Confirm sign out"
+              />
+            </View>
+          </View>
+        </View>
+      </Sheet>
+
       <ExportSheet
         visible={exportJsonSheetVisible}
         onClose={() => setExportJsonSheetVisible(false)}

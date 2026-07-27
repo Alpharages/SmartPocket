@@ -34,6 +34,10 @@ import {
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ContentMaxWidth, getElevationStyle } from "@/lib/_core/theme";
+import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
+import { readableTextOn } from "@/lib/_core/contrast";
+import { useCurrency } from "@/lib/currency-provider";
+import { getCurrencySymbol } from "@/lib/currency";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import {
   isCardFormValid,
@@ -84,6 +88,7 @@ function CardFormFields({
   // Same active-theme token source the surface primitives read — never
   // the theme-agnostic useColors() (frozen to the default theme; AC4).
   const { colors } = useThemeTokens();
+  const { currency } = useCurrency();
 
   return (
     <>
@@ -244,7 +249,11 @@ function CardFormFields({
             borderColor: colors.border,
           }}
         >
-          <Text className="text-foreground mr-2 font-semibold">$</Text>
+          {/* SP-029: was a hard-coded "$" while the list formatted with the
+           * user's currency. */}
+          <Text className="text-foreground mr-2 font-semibold">
+            {getCurrencySymbol(currency)}
+          </Text>
           <TextInput
             placeholder="5000"
             placeholderTextColor={colors.muted}
@@ -310,7 +319,12 @@ function CardFormFields({
               }}
             >
               {selectedColor === color && (
-                <Ionicons name="checkmark" size={20} color="white" />
+                // SP-047: was hard-coded white — 2.15:1 on #F59E0B.
+                <Ionicons
+                  name="checkmark"
+                  size={20}
+                  color={readableTextOn(color)}
+                />
               )}
             </Pressable>
           ))}
@@ -488,7 +502,7 @@ export default function CardsScreen() {
     <ScreenContainer className="flex-1 bg-background">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: TAB_BAR_CLEARANCE }}
         refreshControl={<RefreshControl {...refreshProps} />}
       >
         <ResponsiveContent maxWidth={ContentMaxWidth.screen}>

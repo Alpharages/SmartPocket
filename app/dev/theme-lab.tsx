@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
+import { Redirect } from "expo-router";
 import {
   Pressable,
   RefreshControl,
@@ -274,7 +275,16 @@ function PerfInstrumentationPanel() {
   );
 }
 
-export default function ThemeLabScreen() {
+export default function ThemeLabScreenRoute() {
+  // SP-026: this internal design lab is a real, navigable route in a release
+  // build (Expo Router is file-based). Never expose it outside development.
+  if (!__DEV__) {
+    return <Redirect href="/dashboard" />;
+  }
+  return <ThemeLabScreen />;
+}
+
+function ThemeLabScreen() {
   const [pressCount, setPressCount] = useState(0);
   const [lastAction, setLastAction] = useState<string>("None yet");
   const { colorScheme, setColorScheme } = useThemeContext();

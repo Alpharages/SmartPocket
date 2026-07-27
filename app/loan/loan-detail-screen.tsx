@@ -28,13 +28,16 @@ import {
 } from "@/lib/loan-detail";
 import { useLoanDetail, useExpense } from "@/lib/expense-context";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { confirmDestructive } from "@/lib/confirm-dialog";
 
 function BackHeader({
   title,
   onBack,
+  onDelete,
 }: {
   title: string;
   onBack: () => void;
+  onDelete?: () => void;
 }) {
   const colors = useColors();
 
@@ -50,11 +53,28 @@ function BackHeader({
         <Ionicons name="chevron-back" size={22} color={colors.foreground} />
       </Pressable>
       <Text
-        className="flex-1 text-center text-h1 text-foreground mr-10"
+        className="flex-1 text-center text-h1 text-foreground"
         numberOfLines={1}
       >
         {title}
       </Text>
+      {/* SP-018: loans could be created but never edited or deleted, so an
+       * erroneous loan was permanent and kept generating due reminders. */}
+      {onDelete ? (
+        <Pressable
+          onPress={onDelete}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Delete loan"
+          testID="delete-loan-button"
+          className="w-10 h-10 rounded-full items-center justify-center"
+          style={{ backgroundColor: colors.error + "14" }}
+        >
+          <Ionicons name="trash-outline" size={20} color={colors.error} />
+        </Pressable>
+      ) : (
+        <View className="w-10 h-10" />
+      )}
     </View>
   );
 }
@@ -107,7 +127,23 @@ export default function LoanDetailScreen() {
   const loanId = parseLoanRouteId(id);
   const { loanDetail, loadingLoanDetail, loanDetailError, refreshLoanDetail } =
     useLoanDetail(loanId);
-  const { refreshLoans } = useExpense();
+  const { refreshLoans, deleteLoan } = useExpense();
+
+  const handleDelete = useCallback(async () => {
+    if (Number.isNaN(loanId)) return;
+    const confirmed = await confirmDestructive({
+      title: "Delete loan?",
+      message:
+        "This removes the loan and its repayment history. This cannot be undone.",
+    });
+    if (!confirmed) return;
+    try {
+      await deleteLoan(loanId);
+      router.back();
+    } catch {
+      // context showed the error toast
+    }
+  }, [deleteLoan, loanId, router]);
 
   const onRefresh = useCallback(async () => {
     await Promise.all([refreshLoanDetail(), refreshLoans()]);
@@ -191,7 +227,11 @@ export default function LoanDetailScreen() {
       edges={["top", "left", "right", "bottom"]}
       testID="loan-detail-screen"
     >
-      <BackHeader title={title} onBack={() => router.back()} />
+      <BackHeader
+        title={title}
+        onBack={() => router.back()}
+        onDelete={() => void handleDelete()}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -289,7 +329,9 @@ export default function LoanDetailScreen() {
 
         <Animated.View entering={FadeInDown.delay(200).duration(400)}>
           <Pressable
-            onPress={() => router.push(`/loan/record-repayment?id=${loanDetail.id}`)}
+            onPress={() =>
+              router.push(`/loan/record-repayment?id=${loanDetail.id}`)
+            }
             disabled={loanDetail.status === "settled"}
             accessibilityRole="button"
             accessibilityLabel="Record repayment"
@@ -297,9 +339,7 @@ export default function LoanDetailScreen() {
             className="mb-4 rounded-2xl py-4 items-center"
             style={{
               backgroundColor:
-                loanDetail.status === "settled"
-                  ? colors.muted
-                  : colors.primary,
+                loanDetail.status === "settled" ? colors.muted : colors.primary,
               opacity: loanDetail.status === "settled" ? 0.5 : 1,
             }}
           >
@@ -333,10 +373,7 @@ export default function LoanDetailScreen() {
                     </Text>
                   </View>
                   {repayment.note?.trim() ? (
-                    <Text
-                      className="text-sm text-muted mt-1"
-                      numberOfLines={2}
-                    >
+                    <Text className="text-sm text-muted mt-1" numberOfLines={2}>
                       {repayment.note.trim()}
                     </Text>
                   ) : null}

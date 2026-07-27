@@ -166,7 +166,7 @@ export default function ImportCsvScreen() {
       <ScreenHeader
         title="Import CSV"
         accessibilityLabel="Import CSV screen"
-        action={
+        leading={
           <Button
             variant="icon-only"
             accessibilityLabel="Go back"

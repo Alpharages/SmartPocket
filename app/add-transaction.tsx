@@ -36,6 +36,10 @@ import { Motion, Radius, Spacing, Typography } from "@/lib/_core/theme";
 import { MAX_FONT_SCALE } from "@/lib/_core/a11y";
 import { resolveCategoryColor } from "@/constants/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import {
+  formatDateInput,
+  parseDateInput,
+} from "@/lib/recurring-form-validation";
 
 const MIN_TOUCH_TARGET = 44;
 
@@ -49,6 +53,7 @@ export default function AddTransactionScreen() {
   const {
     categories,
     accounts,
+    creditCards,
     transactions,
     addTransaction,
     refreshCategories,
@@ -66,7 +71,14 @@ export default function AddTransactionScreen() {
   const [description, setDescription] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<number | null>(null);
-  const [date] = useState(new Date());
+  // SP-010: cards could be created but never attached to a transaction, so the
+  // whole Cards module produced no data.
+  const [selectedCard, setSelectedCard] = useState<number | null>(null);
+  // SP-008: this was `useState(new Date())` with no setter and no field, so
+  // every entry was stamped at the moment of saving — yesterday's coffee could
+  // not be recorded, and a mis-entered date could not be corrected.
+  const [dateInput, setDateInput] = useState(() => formatDateInput(new Date()));
+  const parsedDate = parseDateInput(dateInput);
   // Sheet owns its own open/close animation as long as it stays mounted in
   // the tree — this route's own `visible` just tells Sheet when to start
   // its close animation, mirroring how ConfirmSheet/RecurringTransactionSheet
@@ -108,27 +120,53 @@ export default function AddTransactionScreen() {
   }, [visible, reducedMotion, goBack]);
 
   const handleSave = async () => {
-    if (!amount || !selectedCategory) {
+    if (!isFormValid || !selectedCategory || !parsedDate) {
       toast.show({
         type: "error",
-        message: "Please fill in all required fields",
+        message: amountError ?? "Please fill in all required fields",
       });
       return;
     }
-    await addTransaction({
-      categoryId: selectedCategory,
-      type,
-      amount,
-      description: description || undefined,
-      date,
-      accountId: selectedAccount ?? undefined,
-    });
+    // SP-046: the success toast fired before the mutation resolved and a
+    // failure rejected unhandled out of onPress. Every other save handler in
+    // the app already wraps this.
+    try {
+      await addTransaction({
+        categoryId: selectedCategory,
+        type,
+        amount: amount.trim(),
+        description: description || undefined,
+        date: parsedDate,
+        accountId: selectedAccount ?? undefined,
+        creditCardId: selectedCard ?? undefined,
+      });
+    } catch {
+      // expense-context rolled back and showed the error toast; keep the sheet
+      // open so the entry is not lost.
+      return;
+    }
     toast.show({ type: "success", message: "Transaction saved" });
     close();
   };
 
   const filteredCategories = categories.filter((c) => c.type === type);
-  const isFormValid = !!amount && !!selectedCategory;
+  const activeCards = useMemo(
+    () => creditCards.filter((card) => card.isActive),
+    [creditCards],
+  );
+
+  // SP-041: `!!amount` accepted "0" and "0.00".
+  const amountError =
+    amount.trim().length === 0
+      ? null
+      : !/^\d+(\.\d{1,2})?$/.test(amount.trim())
+        ? "Enter an amount like 12.50"
+        : Number(amount) <= 0
+          ? "Amount must be greater than zero"
+          : null;
+  const dateError = dateInput.trim() && !parsedDate ? "Use YYYY-MM-DD" : null;
+  const isFormValid =
+    !!amount.trim() && !amountError && !!selectedCategory && !!parsedDate;
 
   // Map filtered categories to CategoryPickerGrid items with resolved colors.
   const pickerCategories = useMemo(
@@ -229,6 +267,8 @@ export default function AddTransactionScreen() {
             </Text>
             <TextInput
               autoFocus
+              accessibilityLabel="Amount"
+              testID="add-transaction-amount"
               placeholder="0.00"
               placeholderTextColor={colors.muted}
               value={amount}
@@ -242,6 +282,18 @@ export default function AddTransactionScreen() {
               maxFontSizeMultiplier={MAX_FONT_SCALE}
             />
           </View>
+          {amountError ? (
+            <Text
+              className="mt-xs"
+              style={{
+                color: colors.error,
+                fontSize: Typography.caption.fontSize,
+              }}
+              testID="add-transaction-amount-error"
+            >
+              {amountError}
+            </Text>
+          ) : null}
         </View>
 
         {/* Category */}
@@ -346,6 +398,74 @@ export default function AddTransactionScreen() {
           </View>
         ) : null}
 
+        {/* Date */}
+        <View>
+          <Text
+            className="text-muted font-semibold mb-xs"
+            style={{ fontSize: Typography.label.fontSize }}
+          >
+            Date
+          </Text>
+          <View
+            className="rounded-md px-lg py-md"
+            style={{
+              backgroundColor: colors.surface,
+              borderWidth: 0.5,
+              borderColor: dateError ? colors.error : colors.border,
+            }}
+          >
+            <TextInput
+              value={dateInput}
+              onChangeText={setDateInput}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              className="text-foreground"
+              style={{ fontSize: Typography.body.fontSize }}
+              accessibilityLabel="Transaction date"
+              testID="add-transaction-date"
+            />
+          </View>
+          {dateError ? (
+            <Text
+              className="mt-xs"
+              style={{
+                color: colors.error,
+                fontSize: Typography.caption.fontSize,
+              }}
+            >
+              {dateError}
+            </Text>
+          ) : null}
+        </View>
+
+        {/* Card — expenses only; income is not charged to a card. */}
+        {type === "expense" && activeCards.length > 0 ? (
+          <View>
+            <Text
+              className="text-muted font-semibold mb-xs"
+              style={{ fontSize: Typography.label.fontSize }}
+            >
+              Card (Optional)
+            </Text>
+            <View className="flex-row flex-wrap gap-sm">
+              <Pill
+                label="None"
+                selected={selectedCard == null}
+                onPress={() => setSelectedCard(null)}
+              />
+              {activeCards.map((card) => (
+                <Pill
+                  key={card.id}
+                  label={card.name}
+                  selected={selectedCard === card.id}
+                  onPress={() => setSelectedCard(card.id)}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         {/* Note */}
         <View>
           <Text
@@ -372,6 +492,8 @@ export default function AddTransactionScreen() {
               style={{ fontSize: Typography.body.fontSize }}
               multiline
               textAlignVertical="top"
+              accessibilityLabel="Note"
+              testID="add-transaction-note"
             />
           </View>
         </View>

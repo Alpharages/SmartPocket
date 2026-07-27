@@ -100,6 +100,9 @@ vi.mock("@/lib/trpc", () => ({
       },
       create: { useMutation: mocks.useMutation },
       recordRepayment: { useMutation: mocks.useMutation },
+      // SP-018: loans can now be edited and deleted from the UI.
+      update: { useMutation: mocks.useMutation },
+      delete: { useMutation: mocks.useMutation },
     },
     summary: {
       monthlyStats: {
@@ -123,6 +126,15 @@ vi.mock("@/lib/trpc", () => ({
       clearAll: { useMutation: mocks.useMutation },
     },
     useUtils: () => ({
+      summary: {
+        monthlyStats: {
+          fetch: vi.fn().mockResolvedValue({
+            totalIncome: 0,
+            totalExpense: 0,
+            netBalance: 0,
+          }),
+        },
+      },
       accounts: {
         transactionCount: {
           fetch: vi.fn().mockResolvedValue(0),

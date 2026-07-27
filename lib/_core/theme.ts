@@ -216,3 +216,13 @@ export const Fonts = Platform.select({
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });
+
+/**
+ * Vertical space a tabbed screen must reserve so its last row clears the
+ * floating tab bar and the FAB that overhangs it.
+ *
+ * QA report SP-062: screens hard-coded `paddingBottom: 32` while the bar
+ * occupies ~86px plus a 30px FAB overhang, so the final list row rendered
+ * underneath it.
+ */
+export const TAB_BAR_CLEARANCE = 128;

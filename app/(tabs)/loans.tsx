@@ -1,4 +1,10 @@
-import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -18,16 +24,12 @@ import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useNavigation } from "expo-router";
 import Animated, { FadeInUp } from "react-native-reanimated";
-import {
-  Button,
-  EmptyState,
-  ScreenHeader,
-  Sheet,
-} from "@/components/ui";
+import { Button, EmptyState, ScreenHeader, Sheet } from "@/components/ui";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ContentMaxWidth } from "@/lib/_core/theme";
+import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
 import { useCurrency } from "@/lib/currency-provider";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import {
   createDefaultLoanForm,
   getLoanFormErrors,
@@ -64,6 +66,7 @@ function LoanFormFields({
   onChange: (patch: Partial<LoanFormValues>) => void;
 }) {
   const colors = useColors();
+  const { currency } = useCurrency();
 
   return (
     <>
@@ -93,7 +96,9 @@ function LoanFormFields({
                 className="font-semibold capitalize"
                 style={{
                   color:
-                    values.direction === direction ? "white" : colors.foreground,
+                    values.direction === direction
+                      ? "white"
+                      : colors.foreground,
                 }}
               >
                 {direction}
@@ -139,7 +144,11 @@ function LoanFormFields({
             borderColor: colors.border,
           }}
         >
-          <Text className="text-foreground mr-2 font-semibold">$</Text>
+          {/* SP-029: was a hard-coded "$" while the list formatted with the
+           * user's currency. */}
+          <Text className="text-foreground mr-2 font-semibold">
+            {getCurrencySymbol(currency)}
+          </Text>
           <TextInput
             placeholder="250.00"
             placeholderTextColor={colors.muted}
@@ -337,7 +346,16 @@ function LoanListItem({ loan, index }: { loan: Loan; index: number }) {
   const router = useRouter();
   const colors = useColors();
   const { currency } = useCurrency();
-  const label = loan.counterparty?.trim() || "No counterparty";
+  // SP-054: "No counterparty" was used as a display name, so several such
+  // loans produced a list of identical rows.
+  const label =
+    loan.counterparty?.trim() ||
+    `${loan.direction === "lend" ? "Lent" : "Borrowed"} · ${new Date(
+      loan.createdAt,
+    ).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+  // SP-053: this showed the original principal, so a loan 90% repaid still
+  // displayed its full amount and the list could not be scanned for what is
+  // actually outstanding.
   const amount = formatCurrency(Number(loan.principal), currency);
 
   return (
@@ -479,7 +497,7 @@ export default function LoansScreen() {
     <ScreenContainer className="flex-1 bg-background">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: TAB_BAR_CLEARANCE }}
         refreshControl={<RefreshControl {...refreshProps} />}
       >
         <ResponsiveContent maxWidth={ContentMaxWidth.screen}>

@@ -20,9 +20,9 @@ export function ThemePickerControl({
   const { colorScheme } = useTheme();
 
   return (
-    <View className="px-lg py-md" accessibilityLabel="Theme style options">
+    <View className="px-lg py-md" accessibilityLabel="Colour theme options">
       <Text className="mb-sm text-body font-medium text-foreground">
-        Theme style
+        Colour theme
       </Text>
       <View className="gap-sm">
         {THEME_ID_OPTIONS.map((option) => {

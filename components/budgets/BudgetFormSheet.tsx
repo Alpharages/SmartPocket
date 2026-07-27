@@ -22,6 +22,7 @@ import { Spacing, Typography } from "@/lib/_core/theme";
 import { resolveCategoryColor } from "@/constants/theme";
 import { isPositiveBudgetAmount } from "@/lib/budget-validation";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { confirmDestructive } from "@/lib/confirm-dialog";
 
 export { isPositiveBudgetAmount };
 
@@ -45,8 +46,14 @@ export function BudgetFormSheet({
   const colors = useColors();
   const scheme = (useColorScheme() ?? "light") as "light" | "dark";
   const { currency } = useCurrency();
-  const { categories, transactions, addBudget, updateBudget, refreshCategories } =
-    useExpense();
+  const {
+    categories,
+    transactions,
+    addBudget,
+    updateBudget,
+    deleteBudget,
+    refreshCategories,
+  } = useExpense();
 
   const onRefresh = useCallback(async () => {
     await refreshCategories();
@@ -63,6 +70,7 @@ export function BudgetFormSheet({
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const expenseCategories = useMemo(
     () => categories.filter((c) => c.type === "expense"),
@@ -109,6 +117,32 @@ export function BudgetFormSheet({
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  // SP-017: a budget, once created, could never be removed — and because the
+  // server rejects a duplicate category+period pair, a mistaken budget
+  // permanently blocked creating the right one for that category.
+  const handleDelete = async () => {
+    if (!budget || deleting) return;
+    const confirmed = await confirmDestructive({
+      title: "Delete budget?",
+      message:
+        "This removes the spending limit. Transactions are not affected.",
+    });
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setErrorMessage(null);
+    try {
+      await deleteBudget(budget.id);
+      onSaved();
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : "Failed to delete budget.",
+      );
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -247,6 +281,21 @@ export function BudgetFormSheet({
         ) : null}
       </ScrollView>
 
+      {isEditing ? (
+        <View className="mt-lg">
+          <Button
+            variant="destructive"
+            label="Delete budget"
+            onPress={handleDelete}
+            loading={deleting}
+            disabled={saving || deleting}
+            size="lg"
+            accessibilityLabel="Delete budget, destructive action"
+            testID="budget-delete-button"
+          />
+        </View>
+      ) : null}
+
       <View className="flex-row gap-md mt-lg">
         <Button
           variant="secondary"
@@ -259,7 +308,7 @@ export function BudgetFormSheet({
           variant="primary"
           label={isEditing ? "Save" : "Create"}
           onPress={handleSave}
-          disabled={!isFormValid || saving}
+          disabled={!isFormValid || saving || deleting}
           className="flex-1"
           size="lg"
           testID="budget-save-button"

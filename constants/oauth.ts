@@ -140,6 +140,33 @@ const encodeState = (value: string) => {
   return value;
 };
 
+export const OAUTH_STATE_KEY = "app_oauth_state_nonce";
+
+/**
+ * CSRF nonce for the OAuth `state` parameter.
+ *
+ * QA report SP-022: `state` was `base64(redirectUri)` — a deterministic,
+ * guessable value that the callback never verified, so it provided no CSRF
+ * protection at all. `state` is now `<nonce>.<base64 redirectUri>`; the nonce
+ * is random, stored before the redirect, and must match on return.
+ */
+function randomNonce(): string {
+  const cryptoObj = (globalThis as { crypto?: Crypto }).crypto;
+  if (cryptoObj?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    cryptoObj.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  // Fallback for runtimes without WebCrypto — still unpredictable enough to
+  // bind a single login attempt, and native/web both provide crypto in practice.
+  return `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+}
+
+export function parseStateNonce(state: string): string | null {
+  const separator = state.indexOf(".");
+  return separator > 0 ? state.slice(0, separator) : null;
+}
+
 /**
  * Get the redirect URI for OAuth callback.
  * - Web: uses API server callback endpoint
@@ -157,7 +184,8 @@ export const getRedirectUri = () => {
 
 export const getLoginUrl = () => {
   const redirectUri = getRedirectUri();
-  const state = encodeState(redirectUri);
+  const nonce = randomNonce();
+  const state = `${nonce}.${encodeState(redirectUri)}`;
 
   const url = new URL(`${OAUTH_PORTAL_URL}/app-auth`);
   url.searchParams.set("appId", APP_ID);
@@ -181,6 +209,13 @@ export const getLoginUrl = () => {
 export async function startOAuthLogin(): Promise<string | null> {
   const loginUrl = getLoginUrl();
 
+  // Persist the nonce so app/oauth/callback.tsx can verify `state` on return.
+  const issuedState = new URL(loginUrl).searchParams.get("state");
+  const nonce = issuedState ? parseStateNonce(issuedState) : null;
+  if (nonce) {
+    await storeOAuthStateNonce(nonce);
+  }
+
   if (ReactNative.Platform.OS === "web") {
     // On web, just redirect
     if (typeof window !== "undefined") {
@@ -192,7 +227,7 @@ export async function startOAuthLogin(): Promise<string | null> {
   const supported = await Linking.canOpenURL(loginUrl);
   if (!supported) {
     console.warn("[OAuth] Cannot open login URL: URL scheme not supported");
-    // 可考虑抛出错误或返回错误状态，让调用方处理
+    // Consider surfacing this to the caller so it can show a retry.
     return null;
   }
 
@@ -200,9 +235,49 @@ export async function startOAuthLogin(): Promise<string | null> {
     await Linking.openURL(loginUrl);
   } catch (error) {
     console.error("[OAuth] Failed to open login URL:", error);
-    // 可考虑抛出错误让调用方处理
+    // Consider rethrowing so the caller can show a retry.
   }
 
   // The OAuth callback will reopen the app via deep link.
   return null;
+}
+
+
+// ---------------------------------------------------------------------------
+// OAuth state nonce persistence (SP-022)
+// ---------------------------------------------------------------------------
+
+type SimpleStorage = {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+};
+
+function webStorage(): SimpleStorage | null {
+  return (
+    (globalThis as typeof globalThis & { sessionStorage?: SimpleStorage })
+      .sessionStorage ?? null
+  );
+}
+
+export async function storeOAuthStateNonce(nonce: string): Promise<void> {
+  if (ReactNative.Platform.OS === "web") {
+    webStorage()?.setItem(OAUTH_STATE_KEY, nonce);
+    return;
+  }
+  const SecureStore = await import("expo-secure-store");
+  await SecureStore.setItemAsync(OAUTH_STATE_KEY, nonce);
+}
+
+export async function takeOAuthStateNonce(): Promise<string | null> {
+  if (ReactNative.Platform.OS === "web") {
+    const storage = webStorage();
+    const value = storage?.getItem(OAUTH_STATE_KEY) ?? null;
+    storage?.removeItem(OAUTH_STATE_KEY);
+    return value;
+  }
+  const SecureStore = await import("expo-secure-store");
+  const value = await SecureStore.getItemAsync(OAUTH_STATE_KEY);
+  await SecureStore.deleteItemAsync(OAUTH_STATE_KEY);
+  return value;
 }

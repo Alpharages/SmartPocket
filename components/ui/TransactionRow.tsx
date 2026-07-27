@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 import {
+  Platform,
   Pressable,
   Text,
   View,
@@ -7,7 +8,6 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import Animated from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { Swipeable } from "react-native-gesture-handler";
 
@@ -19,7 +19,8 @@ import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { cn } from "@/lib/utils";
 import { CategoryToken } from "./CategoryToken";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+// Registered for NativeWind interop in lib/_core/nativewind-pressable (SP-057).
+import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 
 export interface TransactionRowProps {
   title: string;
@@ -35,6 +36,11 @@ export interface TransactionRowProps {
   onEdit?: () => void;
   onDelete?: () => void;
   className?: string;
+  /**
+   * Hide the per-row date. Set by lists that already group rows under a dated
+   * section header, where repeating it is pure noise (SP-064).
+   */
+  hideDate?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -132,6 +138,7 @@ function TransactionRowImpl({
   onEdit,
   onDelete,
   className,
+  hideDate = false,
   style,
 }: TransactionRowProps) {
   // Same active-theme token source the surface primitives read — never
@@ -141,6 +148,11 @@ function TransactionRowImpl({
   const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
 
   const hasSwipeActions = Boolean(onEdit || onDelete);
+  // QA report SP-007: edit/delete lived only inside `renderRightActions`, so on
+  // web they rendered off-screen (measured at x = -9638) with no swipe gesture
+  // to bring them in — the actions were physically unreachable. Render them
+  // inline wherever swipe is not an input method.
+  const usesInlineActions = Platform.OS === "web" && hasSwipeActions;
 
   const handlePressIn = useCallback(() => {
     onPressIn();
@@ -272,7 +284,9 @@ function TransactionRowImpl({
               </View>
             ) : null}
           </View>
-          <Text className="text-xs text-muted mt-0.5">{displayDate}</Text>
+          {hideDate ? null : (
+            <Text className="text-xs text-muted mt-0.5">{displayDate}</Text>
+          )}
           {note ? (
             <Text className="text-xs text-muted mt-0.5" numberOfLines={1}>
               {note}
@@ -290,10 +304,41 @@ function TransactionRowImpl({
           {displayAmount}
         </Text>
       </View>
+
+      {usesInlineActions ? (
+        <View className="flex-row items-center ml-2">
+          {onEdit ? (
+            <Pressable
+              onPress={onEdit}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${title}`}
+              className="items-center justify-center"
+              style={{ minWidth: 44, minHeight: 44 }}
+            >
+              <Ionicons
+                name="create-outline"
+                size={18}
+                color={colors.primary}
+              />
+            </Pressable>
+          ) : null}
+          {onDelete ? (
+            <Pressable
+              onPress={onDelete}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${title}`}
+              className="items-center justify-center"
+              style={{ minWidth: 44, minHeight: 44 }}
+            >
+              <Ionicons name="trash-outline" size={18} color={colors.error} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </AnimatedPressable>
   );
 
-  if (hasSwipeActions) {
+  if (hasSwipeActions && !usesInlineActions) {
     return (
       <Swipeable
         friction={2}

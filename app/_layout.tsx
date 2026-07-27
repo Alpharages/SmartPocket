@@ -27,6 +27,7 @@ import {
   subscribeSafeAreaInsets,
 } from "@/lib/_core/manus-runtime";
 import { ExpenseProvider } from "@/lib/expense-context";
+import { AuthGate } from "@/components/auth-gate";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import * as Auth from "@/lib/_core/auth";
 import { getApiBaseUrl, SESSION_TOKEN_KEY } from "@/constants/oauth";
@@ -217,6 +218,7 @@ export default function RootLayout() {
               <FirstDayOfWeekProvider>
                 <SettingsProvider>
                   <ExpenseProvider>
+                    <AuthGate />
                     <Stack screenOptions={{ headerShown: false }}>
                       <Stack.Screen name="(tabs)" />
                       <Stack.Screen
@@ -248,6 +250,10 @@ export default function RootLayout() {
                         }}
                       />
                       <Stack.Screen name="settings" />
+                      <Stack.Screen
+                        name="login"
+                        options={{ presentation: "fullScreenModal" }}
+                      />
                     </Stack>
                     <StatusBar style="auto" />
                   </ExpenseProvider>

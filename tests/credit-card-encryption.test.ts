@@ -46,7 +46,7 @@ describe("credit card db encryption", () => {
     const { updateCreditCard } = await import("@/server/db");
     const { isEncryptedCardNumber } = await import("@/server/_core/crypto");
 
-    await updateCreditCard(1, { cardNumber: "5555555555554444" });
+    await updateCreditCard(1, 1, { cardNumber: "5555555555554444" });
 
     const body = callDataApi.mock.calls[0][1].body as {
       params: unknown[];
@@ -59,14 +59,14 @@ describe("credit card db encryption", () => {
     callDataApi.mockResolvedValue(undefined);
     const { updateCreditCard } = await import("@/server/db");
 
-    await updateCreditCard(1, { name: "Renamed" });
+    await updateCreditCard(1, 1, { name: "Renamed" });
 
     const body = callDataApi.mock.calls[0][1].body as {
       query: string;
       params: unknown[];
     };
     expect(body.query).not.toContain("cardNumber");
-    expect(body.params).toEqual(["Renamed", 1]);
+    expect(body.params).toEqual(["Renamed", 1, 1]);
   });
 
   it("decrypts cardNumber on getCreditCardById then masks the response", async () => {
@@ -89,7 +89,7 @@ describe("credit card db encryption", () => {
     ]);
 
     const { getCreditCardById } = await import("@/server/db");
-    const card = await getCreditCardById(1);
+    const card = await getCreditCardById(1, 1);
     expect(card?.cardNumberLast4).toBe("1111");
     expect(card && "cardNumber" in card).toBe(false);
   });

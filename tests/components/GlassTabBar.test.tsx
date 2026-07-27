@@ -50,13 +50,15 @@ afterEach(() => {
   push.mockClear();
 });
 
+// Mirrors the navigator's declaration order in app/(tabs)/_layout.tsx — the
+// bar renders in route order, not TAB_ROUTES order.
 const routes = [
   "dashboard",
   "transactions",
   "categories",
   "summary",
-  "cards",
   "loans",
+  "cards",
   "index",
 ].map((name) => ({ key: `${name}-key`, name }));
 
@@ -110,7 +112,10 @@ describe("GlassTabBar", () => {
             typeof n.type === "string" && n.props.accessibilityRole === "tab",
         )
         .map((n) => n.props.accessibilityLabel),
-    ).toEqual(["Home", "Activity", "Categories", "Insights", "Cards"]);
+      // SP-004: Loans replaced Categories in the bar — Categories moved to
+      // Settings › Manage. A route absent from TAB_ROUTES is invisible, which
+      // is how the whole Loans module became unreachable.
+    ).toEqual(["Home", "Activity", "Insights", "Loans", "Cards"]);
   });
 
   it("keeps tab routing behavior and selected state", () => {

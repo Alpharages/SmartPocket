@@ -110,6 +110,17 @@ vi.mock("@/lib/first-day-of-week-provider", () => ({
   }),
 }));
 
+const mockConfirmDestructive = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(true),
+);
+
+// SP-007: delete now goes through a platform-safe confirm helper. The previous
+// tests drove Alert.alert's button callbacks directly, so they passed even
+// though on web those callbacks are never invoked and delete did nothing.
+vi.mock("@/lib/confirm-dialog", () => ({
+  confirmDestructive: mockConfirmDestructive,
+}));
+
 vi.mock("@/lib/expense-context", () => ({
   useExpense: vi.fn(),
 }));
@@ -650,10 +661,8 @@ describe("TransactionsScreen", () => {
   // -------------------------------------------------------------------------
 
   describe("Swipe delete", () => {
-    let alertSpy: MockInstance;
-
     beforeEach(() => {
-      alertSpy = vi.spyOn(Alert, "alert");
+      mockConfirmDestructive.mockReset().mockResolvedValue(true);
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
         transactions: [makeTransaction({ id: 42, categoryId: 2 })],
         categories: mockCategories,
@@ -664,7 +673,6 @@ describe("TransactionsScreen", () => {
 
     it("renders a delete swipe action for each row", () => {
       const root = render(<TransactionsScreen />);
-      // Swipeable mock renders right actions; look for a delete-labelled button
       const deleteBtn = root.findAll(
         (n) =>
           (n.props as any).accessibilityLabel?.includes("Delete") &&
@@ -673,53 +681,45 @@ describe("TransactionsScreen", () => {
       expect(deleteBtn.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("pressing delete shows Alert.alert confirmation", () => {
+    it("pressing delete asks for confirmation", async () => {
       const root = render(<TransactionsScreen />);
       const deleteBtn = root.find(
         (n) =>
           (n.props as any).accessibilityLabel === "Delete Food" &&
           (n.props as any).accessibilityRole === "button",
       );
-      act(() => {
+      await act(async () => {
         deleteBtn.props.onPress();
       });
-      expect(alertSpy).toHaveBeenCalledOnce();
-      expect(alertSpy.mock.calls[0][0]).toBe("Delete Transaction");
+      expect(mockConfirmDestructive).toHaveBeenCalledOnce();
+      expect(mockConfirmDestructive.mock.calls[0][0].title).toBe(
+        "Delete Transaction",
+      );
     });
 
-    it("confirming delete calls deleteTransaction with the transaction id", () => {
+    it("confirming delete calls deleteTransaction with the transaction id", async () => {
+      mockConfirmDestructive.mockResolvedValue(true);
       const root = render(<TransactionsScreen />);
       const deleteBtn = root.find(
         (n) => (n.props as any).accessibilityLabel === "Delete Food",
       );
-      act(() => {
+      await act(async () => {
         deleteBtn.props.onPress();
-      });
-
-      // Grab the destructive button from the Alert call and invoke it
-      const buttons: any[] = alertSpy.mock.calls[0][2];
-      const destructiveBtn = buttons.find((b) => b.style === "destructive");
-      act(() => {
-        destructiveBtn.onPress();
       });
 
       expect(mockDeleteTransaction).toHaveBeenCalledOnce();
       expect(mockDeleteTransaction).toHaveBeenCalledWith(42);
     });
 
-    it("cancelling delete does NOT call deleteTransaction", () => {
+    it("cancelling delete does NOT call deleteTransaction", async () => {
+      mockConfirmDestructive.mockResolvedValue(false);
       const root = render(<TransactionsScreen />);
       const deleteBtn = root.find(
         (n) => (n.props as any).accessibilityLabel === "Delete Food",
       );
-      act(() => {
+      await act(async () => {
         deleteBtn.props.onPress();
       });
-
-      const buttons: any[] = alertSpy.mock.calls[0][2];
-      const cancelBtn = buttons.find((b) => b.style === "cancel");
-      // onPress is undefined for cancel — just verify no delete call
-      cancelBtn.onPress?.();
       expect(mockDeleteTransaction).not.toHaveBeenCalled();
     });
   });

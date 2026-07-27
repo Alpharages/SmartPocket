@@ -83,10 +83,13 @@ describe("account db helpers", () => {
     });
   });
 
-  it("returns empty balances when the query fails", async () => {
+  it("propagates a query failure instead of reporting empty balances", async () => {
+    // SP-014: this used to resolve to {}, so a database outage was
+    // indistinguishable from an account with no activity — the UI showed a
+    // friendly empty state over a real failure.
     callDataApi.mockRejectedValueOnce(new Error("database unavailable"));
     const { getAccountBalances } = await import("@/server/db");
 
-    await expect(getAccountBalances(1)).resolves.toEqual({});
+    await expect(getAccountBalances(1)).rejects.toThrow("database unavailable");
   });
 });
