@@ -31,7 +31,7 @@ export function GlassSurface({
   ...rest
 }: GlassSurfaceProps) {
   const theme = useThemeTokens();
-  const canBlur = useGlassCapability(disableBlur);
+  const { blurEnabled: canBlur } = useGlassCapability(disableBlur);
 
   const opaqueFill = useMemo(
     () =>
