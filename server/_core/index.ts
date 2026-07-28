@@ -11,6 +11,7 @@ import { createContext } from "./context";
 import { sdk } from "./sdk";
 import * as db from "../db";
 import { ENV } from "./env";
+import { buildAllowedOrigins, isOriginAllowed } from "./cors";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -29,50 +30,6 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
     }
   }
   throw new Error(`No available port found starting from ${startPort}`);
-}
-
-/** Origins permitted to make credentialed cross-origin requests (SP-005). */
-function buildAllowedOrigins(): Set<string> {
-  const configured = (process.env.ALLOWED_ORIGINS ?? "")
-    .split(",")
-    .map((value) => value.trim().replace(/\/$/, ""))
-    .filter(Boolean);
-
-  const origins = new Set(configured);
-
-  if (!ENV.isProduction) {
-    // Local development hosts only — never added in production.
-    for (const port of [8081, 3000, 19006]) {
-      origins.add(`http://localhost:${port}`);
-      origins.add(`http://127.0.0.1:${port}`);
-    }
-  }
-
-  return origins;
-}
-
-function isOriginAllowed(origin: string, allowed: Set<string>): boolean {
-  const normalized = origin.replace(/\/$/, "");
-  if (allowed.has(normalized)) return true;
-
-  // Sandbox preview topology: the API (3000-*) and the web client (8081-*)
-  // are sibling subdomains of one preview host. Allow a sibling only when the
-  // parent host is itself allowlisted.
-  for (const entry of allowed) {
-    try {
-      const a = new URL(entry);
-      const b = new URL(normalized);
-      if (
-        a.protocol === b.protocol &&
-        a.hostname.replace(/^\d+-/, "") === b.hostname.replace(/^\d+-/, "")
-      ) {
-        return true;
-      }
-    } catch {
-      // ignore malformed allowlist entries
-    }
-  }
-  return false;
 }
 
 /** Authorize the recurring-generation cron endpoint (SP-011). */
@@ -105,7 +62,10 @@ async function startServer() {
   // explicit allowlist. In development the local Metro/preview hosts are
   // permitted so the web client keeps working; in production only
   // ALLOWED_ORIGINS is honoured.
-  const allowedOrigins = buildAllowedOrigins();
+  const allowedOrigins = buildAllowedOrigins(
+    process.env.ALLOWED_ORIGINS,
+    ENV.isProduction,
+  );
   app.use((req, res, next) => {
     const origin = req.headers.origin;
 
@@ -128,7 +88,9 @@ async function startServer() {
       // Never 200 a preflight for a disallowed origin — without the
       // Allow-Origin header the browser blocks it anyway, but failing loudly
       // makes misconfiguration obvious instead of silent.
-      res.sendStatus(origin && !isOriginAllowed(origin, allowedOrigins) ? 403 : 204);
+      res.sendStatus(
+        origin && !isOriginAllowed(origin, allowedOrigins) ? 403 : 204,
+      );
       return;
     }
     next();
