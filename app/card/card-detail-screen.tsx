@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import { Animated, FadeInDown, FadeInUp } from "@/lib/motion";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { EmptyState } from "@/components/ui/EmptyState";

@@ -23,7 +23,7 @@ import { useExpense, type Loan } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useNavigation } from "expo-router";
-import Animated, { FadeInUp } from "react-native-reanimated";
+import { Animated, FadeInUp } from "@/lib/motion";
 import { Button, EmptyState, ScreenHeader, Sheet } from "@/components/ui";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ContentMaxWidth } from "@/lib/_core/theme";

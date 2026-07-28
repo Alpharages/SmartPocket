@@ -21,7 +21,7 @@ import {
 } from "@/lib/expense-context";
 import { useThemeTokens } from "@/lib/theme-provider";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, { FadeInUp } from "react-native-reanimated";
+import { Animated, FadeInUp } from "@/lib/motion";
 import {
   Button,
   ConfirmSheet,

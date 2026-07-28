@@ -19,7 +19,7 @@ import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
 import { useExpense, type Category } from "@/lib/expense-context";
 import { useThemeTokens } from "@/lib/theme-provider";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import { Animated, FadeInDown, FadeInUp } from "@/lib/motion";
 import {
   CATEGORY_COLOR_LIGHT_VALUES,
   DEFAULT_CATEGORY_ICON,

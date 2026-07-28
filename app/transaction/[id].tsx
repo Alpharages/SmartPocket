@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useExpense } from "@/lib/expense-context";
 import { useCurrency } from "@/lib/currency-provider";
 import { formatSignedCurrency } from "@/lib/currency";
-import Animated, { FadeInUp } from "react-native-reanimated";
+import { Animated, FadeInUp } from "@/lib/motion";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { confirmDestructive } from "@/lib/confirm-dialog";
 import { TransactionEditSheet } from "@/components/ui/TransactionEditSheet";

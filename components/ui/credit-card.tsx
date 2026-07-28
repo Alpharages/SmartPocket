@@ -2,7 +2,7 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import Animated, { FadeInUp } from "react-native-reanimated";
+import { Animated, FadeInUp } from "@/lib/motion";
 
 import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { Radius, Spacing } from "@/lib/_core/theme";

@@ -16,7 +16,7 @@ import { useThemeTokens } from "@/lib/theme-provider";
 import { useBreakpoints } from "@/hooks/use-breakpoint";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import { Animated, FadeInDown, FadeInUp } from "@/lib/motion";
 import {
   ScreenHeader,
   BalanceHero,

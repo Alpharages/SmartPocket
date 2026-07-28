@@ -18,7 +18,7 @@ import {
   resolveCategoryColor,
 } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import { Animated, FadeInDown, FadeInUp } from "@/lib/motion";
 import {
   Button,
   CategoryAnomalyBadge,
