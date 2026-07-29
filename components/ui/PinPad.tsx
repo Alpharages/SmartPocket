@@ -1,13 +1,26 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Text, View, type StyleProp, type ViewStyle } from "react-native";
+import {
+  AccessibilityInfo,
+  Platform,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 
 export type PinPadProps = {
   /** Fired with the 4-digit PIN once the 4th digit is entered. */
   onSubmit: (pin: string) => void;
+  /**
+   * Fired on every digit or backspace key press, before the press is
+   * otherwise handled — lets the caller drop a stale `error` state as soon
+   * as the user starts a new attempt.
+   */
+  onKeyPress?: () => void;
   /** Renders the dots in the error color and clears entered digits. */
   error?: boolean;
   disabled?: boolean;
@@ -53,7 +66,7 @@ function PinPadKey({
   disabled: boolean;
   onPress: (padKey: PadKey) => void;
 }) {
-  const colors = useColors();
+  const { colors } = useThemeTokens();
   const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
 
   const handlePressIn = useCallback(() => {
@@ -73,6 +86,7 @@ function PinPadKey({
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={padKey.label}
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPressIn={handlePressIn}
       onPressOut={onPressOut}
@@ -109,45 +123,64 @@ function PadKeyContent({ padKey, color }: { padKey: PadKey; color: string }) {
 
 export function PinPad({
   onSubmit,
+  onKeyPress,
   error = false,
   disabled = false,
   className,
   style,
 }: PinPadProps) {
-  const colors = useColors();
+  const { colors } = useThemeTokens();
   const [digits, setDigits] = useState<string>("");
 
-  // An error (e.g. a wrong PIN reported by the caller) invalidates whatever
-  // was entered — clear so the user re-enters from a blank pad.
+  // Clear on BOTH edges of `error` — the rising edge invalidates whatever was
+  // entered when the wrong PIN was reported; the falling edge drops any
+  // digits typed while the error was still showing (they were entered before
+  // the caller acknowledged the error and are not a real new attempt).
   useEffect(() => {
-    if (error) setDigits("");
+    setDigits("");
+  }, [error]);
+
+  useEffect(() => {
+    if (digits.length !== PIN_LENGTH) return;
+    onSubmit(digits);
+    setDigits("");
+  }, [digits, onSubmit]);
+
+  // Announce rejected PINs to screen readers — the dots alone convey this by
+  // color only, which fails SC 1.4.1 for low-vision/screen-reader users.
+  useEffect(() => {
+    if (error && Platform.OS === "ios") {
+      AccessibilityInfo.announceForAccessibility(
+        "Incorrect PIN. Please try again.",
+      );
+    }
   }, [error]);
 
   const handleKeyPress = useCallback(
     (padKey: PadKey) => {
+      onKeyPress?.();
       if (padKey.kind === "backspace") {
         setDigits((prev) => prev.slice(0, -1));
         return;
       }
-
-      setDigits((prev) => {
-        if (prev.length >= PIN_LENGTH) return prev;
-        const next = prev + padKey.label;
-        if (next.length === PIN_LENGTH) {
-          onSubmit(next);
-          return "";
-        }
-        return next;
-      });
+      setDigits((prev) =>
+        prev.length >= PIN_LENGTH ? prev : prev + padKey.label,
+      );
     },
-    [onSubmit],
+    [onKeyPress],
   );
+
+  const a11yLabel = error
+    ? "PIN entry: incorrect PIN, please try again"
+    : `PIN entry: ${digits.length} of ${PIN_LENGTH} digits entered`;
 
   return (
     <View className={className} style={style}>
       <View
+        accessible
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={a11yLabel}
         style={{ flexDirection: "row", justifyContent: "center", gap: 16 }}
-        accessibilityLabel={`PIN entry: ${digits.length} of ${PIN_LENGTH} digits entered`}
       >
         {Array.from({ length: PIN_LENGTH }).map((_, index) => {
           const filled = index < digits.length;
@@ -160,12 +193,16 @@ export function PinPad({
                 height: 16,
                 borderRadius: 8,
                 borderWidth: 2,
-                borderColor: error ? colors.error : colors.border,
-                backgroundColor: error
+                borderColor: error
                   ? colors.error
                   : filled
                     ? colors.primary
-                    : undefined,
+                    : colors.muted,
+                backgroundColor: filled
+                  ? error
+                    ? colors.error
+                    : colors.primary
+                  : undefined,
               }}
             />
           );

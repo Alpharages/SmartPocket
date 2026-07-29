@@ -8,6 +8,7 @@ import { TransactionRow } from "@/components/ui/TransactionRow";
 import { CategoryToken } from "@/components/ui/CategoryToken";
 import { Sheet } from "@/components/ui/Sheet";
 import { Toast } from "@/components/ui/Toast";
+import { PinPad } from "@/components/ui/PinPad";
 import { ThemeContext } from "@/lib/theme-provider";
 import { THEME_IDS, getThemeTokens, type ThemeId } from "@/lib/_core/theme";
 
@@ -230,6 +231,24 @@ describe("Story 12.10 — AC2 touch targets (>=44pt) hold across every theme × 
           const dismiss = findByProp(root, "accessibilityLabel", "Dismiss");
           expect(hasMinHeight(dismiss.props.style, 44)).toBe(true);
           expect(hasMinWidth(dismiss.props.style, 44)).toBe(true);
+        });
+
+        it("PinPad keys have minHeight and minWidth >=44", () => {
+          const root = renderUnderTheme(
+            <PinPad onSubmit={() => {}} />,
+            themeId,
+            scheme,
+          );
+          const pinKeys = root.findAll(
+            (n) =>
+              typeof n.type === "string" &&
+              n.props.accessibilityRole === "button",
+          );
+          expect(pinKeys.length).toBeGreaterThan(0);
+          for (const key of pinKeys) {
+            expect(hasMinHeight(key.props.style, 44)).toBe(true);
+            expect(hasMinWidth(key.props.style, 44)).toBe(true);
+          }
         });
       });
     }

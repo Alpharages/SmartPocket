@@ -28,8 +28,8 @@ const mockColors = {
   tabIconSelected: "#4F46E5",
 };
 
-vi.mock("@/hooks/use-colors", () => ({
-  useColors: () => mockColors,
+vi.mock("@/lib/theme-provider", () => ({
+  useThemeTokens: () => ({ colors: mockColors }),
 }));
 
 let renderer: ReactTestRenderer | null = null;
@@ -186,5 +186,74 @@ describe("PinPad", () => {
       (d) => StyleSheet.flatten(d.props.style).backgroundColor !== undefined,
     );
     expect(filled).toHaveLength(0);
+  });
+
+  it("unfilled dots use the muted token, not border, so the ring is visible against the surface", () => {
+    const root = render(<PinPad onSubmit={() => {}} />);
+    for (const dot of dots(root)) {
+      const style = StyleSheet.flatten(dot.props.style);
+      expect(style.borderColor).toBe(mockColors.muted);
+    }
+  });
+
+  it("reflects entered digits even while error stays true (does not mask keystrokes as solid red)", () => {
+    const root = render(<PinPad onSubmit={() => {}} error />);
+    pressDigits(root, "1");
+    const filled = dots(root).filter(
+      (d) => StyleSheet.flatten(d.props.style).backgroundColor !== undefined,
+    );
+    expect(filled).toHaveLength(1);
+  });
+
+  it("clears digits typed while error was showing once error toggles back off (falling edge)", () => {
+    const onSubmit = vi.fn();
+    const root = render(<PinPad onSubmit={onSubmit} error />);
+    pressDigits(root, "12");
+    act(() => {
+      renderer!.update(<PinPad onSubmit={onSubmit} error={false} />);
+    });
+    pressDigits(root, "3456");
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith("3456");
+  });
+
+  it("calls onKeyPress on every digit and backspace press", () => {
+    const onKeyPress = vi.fn();
+    const root = render(<PinPad onSubmit={() => {}} onKeyPress={onKeyPress} />);
+    pressDigits(root, "1");
+    press(findKey(root, "Backspace"));
+    expect(onKeyPress).toHaveBeenCalledTimes(2);
+  });
+
+  it("each key exposes accessibilityState reflecting disabled", () => {
+    const root = render(<PinPad onSubmit={() => {}} disabled />);
+    for (const node of keys(root)) {
+      expect(node.props.accessibilityState).toMatchObject({ disabled: true });
+    }
+  });
+
+  it("the digit-count label is exposed as a single accessible, live-announcing element", () => {
+    const root = render(<PinPad onSubmit={() => {}} />);
+    const label = root.find(
+      (n) =>
+        typeof n.props.accessibilityLabel === "string" &&
+        n.props.accessibilityLabel.startsWith("PIN entry"),
+    );
+    expect(label.props.accessible).toBe(true);
+    expect(label.props.accessibilityLiveRegion).toBe("polite");
+  });
+
+  it("conveys the error state via accessibilityLabel text, not color alone", () => {
+    const root = render(<PinPad onSubmit={() => {}} error />);
+    const label = root.find(
+      (n) =>
+        typeof n.props.accessibilityLabel === "string" &&
+        n.props.accessibilityLabel.includes("incorrect PIN"),
+    );
+    expect(label).toBeTruthy();
+  });
+
+  it("renders without a ThemeProvider ancestor (regression: useColors() threw outside one)", () => {
+    expect(() => render(<PinPad onSubmit={() => {}} />)).not.toThrow();
   });
 });

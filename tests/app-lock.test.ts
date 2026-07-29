@@ -125,4 +125,40 @@ describe("app-lock", () => {
       expect(secureStore.deleteItemAsync).not.toHaveBeenCalled();
     });
   });
+
+  describe("SecureStore failures are guarded, not thrown", () => {
+    it("isPinSet resolves null (not a rejection) when the read rejects", async () => {
+      secureStore.getItemAsync.mockRejectedValue(new Error("Keystore error"));
+      const appLock = await import("@/lib/app-lock");
+      await expect(appLock.isPinSet()).resolves.toBeNull();
+    });
+
+    it("verifyPin resolves null (not a rejection) when the read rejects", async () => {
+      secureStore.getItemAsync.mockRejectedValue(new Error("Keystore error"));
+      const appLock = await import("@/lib/app-lock");
+      await expect(appLock.verifyPin("1234")).resolves.toBeNull();
+    });
+
+    it("setPin still rejects when the write fails, but logs first", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      secureStore.setItemAsync.mockRejectedValue(new Error("Keystore error"));
+      const appLock = await import("@/lib/app-lock");
+      await expect(appLock.setPin("1234")).rejects.toThrow("Keystore error");
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it("clearAppLock still deletes the biometric key when deleting the PIN key rejects", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      secureStore.deleteItemAsync.mockImplementation(async (key: string) => {
+        if (key === "app_lock_pin") throw new Error("Keystore error");
+      });
+      const appLock = await import("@/lib/app-lock");
+      await expect(appLock.clearAppLock()).resolves.toBeUndefined();
+      expect(secureStore.deleteItemAsync).toHaveBeenCalledWith(
+        appLock.BIOMETRIC_KEY,
+      );
+      errorSpy.mockRestore();
+    });
+  });
 });

@@ -13,6 +13,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Toast } from "@/components/ui/Toast";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PinPad } from "@/components/ui/PinPad";
 
 vi.mock("@/hooks/use-colors", () => ({
   useColors: () => ({
@@ -330,6 +331,24 @@ describe("A11y Audit — AC3 Screen-reader labels", () => {
     expect(skel.props.accessible).toBe(true);
     expect(skel.props.accessibilityLabel).toBe("Loading");
   });
+
+  it("PinPad keys expose accessibilityRole + accessibilityLabel + accessibilityState", () => {
+    const root = render(<PinPad onSubmit={() => {}} disabled />);
+    const keys = findAllByProp(root, "accessibilityRole", "button");
+    expect(keys.length).toBeGreaterThan(0);
+    for (const key of keys) {
+      expect(typeof key.props.accessibilityLabel).toBe("string");
+      expect(key.props.accessibilityState).toMatchObject({ disabled: true });
+    }
+  });
+
+  it("PinPad digit-count label is a single accessible, live-announcing element", () => {
+    const root = render(<PinPad onSubmit={() => {}} />);
+    const label = findByProp(root, "accessibilityLiveRegion", "polite");
+    expect(label).toBeDefined();
+    expect(label.props.accessible).toBe(true);
+    expect(String(label.props.accessibilityLabel)).toContain("PIN entry");
+  });
 });
 
 describe("A11y Audit — AC2 Touch targets ≥44pt", () => {
@@ -371,6 +390,13 @@ describe("A11y Audit — AC2 Touch targets ≥44pt", () => {
     );
     const token = findByProp(root, "accessibilityRole", "button");
     expect(hasMinHeight(token.props.style, 44)).toBe(true);
+  });
+
+  it("PinPad keys have minHeight and minWidth ≥44", () => {
+    const root = render(<PinPad onSubmit={() => {}} />);
+    for (const key of findAllByProp(root, "accessibilityRole", "button")) {
+      expect(hasMinHeight(key.props.style, 44)).toBe(true);
+    }
   });
 });
 

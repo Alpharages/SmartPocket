@@ -65,3 +65,5 @@ export { RecurringTransactionRow } from "./RecurringTransactionRow";
 export type { RecurringTransactionRowProps } from "./RecurringTransactionRow";
 export { RecurringTransactionSheet } from "./RecurringTransactionSheet";
 export type { RecurringTransactionSheetProps } from "./RecurringTransactionSheet";
+export { PinPad } from "./PinPad";
+export type { PinPadProps } from "./PinPad";
