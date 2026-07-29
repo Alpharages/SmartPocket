@@ -29,6 +29,7 @@ import {
 import { ExpenseProvider } from "@/lib/expense-context";
 import { AuthGate } from "@/components/auth-gate";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import * as Auth from "@/lib/_core/auth";
 import { getApiBaseUrl, SESSION_TOKEN_KEY } from "@/constants/oauth";
 
@@ -214,52 +215,54 @@ export default function RootLayout() {
           {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
           <ToastProvider>
-            <CurrencyProvider>
-              <FirstDayOfWeekProvider>
-                <SettingsProvider>
-                  <ExpenseProvider>
-                    <AuthGate />
-                    <Stack screenOptions={{ headerShown: false }}>
-                      <Stack.Screen name="(tabs)" />
-                      <Stack.Screen
-                        name="add-transaction"
-                        options={{
-                          presentation: "transparentModal",
-                          animation: "none",
-                        }}
-                      />
-                      <Stack.Screen name="budgets" />
-                      <Stack.Screen name="accounts" />
-                      <Stack.Screen
-                        name="budget-form"
-                        options={{
-                          presentation: "transparentModal",
-                          animation: "none",
-                        }}
-                      />
-                      <Stack.Screen name="recurring" />
-                      <Stack.Screen name="oauth/callback" />
-                      <Stack.Screen name="card/[id]" />
-                      <Stack.Screen name="loan/[id]" />
-                      <Stack.Screen name="import-csv" />
-                      <Stack.Screen
-                        name="loan/record-repayment"
-                        options={{
-                          presentation: "transparentModal",
-                          animation: "none",
-                        }}
-                      />
-                      <Stack.Screen name="settings" />
-                      <Stack.Screen
-                        name="login"
-                        options={{ presentation: "fullScreenModal" }}
-                      />
-                    </Stack>
-                    <StatusBar style="auto" />
-                  </ExpenseProvider>
-                </SettingsProvider>
-              </FirstDayOfWeekProvider>
-            </CurrencyProvider>
+            <ConfirmProvider>
+              <CurrencyProvider>
+                <FirstDayOfWeekProvider>
+                  <SettingsProvider>
+                    <ExpenseProvider>
+                      <AuthGate />
+                      <Stack screenOptions={{ headerShown: false }}>
+                        <Stack.Screen name="(tabs)" />
+                        <Stack.Screen
+                          name="add-transaction"
+                          options={{
+                            presentation: "transparentModal",
+                            animation: "none",
+                          }}
+                        />
+                        <Stack.Screen name="budgets" />
+                        <Stack.Screen name="accounts" />
+                        <Stack.Screen
+                          name="budget-form"
+                          options={{
+                            presentation: "transparentModal",
+                            animation: "none",
+                          }}
+                        />
+                        <Stack.Screen name="recurring" />
+                        <Stack.Screen name="oauth/callback" />
+                        <Stack.Screen name="card/[id]" />
+                        <Stack.Screen name="loan/[id]" />
+                        <Stack.Screen name="import-csv" />
+                        <Stack.Screen
+                          name="loan/record-repayment"
+                          options={{
+                            presentation: "transparentModal",
+                            animation: "none",
+                          }}
+                        />
+                        <Stack.Screen name="settings" />
+                        <Stack.Screen
+                          name="login"
+                          options={{ presentation: "fullScreenModal" }}
+                        />
+                      </Stack>
+                      <StatusBar style="auto" />
+                    </ExpenseProvider>
+                  </SettingsProvider>
+                </FirstDayOfWeekProvider>
+              </CurrencyProvider>
+            </ConfirmProvider>
           </ToastProvider>
         </QueryClientProvider>
       </trpc.Provider>

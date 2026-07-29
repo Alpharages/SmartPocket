@@ -47,6 +47,8 @@ const providers = vi.hoisted(() => ({
     React.createElement("ThemeProvider", {}, children),
   ToastProvider: ({ children }: { children: React.ReactNode }) =>
     React.createElement("ToastProvider", {}, children),
+  ConfirmProvider: ({ children }: { children: React.ReactNode }) =>
+    React.createElement("ConfirmProvider", {}, children),
   CurrencyProvider: ({ children }: { children: React.ReactNode }) =>
     React.createElement("CurrencyProvider", {}, children),
   FirstDayOfWeekProvider: ({ children }: { children: React.ReactNode }) =>
@@ -67,6 +69,7 @@ vi.mock("@/lib/first-day-of-week-provider", () => providers);
 vi.mock("@/lib/settings-provider", () => providers);
 vi.mock("@/lib/expense-context", () => providers);
 vi.mock("@/components/ui/ToastProvider", () => providers);
+vi.mock("@/components/ui/ConfirmProvider", () => providers);
 vi.mock("expo-router", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn() }),
   // AuthGate (SP-006) reads the active segment to decide whether the current

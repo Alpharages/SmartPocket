@@ -62,6 +62,13 @@ export default function CardDetailScreen() {
   const limitAmount = card ? Number(card.creditLimit) : 0;
   const utilisation = limitAmount > 0 ? Math.max(0, total) / limitAmount : 0;
   const overLimit = utilisation > 1;
+  // A non-zero balance must never floor to "0%" at integer resolution.
+  const utilisationLabel =
+    utilisation === 0
+      ? "0%"
+      : utilisation < 0.01
+        ? "<1%"
+        : `${Math.round(utilisation * 100)}%`;
 
   if (Number.isNaN(cardId) || !card) {
     return (
@@ -159,11 +166,11 @@ export default function CardDetailScreen() {
               />
             </View>
             <Text
+              testID="card-detail-utilisation"
               className="text-white/80 text-xs font-medium mt-1.5"
-              accessibilityLabel={`${Math.round(utilisation * 100)} percent of your ${formatMoney(limitAmount, currency)} limit used`}
+              accessibilityLabel={`${utilisationLabel} of your ${formatMoney(limitAmount, currency)} limit used${overLimit ? ", over limit" : ""}`}
             >
-              {Math.round(utilisation * 100)}% of{" "}
-              {formatMoney(limitAmount, currency)} limit
+              {utilisationLabel} of {formatMoney(limitAmount, currency)} limit
               {overLimit ? " — over limit" : ""}
             </Text>
           </View>

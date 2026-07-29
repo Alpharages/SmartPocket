@@ -1,5 +1,7 @@
 import { Alert, Platform } from "react-native";
 
+import { getConfirmHandler } from "@/components/ui/ConfirmProvider";
+
 /**
  * Platform-safe confirmation.
  *
@@ -9,6 +11,11 @@ import { Alert, Platform } from "react-native";
  * no feedback. `app/transaction/[id].tsx` already branched to `window.confirm`;
  * the other call sites did not. This centralises that branch so no screen has
  * to remember it.
+ *
+ * When a `ConfirmProvider` is mounted (see `components/ui/ConfirmProvider.tsx`),
+ * delegate to its themed `ConfirmSheet` on every platform — the raw
+ * `globalThis.confirm()` / `Alert.alert` fallbacks below only run when no
+ * provider is in the tree (e.g. a unit test rendering a screen in isolation).
  */
 export function confirmDestructive({
   title,
@@ -21,6 +28,17 @@ export function confirmDestructive({
   confirmLabel?: string;
   cancelLabel?: string;
 }): Promise<boolean> {
+  const handler = getConfirmHandler();
+  if (handler) {
+    return handler({
+      title,
+      message,
+      confirmLabel,
+      cancelLabel,
+      destructive: true,
+    });
+  }
+
   if (Platform.OS === "web") {
     const text = message ? `${title}\n\n${message}` : title;
     const confirmed =

@@ -46,6 +46,13 @@ vi.mock("@expo/vector-icons", () => {
   return { Ionicons };
 });
 
+// confirmDestructive (lib/confirm-dialog.ts) statically imports ConfirmProvider
+// -> ConfirmSheet -> Sheet, which pulls in the real
+// react-native-safe-area-context package at module-load time.
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 const mockColors = {
   primary: "#4F46E5",
   background: "#F8FAFC",
@@ -285,7 +292,11 @@ describe("LoanDetailScreen", () => {
 
   it("disables record repayment when loan is settled", () => {
     vi.mocked(useLoanDetail).mockReturnValue({
-      loanDetail: { ...mockLoanDetail, status: "settled", remainingBalance: "0.00" },
+      loanDetail: {
+        ...mockLoanDetail,
+        status: "settled",
+        remainingBalance: "0.00",
+      },
       loadingLoanDetail: false,
       loanDetailError: false,
       refreshLoanDetail: vi.fn(),
