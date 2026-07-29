@@ -14,8 +14,16 @@ import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 
 // Routes rendered in the bar, in order. NOTE: adding a `Tabs.Screen` is not
 // enough — a route missing from this list is silently invisible, which is how
-// the entire Loans module became unreachable (QA report SP-004).
-const TAB_ROUTES = ["dashboard", "transactions", "summary", "loans", "cards"];
+// the entire Loans module became unreachable (QA report SP-004). Exported so
+// tests/app.tabs-layout.test.tsx can assert it stays in sync with which
+// screens declare `href: null` (86eyepunf) instead of restating the list.
+export const TAB_ROUTES = [
+  "dashboard",
+  "transactions",
+  "summary",
+  "loans",
+  "cards",
+];
 const MIN_TARGET = 44;
 const FAB_SIZE = 58;
 

@@ -42,9 +42,16 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="categories"
+        // SP-042: Categories was demoted from the tab bar to Settings ›
+        // Manage — it is registered here only so `router.push("/categories")`
+        // resolves. `href: null` records that intent but is inert under our
+        // custom `tabBar` (GlassTabBar destructures neither `href` nor
+        // `tabBarButton`/`tabBarItemStyle`); TAB_ROUTES in GlassTabBar.tsx is
+        // what actually hides it from the bar. The drift guard in
+        // tests/app.tabs-layout.test.tsx is what keeps this comment true.
         options={{
           title: "Categories",
-          tabBarAccessibilityLabel: "Categories tab",
+          href: null,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "grid" : "grid-outline"}

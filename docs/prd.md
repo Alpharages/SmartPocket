@@ -109,7 +109,7 @@ Each has an ID (`NFR-#`) and a measurable target where applicable.
 
 ## 8. Information Architecture & UX Notes
 
-- **Current tabs (built):** Home (Dashboard), Activity (Transactions), Categories, Insights (monthly summary), Cards (credit cards).
+- **Current tabs (built):** Home (Dashboard), Activity (Transactions), Insights (monthly summary), Loans, Cards (credit cards). Categories moved to Settings › Manage (SP-042 IA rebalance, see `QA-REPORT.md` §8.3) — it is CRUD-complete but is configuration, not a tab destination.
 - Quick‑add Income/Expense actions on the dashboard route to the add‑transaction screen; consistent category pickers.
 - **Planned IA additions:** a Settings screen (currency/theme/notifications/AI toggles), and—if/when those features land—Budgets, Loans (with a loan‑detail page: schedule, history, next due), and richer Analytics (charts, trend lines).
 
