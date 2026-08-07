@@ -15,6 +15,11 @@ const mockSetThemePreference = vi.fn().mockResolvedValue(undefined);
 const mockSetThemeId = vi.fn().mockResolvedValue(undefined);
 const mockClearAllData = vi.fn().mockResolvedValue(undefined);
 const mockSetAiEnabled = vi.fn().mockResolvedValue(undefined);
+const mockRequestConsent = vi.fn();
+const mockEnable = vi.fn().mockResolvedValue(undefined);
+const mockDismiss = vi.fn();
+let mockAiConsentVisible = false;
+let mockAiConsentEnabling = false;
 
 vi.mock("expo-router", () => ({
   useRouter: () => ({ back: mockBack, push: vi.fn() }),
@@ -162,6 +167,18 @@ vi.mock("@/lib/settings-provider", () => ({
   }),
 }));
 
+vi.mock("@/hooks/use-ai-consent", () => ({
+  useAiConsent: () => ({
+    aiEnabled: false,
+    needsConsent: true,
+    visible: mockAiConsentVisible,
+    enabling: mockAiConsentEnabling,
+    requestConsent: mockRequestConsent,
+    enable: mockEnable,
+    dismiss: mockDismiss,
+  }),
+}));
+
 let renderer: ReactTestRenderer | null = null;
 
 function render(ui: React.ReactElement): ReactTestInstance {
@@ -183,6 +200,11 @@ afterEach(() => {
   mockSetThemeId.mockClear();
   mockClearAllData.mockClear();
   mockSetAiEnabled.mockClear();
+  mockRequestConsent.mockClear();
+  mockEnable.mockClear();
+  mockDismiss.mockClear();
+  mockAiConsentVisible = false;
+  mockAiConsentEnabling = false;
 });
 
 function findPressableByLabel(
@@ -345,7 +367,7 @@ describe("SettingsScreen", () => {
     expect(toggle.props.accessibilityState?.checked).toBe(false);
   });
 
-  it("calls setAiEnabled when the AI switch is toggled", () => {
+  it("routes the AI switch's off->on flip through the consent card instead of enabling directly", () => {
     const root = render(<SettingsScreen />);
     const toggle = root.find(
       (n) =>
@@ -357,7 +379,69 @@ describe("SettingsScreen", () => {
       toggle.props.onValueChange(true);
     });
 
-    expect(mockSetAiEnabled).toHaveBeenCalledWith(true);
+    expect(mockRequestConsent).toHaveBeenCalledTimes(1);
+    expect(mockSetAiEnabled).not.toHaveBeenCalled();
+  });
+
+  it("turning the AI switch off remains instant and bypasses the consent card", () => {
+    const root = render(<SettingsScreen />);
+    const toggle = root.find(
+      (n) =>
+        String(n.type) === "Switch" &&
+        n.props?.accessibilityLabel === "AI features",
+    );
+
+    act(() => {
+      toggle.props.onValueChange(false);
+    });
+
+    expect(mockSetAiEnabled).toHaveBeenCalledWith(false);
+    expect(mockRequestConsent).not.toHaveBeenCalled();
+  });
+
+  it("shows the consent card when useAiConsent reports visible", () => {
+    mockAiConsentVisible = true;
+    const root = render(<SettingsScreen />);
+    expect(
+      root.find(
+        (n) =>
+          typeof n.type === "string" && n.props?.testID === "ai-consent-card",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("does not show the consent card by default", () => {
+    const root = render(<SettingsScreen />);
+    expect(
+      root.findAll(
+        (n) =>
+          typeof n.type === "string" && n.props?.testID === "ai-consent-card",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("Enable AI on the consent card calls enable(), not setAiEnabled directly", () => {
+    mockAiConsentVisible = true;
+    const root = render(<SettingsScreen />);
+
+    act(() => {
+      findPressableByLabel(root, "Enable AI").props.onPress();
+    });
+
+    expect(mockEnable).toHaveBeenCalledTimes(1);
+    expect(mockSetAiEnabled).not.toHaveBeenCalled();
+  });
+
+  it("Not now on the consent card calls dismiss()", () => {
+    mockAiConsentVisible = true;
+    const root = render(<SettingsScreen />);
+
+    act(() => {
+      findPressableByLabel(root, "Not now").props.onPress();
+    });
+
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+    expect(mockSetAiEnabled).not.toHaveBeenCalled();
   });
 
   it("does not mark AI as coming soon", () => {
