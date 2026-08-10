@@ -129,10 +129,7 @@ function findDigitKey(
   );
 }
 
-async function submitPin(
-  root: ReactTestInstance,
-  pin: string,
-): Promise<void> {
+async function submitPin(root: ReactTestInstance, pin: string): Promise<void> {
   for (const digit of pin) {
     await act(async () => {
       findDigitKey(root, digit).props.onPress();
@@ -227,7 +224,9 @@ describe("SecurityScreen", () => {
         .props.onValueChange(true);
     });
 
-    expect(root.find((n) => n.props?.testID === "security-pin-sheet")).toBeTruthy();
+    expect(
+      root.find((n) => n.props?.testID === "security-pin-sheet"),
+    ).toBeTruthy();
     expect(textOf(root)).toContain("Enter new PIN");
 
     await submitPin(root, "1234");
