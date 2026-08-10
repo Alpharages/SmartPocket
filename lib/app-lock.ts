@@ -7,7 +7,7 @@ export const BIOMETRIC_KEY = "app_lock_biometric";
 const PIN_PATTERN = /^\d{4}$/;
 
 // expo-secure-store has no web implementation — app lock is a native-only
-// feature (see docs/epics.md Epic 13). Callers gate on this before reading
+// feature (ClickUp Epic 13: App Lock). Callers gate on this before reading
 // or writing PIN state; reads resolve `null` and writes no-op on web.
 export function isAppLockSupported(): boolean {
   return Platform.OS !== "web";

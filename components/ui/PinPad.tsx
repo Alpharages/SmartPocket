@@ -1,13 +1,26 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Text, View, type StyleProp, type ViewStyle } from "react-native";
+import {
+  AccessibilityInfo,
+  Platform,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
-import { useColors } from "@/hooks/use-colors";
+import { useThemeTokens } from "@/lib/theme-provider";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 
 export type PinPadProps = {
   /** Fired with the 4-digit PIN once the 4th digit is entered. */
   onSubmit: (pin: string) => void;
+  /**
+   * Fired on every digit or backspace key press, before the press is
+   * otherwise handled — lets the caller drop a stale `error` state as soon
+   * as the user starts a new attempt.
+   */
+  onKeyPress?: () => void;
   /** Renders the dots in the error color and clears entered digits. */
   error?: boolean;
   disabled?: boolean;
@@ -53,7 +66,7 @@ function PinPadKey({
   disabled: boolean;
   onPress: (padKey: PadKey) => void;
 }) {
-  const colors = useColors();
+  const { colors } = useThemeTokens();
   const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
 
   const handlePressIn = useCallback(() => {
@@ -73,6 +86,7 @@ function PinPadKey({
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={padKey.label}
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPressIn={handlePressIn}
       onPressOut={onPressOut}
@@ -109,30 +123,58 @@ function PadKeyContent({ padKey, color }: { padKey: PadKey; color: string }) {
 
 export function PinPad({
   onSubmit,
+  onKeyPress,
   error = false,
   disabled = false,
   className,
   style,
 }: PinPadProps) {
-  const colors = useColors();
+  const { colors } = useThemeTokens();
   const [digits, setDigits] = useState<string>("");
   // Mirrors `digits` but is updated synchronously (not through React state),
   // so two presses that land before the first has re-rendered — two fingers
   // on the pad — each read the other's write instead of both computing `next`
   // from the same stale value and silently dropping a digit.
   const digitsRef = useRef<string>("");
+  // Marks that the in-flight keypress already applied its own digit update in
+  // this commit — set synchronously in `handleKeyPress`, read by the `[error]`
+  // effect below, then unconditionally cleared after every commit so a stale
+  // `true` never suppresses a later, unrelated `error` transition.
+  const keyPressCommitRef = useRef(false);
 
-  // An error (e.g. a wrong PIN reported by the caller) invalidates whatever
-  // was entered — clear so the user re-enters from a blank pad.
+  // Clear stale digits when `error` toggles from an external source — e.g.
+  // the caller flips `error` true after a rejected verify, or flips it back
+  // to false on its own. A keypress that itself triggers the false→true
+  // transition via `onKeyPress` (below) already applied its own digit
+  // synchronously in the same React commit; wiping `digits` here would
+  // destroy that keystroke, so this effect backs off when
+  // `keyPressCommitRef` shows the transition was keypress-driven.
   useEffect(() => {
-    if (error) {
-      digitsRef.current = "";
-      setDigits("");
+    if (keyPressCommitRef.current) return;
+    digitsRef.current = "";
+    setDigits("");
+  }, [error]);
+
+  // Announce rejected PINs to screen readers — the dots alone convey this by
+  // color only, which fails SC 1.4.1 for low-vision/screen-reader users.
+  useEffect(() => {
+    if (error && Platform.OS === "ios") {
+      AccessibilityInfo.announceForAccessibility(
+        "Incorrect PIN. Please try again.",
+      );
     }
   }, [error]);
 
+  // Declared last so it runs after the `[error]` effect above has had its
+  // chance to read the flag for this commit.
+  useEffect(() => {
+    keyPressCommitRef.current = false;
+  });
+
   const handleKeyPress = useCallback(
     (padKey: PadKey) => {
+      keyPressCommitRef.current = true;
+      onKeyPress?.();
       if (padKey.kind === "backspace") {
         digitsRef.current = digitsRef.current.slice(0, -1);
         setDigits(digitsRef.current);
@@ -148,14 +190,20 @@ export function PinPad({
       setDigits(digitsRef.current);
       if (next.length === PIN_LENGTH) onSubmit(next);
     },
-    [onSubmit],
+    [onKeyPress, onSubmit],
   );
+
+  const a11yLabel = error
+    ? "PIN entry: incorrect PIN, please try again"
+    : `PIN entry: ${digits.length} of ${PIN_LENGTH} digits entered`;
 
   return (
     <View className={className} style={style}>
       <View
+        accessible
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={a11yLabel}
         style={{ flexDirection: "row", justifyContent: "center", gap: 16 }}
-        accessibilityLabel={`PIN entry: ${digits.length} of ${PIN_LENGTH} digits entered`}
       >
         {Array.from({ length: PIN_LENGTH }).map((_, index) => {
           const filled = index < digits.length;
@@ -168,12 +216,16 @@ export function PinPad({
                 height: 16,
                 borderRadius: 8,
                 borderWidth: 2,
-                borderColor: error ? colors.error : colors.border,
-                backgroundColor: error
+                borderColor: error
                   ? colors.error
                   : filled
                     ? colors.primary
-                    : undefined,
+                    : colors.muted,
+                backgroundColor: filled
+                  ? error
+                    ? colors.error
+                    : colors.primary
+                  : undefined,
               }}
             />
           );

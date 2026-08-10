@@ -167,10 +167,13 @@ describe("app-lock", () => {
   });
 
   describe("write failures propagate to the caller", () => {
-    it("setPin rejects when the underlying write throws", async () => {
+    it("setPin rejects when the underlying write throws, but logs first", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       secureStore.setItemAsync.mockRejectedValue(new Error("keystore error"));
       const appLock = await import("@/lib/app-lock");
       await expect(appLock.setPin("1234")).rejects.toThrow("keystore error");
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
     });
   });
 });
