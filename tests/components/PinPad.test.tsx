@@ -256,4 +256,22 @@ describe("PinPad", () => {
   it("renders without a ThemeProvider ancestor (regression: useColors() threw outside one)", () => {
     expect(() => render(<PinPad onSubmit={() => {}} />)).not.toThrow();
   });
+
+  it("survives the keystroke that clears a stale error via onKeyPress (regression: batched host state update must not wipe the triggering digit)", () => {
+    const onSubmit = vi.fn();
+    function ErrorRecoveryHost() {
+      const [error, setError] = React.useState(true);
+      return (
+        <PinPad
+          onSubmit={onSubmit}
+          error={error}
+          onKeyPress={() => setError(false)}
+        />
+      );
+    }
+    const root = render(<ErrorRecoveryHost />);
+    pressDigits(root, "3456");
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith("3456");
+  });
 });

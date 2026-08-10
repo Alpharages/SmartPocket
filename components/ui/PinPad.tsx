@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   Platform,
@@ -131,14 +131,28 @@ export function PinPad({
 }: PinPadProps) {
   const { colors } = useThemeTokens();
   const [digits, setDigits] = useState<string>("");
+  // Marks that the in-flight keypress already applied its own `setDigits`
+  // update in this commit — set synchronously in `handleKeyPress`, read by
+  // the `[error]` effect below, then unconditionally cleared after every
+  // commit so a stale `true` never suppresses a later, unrelated `error`
+  // transition (see the two effects below).
+  const keyPressCommitRef = useRef(false);
 
-  // Clear on BOTH edges of `error` — the rising edge invalidates whatever was
-  // entered when the wrong PIN was reported; the falling edge drops any
-  // digits typed while the error was still showing (they were entered before
-  // the caller acknowledged the error and are not a real new attempt).
+  // Clear stale digits when `error` toggles from an external source — e.g.
+  // the caller flips `error` true after a rejected verify, or flips it back
+  // to false on its own. A keypress that itself triggers the false→true
+  // transition via `onKeyPress` (below) already applied its own digit
+  // synchronously in the same React commit; wiping `digits` here would
+  // destroy that keystroke, so this effect backs off when
+  // `keyPressCommitRef` shows the transition was keypress-driven.
   useEffect(() => {
+    if (keyPressCommitRef.current) return;
     setDigits("");
   }, [error]);
+
+  useEffect(() => {
+    keyPressCommitRef.current = false;
+  });
 
   useEffect(() => {
     if (digits.length !== PIN_LENGTH) return;
@@ -158,6 +172,7 @@ export function PinPad({
 
   const handleKeyPress = useCallback(
     (padKey: PadKey) => {
+      keyPressCommitRef.current = true;
       onKeyPress?.();
       if (padKey.kind === "backspace") {
         setDigits((prev) => prev.slice(0, -1));
