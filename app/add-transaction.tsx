@@ -6,7 +6,9 @@ import React, {
   useState,
 } from "react";
 import {
+  AccessibilityInfo,
   Keyboard,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -70,6 +72,8 @@ export default function AddTransactionScreen() {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<number | null>(null);
   // SP-010: cards could be created but never attached to a transaction, so the
   // whole Cards module produced no data.
@@ -85,6 +89,12 @@ export default function AddTransactionScreen() {
   // drive it from local state.
   const [visible, setVisible] = useState(true);
   const closingRef = useRef(false);
+  // A `saving` useState guard alone can't stop a rapid double-press: two
+  // onPress calls in the same event tick both read the pre-render `saving`
+  // value before React applies the update. `savingRef` is set synchronously
+  // so the second call sees it immediately; `saving` state still drives the
+  // Button's disabled/loading UI.
+  const savingRef = useRef(false);
 
   const goBack = useCallback(() => router.back(), [router]);
 
@@ -120,16 +130,21 @@ export default function AddTransactionScreen() {
   }, [visible, reducedMotion, goBack]);
 
   const handleSave = async () => {
+    if (savingRef.current) return;
+    setCategoryError(selectedCategory == null ? "Select a category" : null);
     if (!isFormValid || !selectedCategory || !parsedDate) {
       toast.show({
         type: "error",
-        message: amountError ?? "Please fill in all required fields",
+        message:
+          amountError ?? dateError ?? "Please fill in all required fields",
       });
       return;
     }
     // SP-046: the success toast fired before the mutation resolved and a
     // failure rejected unhandled out of onPress. Every other save handler in
     // the app already wraps this.
+    savingRef.current = true;
+    setSaving(true);
     try {
       await addTransaction({
         categoryId: selectedCategory,
@@ -144,10 +159,22 @@ export default function AddTransactionScreen() {
       // expense-context rolled back and showed the error toast; keep the sheet
       // open so the entry is not lost.
       return;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
     toast.show({ type: "success", message: "Transaction saved" });
     close();
   };
+
+  // AC4: a screen-reader user pressing Save with no category must hear why —
+  // accessibilityLiveRegion covers Android; iOS needs an explicit announcement
+  // (same pattern as Toast.tsx).
+  useEffect(() => {
+    if (categoryError && Platform.OS === "ios") {
+      AccessibilityInfo.announceForAccessibility(categoryError);
+    }
+  }, [categoryError]);
 
   const filteredCategories = categories.filter((c) => c.type === type);
   const activeCards = useMemo(
@@ -214,6 +241,7 @@ export default function AddTransactionScreen() {
               onPress={() => {
                 setType("expense");
                 setSelectedCategory(null);
+                setCategoryError(null);
               }}
               leftIcon={
                 <Ionicons
@@ -230,6 +258,7 @@ export default function AddTransactionScreen() {
               onPress={() => {
                 setType("income");
                 setSelectedCategory(null);
+                setCategoryError(null);
               }}
               leftIcon={
                 <Ionicons
@@ -302,13 +331,16 @@ export default function AddTransactionScreen() {
             className="text-muted font-semibold mb-xs"
             style={{ fontSize: Typography.label.fontSize }}
           >
-            Category
+            Category (Required)
           </Text>
           {pickerCategories.length > 0 ? (
             <CategoryPickerGrid
               categories={pickerCategories}
               selectedId={selectedCategory}
-              onSelect={(id) => setSelectedCategory(id)}
+              onSelect={(id) => {
+                setSelectedCategory(id);
+                setCategoryError(null);
+              }}
               transactions={transactions}
               recentLimit={5}
             />
@@ -321,6 +353,20 @@ export default function AddTransactionScreen() {
               description="Add categories in the Categories tab."
             />
           )}
+          {categoryError ? (
+            <Text
+              accessible
+              accessibilityLiveRegion="polite"
+              className="mt-xs"
+              style={{
+                color: colors.error,
+                fontSize: Typography.caption.fontSize,
+              }}
+              testID="add-transaction-category-error"
+            >
+              {categoryError}
+            </Text>
+          ) : null}
         </View>
 
         {/* Account — only shown when the user has accounts to choose from. */}
@@ -512,7 +558,8 @@ export default function AddTransactionScreen() {
           variant="primary"
           label="Save"
           onPress={handleSave}
-          disabled={!isFormValid}
+          disabled={saving}
+          loading={saving}
           className="flex-1"
           size="lg"
         />

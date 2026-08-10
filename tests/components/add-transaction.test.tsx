@@ -374,16 +374,16 @@ describe("AddTransactionScreen", () => {
       expect(foodChip).toBeNull();
     });
 
-    it("Save is disabled when amount is empty", () => {
+    it("Save is pressable when amount is empty (SP-86eyepuwp: the guard, not a disabled button, reports why)", () => {
       const root = render(<AddTransactionScreen />);
       const saveBtn = findAllByRole(root, "button").find(
         (b) => collectText(b) === "Save",
       );
       expect(saveBtn).toBeTruthy();
-      expect(saveBtn!.props.accessibilityState?.disabled).toBe(true);
+      expect(saveBtn!.props.accessibilityState?.disabled).toBe(false);
     });
 
-    it("Save is disabled when no category is selected", () => {
+    it("Save is pressable when no category is selected (SP-86eyepuwp)", () => {
       const root = render(<AddTransactionScreen />);
       // Fill amount but no category
       const amountInput = root.findAllByType("TextInput" as any)[0];
@@ -393,7 +393,7 @@ describe("AddTransactionScreen", () => {
       const saveBtn = findAllByRole(root, "button").find(
         (b) => collectText(b) === "Save",
       );
-      expect(saveBtn!.props.accessibilityState?.disabled).toBe(true);
+      expect(saveBtn!.props.accessibilityState?.disabled).toBe(false);
     });
 
     it("calls addTransaction with correct payload and closes on save", async () => {
@@ -544,6 +544,201 @@ describe("AddTransactionScreen", () => {
       expect(mockAddTransaction.mock.calls[0][0].description).toBe(
         "Lunch at work",
       );
+    });
+  });
+
+  describe("SP-86eyepuwp — Category is a visibly required field", () => {
+    it("AC1: Category label is marked required, matching the (Optional) siblings' style", () => {
+      const root = render(<AddTransactionScreen />);
+      expect(findByText(root, "Category (Required)")).toBeTruthy();
+      expect(findByText(root, "Account (Optional)")).toBeTruthy();
+      expect(findByText(root, "Note (Optional)")).toBeTruthy();
+    });
+
+    it("AC2 + AC6: pressing Save with a valid amount/date but no category shows an inline error and does not call addTransaction", async () => {
+      const root = render(<AddTransactionScreen />);
+      const amountInput = root.findAllByType("TextInput" as any)[0];
+      act(() => {
+        amountInput.props.onChangeText("25.50");
+      });
+
+      const saveBtn = findAllByRole(root, "button").find(
+        (b) => collectText(b) === "Save",
+      );
+      await act(async () => {
+        saveBtn!.props.onPress();
+      });
+
+      const categoryError = root.findAll(
+        (n) => (n.props as any).testID === "add-transaction-category-error",
+      );
+      expect(categoryError.length).toBeGreaterThanOrEqual(1);
+      expect(collectText(categoryError[0])).toBe("Select a category");
+      expect(mockAddTransaction).not.toHaveBeenCalled();
+    });
+
+    it("AC2: the form retains previously entered values after the category error surfaces", async () => {
+      const root = render(<AddTransactionScreen />);
+      const amountInput = root.findAllByType("TextInput" as any)[0];
+      act(() => {
+        amountInput.props.onChangeText("25.50");
+      });
+
+      const saveBtn = findAllByRole(root, "button").find(
+        (b) => collectText(b) === "Save",
+      );
+      await act(async () => {
+        saveBtn!.props.onPress();
+      });
+
+      expect(amountInput.props.value).toBe("25.50");
+    });
+
+    it("AC3: selecting a category clears the inline error and a subsequent Save persists the transaction", async () => {
+      mockAddTransaction.mockResolvedValue(undefined);
+      vi.useFakeTimers();
+
+      const root = render(<AddTransactionScreen />);
+      const amountInput = root.findAllByType("TextInput" as any)[0];
+      act(() => {
+        amountInput.props.onChangeText("25.50");
+      });
+
+      const saveBtn = findAllByRole(root, "button").find(
+        (b) => collectText(b) === "Save",
+      );
+      await act(async () => {
+        saveBtn!.props.onPress();
+      });
+      expect(
+        root.findAll(
+          (n) => (n.props as any).testID === "add-transaction-category-error",
+        ).length,
+      ).toBeGreaterThanOrEqual(1);
+
+      const foodChip = findAllByRole(root, "radio").find((b) =>
+        ((b.props as any).accessibilityLabel ?? "").startsWith("Food"),
+      );
+      act(() => {
+        foodChip!.props.onPress();
+      });
+
+      expect(
+        root.findAll(
+          (n) => (n.props as any).testID === "add-transaction-category-error",
+        ).length,
+      ).toBe(0);
+
+      await act(async () => {
+        saveBtn!.props.onPress();
+      });
+      expect(mockAddTransaction).toHaveBeenCalledOnce();
+      expect(mockToastShow).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "success" }),
+      );
+    });
+
+    it("AC4: the category error is announced via accessibilityLiveRegion=polite", async () => {
+      const root = render(<AddTransactionScreen />);
+      const amountInput = root.findAllByType("TextInput" as any)[0];
+      act(() => {
+        amountInput.props.onChangeText("25.50");
+      });
+
+      const saveBtn = findAllByRole(root, "button").find(
+        (b) => collectText(b) === "Save",
+      );
+      await act(async () => {
+        saveBtn!.props.onPress();
+      });
+
+      const categoryError = root.findAll(
+        (n) => (n.props as any).testID === "add-transaction-category-error",
+      )[0];
+      expect(categoryError.props.accessibilityLiveRegion).toBe("polite");
+    });
+
+    it("AC5: amount 0 still blocks save with the SP-041 inline error, even with a category selected", async () => {
+      const root = render(<AddTransactionScreen />);
+      const amountInput = root.findAllByType("TextInput" as any)[0];
+      act(() => {
+        amountInput.props.onChangeText("0");
+      });
+
+      const foodChip = findAllByRole(root, "radio").find((b) =>
+        ((b.props as any).accessibilityLabel ?? "").startsWith("Food"),
+      );
+      act(() => {
+        foodChip!.props.onPress();
+      });
+
+      const saveBtn = findAllByRole(root, "button").find(
+        (b) => collectText(b) === "Save",
+      );
+      await act(async () => {
+        saveBtn!.props.onPress();
+      });
+
+      expect(findByText(root, "Amount must be greater than zero")).toBeTruthy();
+      expect(mockAddTransaction).not.toHaveBeenCalled();
+    });
+
+    it("shows the category error under the EmptyState when the selected type has no categories", async () => {
+      (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
+        categories: [],
+        accounts: mockAccounts,
+        creditCards: [],
+        transactions: [],
+        addTransaction: mockAddTransaction,
+      });
+      const root = render(<AddTransactionScreen />);
+      const amountInput = root.findAllByType("TextInput" as any)[0];
+      act(() => {
+        amountInput.props.onChangeText("25.50");
+      });
+
+      const saveBtn = findAllByRole(root, "button").find(
+        (b) => collectText(b) === "Save",
+      );
+      await act(async () => {
+        saveBtn!.props.onPress();
+      });
+
+      expect(
+        root.findAll(
+          (n) => (n.props as any).testID === "add-transaction-category-error",
+        ).length,
+      ).toBeGreaterThanOrEqual(1);
+    });
+
+    it("rapid double-press of Save calls addTransaction only once", async () => {
+      mockAddTransaction.mockResolvedValue(undefined);
+      vi.useFakeTimers();
+
+      const root = render(<AddTransactionScreen />);
+      const amountInput = root.findAllByType("TextInput" as any)[0];
+      act(() => {
+        amountInput.props.onChangeText("25.50");
+      });
+
+      const foodChip = findAllByRole(root, "radio").find((b) =>
+        ((b.props as any).accessibilityLabel ?? "").startsWith("Food"),
+      );
+      act(() => {
+        foodChip!.props.onPress();
+      });
+
+      const saveBtn = findAllByRole(root, "button").find(
+        (b) => collectText(b) === "Save",
+      );
+      await act(async () => {
+        // Two synchronous presses in the same tick, simulating a rapid
+        // double-tap before React re-renders the `saving` state.
+        saveBtn!.props.onPress();
+        saveBtn!.props.onPress();
+      });
+
+      expect(mockAddTransaction).toHaveBeenCalledOnce();
     });
   });
 

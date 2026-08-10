@@ -697,6 +697,44 @@ describe("TransactionsScreen", () => {
       );
     });
 
+    it("confirmation message names the transaction's description, not its category (AC-1, AC-8)", async () => {
+      (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
+        transactions: [
+          makeTransaction({ id: 42, categoryId: 2, description: "Snacks" }),
+        ],
+        categories: mockCategories,
+        loadingTransactions: false,
+        deleteTransaction: mockDeleteTransaction,
+      });
+      const root = render(<TransactionsScreen />);
+      const deleteBtn = root.find(
+        (n) =>
+          (n.props as any).accessibilityLabel === "Delete Snacks" &&
+          (n.props as any).accessibilityRole === "button",
+      );
+      await act(async () => {
+        deleteBtn.props.onPress();
+      });
+      expect(mockConfirmDestructive.mock.calls[0][0].message).toBe(
+        'Delete "Snacks"? This cannot be undone.',
+      );
+    });
+
+    it("confirmation message falls back to the category when there is no description (AC-3)", async () => {
+      const root = render(<TransactionsScreen />);
+      const deleteBtn = root.find(
+        (n) =>
+          (n.props as any).accessibilityLabel === "Delete Food" &&
+          (n.props as any).accessibilityRole === "button",
+      );
+      await act(async () => {
+        deleteBtn.props.onPress();
+      });
+      expect(mockConfirmDestructive.mock.calls[0][0].message).toBe(
+        'Delete "Food"? This cannot be undone.',
+      );
+    });
+
     it("confirming delete calls deleteTransaction with the transaction id", async () => {
       mockConfirmDestructive.mockResolvedValue(true);
       const root = render(<TransactionsScreen />);

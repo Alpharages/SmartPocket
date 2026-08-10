@@ -40,6 +40,7 @@ import {
 import { useFirstDayOfWeek } from "@/lib/first-day-of-week-provider";
 import { useSettings } from "@/lib/settings-provider";
 import { shareFile } from "@/lib/share-file";
+import { isAppLockSupported } from "@/lib/app-lock";
 import {
   THEME_PREFERENCE_OPTIONS,
   type ThemePreference,
@@ -671,6 +672,17 @@ export default function SettingsScreen() {
             accessibilityLabel="Recurring transactions"
           />
         </SettingsSectionGroup>
+
+        {isAppLockSupported() ? (
+          <SettingsSectionGroup title="Security">
+            <SettingsRow
+              icon="lock-closed-outline"
+              label="App Lock"
+              onPress={() => router.push("/security")}
+              accessibilityLabel="App Lock"
+            />
+          </SettingsSectionGroup>
+        ) : null}
 
         <SettingsSectionGroup title="Data Management">
           <SettingsRow
