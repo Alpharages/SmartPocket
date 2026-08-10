@@ -411,6 +411,7 @@ describe("SecurityScreen", () => {
     appLock.isPinSet.mockResolvedValue(false);
 
     await submitPin(root, "1234");
+    await flushMicrotasks();
 
     expect(toast.show).toHaveBeenCalledWith(
       expect.objectContaining({ type: "error" }),
@@ -421,6 +422,15 @@ describe("SecurityScreen", () => {
         n.props?.accessibilityLabel === "App Lock",
     );
     expect(toggle.props.value).toBe(false);
+    // N7: the sheet must not strand the user on "Enter current PIN to turn
+    // off App Lock" for a lock that has already been resynced to off.
+    expect(
+      root.findAll(
+        (n) =>
+          typeof n.type === "string" &&
+          n.props?.testID === "security-pin-sheet",
+      ),
+    ).toHaveLength(0);
   });
 
   it("surfaces an error toast when setPin rejects instead of leaving the sheet stuck", async () => {
@@ -441,10 +451,19 @@ describe("SecurityScreen", () => {
     appLock.setPin.mockRejectedValue(new Error("keychain error"));
     appLock.isPinSet.mockResolvedValue(false);
     await submitPin(root, "1234");
+    await flushMicrotasks();
 
     expect(toast.show).toHaveBeenCalledWith(
       expect.objectContaining({ type: "error" }),
     );
+    // N7: a failed write must not leave the sheet open on a stale step.
+    expect(
+      root.findAll(
+        (n) =>
+          typeof n.type === "string" &&
+          n.props?.testID === "security-pin-sheet",
+      ),
+    ).toHaveLength(0);
   });
 
   it("shows a verification error (not 'Incorrect PIN') when verifyPin cannot determine a result", async () => {

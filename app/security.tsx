@@ -49,7 +49,11 @@ function stepTitle(step: Step): string {
 export default function SecurityScreen() {
   const router = useRouter();
   const colors = useColors();
-  const toast = useToast();
+  // Destructured so effect/callback deps track the stable `show` reference,
+  // not the `useToast()` context object — `ToastProvider` used to hand back
+  // a fresh object on every render, which turned a `toast` dependency into
+  // an infinite read/toast loop on a failing status read (round-2 review, B4).
+  const { show: showToast } = useToast();
   const supported = isAppLockSupported();
 
   const [loading, setLoading] = useState(true);
@@ -78,9 +82,9 @@ export default function SecurityScreen() {
         // above) — and the screen must not report the lock as off.
         if (current === null) {
           setLoadError(true);
-          toast.show({
+          showToast({
             type: "error",
-            message: "Couldn't read App Lock status. Pull down to retry.",
+            message: "Couldn't read App Lock status. Tap Retry to try again.",
           });
         } else {
           setPinSetState(current);
@@ -90,9 +94,9 @@ export default function SecurityScreen() {
         if (cancelled) return;
         console.error("[Security] Failed to read App Lock status:", err);
         setLoadError(true);
-        toast.show({
+        showToast({
           type: "error",
-          message: "Couldn't read App Lock status. Pull down to retry.",
+          message: "Couldn't read App Lock status. Tap Retry to try again.",
         });
       })
       .finally(() => {
@@ -101,7 +105,7 @@ export default function SecurityScreen() {
     return () => {
       cancelled = true;
     };
-  }, [supported, reloadToken, toast]);
+  }, [supported, reloadToken, showToast]);
 
   const closeStep = useCallback(() => {
     setStep("closed");
@@ -188,14 +192,20 @@ export default function SecurityScreen() {
         }
       } catch (err) {
         console.error("[Security] Failed to update App Lock:", err);
-        toast.show({
+        showToast({
           type: "error",
           message: "Something went wrong. Please try again.",
         });
         await resyncPinState();
+        // Reconcile the step machine alongside the data: without this the
+        // sheet stays open on "Enter current PIN to turn off App Lock" even
+        // after a failed clearAppLock() has already deleted the PIN key —
+        // re-entering it then reports "Incorrect PIN" for a lock that reads
+        // as off (round-2 review, N7).
+        closeStep();
       }
     },
-    [step, pendingPin, closeStep, flashError, toast, resyncPinState],
+    [step, pendingPin, closeStep, flashError, showToast, resyncPinState],
   );
 
   if (!supported) {

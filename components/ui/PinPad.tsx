@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { useColors } from "@/hooks/use-colors";
@@ -116,29 +116,39 @@ export function PinPad({
 }: PinPadProps) {
   const colors = useColors();
   const [digits, setDigits] = useState<string>("");
+  // Mirrors `digits` but is updated synchronously (not through React state),
+  // so two presses that land before the first has re-rendered — two fingers
+  // on the pad — each read the other's write instead of both computing `next`
+  // from the same stale value and silently dropping a digit.
+  const digitsRef = useRef<string>("");
 
   // An error (e.g. a wrong PIN reported by the caller) invalidates whatever
   // was entered — clear so the user re-enters from a blank pad.
   useEffect(() => {
-    if (error) setDigits("");
+    if (error) {
+      digitsRef.current = "";
+      setDigits("");
+    }
   }, [error]);
 
   const handleKeyPress = useCallback(
     (padKey: PadKey) => {
       if (padKey.kind === "backspace") {
-        setDigits((prev) => prev.slice(0, -1));
+        digitsRef.current = digitsRef.current.slice(0, -1);
+        setDigits(digitsRef.current);
         return;
       }
 
-      if (digits.length >= PIN_LENGTH) return;
-      // `onSubmit` fires from the handler body, not from inside the
-      // `setDigits` updater — updaters must stay pure, and React may invoke
-      // them more than once (e.g. StrictMode), which would double-fire submit.
-      const next = digits + padKey.label;
-      setDigits(next.length === PIN_LENGTH ? "" : next);
+      if (digitsRef.current.length >= PIN_LENGTH) return;
+      // `onSubmit` fires from the handler body, not from inside a `setDigits`
+      // updater — updaters must stay pure, and React may invoke them more
+      // than once (e.g. StrictMode), which would double-fire submit.
+      const next = digitsRef.current + padKey.label;
+      digitsRef.current = next.length === PIN_LENGTH ? "" : next;
+      setDigits(digitsRef.current);
       if (next.length === PIN_LENGTH) onSubmit(next);
     },
-    [digits, onSubmit],
+    [onSubmit],
   );
 
   return (

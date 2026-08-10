@@ -173,6 +173,21 @@ describe("PinPad", () => {
     }
   });
 
+  it("does not drop a digit when two presses land in the same event-loop tick (two fingers on the pad)", () => {
+    // Regression test: computing `next` from the `digits` state closure
+    // (rather than a synchronously-updated ref) means two presses batched
+    // together both read the same pre-batch value and the second overwrites
+    // the first, silently dropping a digit.
+    const onSubmit = vi.fn();
+    const root = render(<PinPad onSubmit={onSubmit} />);
+    act(() => {
+      findKey(root, "1").props.onPress();
+      findKey(root, "2").props.onPress();
+    });
+    pressDigits(root, "34");
+    expect(onSubmit).toHaveBeenCalledWith("1234");
+  });
+
   it("does not trigger a React render-phase setState warning when the caller's onSubmit updates its own state", () => {
     // Regression test: `onSubmit` must fire from the event-handler body, not
     // from inside the `setDigits` updater. When a caller's `onSubmit` sets its
