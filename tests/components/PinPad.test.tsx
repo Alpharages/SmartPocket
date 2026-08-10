@@ -5,7 +5,7 @@ import TestRenderer, {
   type ReactTestInstance,
   type ReactTestRenderer,
 } from "react-test-renderer";
-import { StyleSheet } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { PinPad } from "@/components/ui/PinPad";
 
@@ -171,6 +171,32 @@ describe("PinPad", () => {
       const style = StyleSheet.flatten(dot.props.style);
       expect(style.borderColor ?? style.backgroundColor).toBe(mockColors.error);
     }
+  });
+
+  it("does not trigger a React render-phase setState warning when the caller's onSubmit updates its own state", () => {
+    // Regression test: `onSubmit` must fire from the event-handler body, not
+    // from inside the `setDigits` updater. When a caller's `onSubmit` sets its
+    // own state (the real-world case — see SecurityScreen.handleSubmitPin),
+    // firing it from inside PinPad's updater makes React log "Cannot update a
+    // component while rendering a different component".
+    function Harness() {
+      const [count, setCount] = React.useState(0);
+      return (
+        <View>
+          <Text>{count}</Text>
+          <PinPad onSubmit={() => setCount((c) => c + 1)} />
+        </View>
+      );
+    }
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const root = render(<Harness />);
+    pressDigits(root, "1234");
+    const renderPhaseWarnings = errorSpy.mock.calls.filter((call) =>
+      String(call[0]).includes("Cannot update a component"),
+    );
+    expect(renderPhaseWarnings).toHaveLength(0);
+    errorSpy.mockRestore();
   });
 
   it("clears entered digits when error becomes true", () => {

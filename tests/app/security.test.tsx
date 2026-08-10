@@ -20,6 +20,12 @@ const appLock = vi.hoisted(() => ({
 
 vi.mock("@/lib/app-lock", () => appLock);
 
+const toast = vi.hoisted(() => ({ show: vi.fn() }));
+
+vi.mock("@/components/ui/ToastProvider", () => ({
+  useToast: () => toast,
+}));
+
 vi.mock("expo-router", () => ({
   useRouter: () => ({ back: mockBack, push: vi.fn() }),
 }));
@@ -146,6 +152,7 @@ beforeEach(() => {
   appLock.setPin.mockReset().mockResolvedValue(undefined);
   appLock.verifyPin.mockReset().mockResolvedValue(true);
   appLock.clearAppLock.mockReset().mockResolvedValue(undefined);
+  toast.show.mockReset();
 });
 
 afterEach(() => {
@@ -346,5 +353,113 @@ describe("SecurityScreen", () => {
 
     expect(appLock.clearAppLock).not.toHaveBeenCalled();
     expect(textOf(root)).toContain("Incorrect PIN");
+  });
+
+  it("shows a recoverable error state (not an infinite spinner) when the status read fails, and recovers on retry", async () => {
+    appLock.isPinSet.mockResolvedValue(null);
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    expect(textOf(root)).toContain("Couldn't read App Lock status.");
+    expect(
+      root.findAll(
+        (n) =>
+          String(n.type) === "Switch" &&
+          n.props?.accessibilityLabel === "App Lock",
+      ),
+    ).toHaveLength(0);
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
+    );
+
+    appLock.isPinSet.mockResolvedValue(true);
+    act(() => {
+      findPressableByLabel(
+        root,
+        "Retry loading App Lock status",
+      ).props.onPress();
+    });
+    await flushMicrotasks();
+
+    const toggle = root.find(
+      (n) =>
+        String(n.type) === "Switch" &&
+        n.props?.accessibilityLabel === "App Lock",
+    );
+    expect(toggle.props.value).toBe(true);
+  });
+
+  it("surfaces an error toast and does not desync state when clearAppLock rejects mid-disable", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(false);
+    });
+
+    appLock.verifyPin.mockResolvedValue(true);
+    appLock.clearAppLock.mockRejectedValue(new Error("keychain error"));
+    // clearAppLock rejected, but the PIN key may already be gone on disk —
+    // isPinSet is re-read to resync the toggle with ground truth.
+    appLock.isPinSet.mockResolvedValue(false);
+
+    await submitPin(root, "1234");
+
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
+    );
+    const toggle = root.find(
+      (n) =>
+        String(n.type) === "Switch" &&
+        n.props?.accessibilityLabel === "App Lock",
+    );
+    expect(toggle.props.value).toBe(false);
+  });
+
+  it("surfaces an error toast when setPin rejects instead of leaving the sheet stuck", async () => {
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    appLock.setPin.mockRejectedValue(new Error("keychain error"));
+    appLock.isPinSet.mockResolvedValue(false);
+    await submitPin(root, "1234");
+
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
+    );
+  });
+
+  it("shows a verification error (not 'Incorrect PIN') when verifyPin cannot determine a result", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      findPressableByLabel(root, "Change PIN").props.onPress();
+    });
+
+    appLock.verifyPin.mockResolvedValue(null);
+    await submitPin(root, "1234");
+
+    expect(textOf(root)).toContain("Couldn't verify your PIN");
+    expect(textOf(root)).not.toContain("Incorrect PIN");
   });
 });

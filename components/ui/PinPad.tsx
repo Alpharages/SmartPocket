@@ -130,17 +130,15 @@ export function PinPad({
         return;
       }
 
-      setDigits((prev) => {
-        if (prev.length >= PIN_LENGTH) return prev;
-        const next = prev + padKey.label;
-        if (next.length === PIN_LENGTH) {
-          onSubmit(next);
-          return "";
-        }
-        return next;
-      });
+      if (digits.length >= PIN_LENGTH) return;
+      // `onSubmit` fires from the handler body, not from inside the
+      // `setDigits` updater — updaters must stay pure, and React may invoke
+      // them more than once (e.g. StrictMode), which would double-fire submit.
+      const next = digits + padKey.label;
+      setDigits(next.length === PIN_LENGTH ? "" : next);
+      if (next.length === PIN_LENGTH) onSubmit(next);
     },
-    [onSubmit],
+    [digits, onSubmit],
   );
 
   return (

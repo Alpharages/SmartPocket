@@ -124,5 +124,53 @@ describe("app-lock", () => {
       await appLock.clearAppLock();
       expect(secureStore.deleteItemAsync).not.toHaveBeenCalled();
     });
+
+    it("still attempts the biometric-key deletion when the PIN-key deletion rejects, then rejects", async () => {
+      const appLock = await import("@/lib/app-lock");
+      secureStore.deleteItemAsync.mockImplementation((key: string) =>
+        key === appLock.PIN_KEY
+          ? Promise.reject(new Error("pin delete failed"))
+          : Promise.resolve(),
+      );
+      await expect(appLock.clearAppLock()).rejects.toThrow("pin delete failed");
+      expect(secureStore.deleteItemAsync).toHaveBeenCalledWith(
+        appLock.BIOMETRIC_KEY,
+      );
+    });
+
+    it("still attempts the PIN-key deletion when the biometric-key deletion rejects, then rejects", async () => {
+      const appLock = await import("@/lib/app-lock");
+      secureStore.deleteItemAsync.mockImplementation((key: string) =>
+        key === appLock.BIOMETRIC_KEY
+          ? Promise.reject(new Error("biometric delete failed"))
+          : Promise.resolve(),
+      );
+      await expect(appLock.clearAppLock()).rejects.toThrow(
+        "biometric delete failed",
+      );
+      expect(secureStore.deleteItemAsync).toHaveBeenCalledWith(appLock.PIN_KEY);
+    });
+  });
+
+  describe("read failures degrade to null instead of rejecting", () => {
+    it("isPinSet resolves null (not a rejection) when the underlying read throws", async () => {
+      secureStore.getItemAsync.mockRejectedValue(new Error("keystore error"));
+      const appLock = await import("@/lib/app-lock");
+      await expect(appLock.isPinSet()).resolves.toBeNull();
+    });
+
+    it("verifyPin resolves null (not a rejection) when the underlying read throws", async () => {
+      secureStore.getItemAsync.mockRejectedValue(new Error("keystore error"));
+      const appLock = await import("@/lib/app-lock");
+      await expect(appLock.verifyPin("1234")).resolves.toBeNull();
+    });
+  });
+
+  describe("write failures propagate to the caller", () => {
+    it("setPin rejects when the underlying write throws", async () => {
+      secureStore.setItemAsync.mockRejectedValue(new Error("keystore error"));
+      const appLock = await import("@/lib/app-lock");
+      await expect(appLock.setPin("1234")).rejects.toThrow("keystore error");
+    });
   });
 });

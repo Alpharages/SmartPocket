@@ -9,6 +9,7 @@ import { PinPad } from "@/components/ui/PinPad";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { Sheet } from "@/components/ui/Sheet";
 import { SettingsRow } from "@/components/ui/SettingsRow";
+import { useToast } from "@/components/ui/ToastProvider";
 import { useColors } from "@/hooks/use-colors";
 import {
   clearAppLock,
@@ -48,14 +49,17 @@ function stepTitle(step: Step): string {
 export default function SecurityScreen() {
   const router = useRouter();
   const colors = useColors();
+  const toast = useToast();
   const supported = isAppLockSupported();
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [pinSet, setPinSetState] = useState(false);
   const [step, setStep] = useState<Step>("closed");
   const [pendingPin, setPendingPin] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     if (!supported) {
@@ -63,15 +67,41 @@ export default function SecurityScreen() {
       return;
     }
     let cancelled = false;
-    void isPinSet().then((current) => {
-      if (cancelled) return;
-      setPinSetState(current === true);
-      setLoading(false);
-    });
+    setLoading(true);
+    setLoadError(false);
+    isPinSet()
+      .then((current) => {
+        if (cancelled) return;
+        // `isPinSet` degrades a storage read failure to `null` (see
+        // lib/app-lock.ts) rather than rejecting, so `null` here means the
+        // read genuinely failed — not "unsupported" (that path returns early
+        // above) — and the screen must not report the lock as off.
+        if (current === null) {
+          setLoadError(true);
+          toast.show({
+            type: "error",
+            message: "Couldn't read App Lock status. Pull down to retry.",
+          });
+        } else {
+          setPinSetState(current);
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        console.error("[Security] Failed to read App Lock status:", err);
+        setLoadError(true);
+        toast.show({
+          type: "error",
+          message: "Couldn't read App Lock status. Pull down to retry.",
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, [supported]);
+  }, [supported, reloadToken, toast]);
 
   const closeStep = useCallback(() => {
     setStep("closed");
@@ -96,49 +126,76 @@ export default function SecurityScreen() {
     setStep("verify-change");
   }, []);
 
+  // Re-reads storage after a write/verify failure so the rendered toggle and
+  // rows always match what's actually on disk — never trust optimistic state
+  // once a `setPin`/`clearAppLock` call has rejected (see B3 review finding).
+  const resyncPinState = useCallback(async () => {
+    const current = await isPinSet();
+    if (current !== null) setPinSetState(current);
+  }, []);
+
   const handleSubmitPin = useCallback(
     async (pin: string) => {
-      if (step === "verify-disable") {
-        if (await verifyPin(pin)) {
-          await clearAppLock();
-          setPinSetState(false);
-          closeStep();
-        } else {
-          flashError("Incorrect PIN. Try again.");
+      try {
+        if (step === "verify-disable") {
+          const verified = await verifyPin(pin);
+          if (verified === null) {
+            flashError("Couldn't verify your PIN. Try again.");
+            return;
+          }
+          if (verified) {
+            await clearAppLock();
+            setPinSetState(false);
+            closeStep();
+          } else {
+            flashError("Incorrect PIN. Try again.");
+          }
+          return;
         }
-        return;
-      }
 
-      if (step === "verify-change") {
-        if (await verifyPin(pin)) {
+        if (step === "verify-change") {
+          const verified = await verifyPin(pin);
+          if (verified === null) {
+            flashError("Couldn't verify your PIN. Try again.");
+            return;
+          }
+          if (verified) {
+            setErrorMessage("");
+            setStep("enter-new");
+          } else {
+            flashError("Incorrect PIN. Try again.");
+          }
+          return;
+        }
+
+        if (step === "enter-new") {
+          setPendingPin(pin);
           setErrorMessage("");
-          setStep("enter-new");
-        } else {
-          flashError("Incorrect PIN. Try again.");
+          setStep("confirm-new");
+          return;
         }
-        return;
-      }
 
-      if (step === "enter-new") {
-        setPendingPin(pin);
-        setErrorMessage("");
-        setStep("confirm-new");
-        return;
-      }
-
-      if (step === "confirm-new") {
-        if (pendingPin !== null && pin === pendingPin) {
-          await setPin(pin);
-          setPinSetState(true);
-          closeStep();
-        } else {
-          // AC: a mismatch restarts the confirm step (re-enter the
-          // confirmation), not the whole new-PIN entry — pendingPin stays.
-          flashError("PINs didn't match. Try again.");
+        if (step === "confirm-new") {
+          if (pendingPin !== null && pin === pendingPin) {
+            await setPin(pin);
+            setPinSetState(true);
+            closeStep();
+          } else {
+            // AC: a mismatch restarts the confirm step (re-enter the
+            // confirmation), not the whole new-PIN entry — pendingPin stays.
+            flashError("PINs didn't match. Try again.");
+          }
         }
+      } catch (err) {
+        console.error("[Security] Failed to update App Lock:", err);
+        toast.show({
+          type: "error",
+          message: "Something went wrong. Please try again.",
+        });
+        await resyncPinState();
       }
     },
-    [step, pendingPin, closeStep, flashError],
+    [step, pendingPin, closeStep, flashError, toast, resyncPinState],
   );
 
   if (!supported) {
@@ -195,6 +252,19 @@ export default function SecurityScreen() {
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : loadError ? (
+        <View className="flex-1 items-center justify-center px-lg">
+          <Text className="text-body text-muted text-center">
+            Couldn&apos;t read App Lock status.
+          </Text>
+          <Button
+            className="mt-md"
+            variant="secondary"
+            label="Retry"
+            accessibilityLabel="Retry loading App Lock status"
+            onPress={() => setReloadToken((n) => n + 1)}
+          />
         </View>
       ) : (
         <View
