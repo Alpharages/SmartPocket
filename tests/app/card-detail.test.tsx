@@ -229,3 +229,107 @@ describe("CardDetailScreen", () => {
     expect(masked).toBeDefined();
   });
 });
+
+describe("CardDetailScreen utilisation label", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function renderWithUtilisation(
+    creditLimit: string,
+    transactionAmount: string | null,
+  ): ReactTestInstance {
+    vi.mocked(useExpense).mockReturnValue({
+      creditCards: [{ ...mockCard, creditLimit }],
+      categories: mockCategories,
+    } as ReturnType<typeof useExpense>);
+    vi.mocked(useCardTransactions).mockReturnValue({
+      cardTransactions:
+        transactionAmount === null
+          ? []
+          : [{ ...mockTransactions[0], amount: transactionAmount }],
+      loadingCardTransactions: false,
+      refreshCardTransactions: vi.fn(),
+    });
+    return renderScreen();
+  }
+
+  function utilisationNode(root: ReactTestInstance): ReactTestInstance {
+    return root.find((n) => n.props.testID === "card-detail-utilisation");
+  }
+
+  function textOf(node: ReactTestInstance | string): string {
+    if (typeof node === "string") return node;
+    return (node.children ?? [])
+      .map((c) => (typeof c === "string" ? c : textOf(c)))
+      .join("");
+  }
+
+  // Extracts the exact leading percentage token (e.g. "34%", "<1%") so
+  // assertions pin the actual value rather than a substring that a
+  // regressed value like "100%" could also satisfy.
+  function leadingPercentToken(text: string): string {
+    return /^(?:<1%|\d+(?:\.\d+)?%)/.exec(text)?.[0] ?? "";
+  }
+
+  it.each([
+    { total: "0", limit: "10000", expected: "0%" },
+    { total: "1", limit: "10000", expected: "<1%" }, // 0.0001
+    { total: "34", limit: "10000", expected: "<1%" }, // 0.0034
+    { total: "50", limit: "10000", expected: "<1%" }, // 0.005
+    { total: "99", limit: "10000", expected: "<1%" }, // 0.0099
+    { total: "100", limit: "10000", expected: "1%" }, // 0.01
+    { total: "3440", limit: "10000", expected: "34%" }, // 0.344
+    { total: "10000", limit: "10000", expected: "100%" }, // 1.0
+    { total: "15000", limit: "10000", expected: "150%" }, // 1.5
+  ])(
+    "never floors a non-zero utilisation to 0% ($total / $limit -> $expected)",
+    ({ total, limit, expected }) => {
+      const root = renderWithUtilisation(limit, total);
+      const node = utilisationNode(root);
+      expect(node).toBeDefined();
+
+      const visibleText = textOf(node);
+      expect(leadingPercentToken(visibleText)).toBe(expected);
+
+      // "<1%" is spelled out for screen readers (see card-detail-screen.tsx)
+      // — the announced value must still match the visible one exactly, in
+      // whichever form it takes.
+      const accessibleExpected = expected === "<1%" ? "less than 1%" : expected;
+      expect(node.props.accessibilityLabel.startsWith(accessibleExpected)).toBe(
+        true,
+      );
+    },
+  );
+
+  it("matches the exact 25.50 / 7500.50 example from the ticket", () => {
+    const root = renderWithUtilisation("7500.50", "25.50");
+    const node = utilisationNode(root);
+    const visibleText = textOf(node);
+    expect(leadingPercentToken(visibleText)).toBe("<1%");
+    expect(node.props.accessibilityLabel.startsWith("less than 1%")).toBe(true);
+  });
+
+  it("keeps the genuine-zero case at 0% when balance is zero", () => {
+    const root = renderWithUtilisation("5000", null);
+    const node = utilisationNode(root);
+    const visibleText = textOf(node);
+    expect(visibleText.startsWith("0%")).toBe(true);
+  });
+
+  it("shows the over-limit suffix unchanged when balance exceeds the limit", () => {
+    const root = renderWithUtilisation("10000", "15000");
+    const node = utilisationNode(root);
+    const visibleText = textOf(node);
+    expect(visibleText).toContain("— over limit");
+    expect(node.props.accessibilityLabel).toContain(", over limit");
+  });
+
+  it("keeps the utilisation block hidden when the card has no limit set", () => {
+    const root = renderWithUtilisation("0", "10");
+    const nodes = root.findAll(
+      (n) => n.props.testID === "card-detail-utilisation",
+    );
+    expect(nodes).toHaveLength(0);
+  });
+});

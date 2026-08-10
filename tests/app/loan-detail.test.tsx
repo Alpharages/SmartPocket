@@ -285,7 +285,11 @@ describe("LoanDetailScreen", () => {
 
   it("disables record repayment when loan is settled", () => {
     vi.mocked(useLoanDetail).mockReturnValue({
-      loanDetail: { ...mockLoanDetail, status: "settled", remainingBalance: "0.00" },
+      loanDetail: {
+        ...mockLoanDetail,
+        status: "settled",
+        remainingBalance: "0.00",
+      },
       loadingLoanDetail: false,
       loanDetailError: false,
       refreshLoanDetail: vi.fn(),
