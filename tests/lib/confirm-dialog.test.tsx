@@ -2,39 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Alert, Platform } from "react-native";
 
 import { confirmDestructive } from "@/lib/confirm-dialog";
-import { setConfirmHandler } from "@/components/ui/ConfirmProvider";
-
-// ConfirmProvider renders ConfirmSheet -> Sheet, which pulls in real
-// react-native-safe-area-context / @expo/vector-icons. Mock them the same
-// way tests/components/ConfirmSheet.test.tsx does.
-vi.mock("@/hooks/use-colors", () => ({
-  useColors: () => ({
-    primary: "#4F46E5",
-    background: "#F8FAFC",
-    surface: "#FFFFFF",
-    foreground: "#111827",
-    muted: "#6B7280",
-    border: "#E5E7EB",
-    success: "#059669",
-    warning: "#D97706",
-    error: "#DC2626",
-    accent: "#DB2777",
-    secondary: "#7C3AED",
-    text: "#111827",
-    tint: "#4F46E5",
-    icon: "#6B7280",
-    tabIconDefault: "#6B7280",
-    tabIconSelected: "#4F46E5",
-  }),
-}));
-
-vi.mock("react-native-safe-area-context", () => ({
-  useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
-}));
-
-vi.mock("@expo/vector-icons", () => ({
-  Ionicons: () => null,
-}));
+import { setConfirmHandler } from "@/lib/confirm-registry";
 
 const originalOS = Platform.OS;
 

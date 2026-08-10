@@ -69,6 +69,12 @@ export default function CardDetailScreen() {
       : utilisation < 0.01
         ? "<1%"
         : `${Math.round(utilisation * 100)}%`;
+  // Screen readers commonly drop or mangle a leading "<" at default
+  // punctuation verbosity, announcing "1 percent" — the opposite of what the
+  // floor guard means. Spell it out for the accessibility label only; the
+  // visible text keeps the compact "<1%" form.
+  const utilisationAccessibleLabel =
+    utilisation > 0 && utilisation < 0.01 ? "less than 1%" : utilisationLabel;
 
   if (Number.isNaN(cardId) || !card) {
     return (
@@ -168,7 +174,7 @@ export default function CardDetailScreen() {
             <Text
               testID="card-detail-utilisation"
               className="text-white/80 text-xs font-medium mt-1.5"
-              accessibilityLabel={`${utilisationLabel} of your ${formatMoney(limitAmount, currency)} limit used${overLimit ? ", over limit" : ""}`}
+              accessibilityLabel={`${utilisationAccessibleLabel} of your ${formatMoney(limitAmount, currency)} limit used${overLimit ? ", over limit" : ""}`}
             >
               {utilisationLabel} of {formatMoney(limitAmount, currency)} limit
               {overLimit ? " — over limit" : ""}

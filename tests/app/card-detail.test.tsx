@@ -265,6 +265,13 @@ describe("CardDetailScreen utilisation label", () => {
       .join("");
   }
 
+  // Extracts the exact leading percentage token (e.g. "34%", "<1%") so
+  // assertions pin the actual value rather than a substring that a
+  // regressed value like "100%" could also satisfy.
+  function leadingPercentToken(text: string): string {
+    return /^(?:<1%|\d+(?:\.\d+)?%)/.exec(text)?.[0] ?? "";
+  }
+
   it.each([
     { total: "0", limit: "10000", expected: "0%" },
     { total: "1", limit: "10000", expected: "<1%" }, // 0.0001
@@ -283,8 +290,15 @@ describe("CardDetailScreen utilisation label", () => {
       expect(node).toBeDefined();
 
       const visibleText = textOf(node);
-      expect(visibleText.startsWith(expected)).toBe(true);
-      expect(node.props.accessibilityLabel).toContain(expected);
+      expect(leadingPercentToken(visibleText)).toBe(expected);
+
+      // "<1%" is spelled out for screen readers (see card-detail-screen.tsx)
+      // — the announced value must still match the visible one exactly, in
+      // whichever form it takes.
+      const accessibleExpected = expected === "<1%" ? "less than 1%" : expected;
+      expect(node.props.accessibilityLabel.startsWith(accessibleExpected)).toBe(
+        true,
+      );
     },
   );
 
@@ -292,8 +306,8 @@ describe("CardDetailScreen utilisation label", () => {
     const root = renderWithUtilisation("7500.50", "25.50");
     const node = utilisationNode(root);
     const visibleText = textOf(node);
-    expect(visibleText.startsWith("0%")).toBe(false);
-    expect(node.props.accessibilityLabel.startsWith("0%")).toBe(false);
+    expect(leadingPercentToken(visibleText)).toBe("<1%");
+    expect(node.props.accessibilityLabel.startsWith("less than 1%")).toBe(true);
   });
 
   it("keeps the genuine-zero case at 0% when balance is zero", () => {

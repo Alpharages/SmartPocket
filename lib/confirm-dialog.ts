@@ -1,6 +1,6 @@
 import { Alert, Platform } from "react-native";
 
-import { getConfirmHandler } from "@/components/ui/ConfirmProvider";
+import { getConfirmHandler } from "@/lib/confirm-registry";
 
 /**
  * Platform-safe confirmation.
@@ -16,6 +16,8 @@ import { getConfirmHandler } from "@/components/ui/ConfirmProvider";
  * delegate to its themed `ConfirmSheet` on every platform — the raw
  * `globalThis.confirm()` / `Alert.alert` fallbacks below only run when no
  * provider is in the tree (e.g. a unit test rendering a screen in isolation).
+ * The handler itself is read from `lib/confirm-registry.ts`, a leaf module,
+ * so this file never statically imports the UI tree.
  */
 export function confirmDestructive({
   title,
