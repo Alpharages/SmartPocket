@@ -2,6 +2,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -38,8 +39,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  // Memoized so consumers that put `useToast()`'s return value in a
+  // useEffect dependency array don't get a new object identity — and thus
+  // an infinite re-run loop — on every toast add/dismiss re-render.
+  const value = useMemo(() => ({ show }), [show]);
+
   return (
-    <ToastContext.Provider value={{ show }}>
+    <ToastContext.Provider value={value}>
       {children}
       {/* Overlay — position: absolute, pointerEvents="box-none" so touches pass through */}
       <View

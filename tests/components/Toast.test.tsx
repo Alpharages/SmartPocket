@@ -405,6 +405,35 @@ describe("ToastProvider", () => {
     expect(toastCount()).toBe(0);
   });
 
+  it("returns a stable context value identity across re-renders triggered by show()", () => {
+    // Regression test: ToastProvider used to pass `value={{ show }}` — a
+    // fresh object every render — which breaks any consumer that puts
+    // `useToast()`'s return value in a useEffect/useCallback dependency
+    // array (a toast firing would re-trigger that effect indefinitely).
+    const seen: ReturnType<typeof useToast>[] = [];
+    let showFn!: ReturnType<typeof useToast>["show"];
+    function Harness() {
+      const value = useToast();
+      seen.push(value);
+      showFn = value.show;
+      return null;
+    }
+
+    render(
+      <ToastProvider>
+        <Harness />
+      </ToastProvider>,
+    );
+    const beforeShow = seen[seen.length - 1];
+
+    act(() => {
+      showFn({ type: "info", message: "hi" });
+    });
+
+    const afterShow = seen[seen.length - 1];
+    expect(afterShow).toBe(beforeShow);
+  });
+
   it("useToast throws when called outside ToastProvider", () => {
     function BadConsumer() {
       useToast();

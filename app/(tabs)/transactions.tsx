@@ -592,7 +592,7 @@ export default function TransactionsScreen() {
             hideDate
             selected={selectedTransactionId === item.id}
             onPress={() => handleTransactionPress(item.id)}
-            onDelete={() => void handleDelete(item.id, categoryName)}
+            onDelete={() => void handleDelete(item.id, title)}
             style={{ backgroundColor: colors.surface }}
           />
         );

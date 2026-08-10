@@ -131,11 +131,15 @@ export function PinPad({
 }: PinPadProps) {
   const { colors } = useThemeTokens();
   const [digits, setDigits] = useState<string>("");
-  // Marks that the in-flight keypress already applied its own `setDigits`
-  // update in this commit — set synchronously in `handleKeyPress`, read by
-  // the `[error]` effect below, then unconditionally cleared after every
-  // commit so a stale `true` never suppresses a later, unrelated `error`
-  // transition (see the two effects below).
+  // Mirrors `digits` but is updated synchronously (not through React state),
+  // so two presses that land before the first has re-rendered — two fingers
+  // on the pad — each read the other's write instead of both computing `next`
+  // from the same stale value and silently dropping a digit.
+  const digitsRef = useRef<string>("");
+  // Marks that the in-flight keypress already applied its own digit update in
+  // this commit — set synchronously in `handleKeyPress`, read by the `[error]`
+  // effect below, then unconditionally cleared after every commit so a stale
+  // `true` never suppresses a later, unrelated `error` transition.
   const keyPressCommitRef = useRef(false);
 
   // Clear stale digits when `error` toggles from an external source — e.g.
@@ -147,18 +151,9 @@ export function PinPad({
   // `keyPressCommitRef` shows the transition was keypress-driven.
   useEffect(() => {
     if (keyPressCommitRef.current) return;
+    digitsRef.current = "";
     setDigits("");
   }, [error]);
-
-  useEffect(() => {
-    keyPressCommitRef.current = false;
-  });
-
-  useEffect(() => {
-    if (digits.length !== PIN_LENGTH) return;
-    onSubmit(digits);
-    setDigits("");
-  }, [digits, onSubmit]);
 
   // Announce rejected PINs to screen readers — the dots alone convey this by
   // color only, which fails SC 1.4.1 for low-vision/screen-reader users.
@@ -170,19 +165,32 @@ export function PinPad({
     }
   }, [error]);
 
+  // Declared last so it runs after the `[error]` effect above has had its
+  // chance to read the flag for this commit.
+  useEffect(() => {
+    keyPressCommitRef.current = false;
+  });
+
   const handleKeyPress = useCallback(
     (padKey: PadKey) => {
       keyPressCommitRef.current = true;
       onKeyPress?.();
       if (padKey.kind === "backspace") {
-        setDigits((prev) => prev.slice(0, -1));
+        digitsRef.current = digitsRef.current.slice(0, -1);
+        setDigits(digitsRef.current);
         return;
       }
-      setDigits((prev) =>
-        prev.length >= PIN_LENGTH ? prev : prev + padKey.label,
-      );
+
+      if (digitsRef.current.length >= PIN_LENGTH) return;
+      // `onSubmit` fires from the handler body, not from inside a `setDigits`
+      // updater — updaters must stay pure, and React may invoke them more
+      // than once (e.g. StrictMode), which would double-fire submit.
+      const next = digitsRef.current + padKey.label;
+      digitsRef.current = next.length === PIN_LENGTH ? "" : next;
+      setDigits(digitsRef.current);
+      if (next.length === PIN_LENGTH) onSubmit(next);
     },
-    [onKeyPress],
+    [onKeyPress, onSubmit],
   );
 
   const a11yLabel = error
