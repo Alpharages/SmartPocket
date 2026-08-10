@@ -16,8 +16,6 @@ export type ConfirmSheetProps = ConfirmOptions & {
   visible: boolean;
   onConfirm: () => void;
   onCancel: () => void;
-  /** Forwarded to `Sheet` — see its doc comment for when a caller needs this. */
-  noModal?: boolean;
 };
 
 export function ConfirmSheet({
@@ -27,7 +25,6 @@ export function ConfirmSheet({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   destructive = false,
-  noModal = false,
   onConfirm,
   onCancel,
 }: ConfirmSheetProps) {
@@ -37,7 +34,6 @@ export function ConfirmSheet({
       onClose={onCancel}
       title={title}
       testID="confirm-sheet"
-      noModal={noModal}
     >
       <View className="gap-4 pb-2">
         {message ? (

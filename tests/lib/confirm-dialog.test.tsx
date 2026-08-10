@@ -10,6 +10,10 @@ afterEach(() => {
   Platform.OS = originalOS;
   setConfirmHandler(null);
   vi.restoreAllMocks();
+  // restoreAllMocks() does not undo vi.stubGlobal() — without this, a test
+  // that throws before reaching its own vi.unstubAllGlobals() call would
+  // leak a stubbed globalThis.confirm into later tests.
+  vi.unstubAllGlobals();
 });
 
 describe("confirmDestructive", () => {
@@ -34,20 +38,25 @@ describe("confirmDestructive", () => {
       destructive: true,
     });
     expect(confirmSpy).not.toHaveBeenCalled();
-    vi.unstubAllGlobals();
   });
 
-  it("delegates to the registered ConfirmProvider handler on native instead of Alert.alert", async () => {
+  it("always uses Alert.alert on native, even when a ConfirmProvider handler is registered", async () => {
+    // Alert.alert presents on the topmost view controller, so it works over
+    // a route presented as transparentModal (e.g. budget-form); a provider
+    // hosted at the app root cannot reliably layer a Modal over one — see
+    // ConfirmProvider.tsx's doc comment. Native must never delegate.
     Platform.OS = "ios";
     const handler = vi.fn().mockResolvedValue(false);
     setConfirmHandler(handler);
-    const alertSpy = vi.spyOn(Alert, "alert");
+    vi.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
+      buttons?.[1]?.onPress?.();
+    });
 
     const result = await confirmDestructive({ title: "Sign out" });
 
-    expect(result).toBe(false);
-    expect(handler).toHaveBeenCalled();
-    expect(alertSpy).not.toHaveBeenCalled();
+    expect(result).toBe(true);
+    expect(handler).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalled();
   });
 
   it("resolves false when the user cancels via the registered handler", async () => {
@@ -74,7 +83,6 @@ describe("confirmDestructive", () => {
     expect(confirmSpy).toHaveBeenCalledWith(
       "Delete transaction\n\nGone for good.",
     );
-    vi.unstubAllGlobals();
   });
 
   it("resolves rather than throwing or hanging when no provider is mounted and globalThis.confirm is unavailable", async () => {
@@ -85,7 +93,6 @@ describe("confirmDestructive", () => {
     const result = await confirmDestructive({ title: "Delete budget" });
 
     expect(result).toBe(false);
-    vi.unstubAllGlobals();
   });
 
   it("falls back to Alert.alert on native when no provider handler is registered", async () => {

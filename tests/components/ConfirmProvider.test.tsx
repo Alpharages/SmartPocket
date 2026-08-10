@@ -142,7 +142,12 @@ describe("ConfirmProvider", () => {
     await expect(result).resolves.toBe(false);
   });
 
-  it("renders the confirm sheet as a root Modal on a normal route", async () => {
+  it("always renders the confirm sheet as a root Modal, regardless of route", async () => {
+    // Native never delegates to this provider (see lib/confirm-dialog.ts),
+    // so the sheet only ever opens in response to a web call — there is no
+    // transparentModal-route case to special-case here any more (round-2
+    // review B1: a root-hosted noModal escape hatch doesn't actually work).
+    routerState.pathname = "/budget-form";
     render(
       React.createElement(ConfirmProvider, null, React.createElement("View")),
     );
@@ -156,23 +161,6 @@ describe("ConfirmProvider", () => {
       (n) => n.props.testID === "confirm-sheet" && typeof n.type === "string",
     );
     expect(sheetNode.type).toBe("Modal");
-  });
-
-  it("renders the confirm sheet noModal when opened from a transparentModal route", async () => {
-    routerState.pathname = "/budget-form";
-    render(
-      React.createElement(ConfirmProvider, null, React.createElement("View")),
-    );
-    await act(async () => {});
-
-    act(() => {
-      getConfirmHandler()!({ title: "Delete budget" });
-    });
-
-    const sheetNode = renderer!.root.find(
-      (n) => n.props.testID === "confirm-sheet" && typeof n.type === "string",
-    );
-    expect(sheetNode.type).not.toBe("Modal");
   });
 
   it("keeps a newer provider's handler registered when an older instance unmounts", async () => {

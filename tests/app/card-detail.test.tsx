@@ -322,6 +322,7 @@ describe("CardDetailScreen utilisation label", () => {
     const node = utilisationNode(root);
     const visibleText = textOf(node);
     expect(visibleText).toContain("— over limit");
+    expect(node.props.accessibilityLabel).toContain(", over limit");
   });
 
   it("keeps the utilisation block hidden when the card has no limit set", () => {
