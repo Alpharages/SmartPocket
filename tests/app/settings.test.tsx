@@ -9,6 +9,7 @@ import TestRenderer, {
 import SettingsScreen from "@/app/settings";
 
 const mockBack = vi.fn();
+const mockPush = vi.fn();
 const mockSetCurrency = vi.fn().mockResolvedValue(undefined);
 const mockSetFirstDayOfWeek = vi.fn().mockResolvedValue(undefined);
 const mockSetThemePreference = vi.fn().mockResolvedValue(undefined);
@@ -16,8 +17,14 @@ const mockSetThemeId = vi.fn().mockResolvedValue(undefined);
 const mockClearAllData = vi.fn().mockResolvedValue(undefined);
 const mockSetAiEnabled = vi.fn().mockResolvedValue(undefined);
 
+const appLock = vi.hoisted(() => ({
+  isAppLockSupported: vi.fn(() => true),
+}));
+
+vi.mock("@/lib/app-lock", () => appLock);
+
 vi.mock("expo-router", () => ({
-  useRouter: () => ({ back: mockBack, push: vi.fn() }),
+  useRouter: () => ({ back: mockBack, push: mockPush }),
 }));
 
 vi.mock("@/components/screen-container", () => ({
@@ -49,6 +56,7 @@ vi.mock("@expo/vector-icons", () => {
     "cloud-upload-outline": 1,
     "trash-outline": 1,
     "server-outline": 1,
+    "lock-closed-outline": 1,
     "sparkles-outline": 1,
     "information-circle-outline": 1,
     "chevron-forward": 1,
@@ -177,12 +185,14 @@ afterEach(() => {
   });
   renderer = null;
   mockBack.mockReset();
+  mockPush.mockReset();
   mockSetCurrency.mockClear();
   mockSetFirstDayOfWeek.mockClear();
   mockSetThemePreference.mockClear();
   mockSetThemeId.mockClear();
   mockClearAllData.mockClear();
   mockSetAiEnabled.mockClear();
+  appLock.isAppLockSupported.mockReturnValue(true);
 });
 
 function findPressableByLabel(
@@ -478,5 +488,27 @@ describe("SettingsScreen", () => {
     });
 
     expect(mockClearAllData).not.toHaveBeenCalled();
+  });
+
+  it("renders a Security section with an App Lock row that navigates to /security", () => {
+    const root = render(<SettingsScreen />);
+    const body = textOf(root);
+    expect(body).toContain("Security");
+
+    act(() => {
+      findPressableByLabel(root, "App Lock").props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith("/security");
+  });
+
+  it("hides the Security section when App Lock is unsupported (web)", () => {
+    appLock.isAppLockSupported.mockReturnValue(false);
+    const root = render(<SettingsScreen />);
+    const body = textOf(root);
+    expect(body).not.toContain("Security");
+    expect(
+      root.findAll((n) => n.props?.accessibilityLabel === "App Lock"),
+    ).toHaveLength(0);
   });
 });
