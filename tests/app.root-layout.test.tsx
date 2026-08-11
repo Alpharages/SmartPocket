@@ -59,6 +59,14 @@ const providers = vi.hoisted(() => ({
     React.createElement("ExpenseProvider", {}, children),
 }));
 
+// This suite covers dev-auth bootstrap, not app-lock behavior (see
+// tests/components/app-lock-gate.test.tsx for that) — stub it as a
+// pass-through so it doesn't pull in the real `expo-secure-store` module.
+const appLockGate = vi.hoisted(() => ({
+  AppLockGate: ({ children }: { children: React.ReactNode }) =>
+    React.createElement(React.Fragment, {}, children),
+}));
+
 vi.mock("@/lib/_core/auth", () => auth);
 vi.mock("@/lib/_core/manus-runtime", () => runtime);
 vi.mock("@/constants/oauth", () => oauth);
@@ -68,6 +76,7 @@ vi.mock("@/lib/currency-provider", () => providers);
 vi.mock("@/lib/first-day-of-week-provider", () => providers);
 vi.mock("@/lib/settings-provider", () => providers);
 vi.mock("@/lib/expense-context", () => providers);
+vi.mock("@/components/app-lock-gate", () => appLockGate);
 vi.mock("@/components/ui/ToastProvider", () => providers);
 vi.mock("@/components/ui/ConfirmProvider", () => providers);
 vi.mock("expo-router", () => ({
