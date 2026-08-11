@@ -1,9 +1,15 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Text, View, type AppStateStatus } from "react-native";
 
 import { PinPad } from "@/components/ui/PinPad";
 import { useThemeTokens } from "@/lib/theme-provider";
-import { isAppLockSupported, isPinSet, verifyPin } from "@/lib/app-lock";
+import {
+  authenticateWithBiometrics,
+  isAppLockSupported,
+  isBiometricEnabled,
+  isPinSet,
+  verifyPin,
+} from "@/lib/app-lock";
 
 // Rendered as a wrapper around <Stack> (not a null-rendering sibling like
 // AuthGate) — it needs to paint an opaque layer over the whole navigator, not
@@ -24,13 +30,20 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     supported ? "checking" : "unlocked",
   );
   const [error, setError] = useState(false);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false);
+  // Guards against re-firing the automatic biometric prompt on every render
+  // while still locked (e.g. a state update from an unrelated effect) —
+  // it resets whenever the gate leaves the "locked" state so the next lock
+  // cycle prompts again.
+  const biometricPromptedRef = useRef(false);
 
   useEffect(() => {
     if (!supported) return;
     let cancelled = false;
-    isPinSet()
-      .then((pinIsSet) => {
+    Promise.all([isPinSet(), isBiometricEnabled()])
+      .then(([pinIsSet, biometricIsEnabled]) => {
         if (cancelled) return;
+        setBiometricEnabledState(biometricIsEnabled === true);
         // `null` means the storage read failed, not that no PIN exists — fail
         // closed rather than risk leaving financial data unlocked because a
         // Keystore/Keychain read errored.
@@ -54,15 +67,36 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
         // and permission prompts, and re-locking mid-flow would be a bug, not
         // a feature.
         if (nextState !== "background") return;
-        // Re-read on every background transition (not cached) so a PIN
-        // set/cleared from Settings takes effect without an app restart.
-        void isPinSet().then((pinIsSet) => {
-          if (pinIsSet !== false) setState("locked");
-        });
+        // Re-read on every background transition (not cached) so a PIN or
+        // biometric preference set/cleared from Settings takes effect
+        // without an app restart.
+        void Promise.all([isPinSet(), isBiometricEnabled()]).then(
+          ([pinIsSet, biometricIsEnabled]) => {
+            if (pinIsSet !== false) {
+              setBiometricEnabledState(biometricIsEnabled === true);
+              setState("locked");
+            }
+          },
+        );
       },
     );
     return () => subscription.remove();
   }, [supported]);
+
+  // Fires the OS biometric prompt automatically the moment the lock screen
+  // appears (AC3), once per lock cycle. A failed/cancelled scan leaves the
+  // gate locked with the PIN pad as the always-available fallback.
+  useEffect(() => {
+    if (state !== "locked") {
+      biometricPromptedRef.current = false;
+      return;
+    }
+    if (!biometricEnabled || biometricPromptedRef.current) return;
+    biometricPromptedRef.current = true;
+    void authenticateWithBiometrics().then((success) => {
+      if (success) setState("unlocked");
+    });
+  }, [state, biometricEnabled]);
 
   const handleSubmit = useCallback((pin: string) => {
     verifyPin(pin)
@@ -79,6 +113,12 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
         setError(true);
         setTimeout(() => setError(false), ERROR_FLASH_MS);
       });
+  }, []);
+
+  const handleBiometricRetry = useCallback(() => {
+    void authenticateWithBiometrics().then((success) => {
+      if (success) setState("unlocked");
+    });
   }, []);
 
   return (
@@ -110,7 +150,13 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
               >
                 Enter your PIN
               </Text>
-              <PinPad onSubmit={handleSubmit} error={error} />
+              <PinPad
+                onSubmit={handleSubmit}
+                error={error}
+                onBiometricPress={
+                  biometricEnabled ? handleBiometricRetry : undefined
+                }
+              />
             </>
           ) : null}
         </View>

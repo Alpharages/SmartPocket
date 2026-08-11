@@ -13,8 +13,11 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { useColors } from "@/hooks/use-colors";
 import {
   clearAppLock,
+  getBiometricLabel,
   isAppLockSupported,
+  isBiometricEnabled,
   isPinSet,
+  setBiometricEnabled,
   setPin,
   verifyPin,
 } from "@/lib/app-lock";
@@ -64,6 +67,10 @@ export default function SecurityScreen() {
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
+  const [biometricLabel, setBiometricLabelState] = useState<string | null>(
+    null,
+  );
+  const [biometricOn, setBiometricOnState] = useState(false);
 
   useEffect(() => {
     if (!supported) {
@@ -107,6 +114,24 @@ export default function SecurityScreen() {
     };
   }, [supported, reloadToken, showToast]);
 
+  // Capability (hardware + enrollment) and preference are read independently
+  // of `pinSet` — the toggle's visibility (pinSet && biometricLabel) is a
+  // render-time decision, not a fetch-time one.
+  useEffect(() => {
+    if (!supported) return;
+    let cancelled = false;
+    Promise.all([getBiometricLabel(), isBiometricEnabled()]).then(
+      ([label, enabled]) => {
+        if (cancelled) return;
+        setBiometricLabelState(label);
+        setBiometricOnState(enabled === true);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [supported, reloadToken]);
+
   const closeStep = useCallback(() => {
     setStep("closed");
     setPendingPin(null);
@@ -130,6 +155,24 @@ export default function SecurityScreen() {
     setStep("verify-change");
   }, []);
 
+  const handleToggleBiometric = useCallback(
+    async (enabled: boolean) => {
+      try {
+        await setBiometricEnabled(enabled);
+        setBiometricOnState(enabled);
+      } catch (err) {
+        console.error("[Security] Failed to update biometric preference:", err);
+        showToast({
+          type: "error",
+          message: "Something went wrong. Please try again.",
+        });
+        const current = await isBiometricEnabled();
+        if (current !== null) setBiometricOnState(current);
+      }
+    },
+    [showToast],
+  );
+
   // Re-reads storage after a write/verify failure so the rendered toggle and
   // rows always match what's actually on disk — never trust optimistic state
   // once a `setPin`/`clearAppLock` call has rejected (see B3 review finding).
@@ -150,6 +193,10 @@ export default function SecurityScreen() {
           if (verified) {
             await clearAppLock();
             setPinSetState(false);
+            // AC: biometric unlock never exists without the PIN fallback —
+            // clearAppLock already wiped the biometric key on disk, this
+            // just keeps the toggle's rendered state in sync.
+            setBiometricOnState(false);
             closeStep();
           } else {
             flashError("Incorrect PIN. Try again.");
@@ -307,6 +354,37 @@ export default function SecurityScreen() {
               accessibilityState={{ checked: pinSet }}
             />
           </View>
+
+          {pinSet && biometricLabel ? (
+            <>
+              <View
+                className="mx-lg"
+                style={{ height: 0.5, backgroundColor: colors.border }}
+              />
+              <View
+                className="flex-row items-center px-lg"
+                style={{ minHeight: 44 }}
+              >
+                <View className="flex-1 pr-md">
+                  <Text className="text-body font-medium text-foreground">
+                    {biometricLabel}
+                  </Text>
+                  <Text className="mt-xs text-caption text-muted">
+                    Unlock with {biometricLabel} instead of your PIN.
+                  </Text>
+                </View>
+                <Switch
+                  value={biometricOn}
+                  onValueChange={handleToggleBiometric}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={colors.surface}
+                  accessibilityRole="switch"
+                  accessibilityLabel={biometricLabel}
+                  accessibilityState={{ checked: biometricOn }}
+                />
+              </View>
+            </>
+          ) : null}
 
           {pinSet ? (
             <>

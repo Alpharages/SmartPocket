@@ -32,6 +32,13 @@ vi.mock("@/lib/theme-provider", () => ({
   useThemeTokens: () => ({ colors: mockColors }),
 }));
 
+vi.mock("@expo/vector-icons", () => {
+  const Ionicons = ({ name }: { name: string }) =>
+    React.createElement("Ionicons", { name });
+  (Ionicons as any).glyphMap = { "finger-print": 1 };
+  return { Ionicons };
+});
+
 let renderer: ReactTestRenderer | null = null;
 
 function render(ui: React.ReactElement): ReactTestInstance {
@@ -314,5 +321,71 @@ describe("PinPad", () => {
     pressDigits(root, "3456");
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledWith("3456");
+  });
+
+  describe("biometric retry key", () => {
+    it("does not render a biometric key when onBiometricPress is not provided", () => {
+      const root = render(<PinPad onSubmit={() => {}} />);
+      expect(
+        root.findAll(
+          (n) => typeof n.type === "string" && n.props?.name === "finger-print",
+        ),
+      ).toHaveLength(0);
+    });
+
+    it("renders a biometric key when onBiometricPress is provided", () => {
+      const root = render(
+        <PinPad onSubmit={() => {}} onBiometricPress={() => {}} />,
+      );
+      expect(
+        root.findAll(
+          (n) => typeof n.type === "string" && n.props?.name === "finger-print",
+        ),
+      ).toHaveLength(1);
+    });
+
+    it("calls onBiometricPress when the biometric key is pressed", () => {
+      const onBiometricPress = vi.fn();
+      const root = render(
+        <PinPad onSubmit={() => {}} onBiometricPress={onBiometricPress} />,
+      );
+      press(findKey(root, "Use biometric unlock"));
+      expect(onBiometricPress).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses a custom biometricLabel for the accessibility label when provided", () => {
+      const onBiometricPress = vi.fn();
+      const root = render(
+        <PinPad
+          onSubmit={() => {}}
+          onBiometricPress={onBiometricPress}
+          biometricLabel="Retry Face ID"
+        />,
+      );
+      press(findKey(root, "Retry Face ID"));
+      expect(onBiometricPress).toHaveBeenCalledTimes(1);
+    });
+
+    it("pressing the biometric key does not consume a digit slot or call onSubmit", () => {
+      const onSubmit = vi.fn();
+      const onBiometricPress = vi.fn();
+      const root = render(
+        <PinPad onSubmit={onSubmit} onBiometricPress={onBiometricPress} />,
+      );
+      press(findKey(root, "Use biometric unlock"));
+      pressDigits(root, "1234");
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit).toHaveBeenCalledWith("1234");
+    });
+
+    it("the biometric key meets the 44pt minimum touch target", () => {
+      const root = render(
+        <PinPad onSubmit={() => {}} onBiometricPress={() => {}} />,
+      );
+      const key = findKey(root, "Use biometric unlock");
+      const style = StyleSheet.flatten(key.props.style);
+      expect(style.minHeight ?? style.height).toBeGreaterThanOrEqual(44);
+      expect(style.minWidth ?? style.width).toBeGreaterThanOrEqual(44);
+    });
   });
 });
