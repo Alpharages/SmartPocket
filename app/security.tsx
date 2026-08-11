@@ -18,6 +18,7 @@ import {
   setPin,
   verifyPin,
 } from "@/lib/app-lock";
+import { trpc } from "@/lib/trpc";
 
 // PinPad's `error` prop must round-trip false -> true -> false for its own
 // clear-on-error effect to fire on the *next* mismatch too; this is how long
@@ -55,6 +56,8 @@ export default function SecurityScreen() {
   // an infinite read/toast loop on a failing status read (round-2 review, B4).
   const { show: showToast } = useToast();
   const supported = isAppLockSupported();
+  const setServerPinMutation = trpc.security.setPin.useMutation();
+  const clearServerPinMutation = trpc.security.clearPin.useMutation();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -120,6 +123,38 @@ export default function SecurityScreen() {
     setTimeout(() => setError(false), ERROR_FLASH_MS);
   }, []);
 
+  // Best-effort account sync (Story 13.6): the local keychain write above is
+  // always the source of truth for this device's unlock — a sync failure
+  // here surfaces a toast but never reopens the sheet or rolls back the
+  // already-successful local change.
+  const syncPinToServer = useCallback(
+    async (pin: string) => {
+      try {
+        await setServerPinMutation.mutateAsync({ pin });
+      } catch (err) {
+        console.error("[Security] Failed to sync PIN to account:", err);
+        showToast({
+          type: "error",
+          message:
+            "PIN saved on this device, but couldn't sync to your account.",
+        });
+      }
+    },
+    [setServerPinMutation, showToast],
+  );
+
+  const clearServerPin = useCallback(async () => {
+    try {
+      await clearServerPinMutation.mutateAsync();
+    } catch (err) {
+      console.error("[Security] Failed to clear account PIN:", err);
+      showToast({
+        type: "error",
+        message: "App Lock turned off, but couldn't sync to your account.",
+      });
+    }
+  }, [clearServerPinMutation, showToast]);
+
   const handleToggleAppLock = useCallback((enabled: boolean) => {
     setErrorMessage("");
     setStep(enabled ? "enter-new" : "verify-disable");
@@ -151,6 +186,7 @@ export default function SecurityScreen() {
             await clearAppLock();
             setPinSetState(false);
             closeStep();
+            await clearServerPin();
           } else {
             flashError("Incorrect PIN. Try again.");
           }
@@ -184,6 +220,7 @@ export default function SecurityScreen() {
             await setPin(pin);
             setPinSetState(true);
             closeStep();
+            await syncPinToServer(pin);
           } else {
             // AC: a mismatch restarts the confirm step (re-enter the
             // confirmation), not the whole new-PIN entry — pendingPin stays.
@@ -205,7 +242,16 @@ export default function SecurityScreen() {
         closeStep();
       }
     },
-    [step, pendingPin, closeStep, flashError, showToast, resyncPinState],
+    [
+      step,
+      pendingPin,
+      closeStep,
+      flashError,
+      showToast,
+      resyncPinState,
+      syncPinToServer,
+      clearServerPin,
+    ],
   );
 
   if (!supported) {

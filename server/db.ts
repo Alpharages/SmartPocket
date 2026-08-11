@@ -146,6 +146,75 @@ export async function updateAiEnabled(
 }
 
 // ============================================================================
+// SECURITY — account-linked PIN (Epic 13, Story 13.6)
+// ============================================================================
+
+export interface UserPinState {
+  pinHash: string | null;
+  pinFailedAttempts: number;
+  pinLockedUntil: Date | null;
+}
+
+export async function getUserPinState(userId: number): Promise<UserPinState> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query: "SELECT * FROM users WHERE id = ?",
+      params: [userId],
+    },
+  });
+  const row = Array.isArray(result)
+    ? (result[0] as Record<string, unknown>)
+    : null;
+  if (!row) {
+    return { pinHash: null, pinFailedAttempts: 0, pinLockedUntil: null };
+  }
+  return {
+    pinHash: (row.pinHash as string | null) ?? null,
+    pinFailedAttempts: Number(row.pinFailedAttempts ?? 0),
+    pinLockedUntil: row.pinLockedUntil
+      ? new Date(row.pinLockedUntil as string)
+      : null,
+  };
+}
+
+/** Stores the salted hash and resets attempt/lockout state — a fresh PIN starts with a clean slate. */
+export async function setUserPin(
+  userId: number,
+  pinHash: string,
+): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+      params: [pinHash, 0, null, userId],
+    },
+  });
+}
+
+export async function clearUserPin(userId: number): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+      params: [null, 0, null, userId],
+    },
+  });
+}
+
+export async function recordPinAttemptResult(
+  userId: number,
+  data: { failedAttempts: number; lockedUntil: Date | null },
+): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+      params: [data.failedAttempts, data.lockedUntil, userId],
+    },
+  });
+}
+
+// ============================================================================
 // CATEGORIES
 // ============================================================================
 

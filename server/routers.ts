@@ -7,6 +7,13 @@ import {
   DEFAULT_CATEGORY_ICON,
   getCategoryColorForName,
 } from "../shared/theme";
+import {
+  hashPin,
+  verifyPinHash,
+  isPinLocked,
+  recordFailedAttempt,
+  MAX_PIN_ATTEMPTS,
+} from "./_core/pin-crypto";
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -1162,6 +1169,79 @@ const settingsRouter = router({
 });
 
 // ============================================================================
+// SECURITY ROUTER — account-linked PIN (Epic 13, Story 13.6)
+//
+// Scope for this session (per resolved dev clarification on 86eyeq72c): sync
+// a single account-wide PIN to the server as a salted hash, with a rate-limited
+// verify path. Profile (mobile/email) and one-time-code recovery are descoped.
+// ============================================================================
+
+const PIN_INPUT = z.object({
+  pin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
+});
+
+const securityRouter = router({
+  getPinStatus: protectedProcedure.query(async ({ ctx }) => {
+    const state = await db.getUserPinState(ctx.user.id);
+    return { pinSet: state.pinHash !== null };
+  }),
+
+  setPin: protectedProcedure
+    .input(PIN_INPUT)
+    .mutation(async ({ ctx, input }) => {
+      const hash = hashPin(input.pin);
+      await db.setUserPin(ctx.user.id, hash);
+      return { pinSet: true };
+    }),
+
+  clearPin: protectedProcedure.mutation(async ({ ctx }) => {
+    await db.clearUserPin(ctx.user.id);
+    return { pinSet: false };
+  }),
+
+  verifyPin: protectedProcedure
+    .input(PIN_INPUT)
+    .mutation(async ({ ctx, input }) => {
+      const state = await db.getUserPinState(ctx.user.id);
+
+      if (!state.pinHash) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No account-linked PIN is set",
+        });
+      }
+
+      const now = new Date();
+      const attemptState = {
+        failedAttempts: state.pinFailedAttempts,
+        lockedUntil: state.pinLockedUntil,
+      };
+      if (isPinLocked(attemptState, now)) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many attempts. Try again later.",
+        });
+      }
+
+      if (verifyPinHash(input.pin, state.pinHash)) {
+        await db.recordPinAttemptResult(ctx.user.id, {
+          failedAttempts: 0,
+          lockedUntil: null,
+        });
+        return { valid: true as const };
+      }
+
+      const next = recordFailedAttempt(attemptState, now);
+      await db.recordPinAttemptResult(ctx.user.id, next);
+      return {
+        valid: false as const,
+        attemptsRemaining: Math.max(0, MAX_PIN_ATTEMPTS - next.failedAttempts),
+        lockedUntil: next.lockedUntil ? next.lockedUntil.toISOString() : null,
+      };
+    }),
+});
+
+// ============================================================================
 // DATA MANAGEMENT ROUTER
 // ============================================================================
 
@@ -1187,6 +1267,7 @@ export const appRouter = router({
   budgets: budgetsRouter,
   loans: loansRouter,
   settings: settingsRouter,
+  security: securityRouter,
   data: dataRouter,
 });
 

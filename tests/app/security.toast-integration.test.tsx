@@ -28,6 +28,23 @@ const appLock = vi.hoisted(() => ({
 
 vi.mock("@/lib/app-lock", () => appLock);
 
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    security: {
+      setPin: {
+        useMutation: () => ({
+          mutateAsync: vi.fn().mockResolvedValue({ pinSet: true }),
+        }),
+      },
+      clearPin: {
+        useMutation: () => ({
+          mutateAsync: vi.fn().mockResolvedValue({ pinSet: false }),
+        }),
+      },
+    },
+  },
+}));
+
 vi.mock("expo-router", () => ({
   useRouter: () => ({ back: mockBack, push: vi.fn() }),
 }));

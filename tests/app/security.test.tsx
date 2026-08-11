@@ -26,6 +26,24 @@ vi.mock("@/components/ui/ToastProvider", () => ({
   useToast: () => toast,
 }));
 
+const security = vi.hoisted(() => ({
+  setPinMutateAsync: vi.fn().mockResolvedValue({ pinSet: true }),
+  clearPinMutateAsync: vi.fn().mockResolvedValue({ pinSet: false }),
+}));
+
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    security: {
+      setPin: {
+        useMutation: () => ({ mutateAsync: security.setPinMutateAsync }),
+      },
+      clearPin: {
+        useMutation: () => ({ mutateAsync: security.clearPinMutateAsync }),
+      },
+    },
+  },
+}));
+
 vi.mock("expo-router", () => ({
   useRouter: () => ({ back: mockBack, push: vi.fn() }),
 }));
@@ -153,6 +171,8 @@ beforeEach(() => {
   appLock.verifyPin.mockReset().mockResolvedValue(true);
   appLock.clearAppLock.mockReset().mockResolvedValue(undefined);
   toast.show.mockReset();
+  security.setPinMutateAsync.mockReset().mockResolvedValue({ pinSet: true });
+  security.clearPinMutateAsync.mockReset().mockResolvedValue({ pinSet: false });
 });
 
 afterEach(() => {
@@ -480,5 +500,113 @@ describe("SecurityScreen", () => {
 
     expect(textOf(root)).toContain("Couldn't verify your PIN");
     expect(textOf(root)).not.toContain("Incorrect PIN");
+  });
+
+  it("syncs a newly set PIN to the server after the local write succeeds", async () => {
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+
+    expect(appLock.setPin).toHaveBeenCalledWith("1234");
+    expect(security.setPinMutateAsync).toHaveBeenCalledWith({ pin: "1234" });
+  });
+
+  it("does not fail the local PIN change when the server sync rejects", async () => {
+    security.setPinMutateAsync.mockRejectedValue(new Error("offline"));
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+    await flushMicrotasks();
+
+    // Local write still succeeded and the sheet closed — server sync failure
+    // is surfaced as a toast, not a blocker (local keychain stays the fast path).
+    expect(appLock.setPin).toHaveBeenCalledWith("1234");
+    expect(
+      root.findAll(
+        (n) =>
+          typeof n.type === "string" &&
+          n.props?.testID === "security-pin-sheet",
+      ),
+    ).toHaveLength(0);
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
+    );
+  });
+
+  it("clears the server-synced PIN after disabling App Lock locally", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(false);
+    });
+
+    appLock.verifyPin.mockResolvedValue(true);
+    await submitPin(root, "1234");
+
+    expect(appLock.clearAppLock).toHaveBeenCalledTimes(1);
+    expect(security.clearPinMutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fail the local disable when the server clear-PIN sync rejects", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    security.clearPinMutateAsync.mockRejectedValue(new Error("offline"));
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(false);
+    });
+
+    appLock.verifyPin.mockResolvedValue(true);
+    await submitPin(root, "1234");
+    await flushMicrotasks();
+
+    const toggle = root.find(
+      (n) =>
+        String(n.type) === "Switch" &&
+        n.props?.accessibilityLabel === "App Lock",
+    );
+    expect(toggle.props.value).toBe(false);
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
+    );
   });
 });
