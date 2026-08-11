@@ -14,7 +14,13 @@ import { PinPad } from "@/components/ui/PinPad";
 import { useAuth } from "@/hooks/use-auth";
 import { confirmDestructive } from "@/lib/confirm-dialog";
 import { useThemeTokens } from "@/lib/theme-provider";
-import { isAppLockSupported, isPinSet, verifyPin } from "@/lib/app-lock";
+import {
+  authenticateWithBiometrics,
+  isAppLockSupported,
+  isBiometricEnabled,
+  isPinSet,
+  verifyPin,
+} from "@/lib/app-lock";
 
 // Rendered as a wrapper around <Stack> (not a null-rendering sibling like
 // AuthGate) — it needs to paint an opaque layer over the whole navigator, not
@@ -51,7 +57,14 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   const [errorMessage, setErrorMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [forgettingPin, setForgettingPin] = useState(false);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const { logout } = useAuth({ autoFetch: false });
+
+  // Guards against re-firing the automatic biometric prompt on every render
+  // while still locked (e.g. a state update from an unrelated effect) —
+  // it resets whenever the gate leaves the "locked" state so the next lock
+  // cycle prompts again.
+  const biometricPromptedRef = useRef(false);
 
   // Bumped by every lock-state-deciding transition (mount check, background
   // re-check) so a slower-resolving async result can never overwrite a
@@ -101,9 +114,10 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     if (!supported) return;
     epochRef.current += 1;
     const epoch = epochRef.current;
-    isPinSet()
-      .then((pinIsSet) => {
+    Promise.all([isPinSet(), isBiometricEnabled()])
+      .then(([pinIsSet, biometricIsEnabled]) => {
         if (epochRef.current !== epoch) return;
+        setBiometricEnabledState(biometricIsEnabled === true);
         // `null` means the storage read failed, not that no PIN exists — fail
         // closed rather than risk leaving financial data unlocked because a
         // Keystore/Keychain read errored.
@@ -134,17 +148,19 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
         // Lock synchronously — the JS thread can suspend shortly after
         // backgrounding on iOS, so waiting for the isPinSet() round-trip to
         // resolve before covering risks painting the unlocked tree first on
-        // return. Re-read live (not cached) so a PIN cleared from Settings
-        // still un-gates on this same transition. Dismiss any presented
-        // route (add-transaction, budget-form, ...) back to the tab root —
-        // the overlay alone can't cover a natively-presented modal screen.
+        // return. Re-read live (not cached) so a PIN or biometric preference
+        // set/cleared from Settings takes effect on this same transition,
+        // without an app restart. Dismiss any presented route
+        // (add-transaction, budget-form, ...) back to the tab root — the
+        // overlay alone can't cover a natively-presented modal screen.
         epochRef.current += 1;
         const epoch = epochRef.current;
         dismissPresentedRoutes();
         setState("locked");
-        isPinSet()
-          .then((pinIsSet) => {
+        Promise.all([isPinSet(), isBiometricEnabled()])
+          .then(([pinIsSet, biometricIsEnabled]) => {
             if (epochRef.current !== epoch) return;
+            setBiometricEnabledState(biometricIsEnabled === true);
             if (pinIsSet === false) setState("unlocked");
           })
           .catch(() => {
@@ -165,6 +181,24 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   }, [supported]);
 
   useEffect(() => clearErrorTimer, [clearErrorTimer]);
+
+  // Fires the OS biometric prompt automatically the moment the lock screen
+  // appears (AC3), once per lock cycle. A failed/cancelled scan leaves the
+  // gate locked with the PIN pad as the always-available fallback. Epoch-
+  // guarded like every other unlock decision: a scan that succeeds after the
+  // app has backgrounded again must not unlock the newer lock.
+  useEffect(() => {
+    if (state !== "locked") {
+      biometricPromptedRef.current = false;
+      return;
+    }
+    if (!biometricEnabled || biometricPromptedRef.current) return;
+    biometricPromptedRef.current = true;
+    const epoch = epochRef.current;
+    void authenticateWithBiometrics().then((success) => {
+      if (success && epochRef.current === epoch) setState("unlocked");
+    });
+  }, [state, biometricEnabled]);
 
   const handleKeyPress = useCallback(() => {
     clearErrorTimer();
@@ -227,6 +261,13 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     }
   }, [logout, clearErrorTimer]);
 
+  const handleBiometricRetry = useCallback(() => {
+    const epoch = epochRef.current;
+    void authenticateWithBiometrics().then((success) => {
+      if (success && epochRef.current === epoch) setState("unlocked");
+    });
+  }, []);
+
   return (
     <>
       <View
@@ -281,6 +322,9 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
                 onKeyPress={handleKeyPress}
                 error={error}
                 disabled={submitting || forgettingPin}
+                onBiometricPress={
+                  biometricEnabled ? handleBiometricRetry : undefined
+                }
               />
               <Button
                 variant="ghost"

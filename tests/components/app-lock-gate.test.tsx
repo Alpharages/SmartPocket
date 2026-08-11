@@ -40,10 +40,19 @@ vi.mock("@/lib/theme-provider", () => ({
   useThemeTokens: () => ({ colors: mockColors }),
 }));
 
+vi.mock("@expo/vector-icons", () => {
+  const Ionicons = ({ name }: { name: string }) =>
+    React.createElement("Ionicons", { name });
+  (Ionicons as any).glyphMap = { "finger-print": 1 };
+  return { Ionicons };
+});
+
 const appLock = vi.hoisted(() => ({
   isAppLockSupported: vi.fn(() => true),
   isPinSet: vi.fn(),
   verifyPin: vi.fn(),
+  isBiometricEnabled: vi.fn(),
+  authenticateWithBiometrics: vi.fn(),
 }));
 
 vi.mock("@/lib/app-lock", () => appLock);
@@ -169,6 +178,8 @@ beforeEach(() => {
   appLock.isAppLockSupported.mockReturnValue(true);
   appLock.isPinSet.mockReset();
   appLock.verifyPin.mockReset();
+  appLock.isBiometricEnabled.mockReset().mockResolvedValue(false);
+  appLock.authenticateWithBiometrics.mockReset();
   routerMock.canDismiss.mockReset().mockReturnValue(false);
   routerMock.dismissAll.mockReset();
   routerMock.replace.mockReset();
@@ -600,6 +611,138 @@ describe("AppLockGate", () => {
       expect(
         pinKeys(root).some((n) => n.props.accessibilityLabel === "Forgot PIN?"),
       ).toBe(false);
+    });
+  });
+
+  describe("biometric unlock (Story 13.4)", () => {
+    it("automatically triggers the OS biometric prompt when the lock screen appears and biometric unlock is enabled", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.isBiometricEnabled.mockResolvedValue(true);
+      appLock.authenticateWithBiometrics.mockReturnValue(new Promise(() => {}));
+      renderGate();
+      await flush();
+
+      expect(appLock.authenticateWithBiometrics).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not auto-trigger the biometric prompt when biometric unlock is disabled", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.isBiometricEnabled.mockResolvedValue(false);
+      const root = renderGate();
+      await flush();
+
+      expect(overlay(root)).toHaveLength(1);
+      expect(appLock.authenticateWithBiometrics).not.toHaveBeenCalled();
+    });
+
+    it("does not auto-trigger the biometric prompt when no PIN is set", async () => {
+      appLock.isPinSet.mockResolvedValue(false);
+      appLock.isBiometricEnabled.mockResolvedValue(true);
+      renderGate();
+      await flush();
+
+      expect(appLock.authenticateWithBiometrics).not.toHaveBeenCalled();
+    });
+
+    it("unlocks automatically on a successful biometric scan", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.isBiometricEnabled.mockResolvedValue(true);
+      appLock.authenticateWithBiometrics.mockResolvedValue(true);
+      const root = renderGate();
+      await flush();
+
+      expect(overlay(root)).toHaveLength(0);
+      expect(content(root)).toHaveLength(1);
+    });
+
+    it("stays locked and keeps the PIN pad available after a failed or cancelled biometric scan", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.isBiometricEnabled.mockResolvedValue(true);
+      appLock.authenticateWithBiometrics.mockResolvedValue(false);
+      const root = renderGate();
+      await flush();
+
+      expect(overlay(root)).toHaveLength(1);
+      expect(findKey(root, "1")).toBeTruthy();
+    });
+
+    it("shows a biometric retry key on the PIN pad when biometric unlock is enabled", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.isBiometricEnabled.mockResolvedValue(true);
+      appLock.authenticateWithBiometrics.mockResolvedValue(false);
+      const root = renderGate();
+      await flush();
+
+      expect(findKey(root, "Use biometric unlock")).toBeTruthy();
+    });
+
+    it("does not show a biometric retry key when biometric unlock is disabled", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.isBiometricEnabled.mockResolvedValue(false);
+      const root = renderGate();
+      await flush();
+
+      expect(() => findKey(root, "Use biometric unlock")).toThrow();
+    });
+
+    it("pressing the biometric retry key re-triggers the prompt and unlocks on success", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.isBiometricEnabled.mockResolvedValue(true);
+      appLock.authenticateWithBiometrics.mockResolvedValueOnce(false);
+      const root = renderGate();
+      await flush();
+      expect(overlay(root)).toHaveLength(1);
+      expect(appLock.authenticateWithBiometrics).toHaveBeenCalledTimes(1);
+
+      appLock.authenticateWithBiometrics.mockResolvedValueOnce(true);
+      await act(async () => {
+        findKey(root, "Use biometric unlock").props.onPress();
+        await Promise.resolve();
+      });
+      await flush();
+
+      expect(appLock.authenticateWithBiometrics).toHaveBeenCalledTimes(2);
+      expect(overlay(root)).toHaveLength(0);
+    });
+
+    it("falls back to the PIN pad and unlocks on a correct PIN after a failed biometric scan", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.isBiometricEnabled.mockResolvedValue(true);
+      appLock.authenticateWithBiometrics.mockResolvedValue(false);
+      appLock.verifyPin.mockResolvedValue(true);
+      const root = renderGate();
+      await flush();
+
+      enterPin(root, "1234");
+      await flush();
+
+      expect(overlay(root)).toHaveLength(0);
+    });
+
+    it("re-prompts biometrics on the next lock cycle after backgrounding again", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.isBiometricEnabled.mockResolvedValue(true);
+      appLock.authenticateWithBiometrics.mockResolvedValue(true);
+      renderGate();
+      await flush();
+      expect(appLock.authenticateWithBiometrics).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        __emitAppStateChange("background");
+        await Promise.resolve();
+      });
+      await flush();
+
+      expect(appLock.authenticateWithBiometrics).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not trigger the biometric prompt at all when app lock is unsupported (web)", async () => {
+      appLock.isAppLockSupported.mockReturnValue(false);
+      renderGate();
+      await flush();
+
+      expect(appLock.isBiometricEnabled).not.toHaveBeenCalled();
+      expect(appLock.authenticateWithBiometrics).not.toHaveBeenCalled();
     });
   });
 });
