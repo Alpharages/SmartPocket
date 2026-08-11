@@ -7,6 +7,7 @@ import {
   View,
   type AppStateStatus,
 } from "react-native";
+import { useRouter } from "expo-router";
 
 import { PinPad } from "@/components/ui/PinPad";
 import { useThemeTokens } from "@/lib/theme-provider";
@@ -17,14 +18,18 @@ import { isAppLockSupported, isPinSet, verifyPin } from "@/lib/app-lock";
 // just redirect. Children are always mounted so navigation state survives a
 // lock/unlock cycle; the overlay is what gates visibility.
 //
-// Known limitation (round-2 review D1): this overlay is a React sibling
-// positioned absolutely within the RN root view. `react-native-screens`
-// presents `transparentModal`/`fullScreenModal` routes (add-transaction,
-// budget-form, loan/record-repayment, login) as native view controllers
-// *above* that root view — the same constraint already documented in
-// components/ui/ConfirmProvider.tsx for a root-hosted Modal. Backgrounding
-// while one of those routes is open can leave it visible over the lock.
-// Tracked as a pending dev-clarification on the story ticket; not fixed here.
+// The overlay alone can't cover a `transparentModal`/`fullScreenModal` route
+// (add-transaction, budget-form, loan/record-repayment, login) — those are
+// presented by react-native-screens as native view controllers *above* the RN
+// root view, the same constraint components/ui/ConfirmProvider.tsx documents
+// for a root-hosted Modal (ticket 86eyepuyq). Unlike that case, this can't be
+// sidestepped by dropping to an OS-native API (there's no `Alert.alert`
+// equivalent for a full PIN pad) — so every lock transition also dismisses
+// any presented route back to the tab root via `router.dismissAll()`
+// (standard popToTop; a normal navigation action on the same still-mounted
+// navigator, not a remount) before the overlay takes over. This can only ever
+// matter for the background-triggered relock: a route can't already be
+// presented at the moment the app cold-starts.
 type GateState = "checking" | "unlocked" | "locked";
 
 const ERROR_FLASH_MS = 600;
@@ -50,10 +55,22 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   const epochRef = useRef(0);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stateRef = useRef(state);
+  const router = useRouter();
+  const routerRef = useRef(router);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
+
+  const dismissPresentedRoutes = useCallback(() => {
+    if (routerRef.current.canDismiss()) {
+      routerRef.current.dismissAll();
+    }
+  }, []);
 
   const clearErrorTimer = useCallback(() => {
     if (errorTimerRef.current !== null) {
@@ -85,12 +102,19 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
         // `null` means the storage read failed, not that no PIN exists — fail
         // closed rather than risk leaving financial data unlocked because a
         // Keystore/Keychain read errored.
-        setState(pinIsSet === false ? "unlocked" : "locked");
+        if (pinIsSet === false) {
+          setState("unlocked");
+        } else {
+          dismissPresentedRoutes();
+          setState("locked");
+        }
       })
       .catch(() => {
-        if (epochRef.current === epoch) setState("locked");
+        if (epochRef.current !== epoch) return;
+        dismissPresentedRoutes();
+        setState("locked");
       });
-  }, [supported]);
+  }, [supported, dismissPresentedRoutes]);
 
   useEffect(() => {
     if (!supported) return;
@@ -106,9 +130,12 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
         // backgrounding on iOS, so waiting for the isPinSet() round-trip to
         // resolve before covering risks painting the unlocked tree first on
         // return. Re-read live (not cached) so a PIN cleared from Settings
-        // still un-gates on this same transition.
+        // still un-gates on this same transition. Dismiss any presented
+        // route (add-transaction, budget-form, ...) back to the tab root —
+        // the overlay alone can't cover a natively-presented modal screen.
         epochRef.current += 1;
         const epoch = epochRef.current;
+        dismissPresentedRoutes();
         setState("locked");
         isPinSet()
           .then((pinIsSet) => {
@@ -121,7 +148,7 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
       },
     );
     return () => subscription.remove();
-  }, [supported]);
+  }, [supported, dismissPresentedRoutes]);
 
   useEffect(() => {
     if (!supported) return;

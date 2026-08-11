@@ -48,6 +48,15 @@ const appLock = vi.hoisted(() => ({
 
 vi.mock("@/lib/app-lock", () => appLock);
 
+const routerMock = vi.hoisted(() => ({
+  canDismiss: vi.fn(() => false),
+  dismissAll: vi.fn(),
+}));
+
+vi.mock("expo-router", () => ({
+  useRouter: () => routerMock,
+}));
+
 function deferred<T>(): {
   promise: Promise<T>;
   resolve: (value: T) => void;
@@ -145,6 +154,8 @@ beforeEach(() => {
   appLock.isAppLockSupported.mockReturnValue(true);
   appLock.isPinSet.mockReset();
   appLock.verifyPin.mockReset();
+  routerMock.canDismiss.mockReset().mockReturnValue(false);
+  routerMock.dismissAll.mockReset();
 });
 
 afterEach(() => {
@@ -463,5 +474,55 @@ describe("AppLockGate", () => {
     expect(overlay(root)).toHaveLength(0);
 
     expect(__emitHardwareBackPress()).toBe(false);
+  });
+
+  it("dismisses a presented route (e.g. add-transaction) back to the tab root when backgrounding locks the app (D1)", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    appLock.verifyPin.mockResolvedValue(true);
+    routerMock.canDismiss.mockReturnValue(true); // a modal route is presented
+    const root = renderGate();
+    await flush();
+    enterPin(root, "1234");
+    await flush();
+    routerMock.dismissAll.mockClear(); // only assert the background-triggered call
+
+    await act(async () => {
+      __emitAppStateChange("background");
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(routerMock.canDismiss).toHaveBeenCalled();
+    expect(routerMock.dismissAll).toHaveBeenCalledTimes(1);
+    expect(overlay(root)).toHaveLength(1);
+  });
+
+  it("does not call dismissAll when nothing is presented (canDismiss false)", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    appLock.verifyPin.mockResolvedValue(true);
+    routerMock.canDismiss.mockReturnValue(false);
+    const root = renderGate();
+    await flush();
+    enterPin(root, "1234");
+    await flush();
+
+    await act(async () => {
+      __emitAppStateChange("background");
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(routerMock.dismissAll).not.toHaveBeenCalled();
+    expect(overlay(root)).toHaveLength(1);
+  });
+
+  it("dismisses presented routes on the initial mount-lock too (defensive; cold start can't reach it in practice)", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    routerMock.canDismiss.mockReturnValue(true);
+    const root = renderGate();
+    await flush();
+
+    expect(routerMock.dismissAll).toHaveBeenCalledTimes(1);
+    expect(overlay(root)).toHaveLength(1);
   });
 });
