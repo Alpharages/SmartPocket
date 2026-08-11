@@ -7,6 +7,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { useThemeTokens } from "@/lib/theme-provider";
 import { usePressFeedback } from "@/hooks/use-press-feedback";
@@ -21,6 +22,13 @@ export type PinPadProps = {
    * as the user starts a new attempt.
    */
   onKeyPress?: () => void;
+  /**
+   * Renders a biometric retry key in the pad's bottom-left slot (replacing
+   * the spacer). Omit to render a plain 4x3 pad with no biometric affordance.
+   */
+  onBiometricPress?: () => void;
+  /** Accessibility label for the biometric retry key. */
+  biometricLabel?: string;
   /** Renders the dots in the error color and clears entered digits. */
   error?: boolean;
   disabled?: boolean;
@@ -31,10 +39,14 @@ export type PinPadProps = {
 const PIN_LENGTH = 4;
 // NFR-5 / WCAG 2.1 AA: every key must present at least a 44pt touch target.
 const MIN_TOUCH_TARGET = 44;
+const DEFAULT_BIOMETRIC_LABEL = "Use biometric unlock";
 
-type PadKey = { label: string; kind: "digit" | "backspace" | "spacer" };
+type PadKey = {
+  label: string;
+  kind: "digit" | "backspace" | "spacer" | "biometric";
+};
 
-const KEY_ROWS: PadKey[][] = [
+const DIGIT_ROWS: PadKey[][] = [
   [
     { label: "1", kind: "digit" },
     { label: "2", kind: "digit" },
@@ -49,11 +61,6 @@ const KEY_ROWS: PadKey[][] = [
     { label: "7", kind: "digit" },
     { label: "8", kind: "digit" },
     { label: "9", kind: "digit" },
-  ],
-  [
-    { label: "", kind: "spacer" },
-    { label: "0", kind: "digit" },
-    { label: "Backspace", kind: "backspace" },
   ],
 ];
 
@@ -114,6 +121,9 @@ function PinPadKey({
 }
 
 function PadKeyContent({ padKey, color }: { padKey: PadKey; color: string }) {
+  if (padKey.kind === "biometric") {
+    return <Ionicons name="finger-print" size={28} color={color} />;
+  }
   return (
     <Text style={{ fontSize: 24, fontWeight: "600", color }}>
       {padKey.kind === "backspace" ? "⌫" : padKey.label}
@@ -124,6 +134,8 @@ function PadKeyContent({ padKey, color }: { padKey: PadKey; color: string }) {
 export function PinPad({
   onSubmit,
   onKeyPress,
+  onBiometricPress,
+  biometricLabel = DEFAULT_BIOMETRIC_LABEL,
   error = false,
   disabled = false,
   className,
@@ -173,6 +185,13 @@ export function PinPad({
 
   const handleKeyPress = useCallback(
     (padKey: PadKey) => {
+      // Biometric retry is a side-channel action, not a PIN keystroke — it
+      // must not touch onKeyPress/digits/onSubmit.
+      if (padKey.kind === "biometric") {
+        onBiometricPress?.();
+        return;
+      }
+
       keyPressCommitRef.current = true;
       onKeyPress?.();
       if (padKey.kind === "backspace") {
@@ -190,12 +209,21 @@ export function PinPad({
       setDigits(digitsRef.current);
       if (next.length === PIN_LENGTH) onSubmit(next);
     },
-    [onKeyPress, onSubmit],
+    [onKeyPress, onSubmit, onBiometricPress],
   );
 
   const a11yLabel = error
     ? "PIN entry: incorrect PIN, please try again"
     : `PIN entry: ${digits.length} of ${PIN_LENGTH} digits entered`;
+
+  const bottomRow: PadKey[] = [
+    onBiometricPress
+      ? { label: biometricLabel, kind: "biometric" }
+      : { label: "", kind: "spacer" },
+    { label: "0", kind: "digit" },
+    { label: "Backspace", kind: "backspace" },
+  ];
+  const keyRows: PadKey[][] = [...DIGIT_ROWS, bottomRow];
 
   return (
     <View className={className} style={style}>
@@ -232,7 +260,7 @@ export function PinPad({
         })}
       </View>
       <View style={{ marginTop: 32, gap: 12 }}>
-        {KEY_ROWS.map((row, rowIndex) => (
+        {keyRows.map((row, rowIndex) => (
           <View
             key={rowIndex}
             style={{ flexDirection: "row", justifyContent: "center", gap: 12 }}

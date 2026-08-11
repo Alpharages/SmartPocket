@@ -1,3 +1,4 @@
+import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
@@ -48,6 +49,87 @@ export async function verifyPin(pin: string): Promise<boolean | null> {
   } catch (error) {
     console.error("[AppLock] Failed to verify PIN:", error);
     return null;
+  }
+}
+
+export async function isBiometricEnabled(): Promise<boolean | null> {
+  if (!isAppLockSupported()) return null;
+  try {
+    const stored = await SecureStore.getItemAsync(BIOMETRIC_KEY);
+    return stored === "true";
+  } catch (error) {
+    console.error("[AppLock] Failed to read biometric preference:", error);
+    return null;
+  }
+}
+
+export async function setBiometricEnabled(enabled: boolean): Promise<void> {
+  if (!isAppLockSupported()) return;
+  try {
+    if (enabled) {
+      await SecureStore.setItemAsync(BIOMETRIC_KEY, "true");
+    } else {
+      await SecureStore.deleteItemAsync(BIOMETRIC_KEY);
+    }
+  } catch (error) {
+    console.error("[AppLock] Failed to update biometric preference:", error);
+    throw error;
+  }
+}
+
+export type BiometricLabel =
+  | "Face ID"
+  | "Touch ID"
+  | "Face unlock"
+  | "Fingerprint";
+
+// Returns null when there's no hardware or nothing is enrolled — the caller
+// hides the toggle rather than show a switch that would silently fail (AC2).
+export async function getBiometricLabel(): Promise<BiometricLabel | null> {
+  if (!isAppLockSupported()) return null;
+  try {
+    const [hasHardware, isEnrolled] = await Promise.all([
+      LocalAuthentication.hasHardwareAsync(),
+      LocalAuthentication.isEnrolledAsync(),
+    ]);
+    if (!hasHardware || !isEnrolled) return null;
+
+    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+    const hasFacial = types.includes(
+      LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION,
+    );
+    const hasFingerprint = types.includes(
+      LocalAuthentication.AuthenticationType.FINGERPRINT,
+    );
+
+    if (Platform.OS === "ios") {
+      if (hasFacial) return "Face ID";
+      if (hasFingerprint) return "Touch ID";
+      return null;
+    }
+    if (hasFacial) return "Face unlock";
+    if (hasFingerprint) return "Fingerprint";
+    return null;
+  } catch (error) {
+    console.error("[AppLock] Failed to read biometric capability:", error);
+    return null;
+  }
+}
+
+// `disableDeviceFallback: true` keeps the OS sheet biometric-only so our PIN
+// pad is the single fallback path — otherwise the device passcode becomes a
+// second, unmanaged way in (Story 13.4 Notes).
+export async function authenticateWithBiometrics(): Promise<boolean> {
+  if (!isAppLockSupported()) return false;
+  try {
+    const result = await LocalAuthentication.authenticateAsync({
+      disableDeviceFallback: true,
+      cancelLabel: "Use PIN",
+    });
+    return result.success;
+  } catch (error) {
+    console.error("[AppLock] Biometric authentication failed:", error);
+    return false;
   }
 }
 

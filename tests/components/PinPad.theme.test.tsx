@@ -1,11 +1,18 @@
 import React from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
 import { StyleSheet } from "react-native";
 
 import { PinPad } from "@/components/ui/PinPad";
 import { ThemeContext } from "@/lib/theme-provider";
 import { getThemeTokens, type ThemeId } from "@/lib/_core/theme";
+
+vi.mock("@expo/vector-icons", () => {
+  const Ionicons = ({ name }: { name: string }) =>
+    React.createElement("Ionicons", { name });
+  (Ionicons as any).glyphMap = { "finger-print": 1 };
+  return { Ionicons };
+});
 
 function renderUnderTheme(element: React.ReactElement, themeId: ThemeId) {
   const theme = getThemeTokens(themeId, "dark");
