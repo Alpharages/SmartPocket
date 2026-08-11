@@ -1,5 +1,12 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { AppState, Text, View, type AppStateStatus } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  AppState,
+  BackHandler,
+  Text,
+  View,
+  type AppStateStatus,
+} from "react-native";
 
 import { PinPad } from "@/components/ui/PinPad";
 import { useThemeTokens } from "@/lib/theme-provider";
@@ -9,6 +16,15 @@ import { isAppLockSupported, isPinSet, verifyPin } from "@/lib/app-lock";
 // AuthGate) — it needs to paint an opaque layer over the whole navigator, not
 // just redirect. Children are always mounted so navigation state survives a
 // lock/unlock cycle; the overlay is what gates visibility.
+//
+// Known limitation (round-2 review D1): this overlay is a React sibling
+// positioned absolutely within the RN root view. `react-native-screens`
+// presents `transparentModal`/`fullScreenModal` routes (add-transaction,
+// budget-form, loan/record-repayment, login) as native view controllers
+// *above* that root view — the same constraint already documented in
+// components/ui/ConfirmProvider.tsx for a root-hosted Modal. Backgrounding
+// while one of those routes is open can leave it visible over the lock.
+// Tracked as a pending dev-clarification on the story ticket; not fixed here.
 type GateState = "checking" | "unlocked" | "locked";
 
 const ERROR_FLASH_MS = 600;
@@ -24,24 +40,56 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     supported ? "checking" : "unlocked",
   );
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // Bumped by every lock-state-deciding transition (mount check, background
+  // re-check) so a slower-resolving async result can never overwrite a
+  // decision made after it started — e.g. a correct-PIN verify that resolves
+  // just as the app backgrounds again must not unlock the newer lock.
+  const epochRef = useRef(0);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateRef = useRef(state);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  const clearErrorTimer = useCallback(() => {
+    if (errorTimerRef.current !== null) {
+      clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = null;
+    }
+  }, []);
+
+  const flashError = useCallback(
+    (message: string) => {
+      clearErrorTimer();
+      setErrorMessage(message);
+      setError(true);
+      errorTimerRef.current = setTimeout(() => {
+        errorTimerRef.current = null;
+        setError(false);
+      }, ERROR_FLASH_MS);
+    },
+    [clearErrorTimer],
+  );
 
   useEffect(() => {
     if (!supported) return;
-    let cancelled = false;
+    epochRef.current += 1;
+    const epoch = epochRef.current;
     isPinSet()
       .then((pinIsSet) => {
-        if (cancelled) return;
+        if (epochRef.current !== epoch) return;
         // `null` means the storage read failed, not that no PIN exists — fail
         // closed rather than risk leaving financial data unlocked because a
         // Keystore/Keychain read errored.
         setState(pinIsSet === false ? "unlocked" : "locked");
       })
       .catch(() => {
-        if (!cancelled) setState("locked");
+        if (epochRef.current === epoch) setState("locked");
       });
-    return () => {
-      cancelled = true;
-    };
   }, [supported]);
 
   useEffect(() => {
@@ -54,39 +102,86 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
         // and permission prompts, and re-locking mid-flow would be a bug, not
         // a feature.
         if (nextState !== "background") return;
-        // Re-read on every background transition (not cached) so a PIN
-        // set/cleared from Settings takes effect without an app restart.
-        void isPinSet().then((pinIsSet) => {
-          if (pinIsSet !== false) setState("locked");
-        });
+        // Lock synchronously — the JS thread can suspend shortly after
+        // backgrounding on iOS, so waiting for the isPinSet() round-trip to
+        // resolve before covering risks painting the unlocked tree first on
+        // return. Re-read live (not cached) so a PIN cleared from Settings
+        // still un-gates on this same transition.
+        epochRef.current += 1;
+        const epoch = epochRef.current;
+        setState("locked");
+        isPinSet()
+          .then((pinIsSet) => {
+            if (epochRef.current !== epoch) return;
+            if (pinIsSet === false) setState("unlocked");
+          })
+          .catch(() => {
+            // Already fail-closed (locked) from the synchronous set above.
+          });
       },
     );
     return () => subscription.remove();
   }, [supported]);
 
-  const handleSubmit = useCallback((pin: string) => {
-    verifyPin(pin)
-      .then((verified) => {
-        if (verified) {
-          setError(false);
-          setState("unlocked");
-        } else {
-          setError(true);
-          setTimeout(() => setError(false), ERROR_FLASH_MS);
-        }
-      })
-      .catch(() => {
-        setError(true);
-        setTimeout(() => setError(false), ERROR_FLASH_MS);
-      });
-  }, []);
+  useEffect(() => {
+    if (!supported) return;
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => stateRef.current !== "unlocked",
+    );
+    return () => subscription.remove();
+  }, [supported]);
+
+  useEffect(() => clearErrorTimer, [clearErrorTimer]);
+
+  const handleKeyPress = useCallback(() => {
+    clearErrorTimer();
+    setError(false);
+  }, [clearErrorTimer]);
+
+  const handleSubmit = useCallback(
+    (pin: string) => {
+      const epoch = epochRef.current;
+      setSubmitting(true);
+      verifyPin(pin)
+        .then((verified) => {
+          if (epochRef.current !== epoch) return;
+          if (verified) {
+            clearErrorTimer();
+            setError(false);
+            setState("unlocked");
+          } else if (verified === null) {
+            flashError("Couldn't verify your PIN. Try again.");
+          } else {
+            flashError("Incorrect PIN. Try again.");
+          }
+        })
+        .catch(() => {
+          if (epochRef.current === epoch) {
+            flashError("Couldn't verify your PIN. Try again.");
+          }
+        })
+        .finally(() => {
+          if (epochRef.current === epoch) setSubmitting(false);
+        });
+    },
+    [clearErrorTimer, flashError],
+  );
 
   return (
     <>
-      {children}
+      <View
+        style={{ flex: 1 }}
+        importantForAccessibility={
+          state !== "unlocked" ? "no-hide-descendants" : "auto"
+        }
+      >
+        {children}
+      </View>
       {state !== "unlocked" ? (
         <View
           testID="app-lock-overlay"
+          accessibilityViewIsModal
           style={{
             position: "absolute",
             top: 0,
@@ -96,13 +191,15 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: colors.background,
+            zIndex: 10000,
+            elevation: 10000,
           }}
         >
           {state === "locked" ? (
             <>
               <Text
                 style={{
-                  marginBottom: 32,
+                  marginBottom: 16,
                   fontSize: 20,
                   fontWeight: "600",
                   color: colors.foreground,
@@ -110,9 +207,26 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
               >
                 Enter your PIN
               </Text>
-              <PinPad onSubmit={handleSubmit} error={error} />
+              <Text
+                style={{
+                  marginBottom: 16,
+                  minHeight: 18,
+                  fontSize: 13,
+                  color: colors.error,
+                }}
+              >
+                {errorMessage}
+              </Text>
+              <PinPad
+                onSubmit={handleSubmit}
+                onKeyPress={handleKeyPress}
+                error={error}
+                disabled={submitting}
+              />
             </>
-          ) : null}
+          ) : (
+            <ActivityIndicator color={colors.primary} />
+          )}
         </View>
       ) : null}
     </>
