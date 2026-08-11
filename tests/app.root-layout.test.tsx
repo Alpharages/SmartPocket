@@ -27,6 +27,14 @@ const runtime = vi.hoisted(() => ({
   subscribeSafeAreaInsets: vi.fn(() => vi.fn()),
 }));
 
+// AuthGate's useAuth() (real, unmocked) now pulls in hooks/use-auth.ts's
+// logout()-clears-app-lock (Story 13.5), which imports lib/app-lock.ts and
+// thus the real `expo-secure-store` — stub it for the same reason `auth`
+// above is stubbed (see the AppLockGate comment below).
+const appLock = vi.hoisted(() => ({
+  clearAppLock: vi.fn(),
+}));
+
 const oauth = vi.hoisted(() => ({
   getApiBaseUrl: vi.fn(() => "http://localhost:3000"),
   SESSION_TOKEN_KEY: "app_session_token",
@@ -72,6 +80,7 @@ const appLockGate = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/_core/auth", () => auth);
+vi.mock("@/lib/app-lock", () => appLock);
 vi.mock("@/lib/_core/manus-runtime", () => runtime);
 vi.mock("@/constants/oauth", () => oauth);
 vi.mock("@/lib/trpc", () => trpc);
