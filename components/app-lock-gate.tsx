@@ -9,7 +9,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
+import { Button } from "@/components/ui/Button";
 import { PinPad } from "@/components/ui/PinPad";
+import { useAuth } from "@/hooks/use-auth";
+import { confirmDestructive } from "@/lib/confirm-dialog";
 import { useThemeTokens } from "@/lib/theme-provider";
 import { isAppLockSupported, isPinSet, verifyPin } from "@/lib/app-lock";
 
@@ -47,6 +50,8 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [forgettingPin, setForgettingPin] = useState(false);
+  const { logout } = useAuth({ autoFetch: false });
 
   // Bumped by every lock-state-deciding transition (mount check, background
   // re-check) so a slower-resolving async result can never overwrite a
@@ -195,6 +200,33 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     [clearErrorTimer, flashError],
   );
 
+  // logout() clears the PIN and biometric preference itself (hooks/use-auth.ts)
+  // so this only has to sign out and leave — there's no lock state left to
+  // re-check. Bump the epoch first so a verify/isPinSet already in flight
+  // can't re-lock or unlock behind this decision.
+  const handleForgotPin = useCallback(async () => {
+    const confirmed = await confirmDestructive({
+      title: "Forgot PIN?",
+      message:
+        "This signs you out. You'll get back in with your account sign-in, and can set a new PIN from Settings.",
+      confirmLabel: "Sign Out",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
+    epochRef.current += 1;
+    setForgettingPin(true);
+    try {
+      await logout();
+      clearErrorTimer();
+      setError(false);
+      setState("unlocked");
+      routerRef.current.replace("/login");
+    } finally {
+      setForgettingPin(false);
+    }
+  }, [logout, clearErrorTimer]);
+
   return (
     <>
       <View
@@ -248,7 +280,15 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
                 onSubmit={handleSubmit}
                 onKeyPress={handleKeyPress}
                 error={error}
-                disabled={submitting}
+                disabled={submitting || forgettingPin}
+              />
+              <Button
+                variant="ghost"
+                label="Forgot PIN?"
+                onPress={handleForgotPin}
+                disabled={submitting || forgettingPin}
+                loading={forgettingPin}
+                style={{ marginTop: 24 }}
               />
             </>
           ) : (

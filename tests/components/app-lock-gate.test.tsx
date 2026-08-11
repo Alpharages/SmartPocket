@@ -51,11 +51,26 @@ vi.mock("@/lib/app-lock", () => appLock);
 const routerMock = vi.hoisted(() => ({
   canDismiss: vi.fn(() => false),
   dismissAll: vi.fn(),
+  replace: vi.fn(),
 }));
 
 vi.mock("expo-router", () => ({
   useRouter: () => routerMock,
 }));
+
+const authMock = vi.hoisted(() => ({
+  logout: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => authMock,
+}));
+
+const confirmDialog = vi.hoisted(() => ({
+  confirmDestructive: vi.fn(),
+}));
+
+vi.mock("@/lib/confirm-dialog", () => confirmDialog);
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -156,6 +171,9 @@ beforeEach(() => {
   appLock.verifyPin.mockReset();
   routerMock.canDismiss.mockReset().mockReturnValue(false);
   routerMock.dismissAll.mockReset();
+  routerMock.replace.mockReset();
+  authMock.logout.mockReset().mockResolvedValue(undefined);
+  confirmDialog.confirmDestructive.mockReset().mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -524,5 +542,64 @@ describe("AppLockGate", () => {
 
     expect(routerMock.dismissAll).toHaveBeenCalledTimes(1);
     expect(overlay(root)).toHaveLength(1);
+  });
+
+  describe("Forgot PIN (Story 13.5)", () => {
+    it("shows a 'Forgot PIN?' action on the lock screen", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      const root = renderGate();
+      await flush();
+
+      expect(findKey(root, "Forgot PIN?")).toBeTruthy();
+    });
+
+    it("asks for confirmation before doing anything, and does nothing if cancelled", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      confirmDialog.confirmDestructive.mockResolvedValue(false);
+      const root = renderGate();
+      await flush();
+
+      await act(async () => {
+        findKey(root, "Forgot PIN?").props.onPress?.();
+        await Promise.resolve();
+      });
+
+      expect(confirmDialog.confirmDestructive).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: expect.stringMatching(/forgot pin/i),
+        }),
+      );
+      expect(authMock.logout).not.toHaveBeenCalled();
+      expect(routerMock.replace).not.toHaveBeenCalled();
+      // Still locked — cancelling must not touch the app lock.
+      expect(overlay(root)).toHaveLength(1);
+    });
+
+    it("on confirm, signs out and drops the user on /login (AC1)", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      confirmDialog.confirmDestructive.mockResolvedValue(true);
+      const root = renderGate();
+      await flush();
+
+      await act(async () => {
+        findKey(root, "Forgot PIN?").props.onPress?.();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(authMock.logout).toHaveBeenCalledTimes(1);
+      expect(routerMock.replace).toHaveBeenCalledWith("/login");
+      // The gate itself no longer blocks — logout() clears the PIN.
+      expect(overlay(root)).toHaveLength(0);
+    });
+
+    it("does not offer Forgot PIN while still checking whether a PIN is set", () => {
+      appLock.isPinSet.mockReturnValue(new Promise(() => {})); // never resolves
+      const root = renderGate();
+
+      expect(
+        pinKeys(root).some((n) => n.props.accessibilityLabel === "Forgot PIN?"),
+      ).toBe(false);
+    });
   });
 });

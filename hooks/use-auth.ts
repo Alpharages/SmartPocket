@@ -1,5 +1,6 @@
 import * as Api from "@/lib/_core/api";
 import * as Auth from "@/lib/_core/auth";
+import { clearAppLock } from "@/lib/app-lock";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 
@@ -58,7 +59,7 @@ export function useAuth(options?: UseAuthOptions) {
     } catch (err) {
       const error =
         err instanceof Error ? err : new Error("Failed to fetch user");
-      
+
       setError(error);
       setUser(null);
     } finally {
@@ -75,6 +76,14 @@ export function useAuth(options?: UseAuthOptions) {
     } finally {
       await Auth.removeSessionToken();
       await Auth.clearUserInfo();
+      try {
+        // Cleared here (not at each sign-out call site) so every path —
+        // Settings, Forgot PIN, any future one — clears a device-local PIN
+        // that would otherwise belong to nobody after the next sign-in.
+        await clearAppLock();
+      } catch (err) {
+        console.error("[Auth] Failed to clear app lock:", err);
+      }
       setUser(null);
       setError(null);
     }
