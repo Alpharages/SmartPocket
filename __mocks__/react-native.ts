@@ -232,3 +232,35 @@ export const Keyboard = {
   dismiss: () => {},
   addListener: () => ({ remove: () => {} }),
 };
+
+export type AppStateStatus = "active" | "background" | "inactive";
+type AppStateListener = (status: AppStateStatus) => void;
+
+let appStateListeners: AppStateListener[] = [];
+let appStateCurrent: AppStateStatus = "active";
+
+export const AppState = {
+  get currentState() {
+    return appStateCurrent;
+  },
+  addEventListener: (_event: "change", listener: AppStateListener) => {
+    appStateListeners.push(listener);
+    return {
+      remove: () => {
+        appStateListeners = appStateListeners.filter((l) => l !== listener);
+      },
+    };
+  },
+};
+
+// Test-only helpers — simulate a native AppState transition and reset
+// between tests (there is no real OS driving `currentState` here).
+export function __emitAppStateChange(status: AppStateStatus): void {
+  appStateCurrent = status;
+  for (const listener of appStateListeners) listener(status);
+}
+
+export function __resetAppStateMock(): void {
+  appStateListeners = [];
+  appStateCurrent = "active";
+}

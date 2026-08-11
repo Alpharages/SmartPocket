@@ -59,6 +59,18 @@ const providers = vi.hoisted(() => ({
     React.createElement("ExpenseProvider", {}, children),
 }));
 
+// This suite covers dev-auth bootstrap, not app-lock behavior (see
+// tests/components/app-lock-gate.test.tsx for that) — stub it as a
+// pass-through so it doesn't pull in the real `expo-secure-store` module.
+// Rendered as a named host node (not a Fragment) so its position relative to
+// <Stack> stays assertable here — a stub a test can't see through can hide a
+// placement regression the way it did for ConfirmProvider (Lore lesson
+// 6dfb8e49-af88-4dd4-a90c-b78764001847).
+const appLockGate = vi.hoisted(() => ({
+  AppLockGate: ({ children }: { children: React.ReactNode }) =>
+    React.createElement("AppLockGate", {}, children),
+}));
+
 vi.mock("@/lib/_core/auth", () => auth);
 vi.mock("@/lib/_core/manus-runtime", () => runtime);
 vi.mock("@/constants/oauth", () => oauth);
@@ -68,6 +80,7 @@ vi.mock("@/lib/currency-provider", () => providers);
 vi.mock("@/lib/first-day-of-week-provider", () => providers);
 vi.mock("@/lib/settings-provider", () => providers);
 vi.mock("@/lib/expense-context", () => providers);
+vi.mock("@/components/app-lock-gate", () => appLockGate);
 vi.mock("@/components/ui/ToastProvider", () => providers);
 vi.mock("@/components/ui/ConfirmProvider", () => providers);
 vi.mock("expo-router", () => ({
@@ -205,6 +218,32 @@ describe("RootLayout dev auth bootstrap", () => {
       renderer!.root.findByType(
         "ExpenseProvider" as unknown as React.ElementType,
       ),
+    ).toBeTruthy();
+  });
+
+  it("mounts AppLockGate wrapping the Stack navigator, not as a sibling", async () => {
+    (
+      globalThis as typeof globalThis & {
+        localStorage: LocalStorageLike;
+      }
+    ).localStorage.setItem(oauth.SESSION_TOKEN_KEY, "existing-token");
+    auth.getSessionToken.mockResolvedValueOnce("existing-token");
+
+    act(() => {
+      renderer = TestRenderer.create(<RootLayout />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const gate = renderer!.root.findByType(
+      "AppLockGate" as unknown as React.ElementType,
+    );
+    // AC: AppLockGate must wrap <Stack> (paint over the whole navigator),
+    // unlike AuthGate, which is a null-rendering sibling — a stub that hides
+    // this composition can't catch a regression that demotes it to a sibling.
+    expect(
+      gate.findByType("Stack" as unknown as React.ElementType),
     ).toBeTruthy();
   });
 
