@@ -1,6 +1,7 @@
 import * as Api from "@/lib/_core/api";
 import * as Auth from "@/lib/_core/auth";
 import { clearAppLock } from "@/lib/app-lock";
+import { trpc } from "@/lib/trpc";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 
@@ -13,6 +14,7 @@ export function useAuth(options?: UseAuthOptions) {
   const [user, setUser] = useState<Auth.User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const clearServerPinMutation = trpc.security.clearPin.useMutation();
 
   const fetchUser = useCallback(async () => {
     try {
@@ -74,6 +76,15 @@ export function useAuth(options?: UseAuthOptions) {
       console.error("[Auth] Logout API call failed:", err);
       // Continue with logout even if API call fails
     } finally {
+      try {
+        // Must run before removeSessionToken() below — the request needs the
+        // still-valid auth header. Best-effort: every sign-out path (Settings
+        // disable, Forgot PIN) should drop the account-linked PIN too, but a
+        // failure here must never block the local session teardown.
+        await clearServerPinMutation.mutateAsync();
+      } catch (err) {
+        console.error("[Auth] Failed to clear account-linked PIN:", err);
+      }
       await Auth.removeSessionToken();
       await Auth.clearUserInfo();
       try {
@@ -87,7 +98,7 @@ export function useAuth(options?: UseAuthOptions) {
       setUser(null);
       setError(null);
     }
-  }, []);
+  }, [clearServerPinMutation]);
 
   const isAuthenticated = useMemo(() => Boolean(user), [user]);
 

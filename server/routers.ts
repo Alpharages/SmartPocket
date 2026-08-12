@@ -11,8 +11,10 @@ import {
   hashPin,
   verifyPinHash,
   isPinLocked,
-  recordFailedAttempt,
   MAX_PIN_ATTEMPTS,
+  PIN_LOCKOUT_MS,
+  isSetPinThrottled,
+  recordSetPinAttempt,
 } from "./_core/pin-crypto";
 
 // ============================================================================
@@ -1180,6 +1182,46 @@ const PIN_INPUT = z.object({
   pin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
 });
 
+/** setPin/clearPin optionally take the current PIN — required once a hash already exists (N4). */
+const PIN_WRITE_INPUT = PIN_INPUT.extend({
+  currentPin: z
+    .string()
+    .regex(/^\d{4}$/, "PIN must be exactly 4 digits")
+    .optional(),
+});
+
+/**
+ * Verifies proof of ownership before overwriting an existing PIN with a new
+ * one. No hash exists yet → nothing to prove, first sync is allowed through.
+ * A hash exists → `currentPin` is required and must match; a bare valid
+ * session is not sufficient proof to silently swap out someone's PIN (N4).
+ *
+ * `clearPin` deliberately does NOT require this: dropping the account link
+ * entirely is what the Forgot-PIN/sign-out path needs to do precisely when
+ * the caller does *not* know the PIN (N1) — gating it on proof-of-PIN would
+ * make that path impossible. An authenticated session is already the trust
+ * boundary for "unsync this device's PIN", same as any other sign-out action.
+ */
+async function assertCurrentPinProof(
+  userId: number,
+  existingHash: string | null,
+  currentPin: string | undefined,
+): Promise<void> {
+  if (existingHash === null) return;
+  if (!currentPin) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "currentPin is required to change an existing PIN",
+    });
+  }
+  if (!(await verifyPinHash(currentPin, existingHash))) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Incorrect current PIN",
+    });
+  }
+}
+
 const securityRouter = router({
   getPinStatus: protectedProcedure.query(async ({ ctx }) => {
     const state = await db.getUserPinState(ctx.user.id);
@@ -1187,9 +1229,20 @@ const securityRouter = router({
   }),
 
   setPin: protectedProcedure
-    .input(PIN_INPUT)
+    .input(PIN_WRITE_INPUT)
     .mutation(async ({ ctx, input }) => {
-      const hash = hashPin(input.pin);
+      const now = Date.now();
+      if (isSetPinThrottled(ctx.user.id, now)) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Please wait a moment before changing your PIN again.",
+        });
+      }
+      recordSetPinAttempt(ctx.user.id, now);
+
+      const state = await db.getUserPinState(ctx.user.id);
+      await assertCurrentPinProof(ctx.user.id, state.pinHash, input.currentPin);
+      const hash = await hashPin(input.pin);
       await db.setUserPin(ctx.user.id, hash);
       return { pinSet: true };
     }),
@@ -1202,6 +1255,11 @@ const securityRouter = router({
   verifyPin: protectedProcedure
     .input(PIN_INPUT)
     .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+      // B2: normalize a stale lockout before evaluating, so a lock that has
+      // already expired can never re-trigger from leftover attempt count.
+      await db.resetExpiredPinLockout(ctx.user.id, now);
+
       const state = await db.getUserPinState(ctx.user.id);
 
       if (!state.pinHash) {
@@ -1211,32 +1269,53 @@ const securityRouter = router({
         });
       }
 
-      const now = new Date();
       const attemptState = {
         failedAttempts: state.pinFailedAttempts,
         lockedUntil: state.pinLockedUntil,
       };
       if (isPinLocked(attemptState, now)) {
+        // N8: include the timestamp so the client can render a countdown
+        // instead of polling (which, under B1's guard, would never count
+        // against a locked account, but still shouldn't be needed).
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
-          message: "Too many attempts. Try again later.",
+          message: `Too many attempts. Try again after ${state.pinLockedUntil!.toISOString()}.`,
         });
       }
 
-      if (verifyPinHash(input.pin, state.pinHash)) {
-        await db.recordPinAttemptResult(ctx.user.id, {
-          failedAttempts: 0,
-          lockedUntil: null,
-        });
+      if (await verifyPinHash(input.pin, state.pinHash)) {
+        await db.resetPinAttempts(ctx.user.id);
         return { valid: true as const };
       }
 
-      const next = recordFailedAttempt(attemptState, now);
-      await db.recordPinAttemptResult(ctx.user.id, next);
+      // B1: the increment itself is a single atomic, guarded SQL UPDATE —
+      // never a JS read-modify-write. If the WHERE guard excluded our row
+      // (a concurrent request locked it first), our guess was not counted;
+      // report the lock instead of a false "still guessing" result.
+      const { counted } = await db.recordFailedPinAttempt(ctx.user.id, {
+        maxAttempts: MAX_PIN_ATTEMPTS,
+        lockedUntilIfTripped: new Date(now.getTime() + PIN_LOCKOUT_MS),
+        now,
+      });
+
+      if (!counted) {
+        const latest = await db.getUserPinState(ctx.user.id);
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: `Too many attempts. Try again after ${latest.pinLockedUntil?.toISOString() ?? ""}.`,
+        });
+      }
+
+      const latest = await db.getUserPinState(ctx.user.id);
       return {
         valid: false as const,
-        attemptsRemaining: Math.max(0, MAX_PIN_ATTEMPTS - next.failedAttempts),
-        lockedUntil: next.lockedUntil ? next.lockedUntil.toISOString() : null,
+        attemptsRemaining: Math.max(
+          0,
+          MAX_PIN_ATTEMPTS - latest.pinFailedAttempts,
+        ),
+        lockedUntil: latest.pinLockedUntil
+          ? latest.pinLockedUntil.toISOString()
+          : null,
       };
     }),
 });

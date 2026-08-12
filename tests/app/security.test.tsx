@@ -14,6 +14,7 @@ const appLock = vi.hoisted(() => ({
   isAppLockSupported: vi.fn(() => true),
   isPinSet: vi.fn(),
   setPin: vi.fn(),
+  getPin: vi.fn(),
   verifyPin: vi.fn(),
   clearAppLock: vi.fn(),
   getBiometricLabel: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock("@/components/ui/ToastProvider", () => ({
 const security = vi.hoisted(() => ({
   setPinMutateAsync: vi.fn().mockResolvedValue({ pinSet: true }),
   clearPinMutateAsync: vi.fn().mockResolvedValue({ pinSet: false }),
+  pinStatusData: { pinSet: false } as { pinSet: boolean } | undefined,
 }));
 
 vi.mock("@/lib/trpc", () => ({
@@ -42,6 +44,9 @@ vi.mock("@/lib/trpc", () => ({
       },
       clearPin: {
         useMutation: () => ({ mutateAsync: security.clearPinMutateAsync }),
+      },
+      getPinStatus: {
+        useQuery: () => ({ data: security.pinStatusData }),
       },
     },
   },
@@ -172,6 +177,7 @@ beforeEach(() => {
   appLock.isAppLockSupported.mockReturnValue(true);
   appLock.isPinSet.mockReset().mockResolvedValue(false);
   appLock.setPin.mockReset().mockResolvedValue(undefined);
+  appLock.getPin.mockReset().mockResolvedValue(null);
   appLock.verifyPin.mockReset().mockResolvedValue(true);
   appLock.clearAppLock.mockReset().mockResolvedValue(undefined);
   appLock.getBiometricLabel.mockReset().mockResolvedValue(null);
@@ -180,6 +186,7 @@ beforeEach(() => {
   toast.show.mockReset();
   security.setPinMutateAsync.mockReset().mockResolvedValue({ pinSet: true });
   security.clearPinMutateAsync.mockReset().mockResolvedValue({ pinSet: false });
+  security.pinStatusData = { pinSet: false };
 });
 
 afterEach(() => {
@@ -329,6 +336,98 @@ describe("SecurityScreen", () => {
     await submitPin(root, "5678");
     await submitPin(root, "5678");
     expect(appLock.setPin).toHaveBeenCalledWith("5678");
+  });
+
+  it("proves the just-verified old PIN to the server when syncing a changed PIN (N4)", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      findPressableByLabel(root, "Change PIN").props.onPress();
+    });
+
+    appLock.verifyPin.mockResolvedValue(true);
+    await submitPin(root, "1111");
+    await submitPin(root, "5678");
+    await submitPin(root, "5678");
+
+    expect(security.setPinMutateAsync).toHaveBeenCalledWith({
+      pin: "5678",
+      currentPin: "1111",
+    });
+  });
+
+  it("syncs a fresh (first-time) PIN without a currentPin, since there is nothing to prove yet", async () => {
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+
+    expect(security.setPinMutateAsync).toHaveBeenCalledWith({
+      pin: "1234",
+      currentPin: undefined,
+    });
+  });
+
+  describe("account reconcile (B3 backfill / N2 self-heal)", () => {
+    it("pushes an existing local PIN to the server when the account has none synced yet", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getPin.mockResolvedValue("4321");
+      security.pinStatusData = { pinSet: false };
+
+      render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      expect(security.setPinMutateAsync).toHaveBeenCalledWith({
+        pin: "4321",
+        currentPin: undefined,
+      });
+    });
+
+    it("does not push when the account already has a synced PIN", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getPin.mockResolvedValue("4321");
+      security.pinStatusData = { pinSet: true };
+
+      render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      expect(security.setPinMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it("does not push when this device has no local PIN, regardless of server state", async () => {
+      appLock.isPinSet.mockResolvedValue(false);
+      security.pinStatusData = { pinSet: true };
+
+      render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      expect(security.setPinMutateAsync).not.toHaveBeenCalled();
+      expect(appLock.getPin).not.toHaveBeenCalled();
+    });
+
+    it("does not push while the server status query hasn't resolved yet", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getPin.mockResolvedValue("4321");
+      security.pinStatusData = undefined;
+
+      render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      expect(security.setPinMutateAsync).not.toHaveBeenCalled();
+    });
   });
 
   it("requires the current PIN and clears the lock when App Lock is turned off", async () => {

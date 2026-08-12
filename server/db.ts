@@ -158,7 +158,8 @@ export interface UserPinState {
 export async function getUserPinState(userId: number): Promise<UserPinState> {
   const result = await callDataApi("Database/query", {
     body: {
-      query: "SELECT * FROM users WHERE id = ?",
+      query:
+        "SELECT pinHash, pinFailedAttempts, pinLockedUntil FROM users WHERE id = ?",
       params: [userId],
     },
   });
@@ -201,17 +202,62 @@ export async function clearUserPin(userId: number): Promise<void> {
   });
 }
 
-export async function recordPinAttemptResult(
-  userId: number,
-  data: { failedAttempts: number; lockedUntil: Date | null },
-): Promise<void> {
+/** Clears failed-attempt/lockout state without touching the hash — used after a successful verify. */
+export async function resetPinAttempts(userId: number): Promise<void> {
   await callDataApi("Database/query", {
     body: {
       query:
         "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-      params: [data.failedAttempts, data.lockedUntil, userId],
+      params: [0, null, userId],
     },
   });
+}
+
+/**
+ * Idempotent, atomic: clears attempt state only if the current lockout has
+ * already passed. Always safe to call — a no-op when not locked or still
+ * locked. Run before evaluating a verify attempt so a stale lockout can't
+ * permanently re-trigger on the next failure (round-2 review B2).
+ */
+export async function resetExpiredPinLockout(
+  userId: number,
+  now: Date,
+): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ? AND pinLockedUntil IS NOT NULL AND pinLockedUntil <= ?",
+      params: [0, null, userId, now],
+    },
+  });
+}
+
+/**
+ * Atomically increments the failure counter and locks once the threshold is
+ * crossed, in a single guarded UPDATE — not a JS read-then-write. The WHERE
+ * clause excludes a row that is already locked (or was locked by a
+ * concurrent request between this request's read and this write), so
+ * `counted: false` tells the caller its guess was not actually counted and
+ * the account should be reported as locked instead. A single-row UPDATE like
+ * this is atomic under InnoDB's row-level locking, which is what makes this
+ * race-safe under concurrent requests (round-2 review B1).
+ */
+export async function recordFailedPinAttempt(
+  userId: number,
+  data: { maxAttempts: number; lockedUntilIfTripped: Date; now: Date },
+): Promise<{ counted: boolean }> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE users SET pinFailedAttempts = pinFailedAttempts + 1, pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL) WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
+      params: [data.maxAttempts, data.lockedUntilIfTripped, userId, data.now],
+    },
+  });
+  const affectedRows =
+    result && typeof result === "object" && "affectedRows" in result
+      ? (result as { affectedRows: number }).affectedRows
+      : 0;
+  return { counted: affectedRows > 0 };
 }
 
 // ============================================================================
@@ -1015,6 +1061,9 @@ export async function deleteAllUserData(userId: number) {
       params: [userId],
     },
   });
+  // N7: "clear all data" must also drop the account-linked PIN — otherwise a
+  // wiped account keeps a stale hash and lockout state.
+  await clearUserPin(userId);
 }
 
 export async function getTransactionById(id: number, userId: number) {

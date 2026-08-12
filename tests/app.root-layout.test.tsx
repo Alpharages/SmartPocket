@@ -45,6 +45,12 @@ const trpc = vi.hoisted(() => ({
   trpc: {
     Provider: ({ children }: { children: React.ReactNode }) =>
       React.createElement("TrpcProvider", {}, children),
+    // AuthGate -> useAuth() (real, unmocked) calls trpc.security.clearPin
+    // as part of logout() (Story 13.6, N1) — stub it so the mutation hook
+    // resolves instead of throwing when `trpc.security` is undefined.
+    security: {
+      clearPin: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+    },
   },
   Provider: ({ children }: { children: React.ReactNode }) =>
     React.createElement("TrpcProvider", {}, children),

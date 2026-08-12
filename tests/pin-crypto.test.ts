@@ -3,47 +3,52 @@ import {
   hashPin,
   verifyPinHash,
   isPinLocked,
-  recordFailedAttempt,
   MAX_PIN_ATTEMPTS,
-  PIN_LOCKOUT_MS,
 } from "@/server/_core/pin-crypto";
 
 describe("hashPin / verifyPinHash", () => {
-  it("round-trips a correct PIN", () => {
-    const stored = hashPin("1234");
-    expect(verifyPinHash("1234", stored)).toBe(true);
+  it("round-trips a correct PIN", async () => {
+    const stored = await hashPin("1234");
+    await expect(verifyPinHash("1234", stored)).resolves.toBe(true);
   });
 
-  it("rejects a wrong PIN", () => {
-    const stored = hashPin("1234");
-    expect(verifyPinHash("4321", stored)).toBe(false);
+  it("rejects a wrong PIN", async () => {
+    const stored = await hashPin("1234");
+    await expect(verifyPinHash("4321", stored)).resolves.toBe(false);
   });
 
-  it("never stores the plaintext PIN in the hash string", () => {
-    const stored = hashPin("1234");
+  it("never stores the plaintext PIN in the hash string", async () => {
+    const stored = await hashPin("1234");
     expect(stored).not.toContain("1234");
   });
 
-  it("produces a different hash for the same PIN (unique salt)", () => {
-    const a = hashPin("1234");
-    const b = hashPin("1234");
+  it("produces a different hash for the same PIN (unique salt)", async () => {
+    const a = await hashPin("1234");
+    const b = await hashPin("1234");
     expect(a).not.toBe(b);
   });
 
-  it("throws for a non-4-digit PIN", () => {
-    expect(() => hashPin("123")).toThrow(/4 digits/);
-    expect(() => hashPin("12345")).toThrow(/4 digits/);
-    expect(() => hashPin("abcd")).toThrow(/4 digits/);
+  it("throws for a non-4-digit PIN", async () => {
+    await expect(hashPin("123")).rejects.toThrow(/4 digits/);
+    await expect(hashPin("12345")).rejects.toThrow(/4 digits/);
+    await expect(hashPin("abcd")).rejects.toThrow(/4 digits/);
   });
 
-  it("verifyPinHash returns false (not throw) for malformed stored hashes", () => {
-    expect(verifyPinHash("1234", "not-a-real-hash")).toBe(false);
-    expect(verifyPinHash("1234", "")).toBe(false);
+  it("verifyPinHash resolves false (not throw/reject) for malformed stored hashes", async () => {
+    await expect(verifyPinHash("1234", "not-a-real-hash")).resolves.toBe(false);
+    await expect(verifyPinHash("1234", "")).resolves.toBe(false);
   });
 
-  it("verifyPinHash returns false for a non-4-digit submitted PIN", () => {
-    const stored = hashPin("1234");
-    expect(verifyPinHash("12", stored)).toBe(false);
+  it("verifyPinHash resolves false for a non-4-digit submitted PIN", async () => {
+    const stored = await hashPin("1234");
+    await expect(verifyPinHash("12", stored)).resolves.toBe(false);
+  });
+
+  it("fails closed on a truncated/corrupted stored hash instead of comparing short (N5)", async () => {
+    const stored = await hashPin("1234");
+    const [prefix, saltB64] = stored.split(":");
+    const truncated = `${prefix}:${saltB64}:AAAA`;
+    await expect(verifyPinHash("1234", truncated)).resolves.toBe(false);
   });
 });
 
@@ -58,37 +63,18 @@ describe("isPinLocked", () => {
 
   it("is locked when lockedUntil is in the future", () => {
     const future = new Date(now.getTime() + 1000);
-    expect(isPinLocked({ failedAttempts: 5, lockedUntil: future }, now)).toBe(
-      true,
-    );
+    expect(
+      isPinLocked(
+        { failedAttempts: MAX_PIN_ATTEMPTS, lockedUntil: future },
+        now,
+      ),
+    ).toBe(true);
   });
 
   it("is not locked when lockedUntil is in the past", () => {
     const past = new Date(now.getTime() - 1000);
-    expect(isPinLocked({ failedAttempts: 5, lockedUntil: past }, now)).toBe(
-      false,
-    );
-  });
-});
-
-describe("recordFailedAttempt", () => {
-  const now = new Date("2026-01-01T00:00:00Z");
-
-  it("increments failedAttempts without locking below the threshold", () => {
-    const next = recordFailedAttempt(
-      { failedAttempts: 0, lockedUntil: null },
-      now,
-    );
-    expect(next.failedAttempts).toBe(1);
-    expect(next.lockedUntil).toBeNull();
-  });
-
-  it("locks out once failedAttempts reaches MAX_PIN_ATTEMPTS", () => {
-    const next = recordFailedAttempt(
-      { failedAttempts: MAX_PIN_ATTEMPTS - 1, lockedUntil: null },
-      now,
-    );
-    expect(next.failedAttempts).toBe(MAX_PIN_ATTEMPTS);
-    expect(next.lockedUntil).toEqual(new Date(now.getTime() + PIN_LOCKOUT_MS));
+    expect(
+      isPinLocked({ failedAttempts: MAX_PIN_ATTEMPTS, lockedUntil: past }, now),
+    ).toBe(false);
   });
 });

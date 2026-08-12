@@ -22,6 +22,7 @@ const appLock = vi.hoisted(() => ({
   isAppLockSupported: vi.fn(() => true),
   isPinSet: vi.fn(),
   setPin: vi.fn(),
+  getPin: vi.fn(),
   verifyPin: vi.fn(),
   clearAppLock: vi.fn(),
   getBiometricLabel: vi.fn(),
@@ -43,6 +44,9 @@ vi.mock("@/lib/trpc", () => ({
         useMutation: () => ({
           mutateAsync: vi.fn().mockResolvedValue({ pinSet: false }),
         }),
+      },
+      getPinStatus: {
+        useQuery: () => ({ data: { pinSet: false } }),
       },
     },
   },
@@ -143,6 +147,7 @@ beforeEach(() => {
   appLock.isAppLockSupported.mockReturnValue(true);
   appLock.isPinSet.mockReset();
   appLock.setPin.mockReset().mockResolvedValue(undefined);
+  appLock.getPin.mockReset().mockResolvedValue(null);
   appLock.verifyPin.mockReset().mockResolvedValue(true);
   appLock.clearAppLock.mockReset().mockResolvedValue(undefined);
   appLock.getBiometricLabel.mockReset().mockResolvedValue(null);

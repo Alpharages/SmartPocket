@@ -41,6 +41,20 @@ export async function setPin(pin: string): Promise<void> {
   }
 }
 
+// Reads back the raw stored PIN — `verifyPin` already does this internally
+// to compare against a candidate; this exposes that same read for the
+// account-sync backfill (Story 13.6 B3), which needs the actual value to
+// push, not just a match/no-match result.
+export async function getPin(): Promise<string | null> {
+  if (!isAppLockSupported()) return null;
+  try {
+    return await SecureStore.getItemAsync(PIN_KEY);
+  } catch (error) {
+    console.error("[AppLock] Failed to read PIN:", error);
+    return null;
+  }
+}
+
 export async function verifyPin(pin: string): Promise<boolean | null> {
   if (!isAppLockSupported()) return null;
   try {
