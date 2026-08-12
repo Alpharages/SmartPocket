@@ -241,6 +241,15 @@ export async function resetExpiredPinLockout(
  * the account should be reported as locked instead. A single-row UPDATE like
  * this is atomic under InnoDB's row-level locking, which is what makes this
  * race-safe under concurrent requests (round-2 review B1).
+ *
+ * `pinLockedUntil` is assigned BEFORE `pinFailedAttempts` in the SET clause
+ * deliberately: MySQL evaluates multi-column UPDATE assignments left to
+ * right, and a later assignment sees the already-updated value of an
+ * earlier one — not the standard-SQL "all reads see the pre-update row"
+ * semantics. Computing the lock decision after the increment would read the
+ * post-increment count and trip the lockout one attempt early (round-2
+ * review R1). Assigning the lock first means its `IF` reads the original,
+ * pre-increment `pinFailedAttempts`.
  */
 export async function recordFailedPinAttempt(
   userId: number,
@@ -249,7 +258,7 @@ export async function recordFailedPinAttempt(
   const result = await callDataApi("Database/query", {
     body: {
       query:
-        "UPDATE users SET pinFailedAttempts = pinFailedAttempts + 1, pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL) WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
+        "UPDATE users SET pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL), pinFailedAttempts = pinFailedAttempts + 1 WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
       params: [data.maxAttempts, data.lockedUntilIfTripped, userId, data.now],
     },
   });

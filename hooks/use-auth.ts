@@ -1,7 +1,6 @@
 import * as Api from "@/lib/_core/api";
 import * as Auth from "@/lib/_core/auth";
 import { clearAppLock } from "@/lib/app-lock";
-import { trpc } from "@/lib/trpc";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 
@@ -14,7 +13,6 @@ export function useAuth(options?: UseAuthOptions) {
   const [user, setUser] = useState<Auth.User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const clearServerPinMutation = trpc.security.clearPin.useMutation();
 
   const fetchUser = useCallback(async () => {
     try {
@@ -76,21 +74,19 @@ export function useAuth(options?: UseAuthOptions) {
       console.error("[Auth] Logout API call failed:", err);
       // Continue with logout even if API call fails
     } finally {
-      try {
-        // Must run before removeSessionToken() below — the request needs the
-        // still-valid auth header. Best-effort: every sign-out path (Settings
-        // disable, Forgot PIN) should drop the account-linked PIN too, but a
-        // failure here must never block the local session teardown.
-        await clearServerPinMutation.mutateAsync();
-      } catch (err) {
-        console.error("[Auth] Failed to clear account-linked PIN:", err);
-      }
       await Auth.removeSessionToken();
       await Auth.clearUserInfo();
       try {
         // Cleared here (not at each sign-out call site) so every path —
         // Settings, Forgot PIN, any future one — clears a device-local PIN
         // that would otherwise belong to nobody after the next sign-in.
+        //
+        // Deliberately local-only: this used to also clear the account-linked
+        // server PIN, but logout() is *every* sign-out, not just Forgot PIN —
+        // that wiped a shared account PIN on an ordinary "Sign out" tap on
+        // any device (round-2 review R2). The account-linked PIN is cleared
+        // by the Forgot-PIN flow specifically (components/app-lock-gate.tsx),
+        // which is the one path defined by the user not knowing the PIN.
         await clearAppLock();
       } catch (err) {
         console.error("[Auth] Failed to clear app lock:", err);
@@ -98,7 +94,7 @@ export function useAuth(options?: UseAuthOptions) {
       setUser(null);
       setError(null);
     }
-  }, [clearServerPinMutation]);
+  }, []);
 
   const isAuthenticated = useMemo(() => Boolean(user), [user]);
 

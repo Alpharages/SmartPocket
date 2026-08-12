@@ -91,7 +91,21 @@ export function isPinLocked(state: PinAttemptState, now: Date): boolean {
 const SET_PIN_MIN_INTERVAL_MS = 2000;
 const lastSetPinAt = new Map<number, number>();
 
+/**
+ * Evicts every entry outside the throttle window. Called from the read side
+ * (checked on every `setPin`) rather than on a timer, so the map never
+ * needs its own scheduled cleanup — it just never grows past the number of
+ * users who changed their PIN within the last `SET_PIN_MIN_INTERVAL_MS`
+ * (round-2 review R7 — was unbounded, one entry per user forever).
+ */
+function evictExpiredSetPinEntries(now: number): void {
+  for (const [userId, at] of lastSetPinAt) {
+    if (now - at >= SET_PIN_MIN_INTERVAL_MS) lastSetPinAt.delete(userId);
+  }
+}
+
 export function isSetPinThrottled(userId: number, now: number): boolean {
+  evictExpiredSetPinEntries(now);
   const last = lastSetPinAt.get(userId);
   return last !== undefined && now - last < SET_PIN_MIN_INTERVAL_MS;
 }
@@ -103,4 +117,9 @@ export function recordSetPinAttempt(userId: number, now: number): void {
 /** Test-only: the throttle map is process-lifetime state, so tests must reset it between cases. */
 export function __resetSetPinThrottleForTests(): void {
   lastSetPinAt.clear();
+}
+
+/** Test-only: verifies eviction actually shrinks the map (round-2 review R7), not just that expired entries are ignored. */
+export function __setPinThrottleSizeForTests(): number {
+  return lastSetPinAt.size;
 }

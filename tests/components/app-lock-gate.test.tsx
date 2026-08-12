@@ -81,6 +81,20 @@ const confirmDialog = vi.hoisted(() => ({
 
 vi.mock("@/lib/confirm-dialog", () => confirmDialog);
 
+const security = vi.hoisted(() => ({
+  clearPinMutateAsync: vi.fn().mockResolvedValue({ pinSet: false }),
+}));
+
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    security: {
+      clearPin: {
+        useMutation: () => ({ mutateAsync: security.clearPinMutateAsync }),
+      },
+    },
+  },
+}));
+
 function deferred<T>(): {
   promise: Promise<T>;
   resolve: (value: T) => void;
@@ -185,6 +199,7 @@ beforeEach(() => {
   routerMock.replace.mockReset();
   authMock.logout.mockReset().mockResolvedValue(undefined);
   confirmDialog.confirmDestructive.mockReset().mockResolvedValue(false);
+  security.clearPinMutateAsync.mockReset().mockResolvedValue({ pinSet: false });
 });
 
 afterEach(() => {
@@ -602,6 +617,44 @@ describe("AppLockGate", () => {
       expect(routerMock.replace).toHaveBeenCalledWith("/login");
       // The gate itself no longer blocks — logout() clears the PIN.
       expect(overlay(root)).toHaveLength(0);
+    });
+
+    it("clears the account-linked PIN before signing out — this is the one path defined by not knowing the PIN (round-2 review R2)", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      confirmDialog.confirmDestructive.mockResolvedValue(true);
+      const root = renderGate();
+      await flush();
+
+      await act(async () => {
+        findKey(root, "Forgot PIN?").props.onPress?.();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(security.clearPinMutateAsync).toHaveBeenCalledTimes(1);
+      const clearPinOrder =
+        security.clearPinMutateAsync.mock.invocationCallOrder[0];
+      const logoutOrder = authMock.logout.mock.invocationCallOrder[0];
+      // Must run before logout() drops the session — the request needs the
+      // still-valid auth header.
+      expect(clearPinOrder).toBeLessThan(logoutOrder);
+    });
+
+    it("still signs out when clearing the account-linked PIN fails", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      confirmDialog.confirmDestructive.mockResolvedValue(true);
+      security.clearPinMutateAsync.mockRejectedValueOnce(new Error("offline"));
+      const root = renderGate();
+      await flush();
+
+      await act(async () => {
+        findKey(root, "Forgot PIN?").props.onPress?.();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(authMock.logout).toHaveBeenCalledTimes(1);
+      expect(routerMock.replace).toHaveBeenCalledWith("/login");
     });
 
     it("does not offer Forgot PIN while still checking whether a PIN is set", () => {

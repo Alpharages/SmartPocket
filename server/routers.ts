@@ -1252,6 +1252,15 @@ const securityRouter = router({
     return { pinSet: false };
   }),
 
+  // Locked-out is a normal, expected outcome of guessing — not an exceptional
+  // server condition — so every "wrong guess" or "already locked" result is
+  // returned as structured data, never thrown as a TRPCError with the
+  // timestamp embedded in prose. A client that missed a response could
+  // otherwise only recover `lockedUntil` by regexing an ISO string out of a
+  // message that might change wording (round-2 review R5, closing out N8
+  // properly). `NOT_FOUND` (no PIN synced at all) is the one case that still
+  // throws — the endpoint doesn't apply, which is a genuinely different kind
+  // of failure than "you guessed and it didn't work."
   verifyPin: protectedProcedure
     .input(PIN_INPUT)
     .mutation(async ({ ctx, input }) => {
@@ -1274,13 +1283,11 @@ const securityRouter = router({
         lockedUntil: state.pinLockedUntil,
       };
       if (isPinLocked(attemptState, now)) {
-        // N8: include the timestamp so the client can render a countdown
-        // instead of polling (which, under B1's guard, would never count
-        // against a locked account, but still shouldn't be needed).
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: `Too many attempts. Try again after ${state.pinLockedUntil!.toISOString()}.`,
-        });
+        return {
+          valid: false as const,
+          attemptsRemaining: 0,
+          lockedUntil: state.pinLockedUntil!.toISOString(),
+        };
       }
 
       if (await verifyPinHash(input.pin, state.pinHash)) {
@@ -1290,21 +1297,14 @@ const securityRouter = router({
 
       // B1: the increment itself is a single atomic, guarded SQL UPDATE —
       // never a JS read-modify-write. If the WHERE guard excluded our row
-      // (a concurrent request locked it first), our guess was not counted;
-      // report the lock instead of a false "still guessing" result.
-      const { counted } = await db.recordFailedPinAttempt(ctx.user.id, {
+      // (a concurrent request locked it first), `counted` is false and our
+      // guess wasn't recorded — but re-reading state either way reports
+      // the account's true current lock/attempt status either way.
+      await db.recordFailedPinAttempt(ctx.user.id, {
         maxAttempts: MAX_PIN_ATTEMPTS,
         lockedUntilIfTripped: new Date(now.getTime() + PIN_LOCKOUT_MS),
         now,
       });
-
-      if (!counted) {
-        const latest = await db.getUserPinState(ctx.user.id);
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: `Too many attempts. Try again after ${latest.pinLockedUntil?.toISOString() ?? ""}.`,
-        });
-      }
 
       const latest = await db.getUserPinState(ctx.user.id);
       return {

@@ -169,6 +169,23 @@ export default function SecurityScreen() {
         await setServerPinMutation.mutateAsync({ pin, currentPin });
       } catch (err) {
         console.error("[Security] Failed to sync PIN to account:", err);
+        // R4: a fresh-enable (no currentPin — nothing to prove yet) hitting
+        // BAD_REQUEST means the account already has a PIN from another
+        // device (assertCurrentPinProof on the server). Say so plainly
+        // instead of the generic message — restoring the existing account
+        // PIN onto this device remains out of scope (see N9), but the user
+        // should know their device's PIN diverged from the account's, not
+        // just that "something" failed to sync.
+        const code = (err as { data?: { code?: string } } | undefined)?.data
+          ?.code;
+        if (code === "BAD_REQUEST" && !currentPin) {
+          showToast({
+            type: "error",
+            message:
+              "This device's PIN wasn't synced — your account already has a PIN from another device.",
+          });
+          return;
+        }
         showToast({
           type: "error",
           message:

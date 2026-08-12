@@ -24,19 +24,6 @@ const appLock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/app-lock", () => appLock);
 
-const security = vi.hoisted(() => ({
-  clearPinMutateAsync: vi.fn().mockResolvedValue({ pinSet: false }),
-}));
-vi.mock("@/lib/trpc", () => ({
-  trpc: {
-    security: {
-      clearPin: {
-        useMutation: () => ({ mutateAsync: security.clearPinMutateAsync }),
-      },
-    },
-  },
-}));
-
 let renderer: TestRenderer.ReactTestRenderer | null = null;
 
 function render(ui: React.ReactElement): ReactTestInstance {
@@ -56,7 +43,6 @@ afterEach(() => {
   auth.removeSessionToken.mockResolvedValue(undefined);
   auth.clearUserInfo.mockResolvedValue(undefined);
   appLock.clearAppLock.mockResolvedValue(undefined);
-  security.clearPinMutateAsync.mockReset().mockResolvedValue({ pinSet: false });
 });
 
 function Capture({ sink }: { sink: (a: ReturnType<typeof useAuth>) => void }) {
@@ -101,24 +87,12 @@ describe("useAuth logout", () => {
     expect(appLock.clearAppLock).toHaveBeenCalledTimes(1);
   });
 
-  it("clears the account-linked PIN on the server before dropping the session token (N1)", async () => {
-    let hook!: ReturnType<typeof useAuth>;
-    render(React.createElement(Capture, { sink: (a) => (hook = a) }));
-
-    await act(async () => {
-      await hook.logout();
-    });
-
-    expect(security.clearPinMutateAsync).toHaveBeenCalledTimes(1);
-    const clearPinOrder =
-      security.clearPinMutateAsync.mock.invocationCallOrder[0];
-    const removeTokenOrder =
-      auth.removeSessionToken.mock.invocationCallOrder[0];
-    expect(clearPinOrder).toBeLessThan(removeTokenOrder);
-  });
-
-  it("still completes logout when the server PIN clear fails", async () => {
-    security.clearPinMutateAsync.mockRejectedValueOnce(new Error("offline"));
+  it("does not touch tRPC or any server call — an ordinary sign-out must never clear the account-linked PIN (round-2 review R2)", async () => {
+    // logout() is *every* sign-out (Settings' "Sign out" row included), not
+    // just Forgot PIN. Clearing the shared account PIN here would wipe it
+    // for every device on an everyday sign-out. That responsibility lives in
+    // components/app-lock-gate.tsx's handleForgotPin, the one path defined
+    // by the user not knowing the PIN — see tests/components/app-lock-gate.test.tsx.
     let hook!: ReturnType<typeof useAuth>;
     render(React.createElement(Capture, { sink: (a) => (hook = a) }));
 
@@ -127,7 +101,6 @@ describe("useAuth logout", () => {
     });
 
     expect(auth.removeSessionToken).toHaveBeenCalledTimes(1);
-    expect(auth.clearUserInfo).toHaveBeenCalledTimes(1);
     expect(appLock.clearAppLock).toHaveBeenCalledTimes(1);
   });
 });

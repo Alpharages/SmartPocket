@@ -199,7 +199,10 @@ describe("recordFailedPinAttempt (B1 — atomic, guarded increment)", () => {
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
-          "UPDATE users SET pinFailedAttempts = pinFailedAttempts + 1, pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL) WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
+          // pinLockedUntil is assigned BEFORE pinFailedAttempts deliberately —
+          // MySQL evaluates SET assignments left to right, so this order is
+          // what makes the IF() read the pre-increment count (round-2 R1).
+          "UPDATE users SET pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL), pinFailedAttempts = pinFailedAttempts + 1 WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
         params: [MAX_PIN_ATTEMPTS, lockedUntilIfTripped, 5, now],
       },
     });
@@ -456,26 +459,30 @@ describe("security router", () => {
     expect(result.lockedUntil).not.toBeNull();
   });
 
-  it("verifyPin rejects with TOO_MANY_REQUESTS while locked out, without attempting the hash compare", async () => {
+  it("verifyPin reports the lock as structured data while locked out, without attempting the hash compare (R5)", async () => {
+    const lockedUntil = new Date(Date.now() + 60_000);
     callDataApi
       .mockResolvedValueOnce({ affectedRows: 0 }) // resetExpiredPinLockout (lock still in the future — no-op)
       .mockResolvedValueOnce([
         {
           pinHash: await hashPin("1234"),
           pinFailedAttempts: MAX_PIN_ATTEMPTS,
-          pinLockedUntil: new Date(Date.now() + 60_000).toISOString(),
+          pinLockedUntil: lockedUntil.toISOString(),
         },
       ]);
     const caller = appRouter.createCaller(createUserContext(3));
 
-    await expect(
-      caller.security.verifyPin({ pin: "1234" }),
-    ).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    const result = await caller.security.verifyPin({ pin: "1234" });
+    expect(result).toEqual({
+      valid: false,
+      attemptsRemaining: 0,
+      lockedUntil: lockedUntil.toISOString(),
+    });
     // reset-expiry + read only — no increment write for an already-locked account.
     expect(callDataApi).toHaveBeenCalledTimes(2);
   });
 
-  it("verifyPin rejects with TOO_MANY_REQUESTS when a concurrent request wins the lock race (B1)", async () => {
+  it("verifyPin reports the lock as structured data when a concurrent request wins the lock race (B1/R5)", async () => {
     const stored = await hashPin("1234");
     const lockedUntil = new Date(Date.now() + PIN_LOCKOUT_MS);
     callDataApi
@@ -497,9 +504,12 @@ describe("security router", () => {
       ]); // re-fetch to report the lock
     const caller = appRouter.createCaller(createUserContext(3));
 
-    await expect(
-      caller.security.verifyPin({ pin: "0000" }),
-    ).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    const result = await caller.security.verifyPin({ pin: "0000" });
+    expect(result).toEqual({
+      valid: false,
+      attemptsRemaining: 0,
+      lockedUntil: lockedUntil.toISOString(),
+    });
   });
 
   it("verifyPin rejects with NOT_FOUND when no PIN is synced yet", async () => {

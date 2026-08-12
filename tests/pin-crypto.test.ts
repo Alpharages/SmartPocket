@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   hashPin,
   verifyPinHash,
   isPinLocked,
+  isSetPinThrottled,
+  recordSetPinAttempt,
   MAX_PIN_ATTEMPTS,
+  __resetSetPinThrottleForTests,
+  __setPinThrottleSizeForTests,
 } from "@/server/_core/pin-crypto";
 
 describe("hashPin / verifyPinHash", () => {
@@ -76,5 +80,26 @@ describe("isPinLocked", () => {
     expect(
       isPinLocked({ failedAttempts: MAX_PIN_ATTEMPTS, lockedUntil: past }, now),
     ).toBe(false);
+  });
+});
+
+describe("setPin throttle eviction (round-2 review R7)", () => {
+  beforeEach(() => {
+    __resetSetPinThrottleForTests();
+  });
+
+  it("evicts an expired entry instead of retaining it forever", () => {
+    recordSetPinAttempt(1, 0);
+    expect(__setPinThrottleSizeForTests()).toBe(1);
+
+    // Any later call to isSetPinThrottled evicts expired entries first.
+    isSetPinThrottled(2, 10_000);
+    expect(__setPinThrottleSizeForTests()).toBe(0);
+  });
+
+  it("does not evict an entry still inside the throttle window", () => {
+    recordSetPinAttempt(1, 0);
+    isSetPinThrottled(2, 500);
+    expect(__setPinThrottleSizeForTests()).toBe(1);
   });
 });

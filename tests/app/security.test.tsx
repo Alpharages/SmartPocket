@@ -663,6 +663,68 @@ describe("SecurityScreen", () => {
     );
   });
 
+  it("shows a specific message when a fresh-enable can't sync because the account already has a PIN from another device (R4)", async () => {
+    security.setPinMutateAsync.mockRejectedValue(
+      Object.assign(new Error("BAD_REQUEST"), {
+        data: { code: "BAD_REQUEST" },
+      }),
+    );
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+    await flushMicrotasks();
+
+    // Local write still succeeded — this device can unlock offline regardless.
+    expect(appLock.setPin).toHaveBeenCalledWith("1234");
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "error",
+        message: expect.stringMatching(
+          /already has a pin from another device/i,
+        ),
+      }),
+    );
+  });
+
+  it("shows the generic sync-failure message for an ordinary (non-conflict) sync error", async () => {
+    security.setPinMutateAsync.mockRejectedValue(new Error("offline"));
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+    await flushMicrotasks();
+
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "error",
+        message: expect.stringMatching(/couldn't sync to your account/i),
+      }),
+    );
+  });
+
   it("clears the server-synced PIN after disabling App Lock locally", async () => {
     appLock.isPinSet.mockResolvedValue(true);
     const root = render(<SecurityScreen />);
