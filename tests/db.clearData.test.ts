@@ -18,7 +18,7 @@ describe("deleteAllUserData", () => {
 
     await deleteAllUserData(42);
 
-    expect(callDataApi).toHaveBeenCalledTimes(6);
+    expect(callDataApi).toHaveBeenCalledTimes(7);
 
     const queries = callDataApi.mock.calls.map(
       (call) =>
@@ -50,6 +50,13 @@ describe("deleteAllUserData", () => {
       /DELETE FROM categories WHERE userId = \?/,
     );
     expect(queries[5].params).toEqual([42]);
+
+    // N7: clearing all data must also drop the account-linked PIN state —
+    // otherwise a wiped account keeps a stale hash and lockout.
+    expect(queries[6].query).toMatch(
+      /UPDATE users SET pinHash = \?, pinFailedAttempts = \?, pinLockedUntil = \? WHERE id = \?/,
+    );
+    expect(queries[6].params).toEqual([null, 0, null, 42]);
   });
 
   it("propagates errors from the data API", async () => {

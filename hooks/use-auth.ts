@@ -80,6 +80,13 @@ export function useAuth(options?: UseAuthOptions) {
         // Cleared here (not at each sign-out call site) so every path —
         // Settings, Forgot PIN, any future one — clears a device-local PIN
         // that would otherwise belong to nobody after the next sign-in.
+        //
+        // Deliberately local-only: this used to also clear the account-linked
+        // server PIN, but logout() is *every* sign-out, not just Forgot PIN —
+        // that wiped a shared account PIN on an ordinary "Sign out" tap on
+        // any device (round-2 review R2). The account-linked PIN is cleared
+        // by the Forgot-PIN flow specifically (components/app-lock-gate.tsx),
+        // which is the one path defined by the user not knowing the PIN.
         await clearAppLock();
       } catch (err) {
         console.error("[Auth] Failed to clear app lock:", err);

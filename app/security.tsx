@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +14,7 @@ import { useColors } from "@/hooks/use-colors";
 import {
   clearAppLock,
   getBiometricLabel,
+  getPin,
   isAppLockSupported,
   isBiometricEnabled,
   isPinSet,
@@ -21,6 +22,7 @@ import {
   setPin,
   verifyPin,
 } from "@/lib/app-lock";
+import { trpc } from "@/lib/trpc";
 
 // PinPad's `error` prop must round-trip false -> true -> false for its own
 // clear-on-error effect to fire on the *next* mismatch too; this is how long
@@ -58,6 +60,12 @@ export default function SecurityScreen() {
   // an infinite read/toast loop on a failing status read (round-2 review, B4).
   const { show: showToast } = useToast();
   const supported = isAppLockSupported();
+  const trpcUtils = trpc.useUtils();
+  const setServerPinMutation = trpc.security.setPin.useMutation();
+  const clearServerPinMutation = trpc.security.clearPin.useMutation();
+  const pinStatusQuery = trpc.security.getPinStatus.useQuery(undefined, {
+    enabled: supported,
+  });
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -71,6 +79,12 @@ export default function SecurityScreen() {
     null,
   );
   const [biometricOn, setBiometricOnState] = useState(false);
+  // Captured when verify-change locally confirms the old PIN, so the
+  // eventual setPin sync can prove ownership of the PIN it's overwriting
+  // (N4) — null on the fresh-enable path, where there's nothing to prove yet.
+  const [verifiedCurrentPin, setVerifiedCurrentPin] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!supported) {
@@ -135,6 +149,7 @@ export default function SecurityScreen() {
   const closeStep = useCallback(() => {
     setStep("closed");
     setPendingPin(null);
+    setVerifiedCurrentPin(null);
     setError(false);
     setErrorMessage("");
   }, []);
@@ -144,6 +159,108 @@ export default function SecurityScreen() {
     setError(true);
     setTimeout(() => setError(false), ERROR_FLASH_MS);
   }, []);
+
+  // Best-effort account sync (Story 13.6): the local keychain write above is
+  // always the source of truth for this device's unlock — a sync failure
+  // here surfaces a toast but never reopens the sheet or rolls back the
+  // already-successful local change.
+  const syncPinToServer = useCallback(
+    async (pin: string, currentPin?: string) => {
+      try {
+        await setServerPinMutation.mutateAsync({ pin, currentPin });
+        // Closes the reconcile's guard, not just its loop. The QueryClient is
+        // created once for the app's lifetime (app/_layout.tsx), so its cache
+        // outlives this screen — and `getPinStatus` runs at the default
+        // staleTime of 0, meaning a remount serves the cached `pinSet: false`
+        // synchronously while refetching behind it. The per-mount ref latch
+        // starts fresh each time, so without this write every revisit fires a
+        // redundant setPin, trips the 2s server cooldown, and toasts a sync
+        // failure for a PIN that is in fact synced (round-4 review U1).
+        trpcUtils.security.getPinStatus.setData(undefined, { pinSet: true });
+      } catch (err) {
+        console.error("[Security] Failed to sync PIN to account:", err);
+        // R4: a fresh-enable (no currentPin — nothing to prove yet) hitting
+        // CONFLICT means the account already has a PIN from another
+        // device (assertCurrentPinProof on the server). Say so plainly
+        // instead of the generic message — restoring the existing account
+        // PIN onto this device remains out of scope (see N9), but the user
+        // should know their device's PIN diverged from the account's, not
+        // just that "something" failed to sync.
+        const code = (err as { data?: { code?: string } } | undefined)?.data
+          ?.code;
+        if (code === "CONFLICT" && !currentPin) {
+          showToast({
+            type: "error",
+            message:
+              "This device's PIN wasn't synced — your account already has a PIN from another device.",
+          });
+          return;
+        }
+        showToast({
+          type: "error",
+          message:
+            "PIN saved on this device, but couldn't sync to your account.",
+        });
+      }
+    },
+    [setServerPinMutation, showToast, trpcUtils],
+  );
+
+  const clearServerPin = useCallback(async () => {
+    try {
+      await clearServerPinMutation.mutateAsync();
+      // Same reason as the setData above — keep the cached status from
+      // outliving the write it describes.
+      trpcUtils.security.getPinStatus.setData(undefined, { pinSet: false });
+    } catch (err) {
+      console.error("[Security] Failed to clear account PIN:", err);
+      showToast({
+        type: "error",
+        message: "App Lock turned off, but couldn't sync to your account.",
+      });
+    }
+  }, [clearServerPinMutation, showToast, trpcUtils]);
+
+  // Latches the reconcile to at most one attempt per mount. `syncPinToServer`
+  // closes over the object react-query's `useMutation` returns, and that is a
+  // fresh literal on every render (no memo — see the tail of
+  // @tanstack/react-query's useMutation), so as an effect dependency it
+  // re-runs the effect on every render. Each sync then re-renders (the
+  // MutationObserver transitions idle -> pending -> settled) while nothing
+  // ever flips `pinStatusQuery.data.pinSet`, so the effect fed itself an
+  // unbounded stream of setPin calls — measured at 151 in ~300ms (round-3
+  // review T1). Invisible to a suite that mocks `useMutation` as a stateless
+  // object. A failed sync retries on the next mount, which is the same
+  // self-heal the N2 note below already relies on.
+  const reconcileAttemptedRef = useRef(false);
+
+  // Reconcile, not just backfill: this closes three gaps at once — (1) a PIN
+  // set under 13.1–13.5 before this story existed never had a chance to sync
+  // (B3's literal "Given a device-local PIN exists"), (2) a previous
+  // syncPinToServer call that failed offline gets retried the next time this
+  // screen mounts, and (3) setPin/clearPin landing out of order over a slow
+  // link self-heals the same way. Deliberately one-directional — local PIN
+  // set + server unset is unambiguous (push it) — but local unset + server
+  // set is NOT reconciled here: that state is indistinguishable from a
+  // legitimate second device that simply hasn't set a local PIN yet, and
+  // force-clearing the account PIN from that signal would destroy another
+  // device's setup. See the N9 note in the PR description.
+  useEffect(() => {
+    if (reconcileAttemptedRef.current) return;
+    if (!supported || loading) return;
+    if (!pinSet) return;
+    if (!pinStatusQuery.data || pinStatusQuery.data.pinSet) return;
+
+    reconcileAttemptedRef.current = true;
+    let cancelled = false;
+    getPin().then((localPin) => {
+      if (cancelled || !localPin) return;
+      void syncPinToServer(localPin);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [supported, loading, pinSet, pinStatusQuery.data, syncPinToServer]);
 
   const handleToggleAppLock = useCallback((enabled: boolean) => {
     setErrorMessage("");
@@ -198,6 +315,7 @@ export default function SecurityScreen() {
             // just keeps the toggle's rendered state in sync.
             setBiometricOnState(false);
             closeStep();
+            await clearServerPin();
           } else {
             flashError("Incorrect PIN. Try again.");
           }
@@ -212,6 +330,9 @@ export default function SecurityScreen() {
           }
           if (verified) {
             setErrorMessage("");
+            // Remember the just-verified old PIN so the eventual server sync
+            // can prove ownership of the PIN it's about to overwrite (N4).
+            setVerifiedCurrentPin(pin);
             setStep("enter-new");
           } else {
             flashError("Incorrect PIN. Try again.");
@@ -228,9 +349,11 @@ export default function SecurityScreen() {
 
         if (step === "confirm-new") {
           if (pendingPin !== null && pin === pendingPin) {
+            const proofOfOldPin = verifiedCurrentPin ?? undefined;
             await setPin(pin);
             setPinSetState(true);
             closeStep();
+            await syncPinToServer(pin, proofOfOldPin);
           } else {
             // AC: a mismatch restarts the confirm step (re-enter the
             // confirmation), not the whole new-PIN entry — pendingPin stays.
@@ -252,7 +375,17 @@ export default function SecurityScreen() {
         closeStep();
       }
     },
-    [step, pendingPin, closeStep, flashError, showToast, resyncPinState],
+    [
+      step,
+      pendingPin,
+      verifiedCurrentPin,
+      closeStep,
+      flashError,
+      showToast,
+      resyncPinState,
+      syncPinToServer,
+      clearServerPin,
+    ],
   );
 
   if (!supported) {

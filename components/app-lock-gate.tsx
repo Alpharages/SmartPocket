@@ -14,6 +14,7 @@ import { PinPad } from "@/components/ui/PinPad";
 import { useAuth } from "@/hooks/use-auth";
 import { confirmDestructive } from "@/lib/confirm-dialog";
 import { useThemeTokens } from "@/lib/theme-provider";
+import { trpc } from "@/lib/trpc";
 import {
   authenticateWithBiometrics,
   isAppLockSupported,
@@ -59,6 +60,7 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   const [forgettingPin, setForgettingPin] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const { logout } = useAuth({ autoFetch: false });
+  const clearServerPinMutation = trpc.security.clearPin.useMutation();
 
   // Guards against re-firing the automatic biometric prompt on every render
   // while still locked (e.g. a state update from an unrelated effect) —
@@ -234,10 +236,27 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     [clearErrorTimer, flashError],
   );
 
-  // logout() clears the PIN and biometric preference itself (hooks/use-auth.ts)
-  // so this only has to sign out and leave — there's no lock state left to
-  // re-check. Bump the epoch first so a verify/isPinSet already in flight
-  // can't re-lock or unlock behind this decision.
+  // logout() clears the local PIN and biometric preference itself
+  // (hooks/use-auth.ts) so this only has to sign out and leave — there's no
+  // lock state left to re-check. Bump the epoch first so a verify/isPinSet
+  // already in flight can't re-lock or unlock behind this decision.
+  //
+  // The account-linked PIN is cleared *here*, not in logout() — this is the
+  // one sign-out path defined by the user not knowing the PIN. logout() is
+  // every sign-out (including the ordinary "Sign out" row in Settings), and
+  // clearing the shared account PIN there would wipe it for every device on
+  // an everyday sign-out (round-2 review R2). Must run before logout() drops
+  // the session — the request needs the still-valid auth header.
+  //
+  // A failed clear aborts the sign-out rather than proceeding: logout() wipes
+  // the local PIN, so continuing would leave `users.pinHash` set with no
+  // device holding a local copy — and every exit from that state is closed
+  // (the Security reconcile is deliberately one-directional, re-enabling
+  // hits assertCurrentPinProof with no currentPin to offer, and the disable
+  // branch needs the PIN that no longer exists). One offline Forgot PIN
+  // would permanently disable App Lock for the whole account (round-3 review
+  // T2). Forgot PIN is already a confirmed, deliberate action, so asking the
+  // user to retry on a working connection is the safe branch.
   const handleForgotPin = useCallback(async () => {
     const confirmed = await confirmDestructive({
       title: "Forgot PIN?",
@@ -251,6 +270,15 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     epochRef.current += 1;
     setForgettingPin(true);
     try {
+      try {
+        await clearServerPinMutation.mutateAsync();
+      } catch (err) {
+        console.error("[AppLockGate] Failed to clear account-linked PIN:", err);
+        flashError(
+          "Couldn't reach your account. Check your connection and try again.",
+        );
+        return;
+      }
       await logout();
       clearErrorTimer();
       setError(false);
@@ -259,7 +287,7 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     } finally {
       setForgettingPin(false);
     }
-  }, [logout, clearErrorTimer]);
+  }, [logout, clearErrorTimer, clearServerPinMutation, flashError]);
 
   const handleBiometricRetry = useCallback(() => {
     const epoch = epochRef.current;

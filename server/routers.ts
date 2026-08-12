@@ -7,6 +7,15 @@ import {
   DEFAULT_CATEGORY_ICON,
   getCategoryColorForName,
 } from "../shared/theme";
+import {
+  hashPin,
+  verifyPinHash,
+  isPinLocked,
+  MAX_PIN_ATTEMPTS,
+  PIN_LOCKOUT_MS,
+  isSetPinThrottled,
+  recordSetPinAttempt,
+} from "./_core/pin-crypto";
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -1162,6 +1171,161 @@ const settingsRouter = router({
 });
 
 // ============================================================================
+// SECURITY ROUTER — account-linked PIN (Epic 13, Story 13.6)
+//
+// Scope for this session (per resolved dev clarification on 86eyeq72c): sync
+// a single account-wide PIN to the server as a salted hash, with a rate-limited
+// verify path. Profile (mobile/email) and one-time-code recovery are descoped.
+// ============================================================================
+
+const PIN_INPUT = z.object({
+  pin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
+});
+
+/** setPin/clearPin optionally take the current PIN — required once a hash already exists (N4). */
+const PIN_WRITE_INPUT = PIN_INPUT.extend({
+  currentPin: z
+    .string()
+    .regex(/^\d{4}$/, "PIN must be exactly 4 digits")
+    .optional(),
+});
+
+/**
+ * Verifies proof of ownership before overwriting an existing PIN with a new
+ * one. No hash exists yet → nothing to prove, first sync is allowed through.
+ * A hash exists → `currentPin` is required and must match; a bare valid
+ * session is not sufficient proof to silently swap out someone's PIN (N4).
+ *
+ * `clearPin` deliberately does NOT require this: dropping the account link
+ * entirely is what the Forgot-PIN/sign-out path needs to do precisely when
+ * the caller does *not* know the PIN (N1) — gating it on proof-of-PIN would
+ * make that path impossible. An authenticated session is already the trust
+ * boundary for "unsync this device's PIN", same as any other sign-out action.
+ */
+async function assertCurrentPinProof(
+  userId: number,
+  existingHash: string | null,
+  currentPin: string | undefined,
+): Promise<void> {
+  if (existingHash === null) return;
+  if (!currentPin) {
+    // CONFLICT, not BAD_REQUEST: the client discriminates on this code to
+    // tell the user their account already holds a PIN from another device,
+    // and tRPC also returns BAD_REQUEST for Zod input-validation failures on
+    // this same procedure — so a malformed input would otherwise be reported
+    // as an account conflict (round-3 review T3).
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "currentPin is required to change an existing PIN",
+    });
+  }
+  if (!(await verifyPinHash(currentPin, existingHash))) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Incorrect current PIN",
+    });
+  }
+}
+
+const securityRouter = router({
+  getPinStatus: protectedProcedure.query(async ({ ctx }) => {
+    const state = await db.getUserPinState(ctx.user.id);
+    return { pinSet: state.pinHash !== null };
+  }),
+
+  setPin: protectedProcedure
+    .input(PIN_WRITE_INPUT)
+    .mutation(async ({ ctx, input }) => {
+      const now = Date.now();
+      if (isSetPinThrottled(ctx.user.id, now)) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Please wait a moment before changing your PIN again.",
+        });
+      }
+      recordSetPinAttempt(ctx.user.id, now);
+
+      const state = await db.getUserPinState(ctx.user.id);
+      await assertCurrentPinProof(ctx.user.id, state.pinHash, input.currentPin);
+      const hash = await hashPin(input.pin);
+      await db.setUserPin(ctx.user.id, hash);
+      return { pinSet: true };
+    }),
+
+  clearPin: protectedProcedure.mutation(async ({ ctx }) => {
+    await db.clearUserPin(ctx.user.id);
+    return { pinSet: false };
+  }),
+
+  // Locked-out is a normal, expected outcome of guessing — not an exceptional
+  // server condition — so every "wrong guess" or "already locked" result is
+  // returned as structured data, never thrown as a TRPCError with the
+  // timestamp embedded in prose. A client that missed a response could
+  // otherwise only recover `lockedUntil` by regexing an ISO string out of a
+  // message that might change wording (round-2 review R5, closing out N8
+  // properly). `NOT_FOUND` (no PIN synced at all) is the one case that still
+  // throws — the endpoint doesn't apply, which is a genuinely different kind
+  // of failure than "you guessed and it didn't work."
+  verifyPin: protectedProcedure
+    .input(PIN_INPUT)
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+      // B2: normalize a stale lockout before evaluating, so a lock that has
+      // already expired can never re-trigger from leftover attempt count.
+      await db.resetExpiredPinLockout(ctx.user.id, now);
+
+      const state = await db.getUserPinState(ctx.user.id);
+
+      if (!state.pinHash) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No account-linked PIN is set",
+        });
+      }
+
+      const attemptState = {
+        failedAttempts: state.pinFailedAttempts,
+        lockedUntil: state.pinLockedUntil,
+      };
+      if (isPinLocked(attemptState, now)) {
+        return {
+          valid: false as const,
+          attemptsRemaining: 0,
+          lockedUntil: state.pinLockedUntil!.toISOString(),
+        };
+      }
+
+      if (await verifyPinHash(input.pin, state.pinHash)) {
+        await db.resetPinAttempts(ctx.user.id);
+        return { valid: true as const };
+      }
+
+      // B1: the increment itself is a single atomic, guarded SQL UPDATE —
+      // never a JS read-modify-write. If the WHERE guard excluded our row
+      // (a concurrent request locked it first), `counted` is false and our
+      // guess wasn't recorded — but re-reading state below reports the
+      // account's true current lock/attempt status either way.
+      await db.recordFailedPinAttempt(ctx.user.id, {
+        maxAttempts: MAX_PIN_ATTEMPTS,
+        lockedUntilIfTripped: new Date(now.getTime() + PIN_LOCKOUT_MS),
+        now,
+      });
+
+      const latest = await db.getUserPinState(ctx.user.id);
+      return {
+        valid: false as const,
+        attemptsRemaining: Math.max(
+          0,
+          MAX_PIN_ATTEMPTS - latest.pinFailedAttempts,
+        ),
+        lockedUntil: latest.pinLockedUntil
+          ? latest.pinLockedUntil.toISOString()
+          : null,
+      };
+    }),
+});
+
+// ============================================================================
 // DATA MANAGEMENT ROUTER
 // ============================================================================
 
@@ -1187,6 +1351,7 @@ export const appRouter = router({
   budgets: budgetsRouter,
   loans: loansRouter,
   settings: settingsRouter,
+  security: securityRouter,
   data: dataRouter,
 });
 

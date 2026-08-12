@@ -146,6 +146,132 @@ export async function updateAiEnabled(
 }
 
 // ============================================================================
+// SECURITY — account-linked PIN (Epic 13, Story 13.6)
+// ============================================================================
+
+export interface UserPinState {
+  pinHash: string | null;
+  pinFailedAttempts: number;
+  pinLockedUntil: Date | null;
+}
+
+export async function getUserPinState(userId: number): Promise<UserPinState> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query:
+        "SELECT pinHash, pinFailedAttempts, pinLockedUntil FROM users WHERE id = ?",
+      params: [userId],
+    },
+  });
+  const row = Array.isArray(result)
+    ? (result[0] as Record<string, unknown>)
+    : null;
+  if (!row) {
+    return { pinHash: null, pinFailedAttempts: 0, pinLockedUntil: null };
+  }
+  return {
+    pinHash: (row.pinHash as string | null) ?? null,
+    pinFailedAttempts: Number(row.pinFailedAttempts ?? 0),
+    pinLockedUntil: row.pinLockedUntil
+      ? new Date(row.pinLockedUntil as string)
+      : null,
+  };
+}
+
+/** Stores the salted hash and resets attempt/lockout state — a fresh PIN starts with a clean slate. */
+export async function setUserPin(
+  userId: number,
+  pinHash: string,
+): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+      params: [pinHash, 0, null, userId],
+    },
+  });
+}
+
+export async function clearUserPin(userId: number): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+      params: [null, 0, null, userId],
+    },
+  });
+}
+
+/** Clears failed-attempt/lockout state without touching the hash — used after a successful verify. */
+export async function resetPinAttempts(userId: number): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+      params: [0, null, userId],
+    },
+  });
+}
+
+/**
+ * Idempotent, atomic: clears attempt state only if the current lockout has
+ * already passed. Always safe to call — a no-op when not locked or still
+ * locked. Run before evaluating a verify attempt so a stale lockout can't
+ * permanently re-trigger on the next failure (round-2 review B2).
+ */
+export async function resetExpiredPinLockout(
+  userId: number,
+  now: Date,
+): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ? AND pinLockedUntil IS NOT NULL AND pinLockedUntil <= ?",
+      params: [0, null, userId, now],
+    },
+  });
+}
+
+/**
+ * Atomically increments the failure counter and locks once the threshold is
+ * crossed, in a single guarded UPDATE — not a JS read-then-write. The WHERE
+ * clause excludes a row that is already locked (or was locked by a
+ * concurrent request between this request's read and this write), and
+ * `counted: false` reports that exclusion. Callers that re-read the row
+ * afterwards get the account's true lock state either way and don't need it;
+ * it is kept because it is the only direct assertion that the WHERE guard —
+ * the whole basis of the race-safety below — actually fired. A single-row
+ * UPDATE like this is atomic under InnoDB's row-level locking, which is what
+ * makes this race-safe under concurrent requests (round-2 review B1).
+ *
+ * `pinLockedUntil` is assigned BEFORE `pinFailedAttempts` in the SET clause
+ * deliberately: MySQL evaluates multi-column UPDATE assignments left to
+ * right, and a later assignment sees the already-updated value of an
+ * earlier one — not the standard-SQL "all reads see the pre-update row"
+ * semantics. Computing the lock decision after the increment would read the
+ * post-increment count and trip the lockout one attempt early (round-2
+ * review R1). Assigning the lock first means its `IF` reads the original,
+ * pre-increment `pinFailedAttempts`.
+ */
+export async function recordFailedPinAttempt(
+  userId: number,
+  data: { maxAttempts: number; lockedUntilIfTripped: Date; now: Date },
+): Promise<{ counted: boolean }> {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE users SET pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL), pinFailedAttempts = pinFailedAttempts + 1 WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
+      params: [data.maxAttempts, data.lockedUntilIfTripped, userId, data.now],
+    },
+  });
+  const affectedRows =
+    result && typeof result === "object" && "affectedRows" in result
+      ? (result as { affectedRows: number }).affectedRows
+      : 0;
+  return { counted: affectedRows > 0 };
+}
+
+// ============================================================================
 // CATEGORIES
 // ============================================================================
 
@@ -946,6 +1072,9 @@ export async function deleteAllUserData(userId: number) {
       params: [userId],
     },
   });
+  // N7: "clear all data" must also drop the account-linked PIN — otherwise a
+  // wiped account keeps a stale hash and lockout state.
+  await clearUserPin(userId);
 }
 
 export async function getTransactionById(id: number, userId: number) {

@@ -22,6 +22,7 @@ const appLock = vi.hoisted(() => ({
   isAppLockSupported: vi.fn(() => true),
   isPinSet: vi.fn(),
   setPin: vi.fn(),
+  getPin: vi.fn(),
   verifyPin: vi.fn(),
   clearAppLock: vi.fn(),
   getBiometricLabel: vi.fn(),
@@ -30,6 +31,31 @@ const appLock = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/app-lock", () => appLock);
+
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    useUtils: () => ({
+      security: {
+        getPinStatus: { setData: vi.fn() },
+      },
+    }),
+    security: {
+      setPin: {
+        useMutation: () => ({
+          mutateAsync: vi.fn().mockResolvedValue({ pinSet: true }),
+        }),
+      },
+      clearPin: {
+        useMutation: () => ({
+          mutateAsync: vi.fn().mockResolvedValue({ pinSet: false }),
+        }),
+      },
+      getPinStatus: {
+        useQuery: () => ({ data: { pinSet: false } }),
+      },
+    },
+  },
+}));
 
 vi.mock("expo-router", () => ({
   useRouter: () => ({ back: mockBack, push: vi.fn() }),
@@ -126,6 +152,7 @@ beforeEach(() => {
   appLock.isAppLockSupported.mockReturnValue(true);
   appLock.isPinSet.mockReset();
   appLock.setPin.mockReset().mockResolvedValue(undefined);
+  appLock.getPin.mockReset().mockResolvedValue(null);
   appLock.verifyPin.mockReset().mockResolvedValue(true);
   appLock.clearAppLock.mockReset().mockResolvedValue(undefined);
   appLock.getBiometricLabel.mockReset().mockResolvedValue(null);

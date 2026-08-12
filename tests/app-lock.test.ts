@@ -86,6 +86,33 @@ describe("app-lock", () => {
     });
   });
 
+  describe("getPin", () => {
+    it("resolves the raw stored PIN", async () => {
+      secureStore.getItemAsync.mockResolvedValue("1234");
+      const appLock = await import("@/lib/app-lock");
+      await expect(appLock.getPin()).resolves.toBe("1234");
+    });
+
+    it("resolves null when no PIN is stored", async () => {
+      secureStore.getItemAsync.mockResolvedValue(null);
+      const appLock = await import("@/lib/app-lock");
+      await expect(appLock.getPin()).resolves.toBeNull();
+    });
+
+    it("degrades to null (not a rejection) when the read throws", async () => {
+      secureStore.getItemAsync.mockRejectedValue(new Error("keystore error"));
+      const appLock = await import("@/lib/app-lock");
+      await expect(appLock.getPin()).resolves.toBeNull();
+    });
+
+    it("resolves null on web without touching SecureStore", async () => {
+      Platform.OS = "web";
+      const appLock = await import("@/lib/app-lock");
+      await expect(appLock.getPin()).resolves.toBeNull();
+      expect(secureStore.getItemAsync).not.toHaveBeenCalled();
+    });
+  });
+
   describe("isPinSet", () => {
     it("resolves true when a PIN is stored", async () => {
       secureStore.getItemAsync.mockResolvedValue("1234");

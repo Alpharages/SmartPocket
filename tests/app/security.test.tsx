@@ -14,6 +14,7 @@ const appLock = vi.hoisted(() => ({
   isAppLockSupported: vi.fn(() => true),
   isPinSet: vi.fn(),
   setPin: vi.fn(),
+  getPin: vi.fn(),
   verifyPin: vi.fn(),
   clearAppLock: vi.fn(),
   getBiometricLabel: vi.fn(),
@@ -27,6 +28,34 @@ const toast = vi.hoisted(() => ({ show: vi.fn() }));
 
 vi.mock("@/components/ui/ToastProvider", () => ({
   useToast: () => toast,
+}));
+
+const security = vi.hoisted(() => ({
+  setPinMutateAsync: vi.fn().mockResolvedValue({ pinSet: true }),
+  clearPinMutateAsync: vi.fn().mockResolvedValue({ pinSet: false }),
+  setPinStatusData: vi.fn(),
+  pinStatusData: { pinSet: false } as { pinSet: boolean } | undefined,
+}));
+
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    useUtils: () => ({
+      security: {
+        getPinStatus: { setData: security.setPinStatusData },
+      },
+    }),
+    security: {
+      setPin: {
+        useMutation: () => ({ mutateAsync: security.setPinMutateAsync }),
+      },
+      clearPin: {
+        useMutation: () => ({ mutateAsync: security.clearPinMutateAsync }),
+      },
+      getPinStatus: {
+        useQuery: () => ({ data: security.pinStatusData }),
+      },
+    },
+  },
 }));
 
 vi.mock("expo-router", () => ({
@@ -154,12 +183,17 @@ beforeEach(() => {
   appLock.isAppLockSupported.mockReturnValue(true);
   appLock.isPinSet.mockReset().mockResolvedValue(false);
   appLock.setPin.mockReset().mockResolvedValue(undefined);
+  appLock.getPin.mockReset().mockResolvedValue(null);
   appLock.verifyPin.mockReset().mockResolvedValue(true);
   appLock.clearAppLock.mockReset().mockResolvedValue(undefined);
   appLock.getBiometricLabel.mockReset().mockResolvedValue(null);
   appLock.isBiometricEnabled.mockReset().mockResolvedValue(false);
   appLock.setBiometricEnabled.mockReset().mockResolvedValue(undefined);
   toast.show.mockReset();
+  security.setPinMutateAsync.mockReset().mockResolvedValue({ pinSet: true });
+  security.clearPinMutateAsync.mockReset().mockResolvedValue({ pinSet: false });
+  security.setPinStatusData.mockReset();
+  security.pinStatusData = { pinSet: false };
 });
 
 afterEach(() => {
@@ -309,6 +343,98 @@ describe("SecurityScreen", () => {
     await submitPin(root, "5678");
     await submitPin(root, "5678");
     expect(appLock.setPin).toHaveBeenCalledWith("5678");
+  });
+
+  it("proves the just-verified old PIN to the server when syncing a changed PIN (N4)", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      findPressableByLabel(root, "Change PIN").props.onPress();
+    });
+
+    appLock.verifyPin.mockResolvedValue(true);
+    await submitPin(root, "1111");
+    await submitPin(root, "5678");
+    await submitPin(root, "5678");
+
+    expect(security.setPinMutateAsync).toHaveBeenCalledWith({
+      pin: "5678",
+      currentPin: "1111",
+    });
+  });
+
+  it("syncs a fresh (first-time) PIN without a currentPin, since there is nothing to prove yet", async () => {
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+
+    expect(security.setPinMutateAsync).toHaveBeenCalledWith({
+      pin: "1234",
+      currentPin: undefined,
+    });
+  });
+
+  describe("account reconcile (B3 backfill / N2 self-heal)", () => {
+    it("pushes an existing local PIN to the server when the account has none synced yet", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getPin.mockResolvedValue("4321");
+      security.pinStatusData = { pinSet: false };
+
+      render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      expect(security.setPinMutateAsync).toHaveBeenCalledWith({
+        pin: "4321",
+        currentPin: undefined,
+      });
+    });
+
+    it("does not push when the account already has a synced PIN", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getPin.mockResolvedValue("4321");
+      security.pinStatusData = { pinSet: true };
+
+      render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      expect(security.setPinMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it("does not push when this device has no local PIN, regardless of server state", async () => {
+      appLock.isPinSet.mockResolvedValue(false);
+      security.pinStatusData = { pinSet: true };
+
+      render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      expect(security.setPinMutateAsync).not.toHaveBeenCalled();
+      expect(appLock.getPin).not.toHaveBeenCalled();
+    });
+
+    it("does not push while the server status query hasn't resolved yet", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getPin.mockResolvedValue("4321");
+      security.pinStatusData = undefined;
+
+      render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      expect(security.setPinMutateAsync).not.toHaveBeenCalled();
+    });
   });
 
   it("requires the current PIN and clears the lock when App Lock is turned off", async () => {
@@ -487,6 +613,207 @@ describe("SecurityScreen", () => {
 
     expect(textOf(root)).toContain("Couldn't verify your PIN");
     expect(textOf(root)).not.toContain("Incorrect PIN");
+  });
+
+  it("syncs a newly set PIN to the server after the local write succeeds", async () => {
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+
+    expect(appLock.setPin).toHaveBeenCalledWith("1234");
+    expect(security.setPinMutateAsync).toHaveBeenCalledWith({ pin: "1234" });
+  });
+
+  it("does not fail the local PIN change when the server sync rejects", async () => {
+    security.setPinMutateAsync.mockRejectedValue(new Error("offline"));
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+    await flushMicrotasks();
+
+    // Local write still succeeded and the sheet closed — server sync failure
+    // is surfaced as a toast, not a blocker (local keychain stays the fast path).
+    expect(appLock.setPin).toHaveBeenCalledWith("1234");
+    expect(
+      root.findAll(
+        (n) =>
+          typeof n.type === "string" &&
+          n.props?.testID === "security-pin-sheet",
+      ),
+    ).toHaveLength(0);
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
+    );
+  });
+
+  it("shows a specific message when a fresh-enable can't sync because the account already has a PIN from another device (R4)", async () => {
+    security.setPinMutateAsync.mockRejectedValue(
+      Object.assign(new Error("CONFLICT"), {
+        data: { code: "CONFLICT" },
+      }),
+    );
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+    await flushMicrotasks();
+
+    // Local write still succeeded — this device can unlock offline regardless.
+    expect(appLock.setPin).toHaveBeenCalledWith("1234");
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "error",
+        message: expect.stringMatching(
+          /already has a pin from another device/i,
+        ),
+      }),
+    );
+  });
+
+  it("does not blame another device for a BAD_REQUEST, which tRPC also returns for input-validation failures (T3)", async () => {
+    security.setPinMutateAsync.mockRejectedValue(
+      Object.assign(new Error("BAD_REQUEST"), {
+        data: { code: "BAD_REQUEST" },
+      }),
+    );
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+    await flushMicrotasks();
+
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "error",
+        message: expect.not.stringMatching(/another device/i),
+      }),
+    );
+  });
+
+  it("shows the generic sync-failure message for an ordinary (non-conflict) sync error", async () => {
+    security.setPinMutateAsync.mockRejectedValue(new Error("offline"));
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+    await flushMicrotasks();
+
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "error",
+        message: expect.stringMatching(/couldn't sync to your account/i),
+      }),
+    );
+  });
+
+  it("clears the server-synced PIN after disabling App Lock locally", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(false);
+    });
+
+    appLock.verifyPin.mockResolvedValue(true);
+    await submitPin(root, "1234");
+
+    expect(appLock.clearAppLock).toHaveBeenCalledTimes(1);
+    expect(security.clearPinMutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fail the local disable when the server clear-PIN sync rejects", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    security.clearPinMutateAsync.mockRejectedValue(new Error("offline"));
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(false);
+    });
+
+    appLock.verifyPin.mockResolvedValue(true);
+    await submitPin(root, "1234");
+    await flushMicrotasks();
+
+    const toggle = root.find(
+      (n) =>
+        String(n.type) === "Switch" &&
+        n.props?.accessibilityLabel === "App Lock",
+    );
+    expect(toggle.props.value).toBe(false);
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
+    );
   });
 
   describe("biometric toggle", () => {

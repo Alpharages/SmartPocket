@@ -31,6 +31,17 @@ export const users = mysqlTable("users", {
   aiEnabled: boolean("aiEnabled").default(false).notNull(),
   /** Opt-in for payment/loan reminder notifications (Epic 7). */
   remindersEnabled: boolean("remindersEnabled").default(false).notNull(),
+  /**
+   * Salted hash of the account-linked App Lock PIN (Epic 13, Story 13.6).
+   * Format: `scrypt:v1:<saltB64>:<hashB64>`. Null when no PIN is synced
+   * server-side. Never a reversible ciphertext — the server cannot recover
+   * the PIN from this value.
+   */
+  pinHash: varchar("pinHash", { length: 255 }),
+  /** Consecutive failed server-side PIN verification attempts since the last success or reset. */
+  pinFailedAttempts: int("pinFailedAttempts").default(0).notNull(),
+  /** Set once pinFailedAttempts crosses the lockout threshold; verifyPin rejects until this passes. */
+  pinLockedUntil: timestamp("pinLockedUntil"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -243,7 +254,9 @@ export const loans = mysqlTable("loans", {
   installmentCount: int("installmentCount"),
   endDate: timestamp("endDate"),
   nextDueDate: timestamp("nextDueDate"),
-  status: mysqlEnum("status", ["active", "settled"]).default("active").notNull(),
+  status: mysqlEnum("status", ["active", "settled"])
+    .default("active")
+    .notNull(),
   note: text("note"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

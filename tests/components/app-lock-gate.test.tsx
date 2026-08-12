@@ -81,6 +81,20 @@ const confirmDialog = vi.hoisted(() => ({
 
 vi.mock("@/lib/confirm-dialog", () => confirmDialog);
 
+const security = vi.hoisted(() => ({
+  clearPinMutateAsync: vi.fn().mockResolvedValue({ pinSet: false }),
+}));
+
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    security: {
+      clearPin: {
+        useMutation: () => ({ mutateAsync: security.clearPinMutateAsync }),
+      },
+    },
+  },
+}));
+
 function deferred<T>(): {
   promise: Promise<T>;
   resolve: (value: T) => void;
@@ -185,6 +199,7 @@ beforeEach(() => {
   routerMock.replace.mockReset();
   authMock.logout.mockReset().mockResolvedValue(undefined);
   confirmDialog.confirmDestructive.mockReset().mockResolvedValue(false);
+  security.clearPinMutateAsync.mockReset().mockResolvedValue({ pinSet: false });
 });
 
 afterEach(() => {
@@ -602,6 +617,51 @@ describe("AppLockGate", () => {
       expect(routerMock.replace).toHaveBeenCalledWith("/login");
       // The gate itself no longer blocks — logout() clears the PIN.
       expect(overlay(root)).toHaveLength(0);
+    });
+
+    it("clears the account-linked PIN before signing out — this is the one path defined by not knowing the PIN (round-2 review R2)", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      confirmDialog.confirmDestructive.mockResolvedValue(true);
+      const root = renderGate();
+      await flush();
+
+      await act(async () => {
+        findKey(root, "Forgot PIN?").props.onPress?.();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(security.clearPinMutateAsync).toHaveBeenCalledTimes(1);
+      const clearPinOrder =
+        security.clearPinMutateAsync.mock.invocationCallOrder[0];
+      const logoutOrder = authMock.logout.mock.invocationCallOrder[0];
+      // Must run before logout() drops the session — the request needs the
+      // still-valid auth header.
+      expect(clearPinOrder).toBeLessThan(logoutOrder);
+    });
+
+    it("aborts the sign-out when clearing the account-linked PIN fails, rather than stranding the account (round-3 review T2)", async () => {
+      // logout() wipes the local PIN, so signing out after a failed clear
+      // would leave users.pinHash set with no device holding a local copy —
+      // and every exit from that state is closed (one-directional reconcile,
+      // assertCurrentPinProof on re-enable, disable branch needs the missing
+      // PIN). Staying locked and asking for a retry is the recoverable branch.
+      appLock.isPinSet.mockResolvedValue(true);
+      confirmDialog.confirmDestructive.mockResolvedValue(true);
+      security.clearPinMutateAsync.mockRejectedValueOnce(new Error("offline"));
+      const root = renderGate();
+      await flush();
+
+      await act(async () => {
+        findKey(root, "Forgot PIN?").props.onPress?.();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(authMock.logout).not.toHaveBeenCalled();
+      expect(routerMock.replace).not.toHaveBeenCalled();
+      // Still locked, and told why.
+      expect(overlay(root)).toHaveLength(1);
     });
 
     it("does not offer Forgot PIN while still checking whether a PIN is set", () => {

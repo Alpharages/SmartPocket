@@ -38,6 +38,7 @@ const DATE_COLUMNS = new Set([
   "startDate",
   "endDate",
   "nextDueDate",
+  "pinLockedUntil",
 ]);
 const NUMERIC_COLUMNS = new Set([
   "id",
@@ -53,6 +54,7 @@ const NUMERIC_COLUMNS = new Set([
   "expiryMonth",
   "expiryYear",
   "installmentCount",
+  "pinFailedAttempts",
 ]);
 
 const store: Record<TableName, Row[]> = {
@@ -221,12 +223,18 @@ function compare(
   return false;
 }
 
-type Condition = {
-  column: string;
-  op: string;
-  literal?: unknown;
-  isParam: boolean;
-};
+type Condition =
+  | {
+      kind: "cmp";
+      column: string;
+      op: string;
+      literal?: unknown;
+      isParam: boolean;
+    }
+  | { kind: "isNull"; column: string; negate: boolean }
+  // `(<col> IS NULL OR <col> <op> ?)` — the exact shape server/db.ts emits for
+  // "not currently locked" guards (Story 13.6 R3). Not a general OR grammar.
+  | { kind: "orNullOrCmp"; column: string; op: string };
 
 /** Parse the WHERE body (already AND-split) into structured conditions. */
 function parseConditions(whereBody: string): Condition[] {
@@ -234,18 +242,90 @@ function parseConditions(whereBody: string): Condition[] {
     .split(/\s+AND\s+/i)
     .map((part) => part.trim())
     .filter(Boolean)
-    .map((part) => {
+    .map((part): Condition => {
+      const orGroup = part.match(
+        /^\((\w+)\s+IS\s+NULL\s+OR\s+\1\s*(>=|<=|=)\s*\?\)$/i,
+      );
+      if (orGroup) {
+        const [, column, op] = orGroup;
+        return { kind: "orNullOrCmp", column, op };
+      }
+
+      const isNotNull = part.match(/^(\w+)\s+IS\s+NOT\s+NULL$/i);
+      if (isNotNull) {
+        return { kind: "isNull", column: isNotNull[1], negate: true };
+      }
+
+      const isNull = part.match(/^(\w+)\s+IS\s+NULL$/i);
+      if (isNull) {
+        return { kind: "isNull", column: isNull[1], negate: false };
+      }
+
       const m = part.match(/^(\w+)\s*(>=|<=|=)\s*(.+)$/);
       if (!m) throw new Error(`devDb: unparseable condition "${part}"`);
       const [, column, op, rhsRaw] = m;
       const rhs = rhsRaw.trim();
-      if (rhs === "?") return { column, op, isParam: true };
+      if (rhs === "?") return { kind: "cmp", column, op, isParam: true };
       // literal: quoted string or number
       const unquoted = rhs.replace(/^'(.*)'$/, "$1");
       const literal =
         unquoted === rhs && !Number.isNaN(Number(rhs)) ? Number(rhs) : unquoted;
-      return { column, op, literal, isParam: false };
+      return { kind: "cmp", column, op, literal, isParam: false };
     });
+}
+
+type BoundCondition =
+  | { kind: "cmp"; column: string; op: string; value: unknown }
+  | { kind: "isNull"; column: string; negate: boolean }
+  | { kind: "orNullOrCmp"; column: string; op: string; value: unknown };
+
+// Params are bound to conditions exactly once, up front — NOT inside the
+// per-row filter below. Each `?` in the WHERE text corresponds to one query-
+// level value shared by every row being tested; consuming `cursor` per row
+// (e.g. inside a short-circuiting `.every`) would desync it across rows.
+function bindConditions(
+  conditions: Condition[],
+  params: unknown[],
+  cursor: { i: number },
+): BoundCondition[] {
+  return conditions.map((c): BoundCondition => {
+    if (c.kind === "isNull") return c;
+    if (c.kind === "orNullOrCmp") {
+      return {
+        kind: "orNullOrCmp",
+        column: c.column,
+        op: c.op,
+        value: params[cursor.i++],
+      };
+    }
+    const value = c.isParam ? params[cursor.i++] : c.literal;
+    return { kind: "cmp", column: c.column, op: c.op, value };
+  });
+}
+
+function matchesBoundCondition(row: Row, condition: BoundCondition): boolean {
+  if (condition.kind === "isNull") {
+    const isNull =
+      row[condition.column] === null || row[condition.column] === undefined;
+    return condition.negate ? !isNull : isNull;
+  }
+  if (condition.kind === "orNullOrCmp") {
+    const cellIsNull =
+      row[condition.column] === null || row[condition.column] === undefined;
+    if (cellIsNull) return true;
+    return compare(
+      condition.column,
+      row[condition.column],
+      condition.op,
+      coerce(condition.column, condition.value),
+    );
+  }
+  return compare(
+    condition.column,
+    row[condition.column],
+    condition.op,
+    coerce(condition.column, condition.value),
+  );
 }
 
 function applyWhere(
@@ -254,20 +334,104 @@ function applyWhere(
   params: unknown[],
   cursor: { i: number },
 ): Row[] {
-  // Bind params to conditions in order
-  const bound = conditions.map((c) => ({
-    ...c,
-    value: c.isParam ? params[cursor.i++] : c.literal,
-  }));
+  const bound = bindConditions(conditions, params, cursor);
   return rows.filter((row) =>
-    bound.every((c) =>
-      compare(c.column, row[c.column], c.op, coerce(c.column, c.value)),
-    ),
+    bound.every((c) => matchesBoundCondition(row, c)),
   );
 }
 
 function clone(row: Row): Row {
   return { ...row };
+}
+
+// ---------------------------------------------------------------------------
+// SET-clause expression evaluation (Story 13.6 R1/R3)
+//
+// MySQL evaluates multi-column UPDATE SET assignments left to right, and a
+// later assignment sees the already-updated value of an earlier one — not
+// "every assignment reads the pre-statement row" as standard SQL suggests.
+// This mini-evaluator reproduces that so devDb can genuinely exercise the
+// same off-by-one class of bug the real driver would (see
+// server/db.ts recordFailedPinAttempt and the R1 finding it fixes). Scoped
+// to exactly the expression forms server/db.ts emits — not a general parser.
+// ---------------------------------------------------------------------------
+
+/** Splits on top-level commas only — a `,` inside IF(...) must not split the clause. */
+function splitTopLevelCommas(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if (ch === "," && depth === 0) {
+      parts.push(text.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts.map((p) => p.trim());
+}
+
+/**
+ * Evaluates a scalar SET-clause expression against `workingRow` — a row
+ * mutated in place by earlier assignments in the same statement, so later
+ * expressions see their effects (the left-to-right semantics this exists
+ * for). Consumes `?` placeholders left to right regardless of which IF()
+ * branch is ultimately used: a prepared statement substitutes params into
+ * the query text before execution, so both branches' placeholders are
+ * always present positionally.
+ */
+function evalSetValue(
+  expr: string,
+  workingRow: Row,
+  params: unknown[],
+  cursor: { i: number },
+): unknown {
+  const trimmed = expr.trim();
+  if (trimmed === "?") return params[cursor.i++];
+  if (/^NULL$/i.test(trimmed)) return null;
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
+
+  const ifMatch = trimmed.match(/^IF\s*\((.*)\)$/is);
+  if (ifMatch) {
+    const args = splitTopLevelCommas(ifMatch[1]);
+    if (args.length !== 3) {
+      throw new Error(`devDb: IF() expects 3 arguments, got "${trimmed}"`);
+    }
+    const [condText, thenText, elseText] = args;
+    const condTrue = evalSetCondition(condText, workingRow, params, cursor);
+    const thenValue = evalSetValue(thenText, workingRow, params, cursor);
+    const elseValue = evalSetValue(elseText, workingRow, params, cursor);
+    return condTrue ? thenValue : elseValue;
+  }
+
+  const addMatch = trimmed.match(/^(\w+)\s*\+\s*(\d+)$/);
+  if (addMatch) {
+    const [, col, amount] = addMatch;
+    return Number(workingRow[col] ?? 0) + Number(amount);
+  }
+
+  if (/^\w+$/.test(trimmed)) return workingRow[trimmed];
+
+  throw new Error(`devDb: unsupported SET expression "${trimmed}"`);
+}
+
+function evalSetCondition(
+  expr: string,
+  workingRow: Row,
+  params: unknown[],
+  cursor: { i: number },
+): boolean {
+  const m = expr.trim().match(/^(.+?)\s*(>=|<=|=)\s*(.+)$/);
+  if (!m) throw new Error(`devDb: unsupported SET condition "${expr}"`);
+  const [, leftText, op, rightText] = m;
+  const left = Number(evalSetValue(leftText, workingRow, params, cursor));
+  const right = Number(evalSetValue(rightText, workingRow, params, cursor));
+  if (op === ">=") return left >= right;
+  if (op === "<=") return left <= right;
+  return left === right;
 }
 
 // ---------------------------------------------------------------------------
@@ -324,17 +488,27 @@ export async function devQuery(
     const table = m[1] as TableName;
     const setClause = m[2];
     const whereBody = m[3];
-    const setCols = setClause
-      .split(",")
-      .map((s) => s.trim().replace(/\s*=\s*\?$/, ""));
-    const cursor = { i: 0 };
-    const setValues = setCols.map((col) => coerce(col, params[cursor.i++]));
+    const setAssignments = splitTopLevelCommas(setClause).map((part) => {
+      const eq = part.indexOf("=");
+      return {
+        column: part.slice(0, eq).trim(),
+        expr: part.slice(eq + 1).trim(),
+      };
+    });
+    // Param count for the SET clause is fixed by its TEXT (both IF() branches'
+    // `?` are always consumed, regardless of which is taken — see
+    // evalSetValue) — so WHERE params start right after it, independent of
+    // any row's data.
+    const setParamCount = (setClause.match(/\?/g) ?? []).length;
+    const whereCursor = { i: setParamCount };
     const conditions = parseConditions(whereBody);
-    const matched = applyWhere(store[table], conditions, params, cursor);
+    const matched = applyWhere(store[table], conditions, params, whereCursor);
     matched.forEach((row) => {
-      setCols.forEach((col, idx) => {
-        row[col] = setValues[idx];
-      });
+      const setCursor = { i: 0 };
+      for (const { column, expr } of setAssignments) {
+        const rawValue = evalSetValue(expr, row, params, setCursor);
+        row[column] = coerce(column, rawValue);
+      }
       row.updatedAt = new Date();
     });
     return { affectedRows: matched.length };
@@ -355,13 +529,17 @@ export async function devQuery(
   }
 
   // ---- SELECT ----
+  // Column list may be `*` or an explicit `col1, col2, ...` (Story 13.6 R3 —
+  // server/db.ts's getUserPinState selects explicit columns, matching the
+  // getUserSettings convention).
   m = sql.match(
-    /^SELECT\s+\*\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+\?)?(?:\s+OFFSET\s+\?)?\s*$/i,
+    /^SELECT\s+(\*|[\w]+(?:\s*,\s*[\w]+)*)\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+\?)?(?:\s+OFFSET\s+\?)?\s*$/i,
   );
   if (m && /^SELECT/i.test(sql)) {
-    const table = m[1] as TableName;
-    const whereBody = m[2];
-    const orderBy = m[3];
+    const columnsRaw = m[1];
+    const table = m[2] as TableName;
+    const whereBody = m[3];
+    const orderBy = m[4];
     const hasLimit = /\sLIMIT\s+\?/i.test(sql);
     const hasOffset = /\sOFFSET\s+\?/i.test(sql);
 
@@ -395,7 +573,15 @@ export async function devQuery(
     if (offset) rows = rows.slice(offset);
     if (limit !== undefined) rows = rows.slice(0, limit);
 
-    return rows.map(clone);
+    const cloned = rows.map(clone);
+    if (columnsRaw.trim() === "*") return cloned;
+
+    const wantedColumns = columnsRaw.split(",").map((c) => c.trim());
+    return cloned.map((row) => {
+      const projected: Row = {};
+      for (const col of wantedColumns) projected[col] = row[col];
+      return projected;
+    });
   }
 
   throw new Error(`devDb: unsupported query: ${sql}`);

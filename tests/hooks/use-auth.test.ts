@@ -86,4 +86,28 @@ describe("useAuth logout", () => {
 
     expect(appLock.clearAppLock).toHaveBeenCalledTimes(1);
   });
+
+  it("does not touch tRPC or any server call — an ordinary sign-out must never clear the account-linked PIN (round-2 review R2)", async () => {
+    // logout() is *every* sign-out (Settings' "Sign out" row included), not
+    // just Forgot PIN. Clearing the shared account PIN here would wipe it
+    // for every device on an everyday sign-out. That responsibility lives in
+    // components/app-lock-gate.tsx's handleForgotPin, the one path defined
+    // by the user not knowing the PIN — see tests/components/app-lock-gate.test.tsx.
+    //
+    // The load-bearing guard is the absence of a `vi.mock("@/lib/trpc")` in
+    // this file: reintroducing a tRPC hook into logout() would run
+    // useMutation outside any QueryClientProvider and blow up here. Do not
+    // add that mock back — it would silently disarm this test (round-3
+    // review T7).
+    let hook!: ReturnType<typeof useAuth>;
+    render(React.createElement(Capture, { sink: (a) => (hook = a) }));
+
+    await act(async () => {
+      await hook.logout();
+    });
+
+    expect(auth.removeSessionToken).toHaveBeenCalledTimes(1);
+    expect(auth.clearUserInfo).toHaveBeenCalledTimes(1);
+    expect(appLock.clearAppLock).toHaveBeenCalledTimes(1);
+  });
 });
