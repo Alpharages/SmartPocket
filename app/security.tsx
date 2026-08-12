@@ -60,6 +60,7 @@ export default function SecurityScreen() {
   // an infinite read/toast loop on a failing status read (round-2 review, B4).
   const { show: showToast } = useToast();
   const supported = isAppLockSupported();
+  const trpcUtils = trpc.useUtils();
   const setServerPinMutation = trpc.security.setPin.useMutation();
   const clearServerPinMutation = trpc.security.clearPin.useMutation();
   const pinStatusQuery = trpc.security.getPinStatus.useQuery(undefined, {
@@ -167,6 +168,15 @@ export default function SecurityScreen() {
     async (pin: string, currentPin?: string) => {
       try {
         await setServerPinMutation.mutateAsync({ pin, currentPin });
+        // Closes the reconcile's guard, not just its loop. The QueryClient is
+        // created once for the app's lifetime (app/_layout.tsx), so its cache
+        // outlives this screen — and `getPinStatus` runs at the default
+        // staleTime of 0, meaning a remount serves the cached `pinSet: false`
+        // synchronously while refetching behind it. The per-mount ref latch
+        // starts fresh each time, so without this write every revisit fires a
+        // redundant setPin, trips the 2s server cooldown, and toasts a sync
+        // failure for a PIN that is in fact synced (round-4 review U1).
+        trpcUtils.security.getPinStatus.setData(undefined, { pinSet: true });
       } catch (err) {
         console.error("[Security] Failed to sync PIN to account:", err);
         // R4: a fresh-enable (no currentPin — nothing to prove yet) hitting
@@ -193,12 +203,15 @@ export default function SecurityScreen() {
         });
       }
     },
-    [setServerPinMutation, showToast],
+    [setServerPinMutation, showToast, trpcUtils],
   );
 
   const clearServerPin = useCallback(async () => {
     try {
       await clearServerPinMutation.mutateAsync();
+      // Same reason as the setData above — keep the cached status from
+      // outliving the write it describes.
+      trpcUtils.security.getPinStatus.setData(undefined, { pinSet: false });
     } catch (err) {
       console.error("[Security] Failed to clear account PIN:", err);
       showToast({
@@ -206,7 +219,7 @@ export default function SecurityScreen() {
         message: "App Lock turned off, but couldn't sync to your account.",
       });
     }
-  }, [clearServerPinMutation, showToast]);
+  }, [clearServerPinMutation, showToast, trpcUtils]);
 
   // Latches the reconcile to at most one attempt per mount. `syncPinToServer`
   // closes over the object react-query's `useMutation` returns, and that is a

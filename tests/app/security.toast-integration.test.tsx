@@ -34,6 +34,11 @@ vi.mock("@/lib/app-lock", () => appLock);
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
+    useUtils: () => ({
+      security: {
+        getPinStatus: { setData: vi.fn() },
+      },
+    }),
     security: {
       setPin: {
         useMutation: () => ({

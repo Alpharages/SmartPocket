@@ -33,11 +33,17 @@ vi.mock("@/components/ui/ToastProvider", () => ({
 const security = vi.hoisted(() => ({
   setPinMutateAsync: vi.fn().mockResolvedValue({ pinSet: true }),
   clearPinMutateAsync: vi.fn().mockResolvedValue({ pinSet: false }),
+  setPinStatusData: vi.fn(),
   pinStatusData: { pinSet: false } as { pinSet: boolean } | undefined,
 }));
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
+    useUtils: () => ({
+      security: {
+        getPinStatus: { setData: security.setPinStatusData },
+      },
+    }),
     security: {
       setPin: {
         useMutation: () => ({ mutateAsync: security.setPinMutateAsync }),
@@ -186,6 +192,7 @@ beforeEach(() => {
   toast.show.mockReset();
   security.setPinMutateAsync.mockReset().mockResolvedValue({ pinSet: true });
   security.clearPinMutateAsync.mockReset().mockResolvedValue({ pinSet: false });
+  security.setPinStatusData.mockReset();
   security.pinStatusData = { pinSet: false };
 });
 
