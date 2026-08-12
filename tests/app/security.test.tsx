@@ -665,8 +665,8 @@ describe("SecurityScreen", () => {
 
   it("shows a specific message when a fresh-enable can't sync because the account already has a PIN from another device (R4)", async () => {
     security.setPinMutateAsync.mockRejectedValue(
-      Object.assign(new Error("BAD_REQUEST"), {
-        data: { code: "BAD_REQUEST" },
+      Object.assign(new Error("CONFLICT"), {
+        data: { code: "CONFLICT" },
       }),
     );
     const root = render(<SecurityScreen />);
@@ -694,6 +694,37 @@ describe("SecurityScreen", () => {
         message: expect.stringMatching(
           /already has a pin from another device/i,
         ),
+      }),
+    );
+  });
+
+  it("does not blame another device for a BAD_REQUEST, which tRPC also returns for input-validation failures (T3)", async () => {
+    security.setPinMutateAsync.mockRejectedValue(
+      Object.assign(new Error("BAD_REQUEST"), {
+        data: { code: "BAD_REQUEST" },
+      }),
+    );
+    const root = render(<SecurityScreen />);
+    await flushMicrotasks();
+
+    act(() => {
+      root
+        .find(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "App Lock",
+        )
+        .props.onValueChange(true);
+    });
+
+    await submitPin(root, "1234");
+    await submitPin(root, "1234");
+    await flushMicrotasks();
+
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "error",
+        message: expect.not.stringMatching(/another device/i),
       }),
     );
   });

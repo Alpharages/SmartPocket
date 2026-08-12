@@ -640,7 +640,12 @@ describe("AppLockGate", () => {
       expect(clearPinOrder).toBeLessThan(logoutOrder);
     });
 
-    it("still signs out when clearing the account-linked PIN fails", async () => {
+    it("aborts the sign-out when clearing the account-linked PIN fails, rather than stranding the account (round-3 review T2)", async () => {
+      // logout() wipes the local PIN, so signing out after a failed clear
+      // would leave users.pinHash set with no device holding a local copy —
+      // and every exit from that state is closed (one-directional reconcile,
+      // assertCurrentPinProof on re-enable, disable branch needs the missing
+      // PIN). Staying locked and asking for a retry is the recoverable branch.
       appLock.isPinSet.mockResolvedValue(true);
       confirmDialog.confirmDestructive.mockResolvedValue(true);
       security.clearPinMutateAsync.mockRejectedValueOnce(new Error("offline"));
@@ -653,8 +658,10 @@ describe("AppLockGate", () => {
         await Promise.resolve();
       });
 
-      expect(authMock.logout).toHaveBeenCalledTimes(1);
-      expect(routerMock.replace).toHaveBeenCalledWith("/login");
+      expect(authMock.logout).not.toHaveBeenCalled();
+      expect(routerMock.replace).not.toHaveBeenCalled();
+      // Still locked, and told why.
+      expect(overlay(root)).toHaveLength(1);
     });
 
     it("does not offer Forgot PIN while still checking whether a PIN is set", () => {

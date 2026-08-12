@@ -281,8 +281,12 @@ describe("security router", () => {
     ]);
     const caller = appRouter.createCaller(createUserContext(7));
 
+    // CONFLICT, not BAD_REQUEST — the client discriminates on this code to
+    // explain that another device already set the account PIN, and Zod input
+    // failures on this same procedure use BAD_REQUEST (round-3 review T3).
+    // The "rejects a non-4-digit PIN" case below pins that other half down.
     await expect(caller.security.setPin({ pin: "5678" })).rejects.toMatchObject(
-      { code: "BAD_REQUEST" },
+      { code: "CONFLICT" },
     );
     // Only the read for the currentPin check happened — no overwrite without proof.
     expect(callDataApi).toHaveBeenCalledTimes(1);

@@ -246,8 +246,17 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
   // every sign-out (including the ordinary "Sign out" row in Settings), and
   // clearing the shared account PIN there would wipe it for every device on
   // an everyday sign-out (round-2 review R2). Must run before logout() drops
-  // the session — the request needs the still-valid auth header. Best-effort:
-  // a failure here must never block signing out.
+  // the session — the request needs the still-valid auth header.
+  //
+  // A failed clear aborts the sign-out rather than proceeding: logout() wipes
+  // the local PIN, so continuing would leave `users.pinHash` set with no
+  // device holding a local copy — and every exit from that state is closed
+  // (the Security reconcile is deliberately one-directional, re-enabling
+  // hits assertCurrentPinProof with no currentPin to offer, and the disable
+  // branch needs the PIN that no longer exists). One offline Forgot PIN
+  // would permanently disable App Lock for the whole account (round-3 review
+  // T2). Forgot PIN is already a confirmed, deliberate action, so asking the
+  // user to retry on a working connection is the safe branch.
   const handleForgotPin = useCallback(async () => {
     const confirmed = await confirmDestructive({
       title: "Forgot PIN?",
@@ -265,6 +274,10 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
         await clearServerPinMutation.mutateAsync();
       } catch (err) {
         console.error("[AppLockGate] Failed to clear account-linked PIN:", err);
+        flashError(
+          "Couldn't reach your account. Check your connection and try again.",
+        );
+        return;
       }
       await logout();
       clearErrorTimer();
@@ -274,7 +287,7 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     } finally {
       setForgettingPin(false);
     }
-  }, [logout, clearErrorTimer, clearServerPinMutation]);
+  }, [logout, clearErrorTimer, clearServerPinMutation, flashError]);
 
   const handleBiometricRetry = useCallback(() => {
     const epoch = epochRef.current;

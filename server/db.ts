@@ -236,11 +236,13 @@ export async function resetExpiredPinLockout(
  * Atomically increments the failure counter and locks once the threshold is
  * crossed, in a single guarded UPDATE — not a JS read-then-write. The WHERE
  * clause excludes a row that is already locked (or was locked by a
- * concurrent request between this request's read and this write), so
- * `counted: false` tells the caller its guess was not actually counted and
- * the account should be reported as locked instead. A single-row UPDATE like
- * this is atomic under InnoDB's row-level locking, which is what makes this
- * race-safe under concurrent requests (round-2 review B1).
+ * concurrent request between this request's read and this write), and
+ * `counted: false` reports that exclusion. Callers that re-read the row
+ * afterwards get the account's true lock state either way and don't need it;
+ * it is kept because it is the only direct assertion that the WHERE guard —
+ * the whole basis of the race-safety below — actually fired. A single-row
+ * UPDATE like this is atomic under InnoDB's row-level locking, which is what
+ * makes this race-safe under concurrent requests (round-2 review B1).
  *
  * `pinLockedUntil` is assigned BEFORE `pinFailedAttempts` in the SET clause
  * deliberately: MySQL evaluates multi-column UPDATE assignments left to

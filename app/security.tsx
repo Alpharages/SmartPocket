@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -170,7 +170,7 @@ export default function SecurityScreen() {
       } catch (err) {
         console.error("[Security] Failed to sync PIN to account:", err);
         // R4: a fresh-enable (no currentPin — nothing to prove yet) hitting
-        // BAD_REQUEST means the account already has a PIN from another
+        // CONFLICT means the account already has a PIN from another
         // device (assertCurrentPinProof on the server). Say so plainly
         // instead of the generic message — restoring the existing account
         // PIN onto this device remains out of scope (see N9), but the user
@@ -178,7 +178,7 @@ export default function SecurityScreen() {
         // just that "something" failed to sync.
         const code = (err as { data?: { code?: string } } | undefined)?.data
           ?.code;
-        if (code === "BAD_REQUEST" && !currentPin) {
+        if (code === "CONFLICT" && !currentPin) {
           showToast({
             type: "error",
             message:
@@ -208,6 +208,19 @@ export default function SecurityScreen() {
     }
   }, [clearServerPinMutation, showToast]);
 
+  // Latches the reconcile to at most one attempt per mount. `syncPinToServer`
+  // closes over the object react-query's `useMutation` returns, and that is a
+  // fresh literal on every render (no memo — see the tail of
+  // @tanstack/react-query's useMutation), so as an effect dependency it
+  // re-runs the effect on every render. Each sync then re-renders (the
+  // MutationObserver transitions idle -> pending -> settled) while nothing
+  // ever flips `pinStatusQuery.data.pinSet`, so the effect fed itself an
+  // unbounded stream of setPin calls — measured at 151 in ~300ms (round-3
+  // review T1). Invisible to a suite that mocks `useMutation` as a stateless
+  // object. A failed sync retries on the next mount, which is the same
+  // self-heal the N2 note below already relies on.
+  const reconcileAttemptedRef = useRef(false);
+
   // Reconcile, not just backfill: this closes three gaps at once — (1) a PIN
   // set under 13.1–13.5 before this story existed never had a chance to sync
   // (B3's literal "Given a device-local PIN exists"), (2) a previous
@@ -220,10 +233,12 @@ export default function SecurityScreen() {
   // force-clearing the account PIN from that signal would destroy another
   // device's setup. See the N9 note in the PR description.
   useEffect(() => {
+    if (reconcileAttemptedRef.current) return;
     if (!supported || loading) return;
     if (!pinSet) return;
     if (!pinStatusQuery.data || pinStatusQuery.data.pinSet) return;
 
+    reconcileAttemptedRef.current = true;
     let cancelled = false;
     getPin().then((localPin) => {
       if (cancelled || !localPin) return;

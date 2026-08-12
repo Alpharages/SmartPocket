@@ -1209,8 +1209,13 @@ async function assertCurrentPinProof(
 ): Promise<void> {
   if (existingHash === null) return;
   if (!currentPin) {
+    // CONFLICT, not BAD_REQUEST: the client discriminates on this code to
+    // tell the user their account already holds a PIN from another device,
+    // and tRPC also returns BAD_REQUEST for Zod input-validation failures on
+    // this same procedure — so a malformed input would otherwise be reported
+    // as an account conflict (round-3 review T3).
     throw new TRPCError({
-      code: "BAD_REQUEST",
+      code: "CONFLICT",
       message: "currentPin is required to change an existing PIN",
     });
   }
@@ -1298,8 +1303,8 @@ const securityRouter = router({
       // B1: the increment itself is a single atomic, guarded SQL UPDATE —
       // never a JS read-modify-write. If the WHERE guard excluded our row
       // (a concurrent request locked it first), `counted` is false and our
-      // guess wasn't recorded — but re-reading state either way reports
-      // the account's true current lock/attempt status either way.
+      // guess wasn't recorded — but re-reading state below reports the
+      // account's true current lock/attempt status either way.
       await db.recordFailedPinAttempt(ctx.user.id, {
         maxAttempts: MAX_PIN_ATTEMPTS,
         lockedUntilIfTripped: new Date(now.getTime() + PIN_LOCKOUT_MS),
