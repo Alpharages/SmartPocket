@@ -24,6 +24,9 @@ const appLock = vi.hoisted(() => ({
   setPin: vi.fn(),
   verifyPin: vi.fn(),
   clearAppLock: vi.fn(),
+  getBiometricLabel: vi.fn(),
+  isBiometricEnabled: vi.fn(),
+  setBiometricEnabled: vi.fn(),
 }));
 
 vi.mock("@/lib/app-lock", () => appLock);
@@ -142,6 +145,9 @@ beforeEach(() => {
   appLock.setPin.mockReset().mockResolvedValue(undefined);
   appLock.verifyPin.mockReset().mockResolvedValue(true);
   appLock.clearAppLock.mockReset().mockResolvedValue(undefined);
+  appLock.getBiometricLabel.mockReset().mockResolvedValue(null);
+  appLock.isBiometricEnabled.mockReset().mockResolvedValue(false);
+  appLock.setBiometricEnabled.mockReset().mockResolvedValue(undefined);
 });
 
 afterEach(() => {

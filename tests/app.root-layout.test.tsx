@@ -27,6 +27,14 @@ const runtime = vi.hoisted(() => ({
   subscribeSafeAreaInsets: vi.fn(() => vi.fn()),
 }));
 
+// AuthGate's useAuth() (real, unmocked) now pulls in hooks/use-auth.ts's
+// logout()-clears-app-lock (Story 13.5), which imports lib/app-lock.ts and
+// thus the real `expo-secure-store` — stub it for the same reason `auth`
+// above is stubbed (see the AppLockGate comment below).
+const appLock = vi.hoisted(() => ({
+  clearAppLock: vi.fn(),
+}));
+
 const oauth = vi.hoisted(() => ({
   getApiBaseUrl: vi.fn(() => "http://localhost:3000"),
   SESSION_TOKEN_KEY: "app_session_token",
@@ -59,7 +67,20 @@ const providers = vi.hoisted(() => ({
     React.createElement("ExpenseProvider", {}, children),
 }));
 
+// This suite covers dev-auth bootstrap, not app-lock behavior (see
+// tests/components/app-lock-gate.test.tsx for that) — stub it as a
+// pass-through so it doesn't pull in the real `expo-secure-store` module.
+// Rendered as a named host node (not a Fragment) so its position relative to
+// <Stack> stays assertable here — a stub a test can't see through can hide a
+// placement regression the way it did for ConfirmProvider (Lore lesson
+// 6dfb8e49-af88-4dd4-a90c-b78764001847).
+const appLockGate = vi.hoisted(() => ({
+  AppLockGate: ({ children }: { children: React.ReactNode }) =>
+    React.createElement("AppLockGate", {}, children),
+}));
+
 vi.mock("@/lib/_core/auth", () => auth);
+vi.mock("@/lib/app-lock", () => appLock);
 vi.mock("@/lib/_core/manus-runtime", () => runtime);
 vi.mock("@/constants/oauth", () => oauth);
 vi.mock("@/lib/trpc", () => trpc);
@@ -68,6 +89,7 @@ vi.mock("@/lib/currency-provider", () => providers);
 vi.mock("@/lib/first-day-of-week-provider", () => providers);
 vi.mock("@/lib/settings-provider", () => providers);
 vi.mock("@/lib/expense-context", () => providers);
+vi.mock("@/components/app-lock-gate", () => appLockGate);
 vi.mock("@/components/ui/ToastProvider", () => providers);
 vi.mock("@/components/ui/ConfirmProvider", () => providers);
 vi.mock("expo-router", () => ({
@@ -205,6 +227,32 @@ describe("RootLayout dev auth bootstrap", () => {
       renderer!.root.findByType(
         "ExpenseProvider" as unknown as React.ElementType,
       ),
+    ).toBeTruthy();
+  });
+
+  it("mounts AppLockGate wrapping the Stack navigator, not as a sibling", async () => {
+    (
+      globalThis as typeof globalThis & {
+        localStorage: LocalStorageLike;
+      }
+    ).localStorage.setItem(oauth.SESSION_TOKEN_KEY, "existing-token");
+    auth.getSessionToken.mockResolvedValueOnce("existing-token");
+
+    act(() => {
+      renderer = TestRenderer.create(<RootLayout />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const gate = renderer!.root.findByType(
+      "AppLockGate" as unknown as React.ElementType,
+    );
+    // AC: AppLockGate must wrap <Stack> (paint over the whole navigator),
+    // unlike AuthGate, which is a null-rendering sibling — a stub that hides
+    // this composition can't catch a regression that demotes it to a sibling.
+    expect(
+      gate.findByType("Stack" as unknown as React.ElementType),
     ).toBeTruthy();
   });
 

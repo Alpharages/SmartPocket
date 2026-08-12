@@ -16,6 +16,9 @@ const appLock = vi.hoisted(() => ({
   setPin: vi.fn(),
   verifyPin: vi.fn(),
   clearAppLock: vi.fn(),
+  getBiometricLabel: vi.fn(),
+  isBiometricEnabled: vi.fn(),
+  setBiometricEnabled: vi.fn(),
 }));
 
 vi.mock("@/lib/app-lock", () => appLock);
@@ -82,6 +85,7 @@ vi.mock("@expo/vector-icons", () => {
     "chevron-back": 1,
     "lock-closed-outline": 1,
     "key-outline": 1,
+    "finger-print": 1,
   };
   return { Ionicons };
 });
@@ -170,6 +174,9 @@ beforeEach(() => {
   appLock.setPin.mockReset().mockResolvedValue(undefined);
   appLock.verifyPin.mockReset().mockResolvedValue(true);
   appLock.clearAppLock.mockReset().mockResolvedValue(undefined);
+  appLock.getBiometricLabel.mockReset().mockResolvedValue(null);
+  appLock.isBiometricEnabled.mockReset().mockResolvedValue(false);
+  appLock.setBiometricEnabled.mockReset().mockResolvedValue(undefined);
   toast.show.mockReset();
   security.setPinMutateAsync.mockReset().mockResolvedValue({ pinSet: true });
   security.clearPinMutateAsync.mockReset().mockResolvedValue({ pinSet: false });
@@ -608,5 +615,180 @@ describe("SecurityScreen", () => {
     expect(toast.show).toHaveBeenCalledWith(
       expect.objectContaining({ type: "error" }),
     );
+  });
+
+  describe("biometric toggle", () => {
+    it("is hidden when no PIN is set, even if biometrics are available", async () => {
+      appLock.getBiometricLabel.mockResolvedValue("Face ID");
+      const root = render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      expect(
+        root.findAll(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "Face ID",
+        ),
+      ).toHaveLength(0);
+    });
+
+    it("is hidden when a PIN is set but there is no biometric hardware or nothing enrolled", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getBiometricLabel.mockResolvedValue(null);
+      const root = render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      expect(root.findAll((n) => String(n.type) === "Switch")).toHaveLength(1); // only the App Lock switch
+    });
+
+    it("shows a toggle labelled with the real biometric method when a PIN is set and biometrics are available", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getBiometricLabel.mockResolvedValue("Face ID");
+      appLock.isBiometricEnabled.mockResolvedValue(false);
+      const root = render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      const toggle = root.find(
+        (n) =>
+          String(n.type) === "Switch" &&
+          n.props?.accessibilityLabel === "Face ID",
+      );
+      expect(toggle.props.value).toBe(false);
+    });
+
+    it("reflects the persisted biometric preference", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getBiometricLabel.mockResolvedValue("Touch ID");
+      appLock.isBiometricEnabled.mockResolvedValue(true);
+      const root = render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      const toggle = root.find(
+        (n) =>
+          String(n.type) === "Switch" &&
+          n.props?.accessibilityLabel === "Touch ID",
+      );
+      expect(toggle.props.value).toBe(true);
+    });
+
+    it("enables biometric unlock when the toggle is switched on", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getBiometricLabel.mockResolvedValue("Face unlock");
+      appLock.isBiometricEnabled.mockResolvedValue(false);
+      const root = render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      await act(async () => {
+        root
+          .find(
+            (n) =>
+              String(n.type) === "Switch" &&
+              n.props?.accessibilityLabel === "Face unlock",
+          )
+          .props.onValueChange(true);
+        await Promise.resolve();
+      });
+
+      expect(appLock.setBiometricEnabled).toHaveBeenCalledWith(true);
+      const toggle = root.find(
+        (n) =>
+          String(n.type) === "Switch" &&
+          n.props?.accessibilityLabel === "Face unlock",
+      );
+      expect(toggle.props.value).toBe(true);
+    });
+
+    it("disables biometric unlock when the toggle is switched off", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getBiometricLabel.mockResolvedValue("Fingerprint");
+      appLock.isBiometricEnabled.mockResolvedValue(true);
+      const root = render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      await act(async () => {
+        root
+          .find(
+            (n) =>
+              String(n.type) === "Switch" &&
+              n.props?.accessibilityLabel === "Fingerprint",
+          )
+          .props.onValueChange(false);
+        await Promise.resolve();
+      });
+
+      expect(appLock.setBiometricEnabled).toHaveBeenCalledWith(false);
+      const toggle = root.find(
+        (n) =>
+          String(n.type) === "Switch" &&
+          n.props?.accessibilityLabel === "Fingerprint",
+      );
+      expect(toggle.props.value).toBe(false);
+    });
+
+    it("surfaces an error toast and resyncs when setBiometricEnabled rejects", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getBiometricLabel.mockResolvedValue("Face ID");
+      appLock.isBiometricEnabled.mockResolvedValue(false);
+      const root = render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      appLock.setBiometricEnabled.mockRejectedValue(
+        new Error("keychain error"),
+      );
+      appLock.isBiometricEnabled.mockResolvedValue(false);
+
+      await act(async () => {
+        root
+          .find(
+            (n) =>
+              String(n.type) === "Switch" &&
+              n.props?.accessibilityLabel === "Face ID",
+          )
+          .props.onValueChange(true);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(toast.show).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "error" }),
+      );
+      const toggle = root.find(
+        (n) =>
+          String(n.type) === "Switch" &&
+          n.props?.accessibilityLabel === "Face ID",
+      );
+      expect(toggle.props.value).toBe(false);
+    });
+
+    it("turns the biometric toggle off when App Lock (the PIN) is removed", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      appLock.getBiometricLabel.mockResolvedValue("Face ID");
+      appLock.isBiometricEnabled.mockResolvedValue(true);
+      const root = render(<SecurityScreen />);
+      await flushMicrotasks();
+
+      act(() => {
+        root
+          .find(
+            (n) =>
+              String(n.type) === "Switch" &&
+              n.props?.accessibilityLabel === "App Lock",
+          )
+          .props.onValueChange(false);
+      });
+
+      appLock.verifyPin.mockResolvedValue(true);
+      await submitPin(root, "1234");
+
+      expect(appLock.clearAppLock).toHaveBeenCalledTimes(1);
+      // The biometric row is gone entirely because App Lock (pinSet) is off.
+      expect(
+        root.findAll(
+          (n) =>
+            String(n.type) === "Switch" &&
+            n.props?.accessibilityLabel === "Face ID",
+        ),
+      ).toHaveLength(0);
+    });
   });
 });
