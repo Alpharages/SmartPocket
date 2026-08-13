@@ -1,0 +1,5 @@
+Bug ID,Title,Module,Type,Severity,Priority,Reproducibility,Linked TC,Evidence Tag,Status
+SP-073,recurringTransactions.list returns HTTP 500 on every screen (dev DB has no recurringTransactions table),Recurring / devDb,Functional-API,High,P1,Always (2x),TC-015,Verified,Open
+SP-074,Failed query renders as a legitimate "no data" empty state,Recurring (pattern likely wider),UX-Data Integrity,High,P1,Always (2x),TC-016,Verified,Open
+SP-075,Transaction amount has no upper bound; API accepts values exceeding decimal(12;2),Add Transaction / routers,Validation-Data Integrity,Medium,P2,Always (2x API; 1x UI),TC-008,Verified,Open
+SP-076,Amount field accepts letters and symbols while typing,Add Transaction,UX-Validation,Low,P4,Always (2x),TC-017,Verified,Open

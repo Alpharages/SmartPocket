@@ -1,0 +1,29 @@
+TC ID,Module,Scenario,Test Type,Test Data,Expected Result,Actual Result,Evidence Tag,Status,Linked Bug
+TC-001,Environment,Boot API + Metro from clean clone with no database,Smoke,DATABASE_URL unset,Both services start; /api/health returns 200,Both started; health 200,Verified,Pass,
+TC-002,Auth,POST /api/dev/login issues a session JWT,Functional,empty body,200 with token,200 with JWT for dev_local_user,Verified,Pass,
+TC-003,Navigation,All 13 web routes render authenticated,Smoke,n/a,Each route renders without page error,All 13 rendered with correct seeded content,Verified,Pass,
+TC-004,Dashboard,Totals match seeded data,Functional,seeded 4 transactions,Balance = income - expenses,$3049.75 = +$3200.00 - $150.25,Verified,Pass,
+TC-005,Add Transaction,Save with all fields empty,Negative,empty form,Submission blocked with message,Blocked; "Select a category",Verified,Pass,
+TC-006,Add Transaction,Negative amount,Negative,-5,Submission blocked with message,Blocked; "Enter an amount like 12.50",Verified,Pass,
+TC-007,Add Transaction,Zero amount,Boundary,0,Submission blocked with message,Blocked; "Amount must be greater than zero",Verified,Pass,
+TC-008,Add Transaction,Excessively large amount,Boundary,99999999999999999999,Rejected as out of range,SAVED; dashboard total corrupted to -1e20,Verified,Fail,SP-075
+TC-009,Add Transaction,Valid expense saves,Positive,12.34 / Groceries,Transaction appears in list; totals update,Appeared in list; count 4 -> 6; totals updated,Verified,Pass,
+TC-010,Add Transaction,Saved transaction survives page reload,Functional,12.34,Data persists after full reload,Count held at 6 after reload,Verified,Pass,
+TC-011,Add Transaction,Save returns user to Dashboard (real path),Functional,7.77 / Dining,Returns to /dashboard,Returned to /dashboard on both passes,Verified,Pass,
+TC-012,Add Transaction,Cancel returns to Dashboard without saving,Functional,n/a,Returns to /dashboard; nothing saved,Returned to /dashboard,Verified,Pass,
+TC-013,Layout,No horizontal overflow across viewports and schemes,UI-Responsive,390x844 / 768x1024 / 1440x900 x light+dark,scrollWidth == clientWidth,18/18 combinations OK,Verified,Pass,
+TC-014,Layout,Dark mode renders correctly,UI,dark scheme,Dark palette applied; content legible,Rendered correctly,Verified,Pass,
+TC-015,Recurring,recurringTransactions.list returns a list,Functional-API,Bearer token,200 with array,HTTP 500 TypeError in devDb applyWhere,Verified,Fail,SP-073
+TC-016,Recurring,Failed query surfaces an error to the user,Negative-UX,failing query,Error state with retry affordance,Shows "0 rules / No recurring rules yet",Verified,Fail,SP-074
+TC-017,Add Transaction,Amount field rejects letters while typing,Negative,abc!@#,Non-numeric input ignored,Field accepted "abc!@#",Verified,Fail,SP-076
+TC-018,Quality gates,Unit and integration test suite,Regression,npx vitest run,All tests pass,1595 passed / 1 skipped / 142 files,Verified,Pass,
+TC-019,Quality gates,TypeScript compilation,Static,npx tsc --noEmit,0 errors,0 errors,Verified,Pass,
+TC-020,Quality gates,Lint,Static,npx eslint .,0 errors,0 errors / 78 warnings,Verified,Pass,
+TC-021,Recurring,Create / edit / stop a recurring rule,Functional,n/a,Rule persists,NOT EXECUTED - blocked by SP-073,Untested,Blocked,SP-073
+TC-022,Loans/Cards/Categories/Accounts/Budgets,Full CRUD flows,Functional,n/a,Records persist,NOT EXECUTED - time-boxed to highest-risk path,Untested,Not Tested,
+TC-023,Import/Export,CSV import and CSV/JSON export round-trip,Functional,n/a,Data round-trips correctly,NOT EXECUTED - file round-trip not driven,Untested,Not Tested,
+TC-024,Native,App lock / biometrics / notifications / secure store,Functional,n/a,Behaves per spec on device,NOT EXECUTED - no device or simulator,Untested,Not Tested,
+TC-025,Accessibility,Keyboard navigation / focus order / screen reader,Accessibility,n/a,Fully operable without a mouse,NOT EXECUTED,Untested,Not Tested,
+TC-026,Auth,OAuth sign-in / session expiry / logout,Functional,n/a,Session lifecycle correct,NOT EXECUTED - no OAuth issuer configured,Untested,Not Tested,
+TC-027,Database,Behaviour against real MySQL,Functional,n/a,Matches dev DB behaviour,NOT EXECUTED - in-memory dev DB only,Untested,Not Tested,
+TC-028,Regression,Retest prior issues SP-001 to SP-072,Regression,n/a,Previously fixed issues stay fixed,NOT EXECUTED - not a regression pass,Untested,Not Tested,
