@@ -18,7 +18,15 @@ const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
 const schemeFromBundleId = `manus${timestamp}`;
 
 const env = {
-  appName: "Expense Tracker",
+  // SP-093: shipped as "Expense Tracker" while the UI called itself
+  // SmartPocket in the same breath — Settings > About showed one name directly
+  // above copy using the other. This is the name users see on the icon, the
+  // splash, the browser tab and the store listing.
+  appName: "SmartPocket",
+  // Left as-is deliberately: the slug is the Expo/EAS project identifier, not
+  // a user-facing string, and renaming it re-points an existing project. The
+  // deep-link scheme is derived from the bundle id above, not from this, so
+  // the two are independent. Rename it as a separate, coordinated change.
   appSlug: "expense-tracker-app",
   logoUrl:
     "https://d2xsxph8kpxj0f.cloudfront.net/310519663047064921/hxpiTJvwMmNSu7di699jqw/icon-P5bkGGifnXEVDxAdLtvPBT.webp",

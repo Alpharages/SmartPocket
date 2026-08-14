@@ -47,6 +47,7 @@ import {
   MAX_MONEY_MESSAGE,
   MONEY_PATTERN,
   isWithinMoneyRange,
+  sanitizeAmountInput,
 } from "@shared/money";
 
 const MIN_TOUCH_TARGET = 44;
@@ -311,7 +312,11 @@ export default function AddTransactionScreen() {
               placeholder="0.00"
               placeholderTextColor={colors.muted}
               value={amount}
-              onChangeText={setAmount}
+              // SP-076: `keyboardType`/`inputMode` is only a keyboard *hint* —
+              // on web (and with a hardware keyboard) letters and symbols typed
+              // straight in, and nothing said so until Save. Drop anything that
+              // is not part of a money amount as it is entered.
+              onChangeText={(next) => setAmount(sanitizeAmountInput(next))}
               keyboardType="decimal-pad"
               className="flex-1 text-foreground"
               style={{

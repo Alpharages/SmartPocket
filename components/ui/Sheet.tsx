@@ -15,8 +15,6 @@ import {
   Text,
   View,
   useWindowDimensions,
-  type StyleProp,
-  type ViewStyle,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -216,12 +214,13 @@ export function Sheet({
     transform: [{ translateY: translateY.value + dragOffset.value }],
   }));
 
-  // "aria-modal" is a React Native Web HTML attribute, not a ViewStyle key.
-  // The cast is intentional: RN Web passes unknown props through to the DOM.
-  const panelWebProps =
-    Platform.OS === "web"
-      ? ({ "aria-modal": true } as Record<string, boolean>)
-      : {};
+  // "aria-modal" is a React Native Web HTML attribute, not a ViewStyle key —
+  // so it must be spread as a *prop*, never merged into `style`. It was being
+  // pushed into the style array, which made RN Web log "Unsupported style
+  // property aria-modal" on every sheet open and dropped the attribute, so the
+  // sheet never announced itself as modal to assistive technology.
+  const panelWebProps: Record<string, boolean> =
+    Platform.OS === "web" ? { "aria-modal": true } : {};
 
   const titleTypography = Typography.h3;
   const panelMaxWidth = ContentMaxWidth.sheet;
@@ -255,6 +254,7 @@ export function Sheet({
       <Animated.View
         accessible={true}
         {...(title ? { accessibilityLabel: title } : {})}
+        {...panelWebProps}
         style={[
           {
             // Height cap lives in the style layer (not className) so it holds
@@ -280,7 +280,6 @@ export function Sheet({
             ...getElevationStyle("lg", colors.foreground),
           },
           panelStyle,
-          panelWebProps as StyleProp<ViewStyle>,
         ]}
         testID={`${testID}-panel`}
       >

@@ -30,3 +30,21 @@ export function isValidMoneyString(value: string): boolean {
 export function isWithinMoneyRange(value: string): boolean {
   return Number(value.trim()) <= MAX_MONEY_AMOUNT;
 }
+
+/**
+ * Strips anything that cannot appear in a money amount as the user types
+ * (SP-076). `keyboardType`/`inputMode` only *hints* at a numeric keypad — on
+ * web, and with any hardware keyboard, letters and symbols go straight in and
+ * nothing objects until submit.
+ *
+ * Deliberately permissive about in-progress input: a lone "." and a trailing
+ * "." are preserved so "0." can be typed on the way to "0.5". Shape is still
+ * enforced by `MONEY_PATTERN` on submit.
+ */
+export function sanitizeAmountInput(value: string): string {
+  const digitsAndDots = value.replace(/[^\d.]/g, "");
+  const [head, ...rest] = digitsAndDots.split(".");
+  // Collapse extra decimal points, and cap the fraction at two places.
+  const fraction = rest.join("").slice(0, 2);
+  return rest.length > 0 ? `${head}.${fraction}` : head;
+}

@@ -54,11 +54,28 @@ const radius = {
   sm: 8,
   md: 12,
   lg: 16,
+  // SP-094: 24 and 28 were already in use as raw literals — 24 pairs with
+  // Tailwind's `rounded-3xl` on the glass cards, 28 is the floating tab bar's
+  // tuned radius. Naming them keeps the visuals identical while bringing them
+  // inside the scale, instead of leaving the system to decay one literal at a
+  // time.
+  xl: 24,
+  "2xl": 28,
   full: 9999,
 };
 
 /** @type {const} */
 const typography = {
+  // SP-090: the balance hero hardcoded `fontSize: 42`, so the app's single
+  // most prominent number sat outside the scale entirely. It is a real step
+  // above `display` (which titles other screens), so it gets a named token
+  // rather than being flattened into one.
+  hero: {
+    fontSize: 42,
+    lineHeight: 48,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
   display: { fontSize: 36, lineHeight: 40, fontWeight: "700" },
   h1: { fontSize: 30, lineHeight: 36, fontWeight: "700" },
   h2: { fontSize: 24, lineHeight: 32, fontWeight: "600" },

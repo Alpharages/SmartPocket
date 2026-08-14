@@ -28,7 +28,8 @@ type TableName =
   | "loans"
   | "repayments"
   | "accounts"
-  | "transfers";
+  | "transfers"
+  | "recurringTransactions";
 
 const DATE_COLUMNS = new Set([
   "createdAt",
@@ -68,6 +69,7 @@ const store: Record<TableName, Row[]> = {
   repayments: [],
   accounts: [],
   transfers: [],
+  recurringTransactions: [],
 };
 
 const nextId: Record<TableName, number> = {
@@ -81,11 +83,29 @@ const nextId: Record<TableName, number> = {
   repayments: 1,
   accounts: 1,
   transfers: 1,
+  recurringTransactions: 1,
 };
+
+/**
+ * SP-073: `store[table]` for an unregistered table was `undefined`, so the
+ * first `.filter` on it threw `Cannot read properties of undefined` from deep
+ * inside `applyWhere` — a stack trace that named neither the table nor the
+ * query. Any table added to `drizzle/schema.ts` without a matching entry here
+ * fails the same way, so resolve through this and name the problem.
+ */
+function tableRows(table: TableName): Row[] {
+  const rows = store[table];
+  if (!rows) {
+    throw new Error(
+      `devDb: unknown table "${table}" — add it to TableName, store and nextId in server/_core/devDb.ts`,
+    );
+  }
+  return rows;
+}
 
 function insertRow(table: TableName, row: Row): number {
   const id = nextId[table]++;
-  store[table].push({ id, ...row });
+  tableRows(table).push({ id, ...row });
   return id;
 }
 
@@ -234,7 +254,15 @@ type Condition =
   | { kind: "isNull"; column: string; negate: boolean }
   // `(<col> IS NULL OR <col> <op> ?)` — the exact shape server/db.ts emits for
   // "not currently locked" guards (Story 13.6 R3). Not a general OR grammar.
-  | { kind: "orNullOrCmp"; column: string; op: string };
+  // SP-077: the RHS may also be the literal `NOW()`, which findActiveBudget
+  // emits for its active-window guard. `source` says where the comparison
+  // value comes from so bindConditions knows whether to consume a `?` param.
+  | {
+      kind: "orNullOrCmp";
+      column: string;
+      op: string;
+      source: "param" | "now";
+    };
 
 /** Parse the WHERE body (already AND-split) into structured conditions. */
 function parseConditions(whereBody: string): Condition[] {
@@ -244,11 +272,16 @@ function parseConditions(whereBody: string): Condition[] {
     .filter(Boolean)
     .map((part): Condition => {
       const orGroup = part.match(
-        /^\((\w+)\s+IS\s+NULL\s+OR\s+\1\s*(>=|<=|=)\s*\?\)$/i,
+        /^\((\w+)\s+IS\s+NULL\s+OR\s+\1\s*(>=|<=|=)\s*(\?|NOW\(\))\)$/i,
       );
       if (orGroup) {
-        const [, column, op] = orGroup;
-        return { kind: "orNullOrCmp", column, op };
+        const [, column, op, rhs] = orGroup;
+        return {
+          kind: "orNullOrCmp",
+          column,
+          op,
+          source: rhs === "?" ? "param" : "now",
+        };
       }
 
       const isNotNull = part.match(/^(\w+)\s+IS\s+NOT\s+NULL$/i);
@@ -291,11 +324,13 @@ function bindConditions(
   return conditions.map((c): BoundCondition => {
     if (c.kind === "isNull") return c;
     if (c.kind === "orNullOrCmp") {
+      // `NOW()` is a literal in the SQL text, so it consumes no `?` param —
+      // advancing the cursor for it would desync every later placeholder.
       return {
         kind: "orNullOrCmp",
         column: c.column,
         op: c.op,
-        value: params[cursor.i++],
+        value: c.source === "now" ? new Date() : params[cursor.i++],
       };
     }
     const value = c.isParam ? params[cursor.i++] : c.literal;
@@ -502,7 +537,7 @@ export async function devQuery(
     const setParamCount = (setClause.match(/\?/g) ?? []).length;
     const whereCursor = { i: setParamCount };
     const conditions = parseConditions(whereBody);
-    const matched = applyWhere(store[table], conditions, params, whereCursor);
+    const matched = applyWhere(tableRows(table), conditions, params, whereCursor);
     matched.forEach((row) => {
       const setCursor = { i: 0 };
       for (const { column, expr } of setAssignments) {
@@ -521,32 +556,36 @@ export async function devQuery(
     const conditions = parseConditions(m[2]);
     const cursor = { i: 0 };
     const doomed = new Set(
-      applyWhere(store[table], conditions, params, cursor),
+      applyWhere(tableRows(table), conditions, params, cursor),
     );
-    const before = store[table].length;
-    store[table] = store[table].filter((row) => !doomed.has(row));
-    return { affectedRows: before - store[table].length };
+    const before = tableRows(table).length;
+    store[table] = tableRows(table).filter((row) => !doomed.has(row));
+    return { affectedRows: before - tableRows(table).length };
   }
 
   // ---- SELECT ----
   // Column list may be `*` or an explicit `col1, col2, ...` (Story 13.6 R3 —
   // server/db.ts's getUserPinState selects explicit columns, matching the
   // getUserSettings convention).
+  // SP-077: LIMIT/OFFSET may be a `?` placeholder *or* a literal (findActiveBudget
+  // emits `LIMIT 1`). The literal form was not matched here, so it stayed glued
+  // to the WHERE body and reached parseConditions as
+  // `(endDate IS NULL OR endDate >= NOW()) LIMIT 1`.
   m = sql.match(
-    /^SELECT\s+(\*|[\w]+(?:\s*,\s*[\w]+)*)\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+\?)?(?:\s+OFFSET\s+\?)?\s*$/i,
+    /^SELECT\s+(\*|[\w]+(?:\s*,\s*[\w]+)*)\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?(?:\s+LIMIT\s+(\?|\d+))?(?:\s+OFFSET\s+(\?|\d+))?\s*$/i,
   );
   if (m && /^SELECT/i.test(sql)) {
     const columnsRaw = m[1];
     const table = m[2] as TableName;
     const whereBody = m[3];
     const orderBy = m[4];
-    const hasLimit = /\sLIMIT\s+\?/i.test(sql);
-    const hasOffset = /\sOFFSET\s+\?/i.test(sql);
+    const limitRaw = m[5];
+    const offsetRaw = m[6];
 
     const cursor = { i: 0 };
     let rows = whereBody
-      ? applyWhere(store[table], parseConditions(whereBody), params, cursor)
-      : [...store[table]];
+      ? applyWhere(tableRows(table), parseConditions(whereBody), params, cursor)
+      : [...tableRows(table)];
 
     if (orderBy) {
       const [col, dirRaw] = orderBy.trim().split(/\s+/);
@@ -568,8 +607,19 @@ export async function devQuery(
       });
     }
 
-    const limit = hasLimit ? Number(params[cursor.i++]) : undefined;
-    const offset = hasOffset ? Number(params[cursor.i++]) : undefined;
+    // A literal consumes no `?`, so only advance the cursor for placeholders.
+    const limit =
+      limitRaw === undefined
+        ? undefined
+        : limitRaw === "?"
+          ? Number(params[cursor.i++])
+          : Number(limitRaw);
+    const offset =
+      offsetRaw === undefined
+        ? undefined
+        : offsetRaw === "?"
+          ? Number(params[cursor.i++])
+          : Number(offsetRaw);
     if (offset) rows = rows.slice(offset);
     if (limit !== undefined) rows = rows.slice(0, limit);
 

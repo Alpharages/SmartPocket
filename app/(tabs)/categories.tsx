@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { ResponsiveContent } from "@/components/responsive-content";
 import { ScreenContainer } from "@/components/screen-container";
-import { ContentMaxWidth, getElevationStyle } from "@/lib/_core/theme";
+import { ContentMaxWidth, Radius, getElevationStyle } from "@/lib/_core/theme";
 import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
 import { useExpense, type Category } from "@/lib/expense-context";
 import { useThemeTokens } from "@/lib/theme-provider";
@@ -38,6 +38,7 @@ import { usePressFeedback } from "@/hooks/use-press-feedback";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { AnimatedPressable } from "@/lib/_core/nativewind-pressable";
 import { readableTextOn } from "@/lib/_core/contrast";
+import { CATEGORY_NAME_MAX_LENGTH } from "@/shared/const";
 
 /**
  * A single category row. Extracted into its own component so it can use the
@@ -65,7 +66,15 @@ function CategoryRow({
 }) {
   const { animatedStyle, onPressIn, onPressOut } = usePressFeedback();
   return (
-    <Animated.View entering={FadeInDown.delay(index * 30).duration(400)}>
+    <Animated.View
+      entering={FadeInDown.delay(index * 30).duration(400)}
+      // SP-078: the delete Pressable used to sit inside the row Pressable —
+      // `<button>` inside `<button>`, which React reports as a hydration
+      // error and which makes the row's own hit area ambiguous. Row and
+      // delete are siblings in this flex-row now; the row keeps its
+      // `accessibilityActions` so screen-reader users lose nothing.
+      style={{ flexDirection: "row", alignItems: "center" }}
+    >
       <AnimatedPressable
         onPress={() => onEdit(item)}
         onLongPress={() => onRequestDelete(item)}
@@ -84,6 +93,7 @@ function CategoryRow({
         }}
         style={[
           {
+            flex: 1,
             flexDirection: "row",
             alignItems: "center",
             gap: 12,
@@ -110,18 +120,18 @@ function CategoryRow({
           </Text>
         </View>
         <Ionicons name="pencil" size={16} color={mutedColor} />
-        {/* SP-037: delete was long-press-only with no visual affordance. */}
-        <Pressable
-          onPress={() => onRequestDelete(item)}
-          accessibilityRole="button"
-          accessibilityLabel={`Delete ${item.name}`}
-          hitSlop={8}
-          className="items-center justify-center"
-          style={{ minWidth: 44, minHeight: 44 }}
-        >
-          <Ionicons name="trash-outline" size={16} color={errorColor} />
-        </Pressable>
       </AnimatedPressable>
+      {/* SP-037: delete was long-press-only with no visual affordance. */}
+      <Pressable
+        onPress={() => onRequestDelete(item)}
+        accessibilityRole="button"
+        accessibilityLabel={`Delete ${item.name}`}
+        hitSlop={8}
+        className="items-center justify-center"
+        style={{ minWidth: 44, minHeight: 44, marginRight: 8 }}
+      >
+        <Ionicons name="trash-outline" size={16} color={errorColor} />
+      </Pressable>
     </Animated.View>
   );
 }
@@ -297,7 +307,7 @@ export default function CategoriesScreen() {
            * the rounded-3xl container so the surface's 1px border stroke
            * rounds with the card instead of being clipped square. */}
           <GlassSurface
-            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+            style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
           />
           <FlatList
             data={data}
@@ -317,7 +327,7 @@ export default function CategoriesScreen() {
       ) : (
         <View className="rounded-3xl overflow-hidden">
           <GlassSurface
-            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+            style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
           />
           <EmptyState
             variant="no-data"
@@ -471,6 +481,12 @@ export default function CategoriesScreen() {
                 onChangeText={setCategoryName}
                 className="flex-1 text-foreground"
                 style={{ fontSize: 15 }}
+                // SP-081: a placeholder is not an accessible name — it
+                // disappears the moment the user types.
+                accessibilityLabel="Category name"
+                // SP-082: unbounded input reached the server and came back as
+                // a generic "Failed to add category". Cap it here instead.
+                maxLength={CATEGORY_NAME_MAX_LENGTH}
               />
             </View>
           </View>
@@ -508,45 +524,35 @@ export default function CategoriesScreen() {
             </View>
           </View>
 
-          {/* Action Buttons */}
+          {/* Action Buttons.
+              SP-084: these were raw Pressables, so the disabled submit rendered
+              at full opacity in a flat grey and read as an active button that
+              ignored taps — every other disabled submit in the app dims to 0.5.
+              Using the shared Button primitive makes that impossible to drift
+              again, and brings the loading state with it. */}
           <View className="flex-row gap-3 mt-2">
-            <Pressable
+            <Button
+              variant="secondary"
+              label="Cancel"
               onPress={() => {
                 setEditingCategory(null);
                 setShowModal(false);
               }}
-              accessibilityRole="button"
-              accessibilityLabel="Cancel"
-              className="flex-1 py-3.5 rounded-xl items-center"
-              style={{
-                backgroundColor: colors.background,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-                minHeight: 44,
-              }}
-            >
-              <Text className="text-foreground font-semibold">Cancel</Text>
-            </Pressable>
-            <Pressable
+              className="flex-1"
+              size="lg"
+            />
+            <Button
+              variant="primary"
+              label={editingCategory ? "Save" : "Add Category"}
               onPress={handleSaveCategory}
               disabled={!categoryName.trim()}
-              accessibilityRole="button"
+              loading={saving}
+              className="flex-1"
+              size="lg"
               accessibilityLabel={
                 editingCategory ? "Save Category" : "Add Category"
               }
-              accessibilityState={{ disabled: !categoryName.trim() }}
-              className="flex-1 py-3.5 rounded-xl items-center"
-              style={{
-                backgroundColor: categoryName.trim()
-                  ? colors.primary
-                  : colors.muted,
-                minHeight: 44,
-              }}
-            >
-              <Text className="text-white font-semibold">
-                {editingCategory ? "Save" : "Add Category"}
-              </Text>
-            </Pressable>
+            />
           </View>
         </ScrollView>
       </Sheet>

@@ -5,8 +5,9 @@ import { parseStateNonce, takeOAuthStateNonce } from "@/constants/oauth";
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Text } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { Button } from "@/components/ui";
 
 export default function OAuthCallback() {
   const router = useRouter();
@@ -237,6 +238,19 @@ export default function OAuthCallback() {
             <Text className="text-base leading-6 text-center text-foreground">
               {errorMessage}
             </Text>
+            {/* SP-085: this screen had no interactive elements at all — a user
+                who landed here from a broken or expired link was stranded with
+                no way back into the app. */}
+            <View className="mt-lg w-full" style={{ maxWidth: 280 }}>
+              <Button
+                variant="primary"
+                label="Back to sign in"
+                size="lg"
+                onPress={() => router.replace("/login")}
+                accessibilityLabel="Back to sign in"
+                testID="oauth-error-retry"
+              />
+            </View>
           </>
         )}
       </ThemedView>

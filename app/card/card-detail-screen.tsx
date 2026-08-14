@@ -86,9 +86,20 @@ export default function CardDetailScreen() {
           <Pressable
             onPress={() => router.back()}
             hitSlop={8}
+            // SP-086: no accessibilityRole, so this never reached the DOM as a
+            // button — screen-reader and keyboard users had no way out of the
+            // screen. Sizing also moved to `style`: NativeWind className is
+            // disabled on Pressable app-wide, so `w-10 h-10` never applied.
+            accessibilityRole="button"
             accessibilityLabel="Go back"
-            className="w-10 h-10 rounded-full items-center justify-center"
-            style={{ backgroundColor: colors.surface }}
+            style={{
+              backgroundColor: colors.surface,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
             <Ionicons name="chevron-back" size={22} color={colors.foreground} />
           </Pressable>
@@ -112,9 +123,19 @@ export default function CardDetailScreen() {
         <Pressable
           onPress={() => router.back()}
           hitSlop={8}
+          // SP-086: missing accessibilityRole kept this out of the DOM as a
+          // button, so screen-reader and keyboard users had no way back.
+          // className sizing does not apply to Pressable in this app.
+          accessibilityRole="button"
           accessibilityLabel="Go back"
-          className="w-10 h-10 rounded-full items-center justify-center"
-          style={{ backgroundColor: colors.surface }}
+          style={{
+            backgroundColor: colors.surface,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
           <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </Pressable>

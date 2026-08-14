@@ -33,7 +33,7 @@ import {
 } from "@/components/ui";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/hooks/use-confirm";
-import { ContentMaxWidth, getElevationStyle } from "@/lib/_core/theme";
+import { ContentMaxWidth, Radius, getElevationStyle } from "@/lib/_core/theme";
 import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { useCurrency } from "@/lib/currency-provider";
@@ -106,6 +106,7 @@ function CardFormFields({
         >
           <TextInput
             placeholder="e.g., My Visa"
+            accessibilityLabel="Card name"
             placeholderTextColor={colors.muted}
             value={values.cardName}
             onChangeText={(cardName) => onChange({ cardName })}
@@ -130,6 +131,7 @@ function CardFormFields({
           >
             <TextInput
               placeholder="1234 5678 9012 3456"
+              accessibilityLabel="Card number"
               placeholderTextColor={colors.muted}
               value={values.cardNumber}
               onChangeText={(cardNumber) => onChange({ cardNumber })}
@@ -177,6 +179,7 @@ function CardFormFields({
         >
           <TextInput
             placeholder="John Doe"
+            accessibilityLabel="Cardholder name"
             placeholderTextColor={colors.muted}
             value={values.cardholderName}
             onChangeText={(cardholderName) => onChange({ cardholderName })}
@@ -201,6 +204,7 @@ function CardFormFields({
           >
             <TextInput
               placeholder="MM"
+              accessibilityLabel="Expiry month"
               placeholderTextColor={colors.muted}
               value={values.expiryMonth}
               onChangeText={(expiryMonth) => onChange({ expiryMonth })}
@@ -225,6 +229,7 @@ function CardFormFields({
           >
             <TextInput
               placeholder="YYYY"
+              accessibilityLabel="Expiry year"
               placeholderTextColor={colors.muted}
               value={values.expiryYear}
               onChangeText={(expiryYear) => onChange({ expiryYear })}
@@ -256,6 +261,7 @@ function CardFormFields({
           </Text>
           <TextInput
             placeholder="5000"
+            accessibilityLabel="Credit limit"
             placeholderTextColor={colors.muted}
             value={values.creditLimit}
             onChangeText={(creditLimit) => onChange({ creditLimit })}
@@ -585,7 +591,7 @@ export default function CardsScreen() {
                  * border stroke rounds with the card instead of being
                  * clipped square. */}
                 <GlassSurface
-                  style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+                  style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
                 />
                 <EmptyState
                   variant="no-data"

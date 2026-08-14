@@ -111,6 +111,8 @@ vi.mock("expo-router", () => ({
   // AuthGate (SP-006) reads the active segment to decide whether the current
   // route is public.
   useSegments: () => ["(tabs)"],
+  // SP-079: DocumentTitle derives the web document title from the pathname.
+  usePathname: () => "/dashboard",
   Stack: Object.assign(
     ({ children }: { children: React.ReactNode }) =>
       React.createElement("Stack", {}, children),

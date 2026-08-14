@@ -6,7 +6,7 @@ import { StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { usePressFeedback } from "@/hooks/use-press-feedback";
-import { getElevationStyle } from "@/lib/_core/theme";
+import { Radius, getElevationStyle } from "@/lib/_core/theme";
 import { useThemeTokens } from "@/lib/theme-provider";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { GlassSurface } from "@/components/ui/GlassSurface";
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     paddingTop: 30,
   },
   surface: {
-    borderRadius: 28,
+    borderRadius: Radius["2xl"],
     borderWidth: StyleSheet.hairlineWidth,
     minHeight: 86,
     paddingTop: 34,

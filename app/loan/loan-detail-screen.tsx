@@ -46,9 +46,18 @@ function BackHeader({
       <Pressable
         onPress={onBack}
         hitSlop={8}
+        // SP-086: see card-detail-screen — missing role meant no exposed
+        // button, and className sizing does not apply to Pressable here.
+        accessibilityRole="button"
         accessibilityLabel="Go back"
-        className="w-10 h-10 rounded-full items-center justify-center"
-        style={{ backgroundColor: colors.surface }}
+        style={{
+          backgroundColor: colors.surface,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
       >
         <Ionicons name="chevron-back" size={22} color={colors.foreground} />
       </Pressable>
@@ -67,8 +76,17 @@ function BackHeader({
           accessibilityRole="button"
           accessibilityLabel="Delete loan"
           testID="delete-loan-button"
-          className="w-10 h-10 rounded-full items-center justify-center"
-          style={{ backgroundColor: colors.error + "14" }}
+          // SP-091: NativeWind className is disabled on Pressable in this app,
+          // so `w-10 h-10` never applied and the control rendered at 40x40 —
+          // under the 44x44 minimum. Size it in `style`.
+          style={{
+            backgroundColor: colors.error + "14",
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
           <Ionicons name="trash-outline" size={20} color={colors.error} />
         </Pressable>

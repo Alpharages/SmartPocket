@@ -123,6 +123,9 @@ export const Pill = forwardRef<PillRef, PillProps>(
         accessibilityRole={role}
         accessibilityLabel={resolvedAccessibilityLabel}
         accessibilityState={accessibilityState}
+        // SP-080: see CategoryToken — accessibilityState.checked does not
+        // reach the DOM as aria-checked on web.
+        aria-checked={role === "radio" ? selected : undefined}
         disabled={disabled}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}

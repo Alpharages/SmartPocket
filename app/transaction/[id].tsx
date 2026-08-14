@@ -91,9 +91,22 @@ export default function TransactionDetailScreen() {
           <Pressable
             onPress={() => router.back()}
             hitSlop={8}
+            // SP-086: missing accessibilityRole kept this out of the DOM as a
+            // button, so screen-reader and keyboard users had no way back.
+            // className sizing does not apply to Pressable in this app.
+            accessibilityRole="button"
             accessibilityLabel="Go back"
-            className="w-10 h-10 rounded-full items-center justify-center"
-            style={{ backgroundColor: colors.surface }}
+            // SP-091: NativeWind className is disabled on Pressable in this app,
+            // so `w-10 h-10` never applied and the control rendered at 40x40 —
+            // under the 44x44 minimum. Size it in `style`.
+            style={{
+              backgroundColor: colors.surface,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
             <Ionicons name="chevron-back" size={22} color={colors.foreground} />
           </Pressable>
@@ -143,9 +156,22 @@ export default function TransactionDetailScreen() {
           <Pressable
             onPress={() => router.back()}
             hitSlop={8}
+            // SP-086: missing accessibilityRole kept this out of the DOM as a
+            // button, so screen-reader and keyboard users had no way back.
+            // className sizing does not apply to Pressable in this app.
+            accessibilityRole="button"
             accessibilityLabel="Go back"
-            className="w-10 h-10 rounded-full items-center justify-center"
-            style={{ backgroundColor: colors.surface }}
+            // SP-091: NativeWind className is disabled on Pressable in this app,
+            // so `w-10 h-10` never applied and the control rendered at 40x40 —
+            // under the 44x44 minimum. Size it in `style`.
+            style={{
+              backgroundColor: colors.surface,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
             <Ionicons name="chevron-back" size={22} color={colors.foreground} />
           </Pressable>
@@ -159,8 +185,17 @@ export default function TransactionDetailScreen() {
               accessibilityRole="button"
               accessibilityLabel="Edit transaction"
               testID="edit-transaction-button"
-              className="w-10 h-10 rounded-full items-center justify-center"
-              style={{ backgroundColor: colors.primary + "14" }}
+              // SP-091: NativeWind className is disabled on Pressable in this app,
+              // so `w-10 h-10` never applied and the control rendered at 40x40 —
+              // under the 44x44 minimum. Size it in `style`.
+              style={{
+                backgroundColor: colors.primary + "14",
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
               <Ionicons
                 name="create-outline"
@@ -172,8 +207,17 @@ export default function TransactionDetailScreen() {
               onPress={() => void handleDelete()}
               hitSlop={8}
               accessibilityLabel="Delete transaction"
-              className="w-10 h-10 rounded-full items-center justify-center"
-              style={{ backgroundColor: colors.error + "14" }}
+              // SP-091: NativeWind className is disabled on Pressable in this app,
+              // so `w-10 h-10` never applied and the control rendered at 40x40 —
+              // under the 44x44 minimum. Size it in `style`.
+              style={{
+                backgroundColor: colors.error + "14",
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
               <Ionicons name="trash-outline" size={20} color={colors.error} />
             </Pressable>

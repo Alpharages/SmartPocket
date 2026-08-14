@@ -132,13 +132,29 @@ rare (AI/insight highlights, hero gradient end-stop). Indigo is the single brand
 | `foreground` | `#111827` | `#F1F5F9` | Primary text                                         |
 | `muted`      | `#6B7280` | `#9CA3AF` | Secondary text, inactive icons                       |
 | `border`     | `#E5E7EB` | `#2D3748` | Dividers, outlines                                   |
-| `success`    | `#059669` | `#34D399` | **Income / positive (semantic only)**                |
+| `success`    | `#047857` | `#6EE7B7` | **Income / positive (semantic only)**                |
 | `error`      | `#DC2626` | `#FCA5A5` | **Expense / negative / destructive (semantic only)** |
-| `warning`    | `#D97706` | `#FBBF24` | Alerts, over-budget, due-soon                        |
-| `accent`     | `#DB2777` | `#F472B6` | Rare small accents (AI/insight)                      |
+| `warning`    | `#B45309` | `#FBBF24` | Alerts, over-budget, due-soon                        |
+| `accent`     | `#BE185D` | `#F472B6` | Rare small accents (AI/insight)                      |
 | `secondary`  | `#7C3AED` | `#A78BFA` | Hero gradient end-stop, rare accents                 |
 
-**Balance hero gradient:** `primary → secondary` (indigo → violet), used only on the dashboard.
+**Balance hero gradient:** each theme owns its own stops (see _Themes_ below); Aurora's are
+`#818CF8 → #C4B5FD → #67E8F9` in light and `#6366F1 → #A855F7 → #22D3EE` in dark, at 135°. Used
+only on the dashboard balance card. On a `low` device tier the hero drops to a solid fill of the
+first stop — a deliberate performance fallback, not a bug (`GradientHero`, `lib/_core/perf.ts`).
+
+### Themes
+
+The app ships **three** complete themes, switchable in Settings, each with its own colour set,
+hero gradient, glass parameters and category palette:
+
+| Theme                 | Character                    | Light surface        | Dark surface         |
+| --------------------- | ---------------------------- | -------------------- | -------------------- |
+| **Aurora** (default)  | Cool indigo → violet → cyan  | `#F8FAFC`            | `#0B0F19`            |
+| **Obsidian & Gold**   | Ivory / warm gold, navy dark | `#FDF7E8` (gradient) | `#16213E` (gradient) |
+| **Midnight Spectrum** | Violet → pink → amber        | `#A78BFA` (gradient) | `#7C3AED` (gradient) |
+
+The token table above is Aurora's, which is also the top-level alias set in `theme.config.js`.
 
 ### Category Colors (data-driven; defaults)
 
@@ -154,23 +170,25 @@ rare (AI/insight highlights, hero gradient end-stop). Indigo is the single brand
 
 ### Type Scale (system font stack: SF Pro / Roboto / system-ui)
 
-| Token     | Size / Line | Weight | Use                                 |
-| --------- | ----------- | ------ | ----------------------------------- |
-| `display` | 32 / 38     | 700    | Balance hero amount                 |
-| `h1`      | 28 / 34     | 700    | Screen titles                       |
-| `h2`      | 22 / 28     | 600    | Section titles                      |
-| `h3`      | 18 / 24     | 600    | Card titles                         |
-| `body`    | 16 / 24     | 400    | Default text                        |
-| `label`   | 14 / 20     | 500    | Field labels, chips                 |
-| `caption` | 12 / 16     | 400    | Timestamps, hints                   |
-| `number`  | tabular     | 600    | All monetary figures (tabular-nums) |
+| Token     | Size / Line | Weight | Use                                     |
+| --------- | ----------- | ------ | --------------------------------------- |
+| `hero`    | 42 / 48     | 700    | Dashboard balance amount (tabular-nums) |
+| `display` | 36 / 40     | 700    | Large figures / feature numerals        |
+| `h1`      | 30 / 36     | 700    | Screen titles                           |
+| `h2`      | 24 / 32     | 600    | Section titles                          |
+| `h3`      | 20 / 28     | 600    | Card titles                             |
+| `body`    | 16 / 24     | 400    | Default text                            |
+| `label`   | 14 / 20     | 500    | Field labels, chips                     |
+| `caption` | 12 / 16     | 400    | Timestamps, hints                       |
+| `micro`   | 10 / 14     | 400    | Dense micro-labels (month badge)        |
+| `number`  | 16 / 24     | 600    | All monetary figures (tabular-nums)     |
 
 Monetary values use tabular figures; support Dynamic Type up to 200%.
 
 ### Spacing (4-pt base)
 
 - `xs 4` · `sm 8` · `md 12` (default) · `lg 16` (screen/card padding) · `xl 20` · `2xl 24`
-- **Radius:** `sm 8` · `md 12` (default) · `lg 16` (cards) · `full` (pills/chips)
+- **Radius:** `sm 8` · `md 12` (default) · `lg 16` (cards) · `xl 24` (glass cards) · `2xl 28` (tab bar) · `full` (pills/chips)
 - **Elevation:** subtle, low-opacity shadows; dark mode relies on `surface` lightness over heavy shadows
 
 ---
@@ -213,4 +231,6 @@ These were observed in the built screens and should be corrected during the toke
 - Fix Dashboard **quick-action chips overlapping** the balance hero (use Button primitives in-flow)
 - Convert the **"Add New Category"** full-width banner into a real Button
 - Standardize **Activity filter chips** on the shared `Pill` primitive
-- Unify app title to **SmartPocket** (currently shows "Expense Tracker")
+- ~~Unify app title to **SmartPocket**~~ — done (SP-093); `app.config.ts` `appName` is now
+  `SmartPocket`. The Expo/EAS `slug` is still `expense-tracker-app`: it is an infrastructure
+  identifier, not user-facing, and renaming it re-points the project.

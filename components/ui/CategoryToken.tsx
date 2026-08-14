@@ -279,6 +279,12 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
         accessibilityRole={role}
         accessibilityLabel={resolvedAccessibilityLabel}
         accessibilityState={accessibilityState}
+        // SP-080: react-native-web does not translate
+        // `accessibilityState.checked` into `aria-checked`, so a screen reader
+        // announced the selected category as "not checked". Selection was only
+        // conveyed by appending ", selected" to the label. Pass the ARIA
+        // attribute directly; native keeps using accessibilityState above.
+        aria-checked={role === "radio" ? isSelected : undefined}
         disabled={isDisabled}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}

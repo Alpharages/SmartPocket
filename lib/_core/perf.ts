@@ -1,4 +1,4 @@
-import { Dimensions, PixelRatio } from "react-native";
+import { Dimensions, PixelRatio, Platform } from "react-native";
 
 /** Target sustained frame rate for scrolling and theme switching (AC1). */
 export const TARGET_FPS = 60;
@@ -48,12 +48,35 @@ export function subscribeDeviceTierOverride(listener: () => void): () => void {
  */
 export function getDeviceTier(): DeviceTier {
   if (tierOverride) return tierOverride;
+
+  // SP-092: the pixel-count heuristic assumes "few pixels" means "weak GPU",
+  // which holds for phones and inverts on desktop — a 1366x768 non-retina
+  // laptop lands at 1,049,088 px, under the low band, and silently lost the
+  // hero gradient, while a 1440x900 machine of similar power kept it. A
+  // desktop pushing fewer pixels has *less* work to do, not more, so the
+  // band test only applies where it was calibrated: touch devices.
+  if (!isTouchPlatform()) return "high";
+
   const { width, height } = Dimensions.get("window");
   const pixelRatio = PixelRatio.get();
   const physicalPixels = width * height * pixelRatio * pixelRatio;
   if (physicalPixels < LOW_TIER_MAX_PIXELS) return "low";
   if (physicalPixels < MID_TIER_MAX_PIXELS) return "mid";
   return "high";
+}
+
+/** iOS/Android natively, and a coarse-pointer browser on the web (a phone or
+ * tablet), which is exactly where the pixel-count bands were calibrated. */
+function isTouchPlatform(): boolean {
+  if (Platform.OS === "ios" || Platform.OS === "android") return true;
+  if (Platform.OS !== "web") return false;
+  const mm = (
+    globalThis as typeof globalThis & {
+      matchMedia?: (q: string) => { matches: boolean };
+    }
+  ).matchMedia;
+  // No matchMedia (SSR/test): treat as desktop rather than degrading blindly.
+  return mm ? mm("(pointer: coarse)").matches : false;
 }
 
 /** Whether the low-cost fallback (reduced effects / no blur) should engage

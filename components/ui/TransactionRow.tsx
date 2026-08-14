@@ -302,38 +302,40 @@ function TransactionRowImpl({
         </Text>
       </View>
 
-      {usesInlineActions ? (
-        <View className="flex-row items-center ml-2">
-          {onEdit ? (
-            <Pressable
-              onPress={onEdit}
-              accessibilityRole="button"
-              accessibilityLabel={`Edit ${title}`}
-              className="items-center justify-center"
-              style={{ minWidth: 44, minHeight: 44 }}
-            >
-              <Ionicons
-                name="create-outline"
-                size={18}
-                color={colors.primary}
-              />
-            </Pressable>
-          ) : null}
-          {onDelete ? (
-            <Pressable
-              onPress={onDelete}
-              accessibilityRole="button"
-              accessibilityLabel={`Delete ${title}`}
-              className="items-center justify-center"
-              style={{ minWidth: 44, minHeight: 44 }}
-            >
-              <Ionicons name="trash-outline" size={18} color={colors.error} />
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
     </AnimatedPressable>
   );
+
+  // SP-078: these used to render *inside* the row Pressable, producing
+  // `<button>` inside `<button>` — invalid HTML that React reports as a
+  // hydration error and that leaves the row's own hit area ambiguous. They are
+  // siblings of the row now. The row keeps its `accessibilityActions` for
+  // edit/delete, so screen-reader users lose nothing by the regrouping.
+  const inlineActions = usesInlineActions ? (
+    <View className="flex-row items-center pr-2">
+      {onEdit ? (
+        <Pressable
+          onPress={onEdit}
+          accessibilityRole="button"
+          accessibilityLabel={`Edit ${title}`}
+          className="items-center justify-center"
+          style={{ minWidth: 44, minHeight: 44 }}
+        >
+          <Ionicons name="create-outline" size={18} color={colors.primary} />
+        </Pressable>
+      ) : null}
+      {onDelete ? (
+        <Pressable
+          onPress={onDelete}
+          accessibilityRole="button"
+          accessibilityLabel={`Delete ${title}`}
+          className="items-center justify-center"
+          style={{ minWidth: 44, minHeight: 44 }}
+        >
+          <Ionicons name="trash-outline" size={18} color={colors.error} />
+        </Pressable>
+      ) : null}
+    </View>
+  ) : null;
 
   if (hasSwipeActions && !usesInlineActions) {
     return (
@@ -379,6 +381,15 @@ function TransactionRowImpl({
       >
         {rowContent}
       </Swipeable>
+    );
+  }
+
+  if (inlineActions) {
+    return (
+      <View className="flex-row items-center">
+        <View className="flex-1">{rowContent}</View>
+        {inlineActions}
+      </View>
     );
   }
 

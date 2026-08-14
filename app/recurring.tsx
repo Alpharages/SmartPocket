@@ -34,6 +34,7 @@ export default function RecurringScreen() {
   const {
     recurringTransactions,
     loadingRecurringTransactions,
+    recurringTransactionsError,
     categories,
     cancelRecurringTransaction,
     refreshRecurringTransactions,
@@ -155,9 +156,15 @@ export default function RecurringScreen() {
       <ResponsiveContent>
         <ScreenHeader
           title="Recurring"
-          subtitle={`${sortedRules.length} rule${
-            sortedRules.length === 1 ? "" : "s"
-          }`}
+          // SP-074: "0 rules" is a claim about the user's data. Don't make it
+          // when the load failed and we have no idea what the real count is.
+          subtitle={
+            recurringTransactionsError
+              ? "Couldn't load"
+              : `${sortedRules.length} rule${
+                  sortedRules.length === 1 ? "" : "s"
+                }`
+          }
           accessibilityLabel="Recurring transactions screen header"
           action={
             <View
@@ -223,6 +230,27 @@ export default function RecurringScreen() {
               <View className="items-center justify-center py-20">
                 <ActivityIndicator size="large" color={colors.primary} />
               </View>
+            ) : recurringTransactionsError ? (
+              // SP-074: a failed load fell through to the empty state below,
+              // telling the user they had no rules when the truth was that we
+              // could not find out. Never assert "no data" on an error.
+              <EmptyState
+                variant="no-data"
+                icon={
+                  <Ionicons
+                    name="cloud-offline-outline"
+                    size={28}
+                    color={colors.error}
+                  />
+                }
+                title="Couldn't load your recurring rules"
+                description="Something went wrong reaching the server. Your rules are safe — this screen just can't show them right now."
+                action={{
+                  label: "Try again",
+                  onPress: () => void refreshRecurringTransactions(),
+                }}
+                testID="recurring-load-error"
+              />
             ) : (
               <EmptyState
                 variant="no-data"

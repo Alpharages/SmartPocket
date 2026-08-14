@@ -1,13 +1,15 @@
 import "@/global.css";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useRouter, type Href } from "expo-router";
+import { Stack, useRouter, usePathname, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { ActivityIndicator, Platform, Text, View } from "react-native";
 import * as Notifications from "expo-notifications";
 import { handleLoanNotificationResponse } from "@/lib/notification-routing";
+import { getPageTitle } from "@/lib/_core/page-title";
+import { getAppMetadata } from "@/lib/app-metadata";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider, useThemeTokens } from "@/lib/theme-provider";
 import { Button } from "@/components/ui/Button";
@@ -119,6 +121,22 @@ function ShellFallback({
       )}
     </View>
   );
+}
+
+/**
+ * SP-079: every route rendered an empty `<title>`. Expo Router's per-screen
+ * `title` options never reached `document.title` here, so set it explicitly
+ * from the pathname. Renders nothing; web-only.
+ */
+function DocumentTitle() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    document.title = getPageTitle(pathname, getAppMetadata().name);
+  }, [pathname]);
+
+  return null;
 }
 
 export default function RootLayout() {
@@ -324,6 +342,7 @@ export default function RootLayout() {
           {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
           {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
+          <DocumentTitle />
           <ToastProvider>
             <ConfirmProvider>
               <CurrencyProvider>

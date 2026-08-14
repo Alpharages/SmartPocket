@@ -258,9 +258,10 @@ describe("ExpenseProvider clearAllData", () => {
       await expect(clearAllData!()).rejects.toThrow("clearAllData failed");
     });
 
+    // SP-083: surface the server's message rather than a hardcoded string.
     expect(mocks.toastShow).toHaveBeenCalledWith({
       type: "error",
-      message: "Failed to clear data",
+      message: "network",
     });
     expect(mocks.monthlyStatsRefetch.mock.calls.length).toBe(
       refetchCallsBefore,

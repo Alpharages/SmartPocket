@@ -270,15 +270,6 @@ export function BudgetFormSheet({
           )}
         </View>
 
-        {errorMessage ? (
-          <Text
-            className="text-error"
-            style={{ fontSize: Typography.caption.fontSize }}
-            testID="budget-form-error"
-          >
-            {errorMessage}
-          </Text>
-        ) : null}
       </ScrollView>
 
       {isEditing ? (
@@ -294,6 +285,24 @@ export function BudgetFormSheet({
             testID="budget-delete-button"
           />
         </View>
+      ) : null}
+
+      {/* SP-077: this used to sit at the end of the ScrollView, below the
+          category grid, so a save failure could be reported off-screen while
+          the user stared at an unchanged sheet. It lives in the footer with
+          the actions now, next to the button that triggered it, and announces
+          itself for screen-reader users. */}
+      {errorMessage ? (
+        <Text
+          accessible
+          accessibilityLiveRegion="polite"
+          role="alert"
+          className="text-error mt-lg"
+          style={{ fontSize: Typography.caption.fontSize }}
+          testID="budget-form-error"
+        >
+          {errorMessage}
+        </Text>
       ) : null}
 
       <View className="flex-row gap-md mt-lg">

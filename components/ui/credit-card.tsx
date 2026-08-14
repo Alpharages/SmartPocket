@@ -173,10 +173,16 @@ export function CreditCard({
             // remapped off on Pressable and silently drops on web.
             style={{
               position: "absolute",
-              top: Spacing.lg,
-              right: Spacing.lg,
+              // SP-091: `padding: xs` around an 18px icon measured 26x28 —
+              // under the 44x44 minimum even with hitSlop, which does not
+              // apply on web. Size the control itself instead.
+              top: Spacing.sm,
+              right: Spacing.sm,
               zIndex: 10,
-              padding: Spacing.xs,
+              width: 44,
+              height: 44,
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
             <Ionicons name="pencil" size={18} color="white" />

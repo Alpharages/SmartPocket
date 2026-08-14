@@ -295,16 +295,29 @@ Tokens (light / dark) — formalized from `theme.config.js`:
 | `foreground` | `#111827` | `#F1F5F9` | Primary text                                         |
 | `muted`      | `#6B7280` | `#9CA3AF` | Secondary text, inactive icons                       |
 | `border`     | `#E5E7EB` | `#2D3748` | Dividers, outlines                                   |
-| `success`    | `#059669` | `#34D399` | **Income / positive (semantic only)**                |
+| `success`    | `#047857` | `#6EE7B7` | **Income / positive (semantic only)**                |
 | `error`      | `#DC2626` | `#FCA5A5` | **Expense / negative / destructive (semantic only)** |
-| `warning`    | `#D97706` | `#FBBF24` | Alerts, over-budget, due-soon                        |
-| `accent`     | `#DB2777` | `#F472B6` | Rare small accents (AI/insight highlights)           |
+| `warning`    | `#B45309` | `#FBBF24` | Alerts, over-budget, due-soon                        |
+| `accent`     | `#BE185D` | `#F472B6` | Rare small accents (AI/insight highlights)           |
 | `secondary`  | `#7C3AED` | `#A78BFA` | Hero gradient end-stop, rare accents                 |
 
-- **Hero gradient:** `primary → secondary` (indigo → violet), used only on the dashboard balance card.
+- **Hero gradient:** per-theme stops, not `primary → secondary`. Aurora is
+  `#818CF8 → #C4B5FD → #67E8F9` (light) and `#6366F1 → #A855F7 → #22D3EE` (dark) at 135°, used
+  only on the dashboard balance card. On a `low` device tier `GradientHero` renders a solid fill
+  of the first stop instead — a deliberate performance fallback.
+- **Themes:** three complete, switchable token sets ship — **Aurora** (default, indigo/violet/cyan),
+  **Obsidian & Gold** (ivory/gold, navy dark) and **Midnight Spectrum** (violet/pink/amber). Each
+  owns its colours, hero gradient, glass parameters and category palette. The table above is
+  Aurora's, which doubles as the top-level alias set in `theme.config.js`.
 - **Semantic discipline:** `success`/`error` are reserved for money & destructive actions; never decorative.
 - **Category palette:** a separate, data-driven token set (each category owns a color+icon). Defaults
   should be tuned for WCAG AA on both surfaces.
+
+> **Kept in sync with `theme.config.js` (SP-087/088/089).** The `success`, `warning` and
+> `accent` values are darker than a naive palette pick because they are tuned to clear WCAG AA
+> against the near-white background — `tests/theme-aa-contrast.test.ts` asserts this. Do not
+> "restore" the lighter values. Likewise the type scale below is the shipped scale, not an
+> aspirational one.
 
 ### Typography System
 
@@ -313,14 +326,16 @@ Roboto on Android, system stack on web. A type scale:
 
 | Token     | Size / Line | Weight | Use                                               |
 | --------- | ----------- | ------ | ------------------------------------------------- |
-| `display` | 32 / 38     | 700    | Balance hero amount                               |
-| `h1`      | 28 / 34     | 700    | Screen titles                                     |
-| `h2`      | 22 / 28     | 600    | Section titles                                    |
-| `h3`      | 18 / 24     | 600    | Card titles                                       |
+| `hero`    | 42 / 48     | 700    | Dashboard balance amount (tabular-nums)           |
+| `display` | 36 / 40     | 700    | Large figures / feature numerals                  |
+| `h1`      | 30 / 36     | 700    | Screen titles                                     |
+| `h2`      | 24 / 32     | 600    | Section titles                                    |
+| `h3`      | 20 / 28     | 600    | Card titles                                       |
 | `body`    | 16 / 24     | 400    | Default text                                      |
 | `label`   | 14 / 20     | 500    | Field labels, chips                               |
 | `caption` | 12 / 16     | 400    | Timestamps, hints                                 |
-| `number`  | tabular     | 600    | All monetary figures (tabular-nums for alignment) |
+| `micro`   | 10 / 14     | 400    | Dense micro-labels (month badge, card-label chip) |
+| `number`  | 16 / 24     | 600    | All monetary figures (tabular-nums for alignment) |
 
 - Monetary values use **tabular figures** so columns of money align.
 - Support Dynamic Type / font scaling up to 200% (NFR-5).
@@ -338,7 +353,7 @@ Roboto on Android, system stack on web. A type scale:
 | `xl`  | 20  | generous section spacing     |
 | `2xl` | 24  | screen-level separation      |
 
-Radius: `sm 8` · `md 12` (default) · `lg 16` (cards) · `full` (pills/chips).
+Radius: `sm 8` · `md 12` (default) · `lg 16` (cards) · `xl 24` (glass cards) · `2xl 28` (floating tab bar) · `full` (pills/chips).
 Elevation: subtle, low-opacity shadows (matching the tab bar's `shadowOpacity 0.04`); dark mode
 relies on `surface` lightness rather than heavy shadows.
 

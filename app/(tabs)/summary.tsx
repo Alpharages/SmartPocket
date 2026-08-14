@@ -41,6 +41,7 @@ import {
   TAB_BAR_CLEARANCE,
   Typography,
   getElevationStyle,
+  Radius,
 } from "@/lib/_core/theme";
 import { readableTextOn } from "@/lib/_core/contrast";
 import { useCurrency } from "@/lib/currency-provider";
@@ -357,7 +358,7 @@ export default function SummaryScreen() {
           accessibilityLabel="Loading spending trend"
         >
           <GlassSurface
-            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+            style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
           />
           <Skeleton variant="line" width="100%" height={180} radius={12} />
         </View>
@@ -367,7 +368,7 @@ export default function SummaryScreen() {
           style={getElevationStyle("sm", colors.foreground)}
         >
           <GlassSurface
-            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+            style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
           />
           <Ionicons name="analytics-outline" size={36} color={colors.muted} />
           <Text className="text-muted font-medium mt-3 text-sm">
@@ -387,7 +388,7 @@ export default function SummaryScreen() {
            * the rounded-3xl container so the surface's 1px border stroke
            * rounds with the card instead of being clipped square. */}
           <GlassSurface
-            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+            style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
           />
           <MonthlyTrendChart
             data={trendData}
@@ -465,7 +466,7 @@ export default function SummaryScreen() {
           accessibilityLabel="Loading spending breakdown"
         >
           <GlassSurface
-            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+            style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
           />
           {[0, 1, 2, 3].map((i) => (
             <View key={i} className="py-2">
@@ -483,7 +484,7 @@ export default function SummaryScreen() {
           style={getElevationStyle("sm", colors.foreground)}
         >
           <GlassSurface
-            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+            style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
           />
           <Ionicons name="pie-chart-outline" size={36} color={colors.muted} />
           <Text className="text-muted font-medium mt-3 text-sm">
@@ -503,7 +504,7 @@ export default function SummaryScreen() {
            * the rounded-3xl container so the surface's 1px border stroke
            * rounds with the card instead of being clipped square. */}
           <GlassSurface
-            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+            style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
           />
           <CategoryPieChart
             slices={categoryExpenses.map((item) => ({
@@ -655,8 +656,17 @@ export default function SummaryScreen() {
           <View className="px-6 pt-6 pb-2">
             <View className="flex-row items-center gap-3">
               <View
-                className="w-10 h-10 rounded-full items-center justify-center"
-                style={{ backgroundColor: selectedCategoryColor }}
+                // SP-091: NativeWind className is disabled on Pressable in this app,
+                // so `w-10 h-10` never applied and the control rendered at 40x40 —
+                // under the 44x44 minimum. Size it in `style`.
+                style={{
+                  backgroundColor: selectedCategoryColor,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
                 <Ionicons
                   name={

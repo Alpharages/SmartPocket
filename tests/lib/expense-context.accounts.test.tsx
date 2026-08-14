@@ -243,9 +243,12 @@ describe("expense context accounts", () => {
       ).rejects.toThrow("addAccount failed");
     });
 
+    // SP-083: the handler used to discard the error and show a hardcoded
+    // "Failed to add account", hiding the server's actual explanation (e.g.
+    // "An expense category named X already exists"). The real message wins.
     expect(mocks.toastShow).toHaveBeenCalledWith({
       type: "error",
-      message: "Failed to add account",
+      message: "fail",
     });
     expect(api).not.toBeNull();
   });

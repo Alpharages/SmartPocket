@@ -12,6 +12,7 @@ import { applyOptimistic, snapshotList } from "./optimistic";
 import { getMonthBoundaries, getWeekBoundaries } from "./budget-period";
 import { useFirstDayOfWeek } from "./first-day-of-week-provider";
 import { syncLoanReminderState } from "./loan-reminders";
+import { getMutationErrorMessage } from "./mutation-error";
 
 function toRecurringMutationInput(
   rule: RecurringTransaction,
@@ -320,6 +321,8 @@ interface ExpenseContextType {
   // Recurring transactions
   recurringTransactions: RecurringTransaction[];
   loadingRecurringTransactions: boolean;
+  /** SP-074: the last recurring load failed — the list is not authoritative. */
+  recurringTransactionsError: boolean;
   refreshRecurringTransactions: () => Promise<void>;
   addRecurringTransaction: (
     data: CreateRecurringTransactionInput,
@@ -345,17 +348,6 @@ interface ExpenseContextType {
 
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
 
-function getMutationErrorMessage(err: unknown, fallback: string): string {
-  if (
-    err &&
-    typeof err === "object" &&
-    "message" in err &&
-    typeof (err as { message: unknown }).message === "string"
-  ) {
-    return (err as { message: string }).message;
-  }
-  return fallback;
-}
 
 export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const toast = useToast();
@@ -397,6 +389,9 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     RecurringTransaction[]
   >([]);
   const [loadingRecurringTransactions, setLoadingRecurringTransactions] =
+    useState(false);
+  // SP-074: distinguishes "the load failed" from "there are none".
+  const [recurringTransactionsError, setRecurringTransactionsError] =
     useState(false);
 
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -447,9 +442,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         await createCategoryMutation.mutateAsync(data);
         await refreshCategories();
         toast.show({ type: "success", message: "Category added" });
-      } catch {
+      } catch (err) {
         setCategories(snapshot);
-        toast.show({ type: "error", message: "Failed to add category" });
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to add category"),
+        });
         throw new Error("addCategory failed");
       }
     },
@@ -465,9 +463,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       try {
         await updateCategoryMutation.mutateAsync({ id, ...data } as any);
         toast.show({ type: "success", message: "Category updated" });
-      } catch {
+      } catch (err) {
         setCategories(snapshot);
-        toast.show({ type: "error", message: "Failed to update category" });
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to update category"),
+        });
         throw new Error("updateCategory failed");
       }
     },
@@ -481,9 +482,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       try {
         await deleteCategoryMutation.mutateAsync({ id });
         toast.show({ type: "success", message: "Category deleted" });
-      } catch {
+      } catch (err) {
         setCategories(snapshot);
-        toast.show({ type: "error", message: "Failed to delete category" });
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to delete category"),
+        });
         throw new Error("deleteCategory failed");
       }
     },
@@ -542,9 +546,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         });
         await refreshCreditCards();
         toast.show({ type: "success", message: "Card added" });
-      } catch {
+      } catch (err) {
         setCreditCards(snapshot);
-        toast.show({ type: "error", message: "Failed to add card" });
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to add card"),
+        });
         throw new Error("addCreditCard failed");
       }
     },
@@ -565,9 +572,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
           ...(cardNumber !== undefined ? { cardNumber } : {}),
         } as Parameters<typeof updateCardMutation.mutateAsync>[0]);
         toast.show({ type: "success", message: "Card updated" });
-      } catch {
+      } catch (err) {
         setCreditCards(snapshot);
-        toast.show({ type: "error", message: "Failed to update card" });
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to update card"),
+        });
         throw new Error("updateCreditCard failed");
       }
     },
@@ -581,9 +591,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       try {
         await deleteCardMutation.mutateAsync({ id });
         toast.show({ type: "success", message: "Card deleted" });
-      } catch {
+      } catch (err) {
         setCreditCards(snapshot);
-        toast.show({ type: "error", message: "Failed to delete card" });
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to delete card"),
+        });
         throw new Error("deleteCreditCard failed");
       }
     },
@@ -670,9 +683,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         await createAccountMutation.mutateAsync(data);
         await refreshAccounts();
         toast.show({ type: "success", message: "Account added" });
-      } catch {
+      } catch (err) {
         setAccounts(snapshot);
-        toast.show({ type: "error", message: "Failed to add account" });
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to add account"),
+        });
         throw new Error("addAccount failed");
       }
     },
@@ -692,9 +708,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       try {
         await updateAccountMutation.mutateAsync({ id, ...data });
         toast.show({ type: "success", message: "Account updated" });
-      } catch {
+      } catch (err) {
         setAccounts(snapshot);
-        toast.show({ type: "error", message: "Failed to update account" });
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to update account"),
+        });
         throw new Error("updateAccount failed");
       }
     },
@@ -736,7 +755,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         });
         await refreshAccountBalances();
         toast.show({ type: "success", message: "Account deleted" });
-      } catch {
+      } catch (err) {
         setAccounts(snapshot);
         toast.show({
           type: "error",
@@ -1127,9 +1146,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         await refreshAccountBalances();
         await refreshMonthlyStats();
         toast.show({ type: "success", message: "Transaction added" });
-      } catch {
+      } catch (err) {
         setTransactions(snapshot);
-        toast.show({ type: "error", message: "Failed to add transaction" });
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to add transaction"),
+        });
         throw new Error("addTransaction failed");
       }
     },
@@ -1153,8 +1175,11 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         await refreshBudgetProgress();
         await refreshAccountBalances();
         toast.show({ type: "success", message: "Import complete" });
-      } catch {
-        toast.show({ type: "error", message: "Import failed" });
+      } catch (err) {
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Import failed"),
+        });
         throw new Error("importTransactions failed");
       }
     },
@@ -1188,9 +1213,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         await refreshAccountBalances();
         await refreshMonthlyStats();
         toast.show({ type: "success", message: "Transaction updated" });
-      } catch {
+      } catch (err) {
         setTransactions(snapshot);
-        toast.show({ type: "error", message: "Failed to update transaction" });
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to update transaction"),
+        });
         throw new Error("updateTransaction failed");
       }
     },
@@ -1214,9 +1242,12 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         await refreshAccountBalances();
         await refreshMonthlyStats();
         toast.show({ type: "success", message: "Transaction deleted" });
-      } catch {
+      } catch (err) {
         setTransactions(snapshot);
-        toast.show({ type: "error", message: "Failed to delete transaction" });
+        toast.show({
+          type: "error",
+          message: getMutationErrorMessage(err, "Failed to delete transaction"),
+        });
         throw new Error("deleteTransaction failed");
       }
     },
@@ -1233,10 +1264,14 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const refreshRecurringTransactions = useCallback(async () => {
     setLoadingRecurringTransactions(true);
     try {
-      const { data } = await recurringTransactionsQuery.refetch();
+      // SP-074: `refetch()` resolves with an `error` instead of throwing, so a
+      // failed load left the list empty and indistinguishable from "you have
+      // no rules". Track the failure so the screen can say so and offer a retry.
+      const { data, isError } = await recurringTransactionsQuery.refetch();
       if (data) {
         setRecurringTransactions(data as RecurringTransaction[]);
       }
+      setRecurringTransactionsError(isError);
     } finally {
       setLoadingRecurringTransactions(false);
     }
@@ -1416,8 +1451,11 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
         refreshMonthlyStats(),
       ]);
       toast.show({ type: "success", message: "All data cleared" });
-    } catch {
-      toast.show({ type: "error", message: "Failed to clear data" });
+    } catch (err) {
+      toast.show({
+        type: "error",
+        message: getMutationErrorMessage(err, "Failed to clear data"),
+      });
       throw new Error("clearAllData failed");
     }
   }, [
@@ -1515,6 +1553,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
     recurringTransactions,
     loadingRecurringTransactions,
+    recurringTransactionsError,
     refreshRecurringTransactions,
     addRecurringTransaction,
     updateRecurringTransaction,

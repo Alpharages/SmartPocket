@@ -34,6 +34,8 @@ export const radius: {
   sm: number;
   md: number;
   lg: number;
+  xl: number;
+  "2xl": number;
   full: number;
 };
 
@@ -58,6 +60,7 @@ export type TypographyStyle = {
 };
 
 export const typography: {
+  hero: TypographyStyle;
   display: TypographyStyle;
   h1: TypographyStyle;
   h2: TypographyStyle;

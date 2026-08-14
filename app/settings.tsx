@@ -198,6 +198,12 @@ function AiToggleControl({
         accessibilityLabel="AI features"
         accessibilityHint={AI_EXPLANATION}
         accessibilityState={{ checked: enabled }}
+        // SP-091: the rendered control is 40x20 — under half the 44x44
+        // minimum on the toggle that governs whether data is sent for AI.
+        // Grow the control's own box (the hit area) without resizing the
+        // track artwork, so the target meets the minimum on every platform.
+        hitSlop={12}
+        style={{ minHeight: 44, minWidth: 44 }}
       />
     </View>
   );

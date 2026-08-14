@@ -1,7 +1,7 @@
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
-import { Dimensions, PixelRatio } from "react-native";
+import { Dimensions, PixelRatio, Platform } from "react-native";
 
 import {
   TARGET_FPS,
@@ -85,6 +85,42 @@ describe("getDeviceTier", () => {
   it("classifies a high-density flagship resolution as 'high'", () => {
     mockDeviceResolution(430, 932, 3);
     expect(getDeviceTier()).toBe("high");
+  });
+
+  // SP-092: the pixel-count bands were calibrated for phones. On desktop they
+  // invert — a 1366x768 non-retina laptop sits under the low band and lost the
+  // hero gradient, while a similar 1440x900 machine kept it.
+  describe("desktop (SP-092)", () => {
+    const originalOS = Platform.OS;
+    const g = globalThis as unknown as { matchMedia?: unknown };
+    const originalMatchMedia = g.matchMedia;
+
+    afterEach(() => {
+      (Platform as { OS: string }).OS = originalOS;
+      g.matchMedia = originalMatchMedia;
+    });
+
+    it("does not degrade a low-resolution desktop", () => {
+      (Platform as { OS: string }).OS = "web";
+      g.matchMedia = () => ({ matches: false }); // fine pointer = desktop
+      mockDeviceResolution(1366, 768, 1); // 1,049,088 px — under the low band
+      expect(getDeviceTier()).toBe("high");
+      expect(shouldDegradeEffects(getDeviceTier())).toBe(false);
+    });
+
+    it("still applies the bands to a coarse-pointer (touch) web client", () => {
+      (Platform as { OS: string }).OS = "web";
+      g.matchMedia = () => ({ matches: true }); // coarse pointer = phone/tablet
+      mockDeviceResolution(320, 480, 1.5);
+      expect(getDeviceTier()).toBe("low");
+    });
+
+    it("treats a web client with no matchMedia as desktop rather than degrading", () => {
+      (Platform as { OS: string }).OS = "web";
+      g.matchMedia = undefined;
+      mockDeviceResolution(320, 480, 1.5);
+      expect(getDeviceTier()).toBe("high");
+    });
   });
 });
 

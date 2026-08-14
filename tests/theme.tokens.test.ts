@@ -31,6 +31,12 @@ describe("Theme Tokens", () => {
         sm: 8,
         md: 12,
         lg: 16,
+        // SP-094: 24 and 28 were already in use as raw literals (the glass
+        // cards' `rounded-3xl`, and the floating tab bar). Naming them keeps
+        // the rendering identical and stops the scale eroding one literal at
+        // a time.
+        xl: 24,
+        "2xl": 28,
         full: 9999,
       });
     });

@@ -9,7 +9,7 @@ import {
   formatCurrencyAccessibilityLabel,
   type CurrencySign,
 } from "@/lib/currency";
-import { Radius, getElevationStyle } from "@/lib/_core/theme";
+import { Radius, Typography, getElevationStyle } from "@/lib/_core/theme";
 import { MAX_FONT_SCALE } from "@/lib/_core/a11y";
 import { useAnimatedNumber } from "@/hooks/use-animated-number";
 import { cn } from "@/lib/utils";
@@ -137,9 +137,11 @@ export function BalanceHero({
                 // needs (AC2); hero scale mirrors StatCard's hero variant.
                 className="mt-2 tracking-tight tabular-nums"
                 style={{
-                  fontSize: 42,
-                  lineHeight: 48,
-                  fontWeight: "700",
+                  // SP-090: was a raw `fontSize: 42` literal; now the `hero`
+                  // token so the scale stays the single source of truth.
+                  fontSize: Typography.hero.fontSize,
+                  lineHeight: Typography.hero.lineHeight,
+                  fontWeight: Typography.hero.fontWeight,
                   color: colors.foreground,
                 }}
                 maxFontSizeMultiplier={MAX_FONT_SCALE}

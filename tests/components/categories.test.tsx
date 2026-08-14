@@ -342,8 +342,7 @@ describe("CategoriesScreen", () => {
     const foodRow = root.find(
       (n) =>
         n.props.accessibilityRole === "button" &&
-        typeof n.props.accessibilityLabel === "string" &&
-        n.props.accessibilityLabel.includes("Food"),
+        n.props.accessibilityLabel === "Food, expense category",
     );
     expect(foodRow.props.accessibilityLabel).toBe("Food, expense category");
   });
@@ -376,8 +375,7 @@ describe("CategoriesScreen", () => {
     const rowPressable = root.find(
       (n) =>
         n.props.accessibilityRole === "button" &&
-        typeof n.props.accessibilityLabel === "string" &&
-        n.props.accessibilityLabel.includes("Food"),
+        n.props.accessibilityLabel === "Food, expense category",
     );
     await act(async () => {
       rowPressable.props.onLongPress?.();
@@ -392,8 +390,7 @@ describe("CategoriesScreen", () => {
     const rowPressable = root.find(
       (n) =>
         n.props.accessibilityRole === "button" &&
-        typeof n.props.accessibilityLabel === "string" &&
-        n.props.accessibilityLabel.includes("Salary"),
+        n.props.accessibilityLabel === "Salary, income category",
     );
     await act(async () => {
       rowPressable.props.onAccessibilityAction?.({
