@@ -1,3 +1,6 @@
+// SP-D18: shape *and* upper bound — the bare regex accepted a 15-digit
+// amount that no money column can hold.
+import { isValidMoneyString } from "@shared/money";
 import { formatDateInput, parseDateInput } from "./recurring-form-validation";
 
 export type TransferFormValues = {
@@ -13,8 +16,6 @@ export type TransferFormFieldError = {
   message: string;
 };
 
-const MONEY_REGEX = /^\d+(\.\d{1,2})?$/;
-
 export function createDefaultTransferForm(): TransferFormValues {
   return {
     fromAccountId: null,
@@ -27,7 +28,7 @@ export function createDefaultTransferForm(): TransferFormValues {
 
 export function isPositiveMoney(value: string): boolean {
   const trimmed = value.trim();
-  if (!MONEY_REGEX.test(trimmed)) return false;
+  if (!isValidMoneyString(trimmed)) return false;
   return Number(trimmed) > 0;
 }
 

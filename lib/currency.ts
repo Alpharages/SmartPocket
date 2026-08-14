@@ -65,6 +65,18 @@ function fractionDigitsFor(code: CurrencyCode): number {
   }
 }
 
+/**
+ * SP-D15: is this amount zero *as displayed*? Callers pick the sign from a
+ * semantic type ("this is an expense", "this is a forecast") rather than from
+ * the value, which printed "-Rs 0.00" on the Insights forecast in an empty
+ * month. A signed zero is meaningless in every one of those callers, so the
+ * guard lives here rather than in each of them.
+ */
+function roundsToZero(amount: number, code: CurrencyCode): boolean {
+  const digits = fractionDigitsFor(code);
+  return Math.round(amount * 10 ** digits) === 0;
+}
+
 function formatWithSymbol(amount: number, code: CurrencyCode): string {
   const digits = fractionDigitsFor(code);
   const symbol = getCurrencySymbol(code);
@@ -91,6 +103,8 @@ export function formatCurrency(
   const safeAmount = toSafeAmount(amount);
   const core = formatCurrencyCore(safeAmount, code);
   const sign = opts?.sign ?? "neutral";
+
+  if (roundsToZero(safeAmount, code)) return core;
 
   switch (sign) {
     case "positive":
@@ -139,6 +153,10 @@ export function formatCurrencyAccessibilityLabel(
     const digits = fractionDigitsFor(code);
     spoken = `${absAmount.toFixed(digits)} ${name}`;
   }
+
+  // Same rule as the visual formatter (SP-D15): "minus, zero" is nonsense to
+  // announce, so a displayed zero drops the sign here too.
+  if (roundsToZero(safeAmount, code)) return spoken;
 
   switch (sign) {
     case "positive":

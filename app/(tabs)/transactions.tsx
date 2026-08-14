@@ -423,9 +423,9 @@ export default function TransactionsScreen() {
               accessibilityLabel="Recurring transactions"
               hitSlop={8}
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: colors.surface,
@@ -441,9 +441,9 @@ export default function TransactionsScreen() {
               accessibilityLabel="Add transaction"
               hitSlop={8}
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
                 backgroundColor: colors.primary,
                 alignItems: "center",
                 justifyContent: "center",
@@ -573,7 +573,7 @@ export default function TransactionsScreen() {
         const categoryColor = category?.color ?? colors.muted;
         const categoryIcon = (category?.icon ??
           "pricetag-outline") as keyof typeof Ionicons.glyphMap;
-        const categoryName = category?.name ?? "Uncategorized";
+        const categoryName = category?.name?.trim() || "Uncategorized";
         // SP-050: the title was always the category, so every row in a category
         // read identically. Lead with the description when there is one — the
         // coloured category token already conveys the category.

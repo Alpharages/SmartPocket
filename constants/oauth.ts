@@ -46,13 +46,34 @@ function isLoopbackHost(hostname: string): boolean {
   );
 }
 
+/**
+ * SP-D10: `10.0.2.2` is the *emulator's* alias for the host machine. On a
+ * physical Android device it is an unroutable address, so rewriting a loopback
+ * API URL to it left the app fetching into the void — permanently blank, with
+ * no error. A USB-attached device reaches the host on plain `localhost` via
+ * `adb reverse`, which is the standard dev flow (and works on emulators too),
+ * so only an actual emulator should get the alias.
+ *
+ * Detected from `Platform.constants`, which RN already exposes on Android — no
+ * extra dependency. Emulator images report a `generic`/`sdk_gphone` build.
+ */
+export function isAndroidEmulator(): boolean {
+  const constants = ReactNative.Platform.constants as
+    | { Fingerprint?: string; Model?: string; Brand?: string }
+    | undefined;
+  const signature = [constants?.Fingerprint, constants?.Model, constants?.Brand]
+    .filter(Boolean)
+    .join(" ");
+  return /generic|emulator|sdk_gphone|vbox|goldfish|ranchu/i.test(signature);
+}
+
 /** Best host for the dev API server when running on a native client. */
 export function resolveNativeDevApiHost(): string {
   const metroHost = getMetroDevHost();
 
   if (ReactNative.Platform.OS === "android") {
     if (!metroHost || isLoopbackHost(metroHost)) {
-      return "10.0.2.2";
+      return isAndroidEmulator() ? "10.0.2.2" : "localhost";
     }
     return metroHost;
   }
@@ -241,7 +262,6 @@ export async function startOAuthLogin(): Promise<string | null> {
   // The OAuth callback will reopen the app via deep link.
   return null;
 }
-
 
 // ---------------------------------------------------------------------------
 // OAuth state nonce persistence (SP-022)

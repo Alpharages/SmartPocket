@@ -364,7 +364,20 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
               />
             </>
           ) : (
-            <ActivityIndicator color={colors.primary} />
+            // SP-D12: a bare spinner on an opaque full-screen fill is
+            // indistinguishable from a hang. Say what is being waited on.
+            <>
+              <ActivityIndicator color={colors.primary} />
+              <Text
+                style={{
+                  marginTop: 12,
+                  fontSize: 13,
+                  color: colors.muted,
+                }}
+              >
+                Checking App Lock…
+              </Text>
+            </>
           )}
         </View>
       ) : null}

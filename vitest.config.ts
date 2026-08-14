@@ -52,6 +52,10 @@ export default defineConfig({
         __dirname,
         "./__mocks__/expo-linear-gradient.ts",
       ),
+      "@react-native-community/datetimepicker": path.resolve(
+        __dirname,
+        "./__mocks__/react-native-community-datetimepicker.ts",
+      ),
     },
   },
   optimizeDeps: {
@@ -65,6 +69,7 @@ export default defineConfig({
       "react-native-chart-kit",
       "expo-blur",
       "expo-linear-gradient",
+      "@react-native-community/datetimepicker",
     ],
   },
   test: {

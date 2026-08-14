@@ -187,9 +187,10 @@ describe("TransactionRow", () => {
       expect(queryText(root, "+$42.00")).toHaveLength(0);
     });
 
+    // SP-D15: a zero amount renders unsigned — "-$0.00" is a negative zero.
     it("handles zero amount", () => {
       const root = render(<TransactionRow {...baseProps} amount="0.00" />);
-      expect(getByText(root, "-$0.00")).toBeTruthy();
+      expect(getByText(root, "$0.00")).toBeTruthy();
     });
 
     it("handles numeric amount", () => {
@@ -252,13 +253,13 @@ describe("TransactionRow", () => {
 
     it("renders 0.00, not NaN, for a non-numeric amount", () => {
       const root = render(<TransactionRow {...baseProps} amount="abc" />);
-      expect(getByText(root, "-$0.00")).toBeTruthy();
+      expect(getByText(root, "$0.00")).toBeTruthy();
       expect(queryText(root, "-$NaN")).toHaveLength(0);
     });
 
     it("renders 0.00 for an empty amount string", () => {
       const root = render(<TransactionRow {...baseProps} amount="" />);
-      expect(getByText(root, "-$0.00")).toBeTruthy();
+      expect(getByText(root, "$0.00")).toBeTruthy();
     });
 
     it("renders an em dash, not 'Invalid Date', for an unparseable date", () => {

@@ -242,18 +242,18 @@ describe("AccountsScreen", () => {
     expect(
       findByAccessibilityLabel(
         renderer.root,
-        `Cash Wallet, Cash, USD, balance ${formatCurrency(125.5, "USD")}`,
+        `Cash Wallet, Cash, balance ${formatCurrency(125.5, "USD")}`,
       ),
     ).not.toBeNull();
     expect(
       findByAccessibilityLabel(
         renderer.root,
-        `Main Bank, Bank, USD, balance ${formatCurrency(0, "USD")}`,
+        `Main Bank, Bank, balance ${formatCurrency(0, "USD")}`,
       ),
     ).not.toBeNull();
   });
 
-  it("formats each account balance in its own currency", async () => {
+  it("formats every account balance in the display currency (SP-D08)", async () => {
     const euroAccount = {
       ...sampleAccount,
       id: 3,
@@ -281,12 +281,12 @@ describe("AccountsScreen", () => {
     expect(
       findByAccessibilityLabel(
         renderer.root,
-        `Euro Bank, Bank, EUR, balance ${formatCurrency(99.99, "EUR")}`,
+        `Euro Bank, Bank, balance ${formatCurrency(99.99, "USD")}`,
       ),
     ).not.toBeNull();
   });
 
-  it("renders a zero-decimal currency (JPY) balance without fraction digits", async () => {
+  it("formats a foreign-labelled account in the display currency (SP-D08)", async () => {
     const yenAccount = {
       ...sampleAccount,
       id: 4,
@@ -311,12 +311,13 @@ describe("AccountsScreen", () => {
       renderer = TestRenderer.create(<AccountsScreen />);
     });
 
-    // JPY formats with zero fraction digits (e.g. "¥0", not "¥0.00").
-    expect(formatCurrency(0, "JPY")).not.toContain(".");
+    // SP-D08: the account is labelled JPY, but the balance is folded from
+    // transaction amounts that are denominated in the display currency — so it
+    // must render as USD here, not as "¥0".
     expect(
       findByAccessibilityLabel(
         renderer.root,
-        `Yen Wallet, Cash, JPY, balance ${formatCurrency(0, "JPY")}`,
+        `Yen Wallet, Cash, balance ${formatCurrency(0, "USD")}`,
       ),
     ).not.toBeNull();
   });
@@ -343,7 +344,7 @@ describe("AccountsScreen", () => {
     expect(
       findByAccessibilityLabel(
         renderer.root,
-        `Cash Wallet, Cash, USD, balance ${formatCurrency(-42.5, "USD")}`,
+        `Cash Wallet, Cash, balance ${formatCurrency(-42.5, "USD")}`,
       ),
     ).not.toBeNull();
   });
@@ -373,7 +374,7 @@ describe("AccountsScreen", () => {
     expect(
       findByAccessibilityLabel(
         renderer.root,
-        "Cash Wallet, Cash, USD, balance loading",
+        "Cash Wallet, Cash, balance loading",
       ),
     ).not.toBeNull();
   });

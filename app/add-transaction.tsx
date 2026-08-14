@@ -27,6 +27,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   Button,
   CategoryPickerGrid,
+  DatePickerButton,
   EmptyState,
   Pill,
   Sheet,
@@ -42,6 +43,11 @@ import {
   formatDateInput,
   parseDateInput,
 } from "@/lib/recurring-form-validation";
+import {
+  MAX_MONEY_MESSAGE,
+  MONEY_PATTERN,
+  isWithinMoneyRange,
+} from "@shared/money";
 
 const MIN_TOUCH_TARGET = 44;
 
@@ -183,14 +189,18 @@ export default function AddTransactionScreen() {
   );
 
   // SP-041: `!!amount` accepted "0" and "0.00".
+  // SP-D18: the regex had no upper bound, so a 15-digit amount passed on its
+  // way to a `decimal(12,2)` column. Bound shared with the server schema.
   const amountError =
     amount.trim().length === 0
       ? null
-      : !/^\d+(\.\d{1,2})?$/.test(amount.trim())
+      : !MONEY_PATTERN.test(amount.trim())
         ? "Enter an amount like 12.50"
         : Number(amount) <= 0
           ? "Amount must be greater than zero"
-          : null;
+          : !isWithinMoneyRange(amount.trim())
+            ? MAX_MONEY_MESSAGE
+            : null;
   const dateError = dateInput.trim() && !parsedDate ? "Use YYYY-MM-DD" : null;
   const isFormValid =
     !!amount.trim() && !amountError && !!selectedCategory && !!parsedDate;
@@ -453,7 +463,7 @@ export default function AddTransactionScreen() {
             Date
           </Text>
           <View
-            className="rounded-md px-lg py-md"
+            className="rounded-md px-lg py-md flex-row items-center"
             style={{
               backgroundColor: colors.surface,
               borderWidth: 0.5,
@@ -466,10 +476,16 @@ export default function AddTransactionScreen() {
               placeholder="YYYY-MM-DD"
               placeholderTextColor={colors.muted}
               autoCapitalize="none"
-              className="text-foreground"
+              className="text-foreground flex-1"
               style={{ fontSize: Typography.body.fontSize }}
               accessibilityLabel="Transaction date"
               testID="add-transaction-date"
+            />
+            <DatePickerButton
+              value={dateInput}
+              onChange={setDateInput}
+              accessibilityLabel="Pick transaction date"
+              testID="add-transaction-date-picker"
             />
           </View>
           {dateError ? (

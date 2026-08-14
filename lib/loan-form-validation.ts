@@ -1,3 +1,6 @@
+// SP-D18: shape *and* upper bound — the bare regex accepted a 15-digit
+// amount that no money column can hold.
+import { isValidMoneyString } from "@shared/money";
 import { formatDateInput, parseDateInput } from "./recurring-form-validation";
 
 export type LoanDirection = "lend" | "borrow";
@@ -23,8 +26,6 @@ export type LoanFormFieldError = {
   message: string;
 };
 
-const MONEY_REGEX = /^\d+(\.\d{1,2})?$/;
-
 /** Sensible defaults so Save is reachable once principal is entered. */
 export function createDefaultLoanForm(): LoanFormValues {
   const nextDue = new Date();
@@ -44,14 +45,14 @@ export function createDefaultLoanForm(): LoanFormValues {
 
 export function isPositiveMoney(value: string): boolean {
   const trimmed = value.trim();
-  if (!MONEY_REGEX.test(trimmed)) return false;
+  if (!isValidMoneyString(trimmed)) return false;
   return Number(trimmed) > 0;
 }
 
 export function isNonNegativeOptionalMoney(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) return true;
-  if (!MONEY_REGEX.test(trimmed)) return false;
+  if (!isValidMoneyString(trimmed)) return false;
   return Number(trimmed) >= 0;
 }
 

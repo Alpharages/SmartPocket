@@ -203,7 +203,7 @@ export default function CardDetailScreen() {
                     entering={FadeInDown.delay(index * 40).duration(400)}
                   >
                     <TransactionRow
-                      title={category?.name ?? "Uncategorized"}
+                      title={category?.name || "Uncategorized"}
                       date={item.date}
                       amount={item.amount}
                       type={item.type}

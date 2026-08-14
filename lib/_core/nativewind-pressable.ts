@@ -14,14 +14,21 @@ cssInterop(Animated.Image, { className: "style" });
 // (sizing, rounding, flex). Pass interaction styles through `style` as usual.
 cssInterop(Pressable, { className: "style" });
 
-// QA report SP-057: `Animated.createAnimatedComponent(Pressable)` is a
-// *different* component from `Pressable`, and it had no interop registration —
-// so `className` was silently dropped on every component built on it. Button
-// and TransactionRow both are, which meant their
-// `flex-row items-center justify-center` and `flex-1` classes never applied:
-// buttons rendered as columns (icon stacked above label, 20-26px too tall) and
-// paired buttons stopped sharing their row. Register the animated wrapper once
-// here, and export it so call sites use this instance rather than creating
-// their own unregistered one.
+// SP-D02: do NOT `cssInterop` this one.
+//
+// The interop rebuilds the target prop from scratch — it collects the incoming
+// `style` as "inline rules" and re-assigns them onto a fresh props object
+// (react-native-css-interop `applyRules` -> `assignToTarget`). On the animated
+// Pressable that round-trip loses the result: measured on a physical device,
+// every Button rendered 40px tall with no background or padding (below its own
+// inline `minHeight: 44`), the tab bar stopped distributing, and the FAB went
+// full-width.
+//
+// The registration is also unnecessary — `className` still reaches the inner
+// Pressable, which *is* registered above. Measured both ways on device: with
+// the registration a primary Button is 145x40px, without it 304x92px, and
+// class-based layout (`flex-1`, `mt-*`) still applies.
+//
+// (This replaces an SP-057 note claiming className was dropped here. That
+// diagnosis was wrong; class layout works without the interop.)
 export const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-cssInterop(AnimatedPressable, { className: "style" });

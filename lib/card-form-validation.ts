@@ -1,3 +1,6 @@
+// SP-D18: shape *and* upper bound — the bare regex accepted a 15-digit
+// amount that no money column can hold.
+import { isValidMoneyString } from "@shared/money";
 export type CardFormValues = {
   cardName: string;
   cardNumber: string;
@@ -50,7 +53,7 @@ export function isCardFormValid(
     return false;
   }
 
-  if (!/^\d+(\.\d{1,2})?$/.test(creditLimit.trim())) {
+  if (!isValidMoneyString(creditLimit.trim())) {
     return false;
   }
 

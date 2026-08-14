@@ -8,6 +8,17 @@ type UseAuthOptions = {
   autoFetch?: boolean;
 };
 
+type ApiUser = NonNullable<Awaited<ReturnType<typeof Api.getMe>>>;
+
+const toUser = (apiUser: ApiUser): Auth.User => ({
+  id: apiUser.id,
+  openId: apiUser.openId,
+  name: apiUser.name,
+  email: apiUser.email,
+  loginMethod: apiUser.loginMethod,
+  lastSignedIn: new Date(apiUser.lastSignedIn),
+});
+
 export function useAuth(options?: UseAuthOptions) {
   const { autoFetch = true } = options ?? {};
   const [user, setUser] = useState<Auth.User | null>(null);
@@ -24,14 +35,7 @@ export function useAuth(options?: UseAuthOptions) {
         const apiUser = await Api.getMe();
 
         if (apiUser) {
-          const userInfo: Auth.User = {
-            id: apiUser.id,
-            openId: apiUser.openId,
-            name: apiUser.name,
-            email: apiUser.email,
-            loginMethod: apiUser.loginMethod,
-            lastSignedIn: new Date(apiUser.lastSignedIn),
-          };
+          const userInfo = toUser(apiUser);
           setUser(userInfo);
           // Cache user info in localStorage for faster subsequent loads
           await Auth.setUserInfo(userInfo);
@@ -46,16 +50,35 @@ export function useAuth(options?: UseAuthOptions) {
       const sessionToken = await Auth.getSessionToken();
       if (!sessionToken) {
         setUser(null);
+        await Auth.clearUserInfo();
         return;
       }
 
-      // Use cached user info for native (token validates the session)
+      // SP-D07: the *token* is the session, not the local user-info cache.
+      // Treating a missing cache entry as "not authenticated" stranded every
+      // path that stores a token without also calling setUserInfo — dev
+      // auto-login and the `sessionToken`-in-URL OAuth branch both do — on the
+      // Login screen forever, with a perfectly valid session in SecureStore.
+      // Ask the API who this token belongs to and cache the answer, so the fix
+      // covers every token writer instead of each one remembering to cache.
       const cachedUser = await Auth.getUserInfo();
       if (cachedUser) {
         setUser(cachedUser);
-      } else {
-        setUser(null);
+        return;
       }
+
+      const apiUser = await Api.getMe();
+      if (!apiUser) {
+        // Server rejected the token (getMe only returns null on 401/403).
+        setUser(null);
+        await Auth.removeSessionToken();
+        await Auth.clearUserInfo();
+        return;
+      }
+
+      const userInfo = toUser(apiUser);
+      setUser(userInfo);
+      await Auth.setUserInfo(userInfo);
     } catch (err) {
       const error =
         err instanceof Error ? err : new Error("Failed to fetch user");
@@ -100,21 +123,12 @@ export function useAuth(options?: UseAuthOptions) {
 
   useEffect(() => {
     if (autoFetch) {
-      if (Platform.OS === "web") {
-        // Web: fetch user from API directly (user will login manually if needed)
-        fetchUser();
-      } else {
-        // Native: check for cached user info first for faster initial load
-        Auth.getUserInfo().then((cachedUser) => {
-          if (cachedUser) {
-            setUser(cachedUser);
-            setLoading(false);
-          } else {
-            // No cached user, check session token
-            fetchUser();
-          }
-        });
-      }
+      // SP-D07: native used to short-circuit on a cached user *without*
+      // checking that a session token existed, so a leftover cache entry alone
+      // admitted you to the app shell while every request 401'd. `fetchUser`
+      // already reads the cache for a fast native answer — it just checks the
+      // token first — so both platforms can share the one path.
+      fetchUser();
     } else {
       setLoading(false);
     }

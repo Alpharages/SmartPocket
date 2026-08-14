@@ -8,6 +8,11 @@ import {
   getCategoryColorForName,
 } from "../shared/theme";
 import {
+  MAX_MONEY_MESSAGE,
+  MONEY_PATTERN,
+  isWithinMoneyRange,
+} from "../shared/money";
+import {
   hashPin,
   verifyPinHash,
   isPinLocked,
@@ -51,6 +56,22 @@ export function isExpiryInFuture(
   return month >= currentMonth;
 }
 
+/**
+ * SP-D18: one money schema for every amount the API accepts. The regex was
+ * pasted into eight places here and none of them bounded the value, so a
+ * 15-digit amount passed validation on its way to a `decimal(12,2)` column.
+ * The pattern and bound are shared with the client forms (`shared/money.ts`)
+ * so both reject the same values.
+ */
+const moneySchema = z
+  .string()
+  .regex(MONEY_PATTERN)
+  .refine(isWithinMoneyRange, { message: MAX_MONEY_MESSAGE });
+
+const positiveMoneySchema = moneySchema.refine((v) => Number(v) > 0, {
+  message: "Amount must be greater than zero",
+});
+
 /** Unwrapped card fields — `creditCardSchema` is a ZodEffects and has no `.shape`. */
 const creditCardFields = {
   name: z.string().min(1).max(100),
@@ -65,7 +86,7 @@ const creditCardFields = {
     .int()
     .min(new Date().getFullYear())
     .max(new Date().getFullYear() + 30),
-  creditLimit: z.string().regex(/^\d+(\.\d{1,2})?$/),
+  creditLimit: moneySchema,
   color: z
     .string()
     .regex(/^#[0-9A-F]{6}$/i)
@@ -103,7 +124,7 @@ const creditCardSchema = z
       .int()
       .min(new Date().getFullYear())
       .max(new Date().getFullYear() + 30),
-    creditLimit: z.string().regex(/^\d+(\.\d{1,2})?$/),
+    creditLimit: moneySchema,
     color: z
       .string()
       .regex(/^#[0-9A-F]{6}$/i)
@@ -130,12 +151,7 @@ const transferSchema = z
   .object({
     fromAccountId: z.number(),
     toAccountId: z.number(),
-    amount: z
-      .string()
-      .regex(/^\d+(\.\d{1,2})?$/)
-      .refine((value) => Number(value) > 0, {
-        message: "Amount must be positive",
-      }),
+    amount: positiveMoneySchema,
     description: z.string().max(500).optional(),
     date: z.date(),
   })
@@ -148,12 +164,7 @@ const transactionSchema = z.object({
   type: z.enum(["income", "expense"]),
   // SP-041: was `regex` only, which accepts "0" and "0.00". Every other money
   // field in this file already refines to > 0; transactions were the outlier.
-  amount: z
-    .string()
-    .regex(/^\d+(\.\d{1,2})?$/)
-    .refine((v) => Number(v) > 0, {
-      message: "Amount must be greater than zero",
-    }),
+  amount: positiveMoneySchema,
   description: z.string().max(500).optional(),
   date: z.date(),
   creditCardId: z.number().optional(),
@@ -163,31 +174,17 @@ const transactionSchema = z.object({
 const budgetSchema = z.object({
   categoryId: z.number(),
   period: z.enum(["monthly", "weekly"]),
-  amount: z
-    .string()
-    .regex(/^\d+(\.\d{1,2})?$/)
-    .refine((v) => Number(v) > 0, {
-      message: "Amount must be greater than zero",
-    }),
+  amount: positiveMoneySchema,
   startDate: z.date().optional(),
   endDate: z.date().optional(),
 });
-
-const positiveMoneySchema = z
-  .string()
-  .regex(/^\d+(\.\d{1,2})?$/)
-  .refine((v) => Number(v) > 0, {
-    message: "Amount must be greater than zero",
-  });
 
 const loanSchema = z
   .object({
     direction: z.enum(["lend", "borrow"]),
     counterparty: z.string().max(100).nullable().optional(),
     principal: positiveMoneySchema,
-    rate: z
-      .string()
-      .regex(/^\d+(\.\d{1,2})?$/)
+    rate: moneySchema
       .refine((v) => Number(v) >= 0, {
         message: "Rate must be zero or greater",
       })
@@ -246,7 +243,7 @@ const recurringTransactionSchemaBase = z.object({
   categoryId: z.number(),
   creditCardId: z.number().nullable().optional(),
   type: z.enum(["income", "expense"]),
-  amount: z.string().regex(/^\d+(\.\d{1,2})?$/),
+  amount: moneySchema,
   description: z.string().max(500).nullable().optional(),
   frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
   interval: z.number().int().positive(),

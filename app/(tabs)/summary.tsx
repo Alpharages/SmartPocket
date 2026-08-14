@@ -692,7 +692,7 @@ export default function SummaryScreen() {
                 return (
                   <TransactionRow
                     key={t.id}
-                    title={cat?.name ?? "Uncategorized"}
+                    title={cat?.name || "Uncategorized"}
                     date={t.date}
                     amount={t.amount}
                     type={t.type}

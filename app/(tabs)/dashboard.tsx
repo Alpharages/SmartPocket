@@ -126,7 +126,7 @@ export default function DashboardScreen() {
                   entering={FadeInDown.delay(index * 40).duration(400)}
                 >
                   <TransactionRow
-                    title={category?.name ?? `Category ${item.categoryId}`}
+                    title={category?.name || `Category ${item.categoryId}`}
                     date={item.date}
                     amount={item.amount}
                     type={item.type}

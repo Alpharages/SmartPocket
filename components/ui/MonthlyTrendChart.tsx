@@ -137,8 +137,12 @@ export function MonthlyTrendChart({
       className="w-full items-center py-4"
       onLayout={width == null ? handleLayout : undefined}
     >
+      {/* `legend` is deliberately withheld from chart-kit: it draws its own
+          legend *inside* the chart box, which both duplicated the app-styled
+          legend rendered below and ate into CHART_HEIGHT, squeezing the plot
+          and its x-axis labels. */}
       <LineChart
-        data={chartData}
+        data={{ labels: chartData.labels, datasets: chartData.datasets }}
         width={chartWidth}
         height={CHART_HEIGHT}
         withShadow={false}

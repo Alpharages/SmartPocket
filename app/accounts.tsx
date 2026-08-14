@@ -18,6 +18,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import {
   Button,
   ConfirmSheet,
+  DatePickerButton,
   EmptyState,
   ScreenHeader,
   Sheet,
@@ -75,8 +76,16 @@ function AccountRow({
 }) {
   const colors = useColors();
   const typeLabel = getAccountTypeLabel(account.type);
-  const currencyCode: CurrencyCode = isSupportedCurrency(account.currency)
-    ? account.currency
+  // SP-D08: this balance is folded from transaction/transfer amounts, and those
+  // carry no currency of their own — every figure the app stores and shows is in
+  // the display currency. Formatting it with `account.currency` printed a PKR
+  // sum as `US$30.00`, so the Accounts screen could not be reconciled against
+  // the transaction list or the dashboard totals. Format it the same way as
+  // every other amount in the app; `account.currency` still scopes which
+  // accounts can transfer to each other, it just doesn't denominate this number.
+  const { currency: displayCurrency } = useCurrency();
+  const currencyCode: CurrencyCode = isSupportedCurrency(displayCurrency)
+    ? displayCurrency
     : "USD";
   const balanceDisplay = formatCurrency(balance, currencyCode);
 
@@ -93,17 +102,15 @@ function AccountRow({
         accessible
         accessibilityLabel={
           loadingBalance
-            ? `${account.name}, ${typeLabel}, ${account.currency}, balance loading`
-            : `${account.name}, ${typeLabel}, ${account.currency}, balance ${balanceDisplay}`
+            ? `${account.name}, ${typeLabel}, balance loading`
+            : `${account.name}, ${typeLabel}, balance ${balanceDisplay}`
         }
       >
         <View className="flex-1">
           <Text className="text-body font-semibold text-foreground">
             {account.name}
           </Text>
-          <Text className="text-caption text-muted mt-0.5">
-            {typeLabel} · {account.currency}
-          </Text>
+          <Text className="text-caption text-muted mt-0.5">{typeLabel}</Text>
         </View>
         {loadingBalance ? (
           <ActivityIndicator
@@ -491,21 +498,28 @@ function TransferFormSheet({
 
           <View>
             <Text className="text-label text-muted mb-sm">Date</Text>
-            <TextInput
-              value={values.date}
-              onChangeText={(date) => onChange({ date })}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.muted}
-              accessibilityLabel="Transfer date"
-              className="px-4 py-3.5 rounded-xl text-foreground"
-              style={{
-                backgroundColor: colors.background,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-                fontSize: 15,
-                minHeight: 44,
-              }}
-            />
+            <View className="flex-row items-center">
+              <TextInput
+                value={values.date}
+                onChangeText={(date) => onChange({ date })}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.muted}
+                accessibilityLabel="Transfer date"
+                className="px-4 py-3.5 rounded-xl text-foreground flex-1"
+                style={{
+                  backgroundColor: colors.background,
+                  borderWidth: 0.5,
+                  borderColor: colors.border,
+                  fontSize: 15,
+                  minHeight: 44,
+                }}
+              />
+              <DatePickerButton
+                value={values.date}
+                onChange={(date) => onChange({ date })}
+                accessibilityLabel="Pick transfer date"
+              />
+            </View>
           </View>
 
           <View className="flex-row gap-md">

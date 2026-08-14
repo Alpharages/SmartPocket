@@ -25,6 +25,7 @@ import { useCurrency } from "@/lib/currency-provider";
 import { getCurrencySymbol } from "@/lib/currency";
 import { Spacing, Typography } from "@/lib/_core/theme";
 import { resolveCategoryColor } from "@/constants/theme";
+import { DatePickerButton } from "./DatePickerButton";
 import {
   formatDateInput,
   isRecurringFormValid,
@@ -492,23 +493,30 @@ export function RecurringTransactionSheet({
             >
               Start date
             </Text>
-            <TextInput
-              value={startDateInput}
-              onChangeText={setStartDateInput}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              className="rounded-md px-lg py-md text-foreground"
-              style={{
-                fontSize: Typography.body.fontSize,
-                backgroundColor: colors.surface,
-                borderWidth: 0.5,
-                borderColor: fieldErrors.startDate
-                  ? colors.error
-                  : colors.border,
-              }}
-              accessibilityLabel="Start date"
-            />
+            <View className="flex-row items-center">
+              <TextInput
+                value={startDateInput}
+                onChangeText={setStartDateInput}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                className="rounded-md px-lg py-md text-foreground flex-1"
+                style={{
+                  fontSize: Typography.body.fontSize,
+                  backgroundColor: colors.surface,
+                  borderWidth: 0.5,
+                  borderColor: fieldErrors.startDate
+                    ? colors.error
+                    : colors.border,
+                }}
+                accessibilityLabel="Start date"
+              />
+              <DatePickerButton
+                value={startDateInput}
+                onChange={setStartDateInput}
+                accessibilityLabel="Pick start date"
+              />
+            </View>
             {fieldErrors.startDate ? (
               <Text
                 className="text-error mt-xs"
@@ -578,23 +586,30 @@ export function RecurringTransactionSheet({
               >
                 End date
               </Text>
-              <TextInput
-                value={endDateInput}
-                onChangeText={setEndDateInput}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.muted}
-                autoCapitalize="none"
-                className="rounded-md px-lg py-md text-foreground"
-                style={{
-                  fontSize: Typography.body.fontSize,
-                  backgroundColor: colors.surface,
-                  borderWidth: 0.5,
-                  borderColor: fieldErrors.endDate
-                    ? colors.error
-                    : colors.border,
-                }}
-                accessibilityLabel="End date"
-              />
+              <View className="flex-row items-center">
+                <TextInput
+                  value={endDateInput}
+                  onChangeText={setEndDateInput}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.muted}
+                  autoCapitalize="none"
+                  className="rounded-md px-lg py-md text-foreground flex-1"
+                  style={{
+                    fontSize: Typography.body.fontSize,
+                    backgroundColor: colors.surface,
+                    borderWidth: 0.5,
+                    borderColor: fieldErrors.endDate
+                      ? colors.error
+                      : colors.border,
+                  }}
+                  accessibilityLabel="End date"
+                />
+                <DatePickerButton
+                  value={endDateInput}
+                  onChange={setEndDateInput}
+                  accessibilityLabel="Pick end date"
+                />
+              </View>
               {fieldErrors.endDate ? (
                 <Text
                   className="text-error mt-xs"

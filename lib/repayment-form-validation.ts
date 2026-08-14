@@ -1,8 +1,15 @@
-const MONEY_PATTERN = /^\d+(\.\d{1,2})?$/;
+// SP-D18: shape *and* upper bound — the bare regex accepted a 15-digit
+// amount that no money column can hold.
+import {
+  MAX_MONEY_MESSAGE,
+  MONEY_PATTERN,
+  isValidMoneyString,
+  isWithinMoneyRange,
+} from "@shared/money";
 
 export function isValidRepaymentAmount(amount: string): boolean {
   const trimmed = amount.trim();
-  return MONEY_PATTERN.test(trimmed) && Number(trimmed) > 0;
+  return isValidMoneyString(trimmed) && Number(trimmed) > 0;
 }
 
 export function canSubmitRepayment(
@@ -25,6 +32,9 @@ export function repaymentAmountError(
   }
   if (!MONEY_PATTERN.test(trimmed)) {
     return "Enter a valid amount (up to 2 decimal places)";
+  }
+  if (!isWithinMoneyRange(trimmed)) {
+    return MAX_MONEY_MESSAGE;
   }
   if (Number(trimmed) <= 0) {
     return "Amount must be greater than zero";

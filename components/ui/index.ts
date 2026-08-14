@@ -20,6 +20,7 @@ export type {
 } from "./CategoryToken";
 export { CategoryPickerGrid } from "./CategoryPickerGrid";
 export type { CategoryPickerGridProps } from "./CategoryPickerGrid";
+export { DatePickerButton } from "./DatePickerButton";
 export { Sheet } from "./Sheet";
 export type { SheetProps } from "./Sheet";
 export { GlassSurface } from "./GlassSurface";

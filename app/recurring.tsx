@@ -169,9 +169,9 @@ export default function RecurringScreen() {
                 accessibilityLabel="Go back"
                 hitSlop={8}
                 style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
                   alignItems: "center",
                   justifyContent: "center",
                   backgroundColor: colors.surface,
@@ -191,9 +191,9 @@ export default function RecurringScreen() {
                 accessibilityLabel="Add recurring rule"
                 hitSlop={8}
                 style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
                   backgroundColor: colors.primary,
                   alignItems: "center",
                   justifyContent: "center",
@@ -226,9 +226,7 @@ export default function RecurringScreen() {
             ) : (
               <EmptyState
                 variant="no-data"
-                icon={
-                  <Ionicons name="repeat" size={28} color={colors.muted} />
-                }
+                icon={<Ionicons name="repeat" size={28} color={colors.muted} />}
                 title="No recurring rules yet"
                 description="Create a rule to automatically log regular income or expenses."
                 action={{ label: "Add recurring rule", onPress: openCreate }}

@@ -1,3 +1,10 @@
+// SP-D18: shape *and* upper bound — the bare regex accepted a 15-digit
+// amount that no money column can hold.
+import {
+  MAX_MONEY_MESSAGE,
+  MONEY_PATTERN,
+  isWithinMoneyRange,
+} from "@shared/money";
 export type RecurringEndCondition = "count" | "endDate" | "never";
 
 export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly";
@@ -19,8 +26,6 @@ export type RecurringFormValues = {
 export type RecurringFormField = keyof RecurringFormValues;
 
 export type RecurringFormErrors = Partial<Record<RecurringFormField, string>>;
-
-const AMOUNT_REGEX = /^\d+(\.\d{1,2})?$/;
 
 /** Parse YYYY-MM-DD into a local start-of-day Date, or null if invalid. */
 export function parseDateInput(value: string): Date | null {
@@ -54,8 +59,11 @@ export function validateRecurringForm(
 ): RecurringFormErrors {
   const errors: RecurringFormErrors = {};
 
-  if (!values.amount.trim() || !AMOUNT_REGEX.test(values.amount.trim())) {
+  const trimmedAmount = values.amount.trim();
+  if (!trimmedAmount || !MONEY_PATTERN.test(trimmedAmount)) {
     errors.amount = "Enter a valid amount (up to 2 decimal places)";
+  } else if (!isWithinMoneyRange(trimmedAmount)) {
+    errors.amount = MAX_MONEY_MESSAGE;
   }
 
   if (values.categoryId == null) {

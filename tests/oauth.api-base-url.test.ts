@@ -37,11 +37,39 @@ describe("getApiBaseUrl native dev loopback rewrite", () => {
     expect(getApiBaseUrl()).toBe("http://192.168.2.15:3000");
   });
 
-  it("rewrites localhost to 10.0.2.2 on Android when Metro is loopback", async () => {
+  // SP-D10: `10.0.2.2` is the *emulator's* host alias. A physical device gets an
+  // unroutable address from it, which is why the app sat on a blank screen with
+  // no error; it keeps `localhost`, which `adb reverse` forwards to the host.
+  it("rewrites localhost to 10.0.2.2 on an Android emulator when Metro is loopback", async () => {
     constants.expoConfig = { hostUri: "localhost:8081" };
-    vi.doMock("react-native", () => ({ Platform: { OS: "android" } }));
+    vi.doMock("react-native", () => ({
+      Platform: {
+        OS: "android",
+        constants: {
+          Fingerprint: "google/sdk_gphone64_arm64/generic:16/UP1A/user",
+          Model: "sdk_gphone64_arm64",
+          Brand: "google",
+        },
+      },
+    }));
     const { getApiBaseUrl } = await import("@/constants/oauth");
     expect(getApiBaseUrl()).toBe("http://10.0.2.2:3000");
+  });
+
+  it("keeps localhost on a physical Android device when Metro is loopback", async () => {
+    constants.expoConfig = { hostUri: "localhost:8081" };
+    vi.doMock("react-native", () => ({
+      Platform: {
+        OS: "android",
+        constants: {
+          Fingerprint: "vivo/V2352/V2352:16/AP3A/compiler:user/release-keys",
+          Model: "V2352",
+          Brand: "vivo",
+        },
+      },
+    }));
+    const { getApiBaseUrl } = await import("@/constants/oauth");
+    expect(getApiBaseUrl()).toBe("http://localhost:3000");
   });
 
   it("uses Metro LAN host on Android when available", async () => {
@@ -81,7 +109,10 @@ describe("getApiBaseUrl web host derivation when env is unset", () => {
 
   it("rewrites the sandbox 8081- hostname prefix to 3000-", async () => {
     vi.stubGlobal("window", {
-      location: { protocol: "https:", hostname: "8081-abc123.region.example.dev" },
+      location: {
+        protocol: "https:",
+        hostname: "8081-abc123.region.example.dev",
+      },
     });
     const { getApiBaseUrl } = await import("@/constants/oauth");
     expect(getApiBaseUrl()).toBe("https://3000-abc123.region.example.dev");

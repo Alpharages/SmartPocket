@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { Button } from "@/components/ui/Button";
 import { CategoryPickerGrid } from "@/components/ui/CategoryPickerGrid";
+import { DatePickerButton } from "@/components/ui/DatePickerButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pill } from "@/components/ui/Pill";
 import { Sheet } from "@/components/ui/Sheet";
@@ -237,7 +238,7 @@ export function TransactionEditSheet({
             Date
           </Text>
           <View
-            className="rounded-md px-lg py-md"
+            className="rounded-md px-lg py-md flex-row items-center"
             style={{
               backgroundColor: colors.surface,
               borderWidth: 0.5,
@@ -250,10 +251,16 @@ export function TransactionEditSheet({
               placeholder="YYYY-MM-DD"
               placeholderTextColor={colors.muted}
               autoCapitalize="none"
-              className="text-foreground"
+              className="text-foreground flex-1"
               style={{ fontSize: Typography.body.fontSize }}
               accessibilityLabel="Transaction date"
               testID="edit-transaction-date"
+            />
+            <DatePickerButton
+              value={dateInput}
+              onChange={setDateInput}
+              accessibilityLabel="Pick transaction date"
+              testID="edit-transaction-date-picker"
             />
           </View>
           {dateError ? (

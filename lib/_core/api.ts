@@ -1,6 +1,21 @@
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "./auth";
 
+/**
+ * Thrown for any non-2xx response, carrying the status so callers can tell
+ * "the server rejected this session" (401/403) apart from "the request never
+ * arrived" (network failure) — SP-D07 depended on that distinction.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function apiCall<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -52,8 +67,9 @@ export async function apiCall<T>(
       } catch {
         // Not JSON, use text as is
       }
-      throw new Error(
+      throw new ApiError(
         errorMessage || `API call failed: ${response.statusText}`,
+        response.status,
       );
     }
 
@@ -124,7 +140,17 @@ export async function getMe(): Promise<{
     const result = await apiCall<{ user: any }>("/api/auth/me");
     return result.user || null;
   } catch (error) {
+    // `null` means "the server says this session is not valid" — the caller
+    // signs the user out on it. A network failure is not that, so it rethrows
+    // instead: swallowing it here used to turn an unreachable API into a
+    // sign-out that also wiped the cached user (SP-D07).
+    if (
+      error instanceof ApiError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      return null;
+    }
     console.error("[API] getMe failed:", error);
-    return null;
+    throw error;
   }
 }

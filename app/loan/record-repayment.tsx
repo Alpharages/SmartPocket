@@ -30,7 +30,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Button } from "@/components/ui";
+import { Button, DatePickerButton } from "@/components/ui";
 import { useColors } from "@/hooks/use-colors";
 import { useCurrency } from "@/lib/currency-provider";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
@@ -289,22 +289,30 @@ export default function RecordRepaymentScreen() {
                   >
                     Date
                   </Text>
-                  <TextInput
-                    value={dateInput}
-                    onChangeText={setDateInput}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={colors.muted}
-                    autoCapitalize="none"
-                    className="rounded-xl px-4 py-3 text-base text-foreground"
-                    style={{
-                      backgroundColor: colors.background,
-                      borderWidth: 1,
-                      borderColor: parsedDate ? colors.border : colors.error,
-                      minHeight: 52,
-                    }}
-                    accessibilityLabel="Repayment date"
-                    testID="record-repayment-date"
-                  />
+                  <View className="flex-row items-center">
+                    <TextInput
+                      value={dateInput}
+                      onChangeText={setDateInput}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={colors.muted}
+                      autoCapitalize="none"
+                      className="rounded-xl px-4 py-3 text-base text-foreground flex-1"
+                      style={{
+                        backgroundColor: colors.background,
+                        borderWidth: 1,
+                        borderColor: parsedDate ? colors.border : colors.error,
+                        minHeight: 52,
+                      }}
+                      accessibilityLabel="Repayment date"
+                      testID="record-repayment-date"
+                    />
+                    <DatePickerButton
+                      value={dateInput}
+                      onChange={setDateInput}
+                      accessibilityLabel="Pick repayment date"
+                      testID="record-repayment-date-picker"
+                    />
+                  </View>
                   {!parsedDate ? (
                     <Text
                       className="text-sm mt-1"

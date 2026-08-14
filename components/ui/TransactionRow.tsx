@@ -44,14 +44,6 @@ export interface TransactionRowProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** Parse a money prop defensively. DB `decimal(12,2)` strings are valid today,
- *  but the reusable primitive has no schema guarantee at its boundary, so a
- *  non-numeric/empty value falls back to 0 instead of rendering "$NaN". */
-function toSafeNumber(amount: string | number): number {
-  const parsed = typeof amount === "string" ? parseFloat(amount) : amount;
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 /** Coerce a date prop to a valid Date, or null if unparseable — never let
  *  `new Date(bad)` leak a literal "Invalid Date" into the UI or a11y label. */
 function toValidDate(date: string | Date): Date | null {
@@ -91,12 +83,17 @@ function buildAccessibilityLabel(
     ? dateObj.toLocaleDateString("en-US", { month: "long", day: "numeric" })
     : "";
 
-  const parts: string[] = [title, type, formattedAmount];
+  // SP-D19: a row exposed an empty accessibility label. `title` traces back to
+  // a nullable `description` column and to category names, so an empty string
+  // can reach here and used to be joined in as a blank leading segment. Filter
+  // empty segments out; `type` and the formatted amount are always present, so
+  // the label can no longer come out blank whatever the caller passes.
+  const parts: string[] = [title.trim(), type, formattedAmount];
   if (dateStr) parts.push(dateStr);
   if (cardLabel) parts.push(`via ${cardLabel}`);
   if (note) parts.push(note);
 
-  return parts.join(", ");
+  return parts.filter((part) => part.trim().length > 0).join(", ");
 }
 
 /** Format date for display. Falls back to an em dash for invalid input. */

@@ -5,11 +5,12 @@ import { Stack, useRouter, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
-import { Platform } from "react-native";
+import { ActivityIndicator, Platform, Text, View } from "react-native";
 import * as Notifications from "expo-notifications";
 import { handleLoanNotificationResponse } from "@/lib/notification-routing";
 import "@/lib/_core/nativewind-pressable";
-import { ThemeProvider } from "@/lib/theme-provider";
+import { ThemeProvider, useThemeTokens } from "@/lib/theme-provider";
+import { Button } from "@/components/ui/Button";
 import { CurrencyProvider } from "@/lib/currency-provider";
 import { FirstDayOfWeekProvider } from "@/lib/first-day-of-week-provider";
 import { SettingsProvider } from "@/lib/settings-provider";
@@ -57,6 +58,69 @@ export const unstable_settings = {
   anchor: "(tabs)",
 };
 
+/**
+ * What the app shows while the shell is still gated, and when gating failed.
+ * Split out so it can read theme tokens — it renders inside ThemeProvider,
+ * above the rest of the provider stack.
+ */
+function ShellFallback({
+  error,
+  onRetry,
+  onDismiss,
+}: {
+  error: string | null;
+  onRetry: () => void;
+  onDismiss: () => void;
+}) {
+  const { colors } = useThemeTokens();
+
+  return (
+    <View
+      testID="app-shell-fallback"
+      style={{
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        gap: 16,
+        backgroundColor: colors.background,
+      }}
+    >
+      {error ? (
+        <>
+          <Text
+            style={{
+              fontSize: 17,
+              fontWeight: "600",
+              color: colors.foreground,
+            }}
+          >
+            Can&apos;t reach the server
+          </Text>
+          <Text
+            style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}
+          >
+            {error}
+          </Text>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <Button label="Retry" onPress={onRetry} />
+            <Button
+              variant="secondary"
+              label="Continue offline"
+              onPress={onDismiss}
+            />
+          </View>
+        </>
+      ) : (
+        <>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={{ fontSize: 13, color: colors.muted }}>Connecting…</Text>
+        </>
+      )}
+    </View>
+  );
+}
+
 export default function RootLayout() {
   const router = useRouter();
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
@@ -71,6 +135,10 @@ export default function RootLayout() {
     if (Platform.OS === "web") return hasWebSessionToken();
     return false;
   });
+  // SP-D10/SP-D11: when dev auto-login can't reach the API the shell used to
+  // stay blank with nothing to read. Keep the reason so the gate can show it.
+  const [shellError, setShellError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
@@ -122,7 +190,24 @@ export default function RootLayout() {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           if (cancelled) return;
           try {
-            const res = await fetch(loginUrl, { method: "POST" });
+            // SP-D10: an unreachable host makes `fetch` hang for a minute or
+            // more, so without a deadline the shell sits blank long enough to
+            // read as a freeze. Fail fast and let the error state explain.
+            //
+            // Hand-rolled rather than `AbortSignal.timeout()` — Hermes does not
+            // implement it, and calling it threw before `fetch` ever ran, which
+            // broke dev auto-login outright.
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+            let res: Response;
+            try {
+              res = await fetch(loginUrl, {
+                method: "POST",
+                signal: controller.signal,
+              });
+            } finally {
+              clearTimeout(timeout);
+            }
             if (!res.ok) {
               throw new Error(`HTTP ${res.status}`);
             }
@@ -132,6 +217,7 @@ export default function RootLayout() {
               if (__DEV__) {
                 console.log("[Dev] Auto-login successful");
               }
+              if (!cancelled) setShellError(null);
               return;
             }
             throw new Error("No token in response");
@@ -140,13 +226,18 @@ export default function RootLayout() {
               await new Promise((r) => setTimeout(r, 1000 * attempt));
               continue;
             }
+            const detail = err instanceof Error ? err.message : String(err);
             console.warn(
               `[Dev] Auto-login failed after ${maxAttempts} attempts.\n` +
                 `  API: ${loginUrl}\n` +
                 `  Start the backend with: pnpm dev (or pnpm dev:server)\n` +
-                `  On a physical device, set EXPO_PUBLIC_API_BASE_URL to your machine's LAN IP.`,
+                `  On a physical device, run \`adb reverse tcp:${process.env.EXPO_PUBLIC_API_PORT ?? "3000"} tcp:${process.env.EXPO_PUBLIC_API_PORT ?? "3000"}\`\n` +
+                `  or set EXPO_PUBLIC_API_BASE_URL to your machine's LAN IP.`,
               err,
             );
+            if (!cancelled) {
+              setShellError(`Could not reach the API at ${apiUrl} (${detail})`);
+            }
           }
         }
       } finally {
@@ -159,7 +250,7 @@ export default function RootLayout() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryToken]);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
     setInsets(metrics.insets);
@@ -204,8 +295,26 @@ export default function RootLayout() {
     };
   }, [initialInsets, initialFrame]);
 
-  if (!isAppShellReady) {
-    return null;
+  // SP-D11: this gate used to `return null`, so any failure to reach the API
+  // during dev auto-login painted an indefinitely blank white screen with no
+  // spinner, message or way out. Always render *something* explaining the wait,
+  // and offer a retry when the reason is known.
+  if (!isAppShellReady || shellError) {
+    return (
+      <ThemeProvider>
+        <SafeAreaProvider initialMetrics={providerInitialMetrics}>
+          <ShellFallback
+            error={shellError}
+            onRetry={() => {
+              setShellError(null);
+              setIsAppShellReady(false);
+              setRetryToken((n) => n + 1);
+            }}
+            onDismiss={() => setShellError(null)}
+          />
+        </SafeAreaProvider>
+      </ThemeProvider>
+    );
   }
 
   const content = (

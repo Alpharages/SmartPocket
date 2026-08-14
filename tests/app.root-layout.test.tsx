@@ -53,6 +53,20 @@ const trpc = vi.hoisted(() => ({
 const providers = vi.hoisted(() => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) =>
     React.createElement("ThemeProvider", {}, children),
+  // SP-D11: the pre-shell fallback reads theme tokens to paint a themed
+  // loading/error state instead of the old bare `return null`.
+  useThemeTokens: () => ({
+    colors: {
+      background: "#fff",
+      foreground: "#000",
+      muted: "#888",
+      primary: "#4f46e5",
+      surface: "#fff",
+      border: "#eee",
+      error: "#e11",
+      success: "#0a0",
+    },
+  }),
   ToastProvider: ({ children }: { children: React.ReactNode }) =>
     React.createElement("ToastProvider", {}, children),
   ConfirmProvider: ({ children }: { children: React.ReactNode }) =>

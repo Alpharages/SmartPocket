@@ -24,7 +24,13 @@ import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useNavigation } from "expo-router";
 import { Animated, FadeInUp } from "@/lib/motion";
-import { Button, EmptyState, ScreenHeader, Sheet } from "@/components/ui";
+import {
+  Button,
+  DatePickerButton,
+  EmptyState,
+  ScreenHeader,
+  Sheet,
+} from "@/components/ui";
 import { useToast } from "@/components/ui/ToastProvider";
 import { ContentMaxWidth } from "@/lib/_core/theme";
 import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
@@ -293,7 +299,7 @@ function LoanFormFields({
               </View>
             ) : (
               <View
-                className="px-4 py-3.5 rounded-xl"
+                className="px-4 py-3.5 rounded-xl flex-row items-center"
                 style={{
                   backgroundColor: colors.background,
                   borderWidth: 0.5,
@@ -305,9 +311,14 @@ function LoanFormFields({
                   placeholderTextColor={colors.muted}
                   value={values.endDate}
                   onChangeText={(endDate) => onChange({ endDate })}
-                  className="text-foreground"
+                  className="text-foreground flex-1"
                   style={{ fontSize: 15 }}
                   accessibilityLabel="Schedule end date"
+                />
+                <DatePickerButton
+                  value={values.endDate}
+                  onChange={(endDate) => onChange({ endDate })}
+                  accessibilityLabel="Pick schedule end date"
                 />
               </View>
             )}
@@ -320,7 +331,7 @@ function LoanFormFields({
           Next due date
         </Text>
         <View
-          className="px-4 py-3.5 rounded-xl"
+          className="px-4 py-3.5 rounded-xl flex-row items-center"
           style={{
             backgroundColor: colors.background,
             borderWidth: 0.5,
@@ -332,9 +343,14 @@ function LoanFormFields({
             placeholderTextColor={colors.muted}
             value={values.nextDueDate}
             onChangeText={(nextDueDate) => onChange({ nextDueDate })}
-            className="text-foreground"
+            className="text-foreground flex-1"
             style={{ fontSize: 15 }}
             accessibilityLabel="Next due date"
+          />
+          <DatePickerButton
+            value={values.nextDueDate}
+            onChange={(nextDueDate) => onChange({ nextDueDate })}
+            accessibilityLabel="Pick next due date"
           />
         </View>
       </View>
