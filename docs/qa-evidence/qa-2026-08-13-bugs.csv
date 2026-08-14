@@ -1,0 +1,15 @@
+Bug ID,Title,Module,Screen,Category,Severity,Priority,Reproducibility,Linked TC,Evidence Tag,Status
+SP-073,recurringTransactions.list returns HTTP 500 on every screen (dev DB has no recurringTransactions table),Recurring,All screens,Functional-API,High,P1,Always (2x browser + 2x API),TC-045,Verified,Open
+SP-074,Failed query renders as a legitimate "no data" empty state,Recurring,/recurring,UX-Data Integrity,High,P1,Always (2x),TC-046,Verified,Open
+SP-077,Budget creation returns HTTP 500 and shows the user no error at all,Budgets,/budgets,Functional-API + UX,High,P1,Always (2x browser + 2x API; 8s DOM poll found no message),TC-038,Verified,Open
+SP-075,Money amounts have no upper bound; API accepts values exceeding decimal(12;2),Transactions,Add Transaction,Validation-Data Integrity,Medium,P2,Always (2x API; 1x UI),TC-015 / TC-016,Verified,Open
+SP-078,Nested interactive elements: delete button inside row button causes React hydration errors,Transactions + Categories,/transactions /categories,Accessibility-Correctness,Medium,P2,Always (2x per screen; 5 nested pairs in DOM),TC-028,Verified,Open
+SP-079,document.title is empty on every route,Global,All 22 routes,Accessibility-UX,Medium,P2,Always,TC-055,Verified,Open
+SP-080,Radio controls never set aria-checked; selection encoded only in label text,Global,Add Transaction / Budget Form / Settings,Accessibility,Medium,P2,Always,TC-056,Verified,Open
+SP-081,Seven form inputs have no accessible name (placeholder only),Categories + Cards,New Category / New Card,Accessibility,Medium,P2,Always,TC-034,Verified,Open
+SP-076,Amount field accepts letters and symbols while typing,Transactions,Add Transaction,UX-Validation,Low,P4,Always (2x),TC-014,Verified,Open
+SP-082,Category name has no client-side maximum length; 300 chars accepted then rejected generically,Categories,New Category,Validation,Low,P3,Always,TC-031,Verified,Open
+SP-083,Duplicate category name produces a generic "Failed to add category" message,Categories,New Category,UX-Error Handling,Low,P3,Always,TC-030,Verified,Open
+SP-085,OAuth failure screen is a dead end with no recovery action,Auth,/oauth/callback,UX-Navigation,Low,P3,Always,TC-057,Verified,Open
+SP-086,Back control on card and loan detail is not exposed as a button,Cards + Loans,Card Detail / Loan Detail,Accessibility-Consistency,Low,P3,Always,TC-058,Verified,Open
+SP-084,Disabled "Add Category" submit renders at opacity 1 and looks enabled,Categories,New Category,UI,Cosmetic,P4,Always,TC-033,Verified,Open
