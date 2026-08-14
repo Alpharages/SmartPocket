@@ -1,79 +1,79 @@
-TC ID,Module,Screen,Scenario,Test Type,Test Data,Expected Result,Actual Result,Evidence Tag,Status,Linked Bug
-TC-001,Environment,n/a,Boot API + Metro from clean clone with no database,Smoke,DATABASE_URL unset,Both services start; /api/health 200,Both started; health 200,Verified,Pass,
-TC-002,Auth,n/a,POST /api/dev/login issues a session JWT,Functional,empty body,200 with token,200 with JWT for dev_local_user,Verified,Pass,
-TC-003,Quality gate,n/a,Unit and integration suite,Regression,npx vitest run,All tests pass,1595 passed / 1 skipped / 142 files,Verified,Pass,
-TC-004,Quality gate,n/a,TypeScript compilation,Static,npx tsc --noEmit,0 errors,0 errors,Verified,Pass,
-TC-005,Quality gate,n/a,Lint,Static,npx eslint .,0 errors,0 errors / 78 warnings,Verified,Pass,
-TC-006,Navigation,All,All 22 web routes resolve and render,Smoke,direct deep links,Every route renders; no 404,All 22 rendered,Verified,Pass,
-TC-007,Navigation,Index,Root redirects to dashboard when authenticated,Functional,valid session,Redirect to /dashboard,Redirected to /dashboard,Verified,Pass,
-TC-008,Navigation,Login,Login redirects to dashboard when authenticated,Functional,valid session,Redirect to /dashboard,Redirected to /dashboard,Verified,Pass,
-TC-009,Dashboard,Dashboard,Monthly totals match seeded data,Functional,4 seeded transactions,Balance = income - expenses,$3049.75 = +$3200.00 - $150.25,Verified,Pass,
-TC-010,Dashboard,Dashboard,Recent activity lists seeded transactions,Functional,seed data,4 rows with correct dates and signs,Correct,Verified,Pass,
-TC-011,Transactions,Add Transaction,Save with all fields empty,Negative,empty form,Blocked with message,Blocked; "Select a category",Verified,Pass,
-TC-012,Transactions,Add Transaction,Negative amount,Negative,-5,Blocked with message,Blocked; "Enter an amount like 12.50",Verified,Pass,
-TC-013,Transactions,Add Transaction,Zero amount,Boundary,0,Blocked with message,Blocked; "Amount must be greater than zero",Verified,Pass,
-TC-014,Transactions,Add Transaction,Amount field rejects letters while typing,Negative,abc!@#,Non-numeric ignored on entry,Field accepted "abc!@#",Verified,Fail,SP-076
-TC-015,Transactions,Add Transaction,Excessively large amount rejected (UI),Boundary,99999999999999999999,Rejected as out of range,SAVED; dashboard total corrupted to -1e20,Verified,Fail,SP-075
-TC-016,Transactions,Add Transaction,Over-range amount rejected (API),Boundary,amount 99999999999.99,Rejected; exceeds decimal(12;2),HTTP 200; rows created twice,Verified,Fail,SP-075
-TC-017,Transactions,Add Transaction,Valid expense saves,Positive,12.34 / Groceries,Appears in list; totals update,Appeared; count 4 -> 6; totals updated,Verified,Pass,
-TC-018,Transactions,Add Transaction,Saved transaction survives page reload,Functional,12.34,Data persists,Count held at 6 after reload,Verified,Pass,
-TC-019,Transactions,Add Transaction,Save returns to dashboard (real path),Functional,7.77 / Dining,Returns to /dashboard,Returned on both passes,Verified,Pass,
-TC-020,Transactions,Add Transaction,Cancel returns without saving,Functional,n/a,Returns to /dashboard; nothing saved,Returned; no record added,Verified,Pass,
-TC-021,Transactions,Activity,Search matches description,Functional,"Snacks",Only matching rows,1 transaction; others excluded,Verified,Pass,
-TC-022,Transactions,Activity,Search with no match shows empty state,Negative,zzzznomatch,Clear no-results state,"0 transactions; No results found",Verified,Pass,
-TC-023,Transactions,Activity,Filter by Income,Functional,Income chip,Only income rows,1 transaction; Salary only,Verified,Pass,
-TC-024,Transactions,Activity,Filter by Expense,Functional,Expense chip,Only expense rows,3 transactions; no Salary,Verified,Pass,
-TC-025,Transactions,Activity,Filter reset to All,Functional,All chip,All rows restored,4 transactions,Verified,Pass,
-TC-026,Transactions,Activity,Delete transaction with confirmation,CRUD,Snacks row,Confirm dialog; record removed,"Delete transaction - This cannot be undone"; 200; count 4 -> 3,Verified,Pass,
-TC-027,Transactions,Transaction Detail,Detail screen renders record,Functional,transaction id 1,Amount type category date description,All rendered correctly,Verified,Pass,
-TC-028,Transactions,Activity + Categories,No nested interactive elements,UI-Accessibility,DOM inspection,No button inside button,5 nested pairs; 2 hydration warnings per screen both passes,Verified,Fail,SP-078
-TC-029,Categories,Categories,Create valid category,CRUD,QA Cat,Category created and listed,Created; appears under Expense Categories,Verified,Pass,
-TC-030,Categories,New Category,Duplicate name rejected with clear message,Negative,Groceries,"Message naming the conflict",Generic "Failed to add category",Verified,Fail,SP-083
-TC-031,Categories,New Category,Over-length name handled,Boundary,300 x Z,Input capped or clear max-length message,Field accepted 300 chars; generic server error,Verified,Fail,SP-082
-TC-032,Categories,New Category,Submit disabled while form invalid,UI,empty name,Submit disabled,disabled=true; aria-disabled=true; pointer-events none,Verified,Pass,
-TC-033,Categories,New Category,Disabled submit styled consistently,UI,empty name,opacity 0.5 like other forms,opacity 1 - looks enabled,Verified,Fail,SP-084
-TC-034,Categories/Cards,New Category + New Card,All inputs have accessible names,Accessibility,DOM inspection,Every input has aria-label,7 inputs with aria-label null (6 card + 1 category),Verified,Fail,SP-081
-TC-035,Accounts,Accounts,Create valid account,CRUD,QA Wallet / Wallet,Account created and listed,"1 account - QA Wallet - Wallet - USD - $0.00",Verified,Pass,
-TC-036,Accounts,New Account,Submit disabled while form invalid,UI,empty name,Submit disabled,disabled=true; opacity 0.5,Verified,Pass,
-TC-037,Budgets,Add Budget,Submit gating enables only when valid,UI,amount then category,Disabled until both set,Correctly disabled with amount alone; enabled after category,Verified,Pass,
-TC-038,Budgets,Add Budget,Create a budget,CRUD,100 / Groceries / monthly,Budget created and listed,500 POST budgets.create; list stays empty; NO error shown (8s poll),Verified,Fail,SP-077
-TC-039,Budgets,Budgets,Budget list reflects created budgets,Functional,n/a,Created budgets listed,NOT EXECUTED - no budget can be created,Untested,Blocked,SP-077
-TC-040,Loans,New Loan,Negative principal rejected,Negative,-100,Blocked with message,Blocked; "Enter a valid principal greater than zero",Verified,Pass,
-TC-041,Loans,Loans,Create valid loan,CRUD,Lend / Alice QA / 500,Loan created and listed,"1 loan - Lend - Alice QA - $500.00",Verified,Pass,
-TC-042,Cards,New Card,Invalid card prevented,Negative,number 12 / month 13 / year 2020,Submission prevented,Submit remained disabled; card not created,Verified,Pass,
-TC-043,Cards,Cards,Create valid card,CRUD,4111111111111111 / 12 / 2030,Card created and listed,"2 cards; QA Valid Card; expires 12/30",Verified,Pass,
-TC-044,Cards,Cards,Card number masked in UI,Security-UI,seeded + new card,Only last 4 digits shown,"Masked as dot-dot-dot 1234 and 1111",Verified,Pass,
-TC-045,Recurring,All screens,recurringTransactions.list returns a list,Functional-API,Bearer token,200 with array,HTTP 500 TypeError in devDb applyWhere; fires on every screen,Verified,Fail,SP-073
-TC-046,Recurring,Recurring,Failed query surfaces an error to the user,Negative-UX,failing query,Error state with retry,"Shows 0 rules / No recurring rules yet",Verified,Fail,SP-074
-TC-047,Recurring,Recurring,Create / edit / stop a recurring rule,CRUD,n/a,Rule persists,NOT EXECUTED - blocked by SP-073,Untested,Blocked,SP-073
-TC-048,Settings,Settings,Change currency USD to EUR,Functional,EUR,Amounts render in EUR,Dashboard showed EUR3049.75,Verified,Pass,
-TC-049,Settings,Settings,Currency persists across reload,Functional,EUR,Setting retained,Still EUR after full reload,Verified,Pass,
-TC-050,Settings,Settings,Appearance mode Light to Dark applies,UI,Dark radio,Dark palette applied,Surface rgb(248;250;252) -> rgb(11;15;25),Verified,Pass,
-TC-051,Settings,Settings,Appearance mode persists across reload,Functional,Dark,Setting retained,Still rgb(11;15;25) after reload,Verified,Pass,
-TC-052,Settings,Settings,Alternate colour theme applies,UI,Obsidian & Gold,Distinct palette applied,Surface rgb(15;23;42),Verified,Pass,
-TC-053,Settings,Settings,Export transactions to CSV,Functional,confirm sheet,Valid CSV downloads,smartpocket-transactions-2026-08-13.csv; 188 bytes; correct header and rows,Verified,Pass,
-TC-054,Settings,Settings,Export transactions to JSON,Functional,confirm sheet,Valid JSON downloads,smartpocket-transactions-2026-08-13.json; 1094 bytes; correct structure,Verified,Pass,
-TC-055,Global,All,Every route sets a document title,Accessibility,DOM inspection,Per-screen title,document.title empty on all 22 routes,Verified,Fail,SP-079
-TC-056,Global,Add Transaction + Budget Form,Radio controls expose aria-checked,Accessibility,select a category,aria-checked true on selection,aria-checked null on all radios,Verified,Fail,SP-080
-TC-057,Auth,OAuth Callback,Error screen offers a recovery action,UX-Navigation,no params,Back to sign in action,Text only; zero interactive elements,Verified,Fail,SP-085
-TC-058,Cards/Loans,Card Detail + Loan Detail,Back control exposed as a button,Accessibility,DOM inspection,Labelled focusable back button,0 buttons detected; chevron visual only,Verified,Fail,SP-086
-TC-059,Navigation,All,Browser back navigates correctly,Functional,back x2,Previous routes in order,/settings -> /loans -> /dashboard,Verified,Pass,
-TC-060,Navigation,All,Browser forward navigates correctly,Functional,forward,Returns forward in history,Returned to /loans,Verified,Pass,
-TC-061,Accessibility,Dashboard,Keyboard tab order is logical,Accessibility,12 Tab presses,Sequential logical order,Settings -> actions -> rows -> tabs,Verified,Pass,
-TC-062,Accessibility,Dashboard,Focused controls show visible focus,Accessibility,Tab,Visible focus indicator,outline solid 2px on every stop,Verified,Pass,
-TC-063,UI,Dashboard/Summary/Settings,No horizontal overflow across viewports and schemes,UI-Responsive,390x844 768x1024 1440x900 x light+dark,scrollWidth == clientWidth,18/18 combinations OK,Verified,Pass,
-TC-064,UI,All,Empty states render with icon title description and CTA,UI,empty modules,Consistent informative empty states,Consistent across loans accounts budgets recurring cards search,Verified,Pass,
-TC-065,Performance,Dashboard,Page load and API timing,Performance,navigation timing,Reasonable load,DOMContentLoaded 762ms; batched tRPC 7ms; auth 9ms,Verified,Pass,
-TC-066,Security,API,Validation enforced server-side not only client-side,Security,direct API calls,Server re-validates,Zod schemas re-validate money fields server-side,Verified,Pass,
-TC-067,Accessibility,Dashboard,Colour contrast meets WCAG AA,Accessibility,38 text nodes,All text meets AA,INCONCLUSIVE - no confirmed failure; method cannot evaluate text over gradients,Untested,Not Tested,
-TC-068,Transactions,Transaction Detail,Edit an existing transaction,CRUD,n/a,Changes persist,NOT EXECUTED,Untested,Not Tested,
-TC-069,Import,Import CSV,Import a CSV file end to end,Functional,n/a,Rows imported and validated,NOT EXECUTED - file round trip not driven,Untested,Not Tested,
-TC-070,Settings,Settings,Clear all data,Destructive,n/a,All data removed after confirmation,NOT EXECUTED - deferred to preserve fixtures,Untested,Not Tested,
-TC-071,Auth,Settings,Sign out and session invalidation,Functional,n/a,Session cleared; redirected to login,NOT EXECUTED,Untested,Not Tested,
-TC-072,Loans,Loan Detail,Record a repayment against a loan,CRUD,n/a,Repayment recorded; schedule updates,NOT EXECUTED,Untested,Not Tested,
-TC-073,Native,n/a,App lock / biometrics / notifications / secure store,Functional,n/a,Behaves per spec on device,NOT EXECUTED - no device or simulator,Untested,Not Tested,
-TC-074,Database,n/a,Behaviour against real MySQL,Functional,n/a,Matches dev DB behaviour,NOT EXECUTED - in-memory dev DB only,Untested,Not Tested,
-TC-075,Auth,Login,OAuth sign-in flow and unauthenticated login screen,Functional,n/a,Sign-in completes,NOT EXECUTED - no OAuth issuer configured,Untested,Not Tested,
-TC-076,Accessibility,All,Screen reader announcement order,Accessibility,n/a,Correct announcements,NOT EXECUTED - no screen reader available,Untested,Not Tested,
-TC-077,Regression,All,Retest prior issues SP-001 to SP-072,Regression,n/a,Previously fixed issues stay fixed,NOT EXECUTED - not a regression pass,Untested,Not Tested,
-TC-078,Compatibility,All,Firefox / Safari / Edge rendering,Compatibility,n/a,Renders correctly,NOT EXECUTED - Chromium only,Untested,Not Tested,
+TC ID,Module,Screen,Scenario,Test Type,Test Data,Expected Result,Actual Result,Evidence Tag,Status,Linked Bug,Retest 2026-08-14,Retest Result
+TC-001,Environment,n/a,Boot API + Metro from clean clone with no database,Smoke,DATABASE_URL unset,Both services start; /api/health 200,Both started; health 200,Verified,Pass,,,
+TC-002,Auth,n/a,POST /api/dev/login issues a session JWT,Functional,empty body,200 with token,200 with JWT for dev_local_user,Verified,Pass,,,
+TC-003,Quality gate,n/a,Unit and integration suite,Regression,npx vitest run,All tests pass,1595 passed / 1 skipped / 142 files,Verified,Pass,,,
+TC-004,Quality gate,n/a,TypeScript compilation,Static,npx tsc --noEmit,0 errors,0 errors,Verified,Pass,,,
+TC-005,Quality gate,n/a,Lint,Static,npx eslint .,0 errors,0 errors / 78 warnings,Verified,Pass,,,
+TC-006,Navigation,All,All 22 web routes resolve and render,Smoke,direct deep links,Every route renders; no 404,All 22 rendered,Verified,Pass,,,
+TC-007,Navigation,Index,Root redirects to dashboard when authenticated,Functional,valid session,Redirect to /dashboard,Redirected to /dashboard,Verified,Pass,,,
+TC-008,Navigation,Login,Login redirects to dashboard when authenticated,Functional,valid session,Redirect to /dashboard,Redirected to /dashboard,Verified,Pass,,,
+TC-009,Dashboard,Dashboard,Monthly totals match seeded data,Functional,4 seeded transactions,Balance = income - expenses,$3049.75 = +$3200.00 - $150.25,Verified,Pass,,,
+TC-010,Dashboard,Dashboard,Recent activity lists seeded transactions,Functional,seed data,4 rows with correct dates and signs,Correct,Verified,Pass,,,
+TC-011,Transactions,Add Transaction,Save with all fields empty,Negative,empty form,Blocked with message,"Blocked; ""Select a category""",Verified,Pass,,,
+TC-012,Transactions,Add Transaction,Negative amount,Negative,-5,Blocked with message,"Blocked; ""Enter an amount like 12.50""",Verified,Pass,,,
+TC-013,Transactions,Add Transaction,Zero amount,Boundary,0,Blocked with message,"Blocked; ""Amount must be greater than zero""",Verified,Pass,,,
+TC-014,Transactions,Add Transaction,Amount field rejects letters while typing,Negative,abc!@#,Non-numeric ignored on entry,"Field accepted ""abc!@#""",Verified,Fail,SP-076,Pass,Typing 'abc12.999xyz' leaves '12.99'
+TC-015,Transactions,Add Transaction,Excessively large amount rejected (UI),Boundary,99999999999999999999,Rejected as out of range,SAVED; dashboard total corrupted to -1e20,Verified,Fail,SP-075,Pass,Over-range amount rejected client-side (shared/money.ts)
+TC-016,Transactions,Add Transaction,Over-range amount rejected (API),Boundary,amount 99999999999.99,Rejected; exceeds decimal(12;2),HTTP 200; rows created twice,Verified,Fail,SP-075,Pass,API rejects amounts above 9;999;999;999.99
+TC-017,Transactions,Add Transaction,Valid expense saves,Positive,12.34 / Groceries,Appears in list; totals update,Appeared; count 4 -> 6; totals updated,Verified,Pass,,,
+TC-018,Transactions,Add Transaction,Saved transaction survives page reload,Functional,12.34,Data persists,Count held at 6 after reload,Verified,Pass,,,
+TC-019,Transactions,Add Transaction,Save returns to dashboard (real path),Functional,7.77 / Dining,Returns to /dashboard,Returned on both passes,Verified,Pass,,,
+TC-020,Transactions,Add Transaction,Cancel returns without saving,Functional,n/a,Returns to /dashboard; nothing saved,Returned; no record added,Verified,Pass,,,
+TC-021,Transactions,Activity,Search matches description,Functional,Snacks,Only matching rows,1 transaction; others excluded,Verified,Pass,,,
+TC-022,Transactions,Activity,Search with no match shows empty state,Negative,zzzznomatch,Clear no-results state,0 transactions; No results found,Verified,Pass,,,
+TC-023,Transactions,Activity,Filter by Income,Functional,Income chip,Only income rows,1 transaction; Salary only,Verified,Pass,,,
+TC-024,Transactions,Activity,Filter by Expense,Functional,Expense chip,Only expense rows,3 transactions; no Salary,Verified,Pass,,,
+TC-025,Transactions,Activity,Filter reset to All,Functional,All chip,All rows restored,4 transactions,Verified,Pass,,,
+TC-026,Transactions,Activity,Delete transaction with confirmation,CRUD,Snacks row,Confirm dialog; record removed,Delete transaction - This cannot be undone; 200; count 4 -> 3,Verified,Pass,,,
+TC-027,Transactions,Transaction Detail,Detail screen renders record,Functional,transaction id 1,Amount type category date description,All rendered correctly,Verified,Pass,,,
+TC-028,Transactions,Activity + Categories,No nested interactive elements,UI-Accessibility,DOM inspection,No button inside button,5 nested pairs; 2 hydration warnings per screen both passes,Verified,Fail,SP-078,Pass,0 nested pairs and 0 hydration warnings; delete still works
+TC-029,Categories,Categories,Create valid category,CRUD,QA Cat,Category created and listed,Created; appears under Expense Categories,Verified,Pass,,,
+TC-030,Categories,New Category,Duplicate name rejected with clear message,Negative,Groceries,Message naming the conflict,"Generic ""Failed to add category""",Verified,Fail,SP-083,Pass,Server's specific duplicate message is surfaced
+TC-031,Categories,New Category,Over-length name handled,Boundary,300 x Z,Input capped or clear max-length message,Field accepted 300 chars; generic server error,Verified,Fail,SP-082,Pass,maxLength=100 caps the input
+TC-032,Categories,New Category,Submit disabled while form invalid,UI,empty name,Submit disabled,disabled=true; aria-disabled=true; pointer-events none,Verified,Pass,,,
+TC-033,Categories,New Category,Disabled submit styled consistently,UI,empty name,opacity 0.5 like other forms,opacity 1 - looks enabled,Verified,Fail,SP-084,Pass,Disabled submit renders at opacity 0.5
+TC-034,Categories/Cards,New Category + New Card,All inputs have accessible names,Accessibility,DOM inspection,Every input has aria-label,7 inputs with aria-label null (6 card + 1 category),Verified,Fail,SP-081,Pass,category 1/1 and card 6/6 inputs have accessible names
+TC-035,Accounts,Accounts,Create valid account,CRUD,QA Wallet / Wallet,Account created and listed,1 account - QA Wallet - Wallet - USD - $0.00,Verified,Pass,,,
+TC-036,Accounts,New Account,Submit disabled while form invalid,UI,empty name,Submit disabled,disabled=true; opacity 0.5,Verified,Pass,,,
+TC-037,Budgets,Add Budget,Submit gating enables only when valid,UI,amount then category,Disabled until both set,Correctly disabled with amount alone; enabled after category,Verified,Pass,,,
+TC-038,Budgets,Add Budget,Create a budget,CRUD,100 / Groceries / monthly,Budget created and listed,500 POST budgets.create; list stays empty; NO error shown (8s poll),Verified,Fail,SP-077,Pass,Budget created and listed; failures now surface in-viewport
+TC-039,Budgets,Budgets,Budget list reflects created budgets,Functional,n/a,Created budgets listed,NOT EXECUTED - no budget can be created,Untested,Blocked,SP-077,Pass,Unblocked - budgets list shows created budgets with progress
+TC-040,Loans,New Loan,Negative principal rejected,Negative,-100,Blocked with message,"Blocked; ""Enter a valid principal greater than zero""",Verified,Pass,,,
+TC-041,Loans,Loans,Create valid loan,CRUD,Lend / Alice QA / 500,Loan created and listed,1 loan - Lend - Alice QA - $500.00,Verified,Pass,,,
+TC-042,Cards,New Card,Invalid card prevented,Negative,number 12 / month 13 / year 2020,Submission prevented,Submit remained disabled; card not created,Verified,Pass,,,
+TC-043,Cards,Cards,Create valid card,CRUD,4111111111111111 / 12 / 2030,Card created and listed,2 cards; QA Valid Card; expires 12/30,Verified,Pass,,,
+TC-044,Cards,Cards,Card number masked in UI,Security-UI,seeded + new card,Only last 4 digits shown,Masked as dot-dot-dot 1234 and 1111,Verified,Pass,,,
+TC-045,Recurring,All screens,recurringTransactions.list returns a list,Functional-API,Bearer token,200 with array,HTTP 500 TypeError in devDb applyWhere; fires on every screen,Verified,Fail,SP-073,Pass,HTTP 200 with an array
+TC-046,Recurring,Recurring,Failed query surfaces an error to the user,Negative-UX,failing query,Error state with retry,Shows 0 rules / No recurring rules yet,Verified,Fail,SP-074,Pass,Forced failure shows a named error + retry
+TC-047,Recurring,Recurring,Create / edit / stop a recurring rule,CRUD,n/a,Rule persists,NOT EXECUTED - blocked by SP-073,Untested,Blocked,SP-073,Not Tested,Unblocked by SP-073 but recurring CRUD still not exercised
+TC-048,Settings,Settings,Change currency USD to EUR,Functional,EUR,Amounts render in EUR,Dashboard showed EUR3049.75,Verified,Pass,,,
+TC-049,Settings,Settings,Currency persists across reload,Functional,EUR,Setting retained,Still EUR after full reload,Verified,Pass,,,
+TC-050,Settings,Settings,Appearance mode Light to Dark applies,UI,Dark radio,Dark palette applied,Surface rgb(248;250;252) -> rgb(11;15;25),Verified,Pass,,,
+TC-051,Settings,Settings,Appearance mode persists across reload,Functional,Dark,Setting retained,Still rgb(11;15;25) after reload,Verified,Pass,,,
+TC-052,Settings,Settings,Alternate colour theme applies,UI,Obsidian & Gold,Distinct palette applied,Surface rgb(15;23;42),Verified,Pass,,,
+TC-053,Settings,Settings,Export transactions to CSV,Functional,confirm sheet,Valid CSV downloads,smartpocket-transactions-2026-08-13.csv; 188 bytes; correct header and rows,Verified,Pass,,,
+TC-054,Settings,Settings,Export transactions to JSON,Functional,confirm sheet,Valid JSON downloads,smartpocket-transactions-2026-08-13.json; 1094 bytes; correct structure,Verified,Pass,,,
+TC-055,Global,All,Every route sets a document title,Accessibility,DOM inspection,Per-screen title,document.title empty on all 22 routes,Verified,Fail,SP-079,Pass,Titles set on all 19 swept routes
+TC-056,Global,Add Transaction + Budget Form,Radio controls expose aria-checked,Accessibility,select a category,aria-checked true on selection,aria-checked null on all radios,Verified,Fail,SP-080,Pass,aria-checked true/false on radios and pills
+TC-057,Auth,OAuth Callback,Error screen offers a recovery action,UX-Navigation,no params,Back to sign in action,Text only; zero interactive elements,Verified,Fail,SP-085,Pass,'Back to sign in' action present
+TC-058,Cards/Loans,Card Detail + Loan Detail,Back control exposed as a button,Accessibility,DOM inspection,Labelled focusable back button,0 buttons detected; chevron visual only,Verified,Fail,SP-086,Pass,Back controls expose role=button at 44x44
+TC-059,Navigation,All,Browser back navigates correctly,Functional,back x2,Previous routes in order,/settings -> /loans -> /dashboard,Verified,Pass,,,
+TC-060,Navigation,All,Browser forward navigates correctly,Functional,forward,Returns forward in history,Returned to /loans,Verified,Pass,,,
+TC-061,Accessibility,Dashboard,Keyboard tab order is logical,Accessibility,12 Tab presses,Sequential logical order,Settings -> actions -> rows -> tabs,Verified,Pass,,,
+TC-062,Accessibility,Dashboard,Focused controls show visible focus,Accessibility,Tab,Visible focus indicator,outline solid 2px on every stop,Verified,Pass,,,
+TC-063,UI,Dashboard/Summary/Settings,No horizontal overflow across viewports and schemes,UI-Responsive,390x844 768x1024 1440x900 x light+dark,scrollWidth == clientWidth,18/18 combinations OK,Verified,Pass,,,
+TC-064,UI,All,Empty states render with icon title description and CTA,UI,empty modules,Consistent informative empty states,Consistent across loans accounts budgets recurring cards search,Verified,Pass,,,
+TC-065,Performance,Dashboard,Page load and API timing,Performance,navigation timing,Reasonable load,DOMContentLoaded 762ms; batched tRPC 7ms; auth 9ms,Verified,Pass,,,
+TC-066,Security,API,Validation enforced server-side not only client-side,Security,direct API calls,Server re-validates,Zod schemas re-validate money fields server-side,Verified,Pass,,,
+TC-067,Accessibility,Dashboard,Colour contrast meets WCAG AA,Accessibility,38 text nodes,All text meets AA,INCONCLUSIVE - no confirmed failure; method cannot evaluate text over gradients,Untested,Not Tested,,,
+TC-068,Transactions,Transaction Detail,Edit an existing transaction,CRUD,n/a,Changes persist,NOT EXECUTED,Untested,Not Tested,,,
+TC-069,Import,Import CSV,Import a CSV file end to end,Functional,n/a,Rows imported and validated,NOT EXECUTED - file round trip not driven,Untested,Not Tested,,,
+TC-070,Settings,Settings,Clear all data,Destructive,n/a,All data removed after confirmation,NOT EXECUTED - deferred to preserve fixtures,Untested,Not Tested,,,
+TC-071,Auth,Settings,Sign out and session invalidation,Functional,n/a,Session cleared; redirected to login,NOT EXECUTED,Untested,Not Tested,,,
+TC-072,Loans,Loan Detail,Record a repayment against a loan,CRUD,n/a,Repayment recorded; schedule updates,NOT EXECUTED,Untested,Not Tested,,,
+TC-073,Native,n/a,App lock / biometrics / notifications / secure store,Functional,n/a,Behaves per spec on device,NOT EXECUTED - no device or simulator,Untested,Not Tested,,,
+TC-074,Database,n/a,Behaviour against real MySQL,Functional,n/a,Matches dev DB behaviour,NOT EXECUTED - in-memory dev DB only,Untested,Not Tested,,,
+TC-075,Auth,Login,OAuth sign-in flow and unauthenticated login screen,Functional,n/a,Sign-in completes,NOT EXECUTED - no OAuth issuer configured,Untested,Not Tested,,,
+TC-076,Accessibility,All,Screen reader announcement order,Accessibility,n/a,Correct announcements,NOT EXECUTED - no screen reader available,Untested,Not Tested,,,
+TC-077,Regression,All,Retest prior issues SP-001 to SP-072,Regression,n/a,Previously fixed issues stay fixed,NOT EXECUTED - not a regression pass,Untested,Not Tested,,,
+TC-078,Compatibility,All,Firefox / Safari / Edge rendering,Compatibility,n/a,Renders correctly,NOT EXECUTED - Chromium only,Untested,Not Tested,,,
