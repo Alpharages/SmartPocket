@@ -191,7 +191,13 @@ function LoanFormFields({
             onBlur={() => onChange({ rate: normalizeMoneyInput(values.rate) })}
             className="flex-1 text-foreground"
             keyboardType="decimal-pad"
-            style={{ fontSize: 15 }}
+            style={{
+              // SP-097: without `minWidth: 0` a flex <input> refuses to shrink below
+              // its intrinsic width, overflowing the row and horizontally scrolling
+              // the sheet — which clipped the first character off every label.
+              minWidth: 0,
+              fontSize: 15,
+            }}
             accessibilityLabel="Interest rate"
           />
         </View>

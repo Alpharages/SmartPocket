@@ -132,7 +132,13 @@ function AccountRow({
           accessibilityRole="button"
           accessibilityLabel={`Edit ${account.name}`}
           className="items-center justify-center"
-          style={{ minWidth: 44, minHeight: 44 }}
+          style={{
+            // SP-096: layout classes are inert on Pressable here — set in style.
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 44,
+            minHeight: 44,
+          }}
           testID={`edit-account-${account.id}`}
         >
           <Ionicons name="pencil" size={18} color={colors.primary} />
@@ -142,7 +148,13 @@ function AccountRow({
           accessibilityRole="button"
           accessibilityLabel={`Delete ${account.name}`}
           className="items-center justify-center"
-          style={{ minWidth: 44, minHeight: 44 }}
+          style={{
+            // SP-096: layout classes are inert on Pressable here — set in style.
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 44,
+            minHeight: 44,
+          }}
           testID={`delete-account-${account.id}`}
         >
           <Ionicons name="trash-outline" size={18} color={colors.error} />
@@ -236,6 +248,10 @@ function AccountFormFields({
           accessibilityLabel={`Currency, ${getCurrencyLabel(values.currency)}`}
           className="px-4 py-3.5 rounded-xl flex-row items-center justify-between"
           style={{
+            // SP-096: layout classes are inert on Pressable here — set in style.
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
             backgroundColor: colors.background,
             borderWidth: 0.5,
             borderColor: colors.border,
@@ -411,6 +427,10 @@ function TransferFormSheet({
               accessibilityLabel={`Source account, ${fromAccount?.name ?? "not selected"}`}
               className="px-4 py-3.5 rounded-xl flex-row items-center justify-between"
               style={{
+                // SP-096: layout classes are inert on Pressable here — set in style.
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
                 backgroundColor: colors.background,
                 borderWidth: 0.5,
                 borderColor: colors.border,
@@ -434,6 +454,10 @@ function TransferFormSheet({
               accessibilityState={{ disabled: !canPickDestination }}
               className="px-4 py-3.5 rounded-xl flex-row items-center justify-between"
               style={{
+                // SP-096: layout classes are inert on Pressable here — set in style.
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
                 backgroundColor: colors.background,
                 borderWidth: 0.5,
                 borderColor: colors.border,

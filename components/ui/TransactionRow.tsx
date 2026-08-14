@@ -231,6 +231,15 @@ function TransactionRowImpl({
           // Padding and the selected fill live in `style`, not className: this
           // app drops NativeWind className visual styles on Pressable (notably
           // on web), so px/py and the background must be set here to render.
+          //
+          // The same applies to the row's own direction. `flex-row items-center
+          // justify-between` above is inert on this Pressable, so every row fell
+          // back to React Native's default `column`: the amount dropped onto a
+          // second line under the title and rows grew from ~56px to 88px, on the
+          // dashboard and the Activity list alike. Layout must be set here too.
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           minHeight: 56, // ≥ 44pt touch target with comfortable padding
           paddingHorizontal: 16,
           paddingVertical: 14,
@@ -239,7 +248,12 @@ function TransactionRowImpl({
             : undefined,
         },
         animatedStyle,
-        style,
+        // SP-078 follow-up: with inline actions the caller's `style` (which
+        // carries the row's card background) moves to the wrapper below, so it
+        // spans the row *and* the actions. Applying it here too would paint the
+        // surface only under the row and leave the delete icon stranded on the
+        // page background.
+        usesInlineActions ? null : style,
       ]}
     >
       {/* Left: Avatar + Title/Date */}
@@ -301,7 +315,6 @@ function TransactionRowImpl({
           {displayAmount}
         </Text>
       </View>
-
     </AnimatedPressable>
   );
 
@@ -318,7 +331,13 @@ function TransactionRowImpl({
           accessibilityRole="button"
           accessibilityLabel={`Edit ${title}`}
           className="items-center justify-center"
-          style={{ minWidth: 44, minHeight: 44 }}
+          style={{
+            // SP-096: layout classes are inert on Pressable here — set in style.
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 44,
+            minHeight: 44,
+          }}
         >
           <Ionicons name="create-outline" size={18} color={colors.primary} />
         </Pressable>
@@ -329,7 +348,13 @@ function TransactionRowImpl({
           accessibilityRole="button"
           accessibilityLabel={`Delete ${title}`}
           className="items-center justify-center"
-          style={{ minWidth: 44, minHeight: 44 }}
+          style={{
+            // SP-096: layout classes are inert on Pressable here — set in style.
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 44,
+            minHeight: 44,
+          }}
         >
           <Ionicons name="trash-outline" size={18} color={colors.error} />
         </Pressable>
@@ -349,6 +374,9 @@ function TransactionRowImpl({
                 onPress={onEdit}
                 className="items-center justify-center px-4"
                 style={{
+                  // SP-096: layout classes are inert on Pressable here — set in style.
+                  alignItems: "center",
+                  justifyContent: "center",
                   minHeight: 56,
                   backgroundColor: withAlpha(colors.primary, "14"),
                 }}
@@ -367,6 +395,9 @@ function TransactionRowImpl({
                 onPress={onDelete}
                 className="items-center justify-center px-4"
                 style={{
+                  // SP-096: layout classes are inert on Pressable here — set in style.
+                  alignItems: "center",
+                  justifyContent: "center",
                   minHeight: 56,
                   backgroundColor: withAlpha(colors.error, "14"),
                 }}
@@ -386,7 +417,7 @@ function TransactionRowImpl({
 
   if (inlineActions) {
     return (
-      <View className="flex-row items-center">
+      <View className="flex-row items-center" style={style}>
         <View className="flex-1">{rowContent}</View>
         {inlineActions}
       </View>

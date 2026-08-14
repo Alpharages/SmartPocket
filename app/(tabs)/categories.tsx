@@ -480,7 +480,13 @@ export default function CategoriesScreen() {
                 value={categoryName}
                 onChangeText={setCategoryName}
                 className="flex-1 text-foreground"
-                style={{ fontSize: 15 }}
+                style={{
+                  // SP-097: without `minWidth: 0` a flex <input> refuses to shrink below
+                  // its intrinsic width, overflowing the row and horizontally scrolling
+                  // the sheet — which clipped the first character off every label.
+                  minWidth: 0,
+                  fontSize: 15,
+                }}
                 // SP-081: a placeholder is not an accessible name — it
                 // disappears the moment the user types.
                 accessibilityLabel="Category name"

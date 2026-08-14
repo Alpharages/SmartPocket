@@ -485,7 +485,13 @@ export default function TransactionsScreen() {
           value={searchText}
           onChangeText={setSearchText}
           className="flex-1 text-foreground"
-          style={{ fontSize: Typography.body.fontSize }}
+          style={{
+            // SP-097: without `minWidth: 0` a flex <input> refuses to shrink below
+            // its intrinsic width, overflowing the row and horizontally scrolling
+            // the sheet — which clipped the first character off every label.
+            minWidth: 0,
+            fontSize: Typography.body.fontSize,
+          }}
           returnKeyType="search"
           accessibilityLabel="Search transactions"
         />

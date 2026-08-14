@@ -84,7 +84,6 @@ export default function OAuthCallback() {
           params.error ||
           (url ? new URL(url, "http://dummy").searchParams.get("error") : null);
         if (error) {
-          
           setStatus("error");
           setErrorMessage(error || "OAuth error occurred");
           return;
@@ -147,7 +146,6 @@ export default function OAuthCallback() {
 
         // Otherwise, exchange code for session token
         if (!code || !state) {
-          
           setStatus("error");
           setErrorMessage("Missing code or state parameter");
           return;
@@ -181,7 +179,6 @@ export default function OAuthCallback() {
             router.replace("/dashboard");
           }, 1000);
         } else {
-          
           setStatus("error");
           setErrorMessage("No session token received");
         }

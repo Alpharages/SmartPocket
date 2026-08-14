@@ -208,7 +208,14 @@ export function BudgetFormSheet({
               }}
               keyboardType="decimal-pad"
               className="flex-1 text-foreground"
-              style={{ fontSize: Typography.h2.fontSize, fontWeight: "700" }}
+              style={{
+                // SP-097: without `minWidth: 0` a flex <input> refuses to shrink below
+                // its intrinsic width, overflowing the row and horizontally scrolling
+                // the sheet — which clipped the first character off every label.
+                minWidth: 0,
+                fontSize: Typography.h2.fontSize,
+                fontWeight: "700",
+              }}
               accessibilityLabel="Budget amount"
               testID="budget-amount-input"
             />
@@ -269,7 +276,6 @@ export function BudgetFormSheet({
             />
           )}
         </View>
-
       </ScrollView>
 
       {isEditing ? (

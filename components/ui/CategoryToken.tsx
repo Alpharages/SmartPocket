@@ -297,7 +297,15 @@ export const CategoryToken = forwardRef<CategoryTokenRef, CategoryTokenProps>(
         }}
         className={cn("items-center justify-center", className)}
         style={[
-          { minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET },
+          {
+            // SP-096: the `items-center justify-center` className above is inert
+            // on Pressable here, so chip contents sat top-left inside the 44pt
+            // target instead of centred.
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: MIN_TOUCH_TARGET,
+            minHeight: MIN_TOUCH_TARGET,
+          },
           animatedStyle,
           style,
         ]}

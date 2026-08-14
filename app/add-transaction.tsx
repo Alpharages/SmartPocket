@@ -320,6 +320,10 @@ export default function AddTransactionScreen() {
               keyboardType="decimal-pad"
               className="flex-1 text-foreground"
               style={{
+                // SP-097: without `minWidth: 0` a flex <input> refuses to shrink below
+                // its intrinsic width, overflowing the row and horizontally scrolling
+                // the sheet — which clipped the first character off every label.
+                minWidth: 0,
                 fontSize: Typography.h2.fontSize,
                 fontWeight: "700",
               }}

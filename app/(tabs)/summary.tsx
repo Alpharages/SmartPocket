@@ -223,6 +223,9 @@ export default function SummaryScreen() {
           accessibilityRole="button"
           accessibilityLabel="Previous month"
           style={{
+            // SP-096: layout classes are inert on Pressable here — set in style.
+            alignItems: "center",
+            justifyContent: "center",
             backgroundColor: colors.surface,
             borderWidth: 0.5,
             borderColor: colors.border,
@@ -244,7 +247,12 @@ export default function SummaryScreen() {
               : `${monthLabel}, tap to return to this month`
           }
           className="items-center"
-          style={{ minHeight: 44, justifyContent: "center" }}
+          style={{
+            // SP-096: layout classes are inert on Pressable here — set in style.
+            alignItems: "center",
+            minHeight: 44,
+            justifyContent: "center",
+          }}
         >
           <Text className="text-base font-bold text-foreground">
             {monthLabel}
@@ -276,6 +284,9 @@ export default function SummaryScreen() {
           accessibilityLabel="Next month"
           accessibilityState={{ disabled: !canGoToNextMonth }}
           style={{
+            // SP-096: layout classes are inert on Pressable here — set in style.
+            alignItems: "center",
+            justifyContent: "center",
             opacity: canGoToNextMonth ? 1 : 0.4,
             backgroundColor: colors.surface,
             borderWidth: 0.5,

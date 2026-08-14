@@ -185,6 +185,17 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
       return {
         containerStyle: {
           ...getElevationStyle(elevationLevel, colors.foreground),
+          // SP-096: the `flex-row items-center justify-center` className below
+          // is inert on this Pressable (NativeWind interop is remapped off),
+          // so every button fell back to React Native's default `column`: a
+          // leftIcon/loading spinner stacked ABOVE its label instead of sitting
+          // beside it, and labels stopped centring. Visible on "Add account",
+          // "Add New Card", "Add New Category" and every icon button in the app.
+          // Layout has to live here, next to the radius that needs the same
+          // workaround.
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
           backgroundColor: bg,
           borderColor: border,
           borderWidth: border ? 1 : 0,
@@ -263,6 +274,25 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
       </>
     );
 
+    // SP-095: NativeWind className is remapped off on Pressable
+    // (lib/_core/nativewind-pressable.ts) and silently drops on web, which the
+    // radius above already works around. Layout utilities had no such
+    // workaround, so the 19 call sites passing `className="flex-1"` to split a
+    // sheet footer in half all rendered a content-sized, left-aligned button
+    // with dead space beside it. Mirror the layout intent into `style`, which
+    // is reliable. Applied before the caller's own `style` so an explicit
+    // style always wins.
+    const layoutStyle = useMemo<ViewStyle>(() => {
+      if (!className) return {};
+      const classes = className.split(/\s+/);
+      const out: ViewStyle = {};
+      if (classes.includes("flex-1")) out.flex = 1;
+      if (classes.includes("w-full")) out.width = "100%";
+      if (classes.includes("self-start")) out.alignSelf = "flex-start";
+      if (classes.includes("self-center")) out.alignSelf = "center";
+      return out;
+    }, [className]);
+
     return (
       <AnimatedPressable
         ref={ref}
@@ -282,7 +312,7 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
           isIconOnly && "rounded-lg",
           className,
         )}
-        style={[containerStyle, animatedStyle, style]}
+        style={[containerStyle, layoutStyle, animatedStyle, style]}
       >
         {content}
       </AnimatedPressable>

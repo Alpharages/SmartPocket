@@ -111,7 +111,13 @@ function CardFormFields({
             value={values.cardName}
             onChangeText={(cardName) => onChange({ cardName })}
             className="flex-1 text-foreground"
-            style={{ fontSize: 15 }}
+            style={{
+              // SP-097: without `minWidth: 0` a flex <input> refuses to shrink below
+              // its intrinsic width, overflowing the row and horizontally scrolling
+              // the sheet — which clipped the first character off every label.
+              minWidth: 0,
+              fontSize: 15,
+            }}
           />
         </View>
       </View>
@@ -137,7 +143,13 @@ function CardFormFields({
               onChangeText={(cardNumber) => onChange({ cardNumber })}
               className="flex-1 text-foreground"
               keyboardType="numeric"
-              style={{ fontSize: 15 }}
+              style={{
+                // SP-097: without `minWidth: 0` a flex <input> refuses to shrink below
+                // its intrinsic width, overflowing the row and horizontally scrolling
+                // the sheet — which clipped the first character off every label.
+                minWidth: 0,
+                fontSize: 15,
+              }}
             />
           </View>
         </View>
@@ -184,7 +196,13 @@ function CardFormFields({
             value={values.cardholderName}
             onChangeText={(cardholderName) => onChange({ cardholderName })}
             className="flex-1 text-foreground"
-            style={{ fontSize: 15 }}
+            style={{
+              // SP-097: without `minWidth: 0` a flex <input> refuses to shrink below
+              // its intrinsic width, overflowing the row and horizontally scrolling
+              // the sheet — which clipped the first character off every label.
+              minWidth: 0,
+              fontSize: 15,
+            }}
           />
         </View>
       </View>
@@ -267,7 +285,13 @@ function CardFormFields({
             onChangeText={(creditLimit) => onChange({ creditLimit })}
             className="flex-1 text-foreground"
             keyboardType="decimal-pad"
-            style={{ fontSize: 15 }}
+            style={{
+              // SP-097: without `minWidth: 0` a flex <input> refuses to shrink below
+              // its intrinsic width, overflowing the row and horizontally scrolling
+              // the sheet — which clipped the first character off every label.
+              minWidth: 0,
+              fontSize: 15,
+            }}
           />
         </View>
       </View>
