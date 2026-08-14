@@ -307,6 +307,11 @@ function CardFormFields({
               onPress={() => onChange({ cardType: type })}
               className="flex-1 py-3 rounded-xl items-center capitalize"
               style={{
+                // SP-096: className padding is inert on Pressable — size in style.
+                paddingVertical: 12,
+                minHeight: 44,
+                alignItems: "center",
+                justifyContent: "center",
                 backgroundColor:
                   values.cardType === type ? colors.primary : colors.background,
                 borderWidth: values.cardType === type ? 0 : 0.5,

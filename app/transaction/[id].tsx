@@ -374,6 +374,12 @@ export default function TransactionDetailScreen() {
                     accessibilityState={{ disabled: !isAccountDirty }}
                     className="items-center justify-center rounded-xl px-4 py-3"
                     style={{
+                      // SP-096: className padding is inert on Pressable — size in style.
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      minHeight: 44,
+                      alignItems: "center",
+                      justifyContent: "center",
                       backgroundColor: colors.primary,
                       opacity: isAccountDirty ? 1 : 0.5,
                     }}

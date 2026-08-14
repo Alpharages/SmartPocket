@@ -262,6 +262,14 @@ type Condition =
       column: string;
       op: string;
       source: "param" | "now";
+    }
+  // SP-099: `(<colA> <op> ? OR <colB> <op> ?)` — the shape
+  // getAccountTransferCount emits to match a transfer on either side of the
+  // pair. Two distinct columns, so it is not the orNullOrCmp shape above.
+  | {
+      kind: "orTwoCols";
+      a: { column: string; op: string };
+      b: { column: string; op: string };
     };
 
 /** Parse the WHERE body (already AND-split) into structured conditions. */
@@ -271,6 +279,18 @@ function parseConditions(whereBody: string): Condition[] {
     .map((part) => part.trim())
     .filter(Boolean)
     .map((part): Condition => {
+      const orTwoCols = part.match(
+        /^\((\w+)\s*(>=|<=|=)\s*\?\s+OR\s+(\w+)\s*(>=|<=|=)\s*\?\)$/i,
+      );
+      if (orTwoCols && orTwoCols[1] !== orTwoCols[3]) {
+        const [, colA, opA, colB, opB] = orTwoCols;
+        return {
+          kind: "orTwoCols",
+          a: { column: colA, op: opA },
+          b: { column: colB, op: opB },
+        };
+      }
+
       const orGroup = part.match(
         /^\((\w+)\s+IS\s+NULL\s+OR\s+\1\s*(>=|<=|=)\s*(\?|NOW\(\))\)$/i,
       );
@@ -310,7 +330,12 @@ function parseConditions(whereBody: string): Condition[] {
 type BoundCondition =
   | { kind: "cmp"; column: string; op: string; value: unknown }
   | { kind: "isNull"; column: string; negate: boolean }
-  | { kind: "orNullOrCmp"; column: string; op: string; value: unknown };
+  | { kind: "orNullOrCmp"; column: string; op: string; value: unknown }
+  | {
+      kind: "orTwoCols";
+      a: { column: string; op: string; value: unknown };
+      b: { column: string; op: string; value: unknown };
+    };
 
 // Params are bound to conditions exactly once, up front — NOT inside the
 // per-row filter below. Each `?` in the WHERE text corresponds to one query-
@@ -323,6 +348,13 @@ function bindConditions(
 ): BoundCondition[] {
   return conditions.map((c): BoundCondition => {
     if (c.kind === "isNull") return c;
+    if (c.kind === "orTwoCols") {
+      return {
+        kind: "orTwoCols",
+        a: { ...c.a, value: params[cursor.i++] },
+        b: { ...c.b, value: params[cursor.i++] },
+      };
+    }
     if (c.kind === "orNullOrCmp") {
       // `NOW()` is a literal in the SQL text, so it consumes no `?` param —
       // advancing the cursor for it would desync every later placeholder.
@@ -343,6 +375,16 @@ function matchesBoundCondition(row: Row, condition: BoundCondition): boolean {
     const isNull =
       row[condition.column] === null || row[condition.column] === undefined;
     return condition.negate ? !isNull : isNull;
+  }
+  if (condition.kind === "orTwoCols") {
+    const hit = (side: { column: string; op: string; value: unknown }) =>
+      compare(
+        side.column,
+        row[side.column],
+        side.op,
+        coerce(side.column, side.value),
+      );
+    return hit(condition.a) || hit(condition.b);
   }
   if (condition.kind === "orNullOrCmp") {
     const cellIsNull =
@@ -561,6 +603,26 @@ export async function devQuery(
     const before = tableRows(table).length;
     store[table] = tableRows(table).filter((row) => !doomed.has(row));
     return { affectedRows: before - tableRows(table).length };
+  }
+
+  // ---- SELECT COUNT(*) ----
+  // SP-099: `SELECT COUNT(*) as x FROM t WHERE ...` fell through to the
+  // "unsupported query" throw, so the account screen could not check whether an
+  // account had linked activity and every delete failed with "Could not verify
+  // linked activity". Four such counts exist in server/db.ts (categories,
+  // account transactions, account transfers, accounts).
+  m = sql.match(
+    /^SELECT\s+COUNT\(\*\)\s+as\s+(\w+)\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+?))?\s*$/i,
+  );
+  if (m) {
+    const alias = m[1];
+    const table = m[2] as TableName;
+    const whereBody = m[3];
+    const cursor = { i: 0 };
+    const rows = whereBody
+      ? applyWhere(tableRows(table), parseConditions(whereBody), params, cursor)
+      : tableRows(table);
+    return [{ [alias]: rows.length }];
   }
 
   // ---- SELECT ----

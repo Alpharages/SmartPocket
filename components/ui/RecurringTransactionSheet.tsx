@@ -424,6 +424,11 @@ export function RecurringTransactionSheet({
             <FilterChipGroup
               mode="single"
               options={FREQUENCY_OPTIONS}
+              // SP-098: FilterChipGroup's scroller carries a 24px inset for
+              // full-bleed screen rows. Inside an already-padded sheet that
+              // double-pads, indenting these chips 24px past every other
+              // control in the form.
+              contentContainerStyle={{ paddingHorizontal: 0 }}
               value={frequency}
               onChange={setFrequency}
             />
@@ -543,6 +548,11 @@ export function RecurringTransactionSheet({
             <FilterChipGroup
               mode="single"
               options={END_CONDITION_OPTIONS}
+              // SP-098: FilterChipGroup's scroller carries a 24px inset for
+              // full-bleed screen rows. Inside an already-padded sheet that
+              // double-pads, indenting these chips 24px past every other
+              // control in the form.
+              contentContainerStyle={{ paddingHorizontal: 0 }}
               value={endCondition}
               onChange={handleEndConditionChange}
             />

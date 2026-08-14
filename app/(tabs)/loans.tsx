@@ -87,6 +87,11 @@ function LoanFormFields({
               onPress={() => onChange({ direction })}
               className="flex-1 py-3 rounded-xl items-center capitalize"
               style={{
+                // SP-096: className padding is inert on Pressable — size in style.
+                paddingVertical: 12,
+                minHeight: 44,
+                alignItems: "center",
+                justifyContent: "center",
                 backgroundColor:
                   values.direction === direction
                     ? colors.primary
@@ -214,6 +219,12 @@ function LoanFormFields({
               onPress={() => onChange({ periodicity })}
               className="px-4 py-2.5 rounded-xl capitalize"
               style={{
+                // SP-096: className padding is inert on Pressable — size in style.
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                minHeight: 44,
+                alignItems: "center",
+                justifyContent: "center",
                 backgroundColor:
                   values.periodicity === periodicity
                     ? colors.primary
@@ -251,6 +262,11 @@ function LoanFormFields({
                   onPress={() => onChange({ scheduleMode: mode })}
                   className="flex-1 py-2.5 rounded-xl items-center"
                   style={{
+                    // SP-096: className padding is inert on Pressable — size in style.
+                    paddingVertical: 10,
+                    minHeight: 44,
+                    alignItems: "center",
+                    justifyContent: "center",
                     backgroundColor:
                       values.scheduleMode === mode
                         ? colors.primary

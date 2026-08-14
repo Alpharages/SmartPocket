@@ -356,6 +356,11 @@ export default function LoanDetailScreen() {
             testID="record-repayment-button"
             className="mb-4 rounded-2xl py-4 items-center"
             style={{
+              // SP-096: className padding is inert on Pressable — size in style.
+              paddingVertical: 16,
+              minHeight: 44,
+              alignItems: "center",
+              justifyContent: "center",
               backgroundColor:
                 loanDetail.status === "settled" ? colors.muted : colors.primary,
               opacity: loanDetail.status === "settled" ? 0.5 : 1,
