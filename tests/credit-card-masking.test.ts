@@ -36,7 +36,7 @@ describe("credit card response masking", () => {
   it("masks list responses with cardNumberLast4 and no cardNumber key", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
     callDataApi.mockResolvedValue([
-      { ...baseRow, cardNumber: encryptCardNumber("4111111111111111") },
+      { ...baseRow, cardNumber: await encryptCardNumber("4111111111111111") },
     ]);
 
     const { getUserCreditCards } = await import("@/server/db");

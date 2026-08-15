@@ -1,12 +1,8 @@
-import { randomBytes, scrypt, timingSafeEqual } from "crypto";
-import { promisify } from "util";
+import { scryptAsync } from "@noble/hashes/scrypt.js";
+import { randomBytes } from "@noble/hashes/utils.js";
+import { equalBytes } from "@noble/ciphers/utils.js";
+import { bytesToBase64, base64ToBytes } from "../../shared/base64";
 import type { Id } from "../../drizzle/schema";
-
-const scryptAsync = promisify(scrypt) as (
-  password: string,
-  salt: Buffer,
-  keylen: number,
-) => Promise<Buffer>;
 
 const VERSION_PREFIX = "scrypt:v1:";
 const KEY_LENGTH = 64;
@@ -14,22 +10,34 @@ const SALT_LENGTH = 16;
 const PIN_PATTERN = /^\d{4}$/;
 
 /**
+ * Node's `scrypt` default cost parameters (N=2^14, r=8, p=1) — kept
+ * identical so a hash produced before this module moved off Node's built-in
+ * `crypto` verifies exactly the same way after.
+ */
+const SCRYPT_OPTS = { N: 16384, r: 8, p: 1, dkLen: KEY_LENGTH };
+
+/**
  * A 4-digit PIN is only 10,000 possibilities — scrypt slows down an offline
  * guess against a leaked hash, but server-side rate limiting (below) is what
  * actually makes the secret meaningful over the wire (ClickUp 86eyeq72c AC).
  *
- * Uses the async `scrypt` (not `scryptSync`) so the ~60-100ms CPU cost runs on
- * libuv's threadpool instead of blocking the single Node event loop — a
- * synchronous hash on every request would let one client stall the whole API
- * (round-2 review N3).
+ * `@noble/hashes` (pure JS, audited, no native module) rather than Node's
+ * built-in `crypto`: `server/routers.ts`'s `securityRouter` needs to run
+ * in-process against the on-device database (Phase 3 of the local-first
+ * plan), and Hermes has no `crypto` module to import. This is the same
+ * reason `server/_core/crypto.ts` (card encryption) moved off Node crypto —
+ * see that file's doc comment for the fuller rationale. Uses the async
+ * `scryptAsync` (not the sync `scrypt`) so the CPU cost never blocks the
+ * single JS thread — on the server that thread serves every other request
+ * meanwhile; on-device it's the thread the UI renders on.
  */
 export async function hashPin(pin: string): Promise<string> {
   if (!PIN_PATTERN.test(pin)) {
     throw new Error("PIN must be exactly 4 digits");
   }
   const salt = randomBytes(SALT_LENGTH);
-  const hash = await scryptAsync(pin, salt, KEY_LENGTH);
-  return `${VERSION_PREFIX}${salt.toString("base64")}:${hash.toString("base64")}`;
+  const hash = await scryptAsync(pin, salt, SCRYPT_OPTS);
+  return `${VERSION_PREFIX}${bytesToBase64(salt)}:${bytesToBase64(hash)}`;
 }
 
 /** Constant-time compare a submitted PIN against a stored hash. Never throws. */
@@ -44,14 +52,17 @@ export async function verifyPinHash(
   if (parts.length !== 2) return false;
 
   const [saltB64, hashB64] = parts;
-  const salt = Buffer.from(saltB64, "base64");
-  const expected = Buffer.from(hashB64, "base64");
+  const salt = base64ToBytes(saltB64);
+  const expected = base64ToBytes(hashB64);
   // Fail closed rather than silently comparing at a shorter, attacker-influenced
   // length — a truncated/corrupted stored hash must never verify (round-2 review N5).
   if (expected.length !== KEY_LENGTH) return false;
 
-  const actual = await scryptAsync(pin, salt, expected.length);
-  return timingSafeEqual(actual, expected);
+  const actual = await scryptAsync(pin, salt, {
+    ...SCRYPT_OPTS,
+    dkLen: expected.length,
+  });
+  return equalBytes(actual, expected);
 }
 
 // ============================================================================

@@ -296,7 +296,12 @@ describe("RootLayout dev auth bootstrap", () => {
     });
   });
 
-  it("keeps the native app shell hidden until dev auto-login completes", async () => {
+  // local-first-sync-plan.md phase 3: native runs entirely through the
+  // in-process tRPC link (lib/trpc.native.ts) and never talks to
+  // server/_core/index.ts, so it no longer needs — or waits for — a dev
+  // session token. This replaces the old "keeps the native app shell hidden
+  // until dev auto-login completes" behaviour.
+  it("renders the native app shell immediately, without ever attempting dev auto-login", async () => {
     Platform.OS = "ios";
     auth.getSessionToken.mockResolvedValueOnce(null);
 
@@ -305,18 +310,18 @@ describe("RootLayout dev auth bootstrap", () => {
     });
 
     expect(
-      renderer!.root.findAllByType(
+      renderer!.root.findByType(
         "ExpenseProvider" as unknown as React.ElementType,
       ),
-    ).toHaveLength(0);
+    ).toBeTruthy();
 
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    expect(fetchSpy).toHaveBeenCalled();
-    expect(auth.setSessionToken).toHaveBeenCalledWith("dev-token");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(auth.setSessionToken).not.toHaveBeenCalled();
     expect(
       renderer!.root.findByType(
         "ExpenseProvider" as unknown as React.ElementType,

@@ -485,8 +485,8 @@ export type SafeCreditCard = Omit<CreditCard, "cardNumber"> & {
   cardNumberLast4: string;
 };
 
-function toSafeCreditCard(row: CreditCard): SafeCreditCard {
-  const plain = row.cardNumber ? decryptCardNumber(row.cardNumber) : "";
+async function toSafeCreditCard(row: CreditCard): Promise<SafeCreditCard> {
+  const plain = row.cardNumber ? await decryptCardNumber(row.cardNumber) : "";
   const { cardNumber: _removed, ...rest } = row;
   return { ...rest, cardNumberLast4: maskCardNumber(plain) };
 }
@@ -503,7 +503,9 @@ export async function getUserCreditCards(
       },
     });
     const rows = Array.isArray(result) ? result : [];
-    return rows.map((row) => toSafeCreditCard(row as CreditCard));
+    return await Promise.all(
+      rows.map((row) => toSafeCreditCard(row as CreditCard)),
+    );
   } catch (error) {
     rethrowReadFailure("getUserCreditCards", error);
   }
@@ -523,7 +525,7 @@ export async function createCreditCard(
         id,
         data.userId,
         data.name,
-        encryptCardNumber(data.cardNumber),
+        await encryptCardNumber(data.cardNumber),
         data.cardholderName,
         data.expiryMonth,
         data.expiryYear,
@@ -548,7 +550,7 @@ export async function updateCreditCard(
 ): Promise<SafeCreditCard | null> {
   const payload: Partial<InsertCreditCard> = { ...data };
   if (payload.cardNumber !== undefined) {
-    payload.cardNumber = encryptCardNumber(payload.cardNumber);
+    payload.cardNumber = await encryptCardNumber(payload.cardNumber);
   }
 
   const { clause, values } = buildUpdate("creditCards", payload);
@@ -588,7 +590,7 @@ export async function getCreditCardById(
       },
     });
     const row = Array.isArray(result) ? result[0] : null;
-    return row ? toSafeCreditCard(row as CreditCard) : null;
+    return row ? await toSafeCreditCard(row as CreditCard) : null;
   } catch (error) {
     rethrowReadFailure("getCreditCardById", error);
   }

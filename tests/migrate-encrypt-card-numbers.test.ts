@@ -53,12 +53,12 @@ describe("migrateEncryptCardNumbers", () => {
     expect(updateCall.body.query).toContain("UPDATE creditCards");
     const stored = updateCall.body.params[0] as string;
     expect(isEncryptedCardNumber(stored)).toBe(true);
-    expect(decryptCardNumber(stored)).toBe("4111111111111111");
+    expect(await decryptCardNumber(stored)).toBe("4111111111111111");
   });
 
   it("skips already-encrypted rows (idempotent re-run)", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const encrypted = encryptCardNumber("4111111111111111");
+    const encrypted = await encryptCardNumber("4111111111111111");
 
     callDataApi.mockResolvedValueOnce([
       { id: testId(2), cardNumber: encrypted },
@@ -79,7 +79,7 @@ describe("migrateEncryptCardNumbers", () => {
 
   it("handles a mixed table of plaintext and encrypted rows", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const encrypted = encryptCardNumber("5555555555554444");
+    const encrypted = await encryptCardNumber("5555555555554444");
 
     callDataApi
       .mockResolvedValueOnce([

@@ -79,7 +79,7 @@ describe("credit card db encryption", () => {
 
   it("decrypts cardNumber on getCreditCardById then masks the response", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const ciphertext = encryptCardNumber("4111111111111111");
+    const ciphertext = await encryptCardNumber("4111111111111111");
 
     callDataApi.mockResolvedValue([
       {
@@ -104,7 +104,7 @@ describe("credit card db encryption", () => {
 
   it("decrypts cardNumber on getUserCreditCards then masks each row", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const ciphertext = encryptCardNumber("4111111111111111");
+    const ciphertext = await encryptCardNumber("4111111111111111");
 
     callDataApi.mockResolvedValue([
       {

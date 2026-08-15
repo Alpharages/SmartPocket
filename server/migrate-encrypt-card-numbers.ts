@@ -1,5 +1,6 @@
 import { callDataApi } from "./_core/dataApi";
 import { encryptCardNumber, isEncryptedCardNumber } from "./_core/crypto";
+import type { Id } from "../drizzle/schema";
 
 export type MigrationSummary = {
   total: number;
@@ -9,7 +10,7 @@ export type MigrationSummary = {
 };
 
 type CreditCardRow = {
-  id: number;
+  id: Id;
   cardNumber: string;
 };
 
@@ -18,12 +19,12 @@ export function formatMigrationSummary(summary: MigrationSummary): string {
 }
 
 /** Validates the encryption key before any database access or mutation. */
-export function assertEncryptionKeyReady(): void {
-  encryptCardNumber("__migration_key_probe__");
+export async function assertEncryptionKeyReady(): Promise<void> {
+  await encryptCardNumber("__migration_key_probe__");
 }
 
 export async function migrateEncryptCardNumbers(): Promise<MigrationSummary> {
-  assertEncryptionKeyReady();
+  await assertEncryptionKeyReady();
 
   const result = await callDataApi("Database/query", {
     body: {
@@ -47,7 +48,7 @@ export async function migrateEncryptCardNumbers(): Promise<MigrationSummary> {
     }
 
     try {
-      const encrypted = encryptCardNumber(row.cardNumber);
+      const encrypted = await encryptCardNumber(row.cardNumber);
       await callDataApi("Database/query", {
         body: {
           query: "UPDATE creditCards SET cardNumber = ? WHERE id = ?",

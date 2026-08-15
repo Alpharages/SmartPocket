@@ -53,6 +53,7 @@ const appLock = vi.hoisted(() => ({
   verifyPin: vi.fn(),
   isBiometricEnabled: vi.fn(),
   authenticateWithBiometrics: vi.fn(),
+  clearAppLock: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/lib/app-lock", () => appLock);
@@ -194,6 +195,7 @@ beforeEach(() => {
   appLock.verifyPin.mockReset();
   appLock.isBiometricEnabled.mockReset().mockResolvedValue(false);
   appLock.authenticateWithBiometrics.mockReset();
+  appLock.clearAppLock.mockReset().mockResolvedValue(undefined);
   routerMock.canDismiss.mockReset().mockReturnValue(false);
   routerMock.dismissAll.mockReset();
   routerMock.replace.mockReset();
@@ -673,10 +675,44 @@ describe("AppLockGate", () => {
       expect(clearPinOrder).toBeLessThan(logoutOrder);
     });
 
+    it("clears the local device PIN too — logout() no longer does this itself (local-first-sync-plan.md)", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      confirmDialog.confirmDestructive.mockResolvedValue(true);
+      const root = renderGate();
+      await flush();
+
+      await act(async () => {
+        findKey(root, "Forgot PIN?").props.onPress?.();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(appLock.clearAppLock).toHaveBeenCalledTimes(1);
+    });
+
+    it("still signs out and clears the local PIN even when clearing it fails", async () => {
+      appLock.isPinSet.mockResolvedValue(true);
+      confirmDialog.confirmDestructive.mockResolvedValue(true);
+      appLock.clearAppLock.mockRejectedValueOnce(new Error("keystore error"));
+      const root = renderGate();
+      await flush();
+
+      await act(async () => {
+        findKey(root, "Forgot PIN?").props.onPress?.();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(appLock.clearAppLock).toHaveBeenCalledTimes(1);
+      expect(authMock.logout).toHaveBeenCalledTimes(1);
+      expect(routerMock.replace).toHaveBeenCalledWith("/login");
+    });
+
     it("aborts the sign-out when clearing the account-linked PIN fails, rather than stranding the account (round-3 review T2)", async () => {
-      // logout() wipes the local PIN, so signing out after a failed clear
-      // would leave users.pinHash set with no device holding a local copy —
-      // and every exit from that state is closed (one-directional reconcile,
+      // handleForgotPin clears the local PIN itself now (logout() no longer
+      // does), so signing out after a failed server-side clear would leave
+      // users.pinHash set with no device holding a local copy — and every
+      // exit from that state is closed (one-directional reconcile,
       // assertCurrentPinProof on re-enable, disable branch needs the missing
       // PIN). Staying locked and asking for a retry is the recoverable branch.
       appLock.isPinSet.mockResolvedValue(true);

@@ -1,6 +1,5 @@
 import * as Api from "@/lib/_core/api";
 import * as Auth from "@/lib/_core/auth";
-import { clearAppLock } from "@/lib/app-lock";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 
@@ -84,7 +83,17 @@ export function useAuth(options?: UseAuthOptions) {
         err instanceof Error ? err : new Error("Failed to fetch user");
 
       setError(error);
-      setUser(null);
+      // A thrown error here means the *network attempt itself* failed —
+      // `Api.getMe()` returns `null` only on 401/403 and rethrows everything
+      // else (SP-D07) — it is not the server rejecting the session. Treating
+      // it as a sign-out is exactly what local-first-sync-plan.md calls out:
+      // "a network failure is treated as a rejected session." Reached on web
+      // (which has no cache fast-path and hits the network on every fetch)
+      // and on native in the narrow window of a stored token with nothing
+      // cached yet. Keep whatever identity is already on disk instead of
+      // wiping it — sync is unreachable, not the session.
+      const cached = await Auth.getUserInfo();
+      setUser(cached);
     } finally {
       setLoading(false);
     }
@@ -99,21 +108,17 @@ export function useAuth(options?: UseAuthOptions) {
     } finally {
       await Auth.removeSessionToken();
       await Auth.clearUserInfo();
-      try {
-        // Cleared here (not at each sign-out call site) so every path —
-        // Settings, Forgot PIN, any future one — clears a device-local PIN
-        // that would otherwise belong to nobody after the next sign-in.
-        //
-        // Deliberately local-only: this used to also clear the account-linked
-        // server PIN, but logout() is *every* sign-out, not just Forgot PIN —
-        // that wiped a shared account PIN on an ordinary "Sign out" tap on
-        // any device (round-2 review R2). The account-linked PIN is cleared
-        // by the Forgot-PIN flow specifically (components/app-lock-gate.tsx),
-        // which is the one path defined by the user not knowing the PIN.
-        await clearAppLock();
-      } catch (err) {
-        console.error("[Auth] Failed to clear app lock:", err);
-      }
+      // Local-first inversion (local-first-sync-plan.md): this used to also
+      // call clearAppLock() here, on the reasoning that the app requires an
+      // account and a PIN left behind after sign-out "would belong to nobody
+      // after the next sign-in." That premise no longer holds — the PIN
+      // belongs to the device and its local user, not to the account, and
+      // there is always a local user to own it. Disconnecting an account
+      // must not wipe the lock protecting data that stays on the phone, so
+      // an ordinary sign-out here leaves it untouched. The Forgot-PIN flow
+      // (components/app-lock-gate.tsx's handleForgotPin) clears it
+      // explicitly instead, since that path — and only that path — is
+      // defined by the user not knowing the PIN.
       setUser(null);
       setError(null);
     }

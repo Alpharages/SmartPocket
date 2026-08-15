@@ -1,12 +1,15 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
-
 import { ENV } from "./env";
+import {
+  decryptWithKey,
+  encryptWithKey,
+  isEncryptedCardNumber,
+  maskCardNumber,
+} from "./card-cipher";
+import { base64ToBytes, hexToBytes } from "../../shared/base64";
 
-const ALGORITHM = "aes-256-gcm";
-const IV_LENGTH = 12;
-const VERSION_PREFIX = "v1:";
+export { isEncryptedCardNumber, maskCardNumber };
 
-function parseEncryptionKey(raw: string): Buffer {
+function parseEncryptionKey(raw: string): Uint8Array {
   if (!raw) {
     throw new Error(
       "CARD_ENCRYPTION_KEY is not set — card numbers cannot be encrypted at rest",
@@ -14,10 +17,10 @@ function parseEncryptionKey(raw: string): Buffer {
   }
 
   if (/^[0-9a-fA-F]{64}$/.test(raw)) {
-    return Buffer.from(raw, "hex");
+    return hexToBytes(raw);
   }
 
-  const decoded = Buffer.from(raw, "base64");
+  const decoded = base64ToBytes(raw);
   if (decoded.length === 32) {
     return decoded;
   }
@@ -27,65 +30,28 @@ function parseEncryptionKey(raw: string): Buffer {
   );
 }
 
-function getEncryptionKey(): Buffer {
+function getEncryptionKey(): Uint8Array {
   return parseEncryptionKey(ENV.cardEncryptionKey);
 }
 
-export function isEncryptedCardNumber(stored: string): boolean {
-  return stored.startsWith(VERSION_PREFIX);
-}
-
-/** Encrypt a plaintext PAN for storage. Idempotent when already encrypted. */
-export function encryptCardNumber(plain: string): string {
-  if (isEncryptedCardNumber(plain)) {
-    return plain;
-  }
-
-  const key = getEncryptionKey();
-  const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGORITHM, key, iv);
-  const ciphertext = Buffer.concat([
-    cipher.update(plain, "utf8"),
-    cipher.final(),
-  ]);
-  const authTag = cipher.getAuthTag();
-
-  return `${VERSION_PREFIX}${iv.toString("base64")}:${authTag.toString("base64")}:${ciphertext.toString("base64")}`;
+/**
+ * Encrypt a plaintext PAN for storage. Idempotent when already encrypted.
+ *
+ * Async to match `crypto.native.ts`'s signature — the device build resolves
+ * its key from `expo-secure-store`, which has no synchronous read API, so
+ * both platforms present the same `Promise`-returning shape and every call
+ * site in `server/db.ts` awaits either one unmodified. The server's own key
+ * lookup (an env var) is synchronous; wrapping it in `Promise.resolve` here
+ * costs nothing.
+ */
+export async function encryptCardNumber(plain: string): Promise<string> {
+  return encryptWithKey(plain, getEncryptionKey());
 }
 
 /**
- * Decrypt a stored card number. Legacy plaintext rows (pre-migration) pass through.
+ * Decrypt a stored card number. Legacy plaintext rows (pre-migration) pass
+ * through unchanged. See `encryptCardNumber` for why this is async.
  */
-/** Return only the last four digits of a plaintext PAN for API/UI responses. */
-export function maskCardNumber(plain: string): string {
-  const trimmed = plain.trim();
-  if (!trimmed) {
-    return "";
-  }
-  return trimmed.slice(-4);
-}
-
-export function decryptCardNumber(stored: string): string {
-  if (!isEncryptedCardNumber(stored)) {
-    return stored;
-  }
-
-  const payload = stored.slice(VERSION_PREFIX.length);
-  const parts = payload.split(":");
-  if (parts.length !== 3) {
-    throw new Error("Invalid encrypted card number format");
-  }
-
-  const [ivB64, authTagB64, ciphertextB64] = parts;
-  const key = getEncryptionKey();
-  const iv = Buffer.from(ivB64, "base64");
-  const authTag = Buffer.from(authTagB64, "base64");
-  const ciphertext = Buffer.from(ciphertextB64, "base64");
-
-  const decipher = createDecipheriv(ALGORITHM, key, iv);
-  decipher.setAuthTag(authTag);
-  return Buffer.concat([
-    decipher.update(ciphertext),
-    decipher.final(),
-  ]).toString("utf8");
+export async function decryptCardNumber(stored: string): Promise<string> {
+  return decryptWithKey(stored, getEncryptionKey());
 }
