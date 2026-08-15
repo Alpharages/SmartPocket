@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import {
   AccessibilityInfo,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -20,6 +20,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
   runOnJS,
+  useAnimatedKeyboard,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -83,6 +84,30 @@ export function Sheet({
   const translateY = useSharedValue(screenHeight);
   const backdropOpacity = useSharedValue(0);
   const dragOffset = useSharedValue(0);
+  // SP-101: the app is edge-to-edge (`edgeToEdgeEnabled` in app.config.ts), so
+  // Android no longer resizes the window for the IME and `adjustResize` is a
+  // no-op — a `KeyboardAvoidingView` inside the panel therefore received no
+  // inset and the keyboard simply covered the sheet, Save button included. The
+  // sheet consumes the IME inset itself instead, which also works inside the
+  // RN `Modal` window (which never inherited `adjustResize` in the first place)
+  // and on iOS.
+  const keyboard = useAnimatedKeyboard();
+  // Reanimated's keyboard hook reads the *activity* window's IME inset, which
+  // a React Native `Modal` (its own Dialog window) never sees — so the plain JS
+  // `Keyboard` events are tracked alongside it and the larger of the two wins.
+  const jsKeyboardHeight = useSharedValue(0);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (e) => {
+      jsKeyboardHeight.value = e.endCoordinates.height;
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      jsKeyboardHeight.value = 0;
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [jsKeyboardHeight]);
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotionEnabled);
@@ -210,9 +235,21 @@ export function Sheet({
     opacity: backdropOpacity.value,
   }));
 
-  const panelStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value + dragOffset.value }],
-  }));
+  const basePaddingBottom = Math.max(insets.bottom, Spacing.lg);
+
+  const panelStyle = useAnimatedStyle(() => {
+    const kb = Math.max(keyboard.height.value, jsKeyboardHeight.value);
+    return {
+      transform: [{ translateY: translateY.value + dragOffset.value }],
+      // Grow the bottom-anchored panel by the keyboard height so its content
+      // ends above the IME instead of behind it. The safe-area inset is
+      // subsumed by the keyboard while it is up, so don't add both.
+      paddingBottom: kb > 0 ? Spacing.lg + kb : basePaddingBottom,
+      // Cap the *visible* area at 90% of what's left above the keyboard, so a
+      // tall sheet still scrolls internally rather than running off the top.
+      maxHeight: snapToContent ? undefined : (screenHeight - kb) * 0.9 + kb,
+    };
+  });
 
   // "aria-modal" is a React Native Web HTML attribute, not a ViewStyle key —
   // so it must be spread as a *prop*, never merged into `style`. It was being
@@ -257,11 +294,10 @@ export function Sheet({
         {...panelWebProps}
         style={[
           {
-            // Height cap lives in the style layer (not className) so it holds
-            // on web, where NativeWind classes are unreliable on animated
-            // hosts; flexShrink lets the content area compress to this cap so
-            // an inner ScrollView gets a bounded height and can scroll.
-            maxHeight: snapToContent ? undefined : "90%",
+            // Height cap and bottom padding are keyboard-aware and live in
+            // `panelStyle` (see SP-101); flexShrink lets the content area
+            // compress to that cap so an inner ScrollView gets a bounded
+            // height and can scroll.
             // ponytail: panel stays opaque colors.surface, not GlassSurface —
             // GlassSurface is a plain (non-Animated) View, and this panel's
             // translateY/drag gesture must stay on the real Animated.View to
@@ -273,7 +309,6 @@ export function Sheet({
             borderTopRightRadius: Radius.lg,
             paddingTop: Spacing.sm,
             paddingHorizontal: Spacing.lg,
-            paddingBottom: Math.max(insets.bottom, Spacing.lg),
             width: "100%",
             maxWidth: Platform.OS === "web" ? panelMaxWidth : undefined,
             alignSelf: Platform.OS === "web" ? "center" : undefined,
@@ -328,15 +363,9 @@ export function Sheet({
           </Pressable>
         </View>
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={0}
-          style={{ flexShrink: 1 }}
-        >
-          <View style={{ flexShrink: 1 }} testID={`${testID}-content`}>
-            {children}
-          </View>
-        </KeyboardAvoidingView>
+        <View style={{ flexShrink: 1 }} testID={`${testID}-content`}>
+          {children}
+        </View>
       </Animated.View>
     </GestureDetector>
   );

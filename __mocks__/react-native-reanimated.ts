@@ -30,6 +30,14 @@ export const withRepeat = (
 // The real reanimated hook returns a boolean, not a SharedValue.
 export const useReducedMotion = () => false;
 
+// Sheet.tsx reads `keyboard.height.value` to lift itself above the IME
+// (SP-101). No keyboard exists under the test renderer, so report 0 — the
+// same shape the real hook returns.
+export const useAnimatedKeyboard = () => ({
+  height: { value: 0 },
+  state: { value: 0 },
+});
+
 export const Easing = {
   linear: (t: number) => t,
   ease: (t: number) => t,

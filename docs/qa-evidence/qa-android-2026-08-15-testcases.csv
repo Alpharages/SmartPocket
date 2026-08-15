@@ -1,0 +1,58 @@
+TC ID,Module,Scenario,Test Type,Test Data,Expected Result,Actual Result,Evidence Tag,Status,Linked Bug ID
+TC-001,Dashboard,Cold start reaches the Dashboard with seeded data,Smoke,dev auto-login,Dashboard renders with balance hero and recent activity,Dashboard rendered with 4 recent rows,[Verified],Pass,
+TC-002,Dashboard,dp audit of every node,UI,n/a,No node below 44dp; no overlap; nothing out of bounds,CLEAN,[Verified],Pass,
+TC-003,Dashboard,Hero renders the theme gradient,UI,Aurora light,Indigo->violet->cyan gradient,Flat #818CF8 solid fill,[Verified],Fail,SP-105
+TC-004,Activity,List renders one line per transaction,Regression,5 rows,Row 56-68dp with amount beside the title,67.2-68.3dp measured across 5 rows,[Verified],Pass,
+TC-005,Activity,Filter pill touch targets and checked state,Accessibility,All/Income/Expense/This Month/This Week,44dp targets; selected pill announces as checked,RadioButton + checkable + checked correct; All chip 42.7dp wide,[Verified],Fail,SP-110
+TC-006,Activity,Search field touch target,Accessibility,n/a,>=44dp,265.6x42.7dp,[Verified],Fail,SP-108
+TC-007,Activity,Pull to refresh picks up new data,Functional,transaction created via API,New row appears,Row appeared after pull-to-refresh,[Verified],Pass,
+TC-008,Insights,Trend chart renders with axis labels,Regression,6 months,Full chart with Mar-Aug labels,Chart and labels fully visible,[Verified],Pass,
+TC-009,Insights,dp audit,UI,n/a,No violations,CLEAN,[Verified],Pass,
+TC-010,Loans,List and detail render,Functional,1 loan,Loan list and detail load,Both loaded; dp audit clean,[Verified],Pass,
+TC-011,Cards,List and detail render,Functional,2 cards,Card list and detail load,Both loaded; dp audit clean,[Verified],Pass,
+TC-012,Sheets,Currency picker renders as a modal sheet,UI,Settings -> Currency,Opaque panel with radius padding and a dimmed backdrop,Transparent unpadded panel with no backdrop; Settings legible through it,[Verified],Fail,SP-100
+TC-013,Sheets,Accessibility tree while a transparentModal sheet is open,Accessibility,Add Transaction via FAB,Content behind is not reachable,Underlying screen buttons present with content-desc,[Verified],Fail,SP-104
+TC-014,Sheets,Keyboard does not cover the sheet body,UX,Add account -> focus name,Content and Save stay above the keyboard,Panel did not move; name field chips currency Cancel and Save all hidden,[Verified],Fail,SP-101
+TC-015,Sheets,Sheet layout restores after keyboard close,UI,Add account,Layout identical before and after,26 nodes identical before and after,[Verified],Pass,
+TC-016,Sheets,Hardware back closes only the sheet,Navigation,Add account open,Sheet closes; screen beneath stays,Returned to Accounts not Dashboard,[Verified],Pass,
+TC-017,Sheets,Footer buttons split the row evenly,Regression,Cancel/Save,Equal width flex-1 buttons,Equal halves on every sheet,[Verified],Pass,
+TC-018,Transaction detail,Account picker rows meet 44dp,Accessibility,3 account rows,>=44dp,306.1x41.1dp,[Verified],Fail,SP-112
+TC-019,Transaction detail,Edit sheet opens and fields are editable,Functional,transaction 19,Edit sheet with populated fields,Opened with amount date and note populated,[Verified],Pass,
+TC-020,Forms,Every TextInput meets 44dp,Accessibility,all forms,>=44dp,41.6-42.7dp on every field,[Verified],Fail,SP-108
+TC-021,Forms,Colour swatch buttons meet 44dp,Accessibility,category and card forms,>=44dp,42.1x42.1dp,[Verified],Fail,SP-109
+TC-022,Categories,Create a category,Functional CRUD,"name QA Temp Cat, expense",Category created and listed,Created and visible in list,[Verified],Pass,
+TC-023,Categories,Delete a category,Functional CRUD,QA Temp Cat,Confirm then removed from UI and DB,Removed from both,[Verified],Pass,
+TC-024,Budgets,Create a budget,Regression,Groceries monthly 300,Budget created and listed,Persisted id 1 monthly 300.00,[Verified],Pass,
+TC-025,Toast,Success toast on create,UI,budget created,Toast shown without obscuring navigation,"Toast shown; covers the header title and back button",[Verified],Fail,SP-114
+TC-026,Toast,Error toast on failure,UI,PIN sync failure,Error toast with clear message,PIN saved on this device but couldnt sync to your account,[Verified],Pass,
+TC-027,Destructive confirms,Native Alert.alert delete,Functional,transaction 20,Dialog then record deleted,Dialog shown; DELETE removed the record from the DB; destructive action has no visual weight on Android,[Verified],Fail,SP-115
+TC-028,Accounts,Create an account,Functional CRUD,QA Throwaway cash PKR,Account created,Created; visible in UI and DB,[Verified],Pass,
+TC-029,Accounts,Delete an account completes,Regression,QA Throwaway,Confirm then removed,Removed from UI and DB,[Verified],Pass,
+TC-030,Security,App Lock switch touch target,Accessibility,n/a,>=44dp,46.9x27.2dp,[Verified],Fail,SP-111
+TC-031,App Lock,Accessibility tree while locked,Security,PIN set; app backgrounded,No protected content reachable,146 nodes with 16 carrying balances and transaction amounts,[Verified],Fail,SP-102
+TC-032,App Lock,PIN persists across a force-stop cold start,Security,PIN 1234,Gate shown on relaunch,Gate shown; SecureStore persisted the PIN,[Verified],Pass,
+TC-033,App Lock,Repeated wrong PIN triggers a lockout,Security negative,12 wrong attempts,Lockout or escalating delay,12 attempts in 14s with no lockout delay or counter,[Verified],Fail,SP-103
+TC-034,App Lock,PIN confirmation mismatch is caught,Negative,1234 then 1235,Error and retry,PINs didnt match. Try again.,[Verified],Pass,
+TC-035,App Lock,Forgot PIN signs out and clears the PIN,Functional,Forgot PIN -> Sign Out,Signed out; PIN cleared; re-auth,Signed out; PIN cleared; dev auto-login returned to Dashboard,[Verified],Pass,
+TC-036,Dynamic Type,Dashboard at 200% font,Accessibility,font_scale 2.0 cold start,No clipping or wrapped figures,Headings and labels fine; balance hero wraps mid-number,[Verified],Fail,SP-106
+TC-037,Dynamic Type,PIN pad at 200% font,Accessibility,font_scale 2.0 cold start,Digits legible,All digits fully legible,[Verified],Pass,
+TC-038,Haptics,Press and tab haptics fire,UX,haptic_feedback_enabled 1,Vibration on press,No expo-haptics vibrator events; both call sites gate on iOS,[Verified],Fail,SP-107
+TC-039,Rotation,Portrait lock is enforced,Compatibility,accelerometer_rotation 1,Stays portrait,Activity stayed port / ROTATION_0,[Verified],Pass,
+TC-040,Themes,Three themes x two schemes render correctly,UI,aurora/obsidian/spectrum x light/dark,Coherent theming with semantic income/expense preserved,All six combinations correct; hero gradient degraded in all,[Verified],Fail,SP-105
+TC-041,dev/theme-lab,Device tier override applies to mounted surfaces,Dev tooling,force tier high,Mounted surfaces re-render at full fidelity,Panel readout changed but the Dashboard hero stayed on the fallback,[Verified],Fail,SP-117
+TC-042,Navigation,Deep links reach the requested route,Functional,manusexpensetrackerapp://security,Route opens,Landed on Dashboard repeatedly; linking-configured-twice error logged,[Verified],Fail,SP-116
+TC-043,Stability,logcat is clean at rest,Non-functional,idle app,No warnings or errors,SafeAreaView deprecation warning from a dependency,[Verified],Fail,SP-118
+TC-044,Recurring,Create a recurring rule,Regression,monthly 55.00 Groceries,Rule created,Persisted id 1 monthly 55.00,[Verified],Pass,
+TC-045,Recurring,Frequency and Ends chips align with other controls,Regression,new rule sheet,Chips at the same inset as labels,Chips at x=16dp matching labels and fields,[Verified],Pass,
+TC-046,Add Transaction,Labels are not clipped,Regression,sheet open,Transaction Type renders in full,Rendered in full,[Verified],Pass,
+TC-047,Cards,Card type chips meet 44dp,Regression,add card sheet,>=44dp,170.1x43.7 and 171.2x43.7dp,[Verified],Pass,
+TC-048,Loans,Direction and periodicity chips meet 44dp,Regression,new loan sheet,>=44dp,Direction 44.3dp; periodicity 43.7dp,[Verified],Pass,
+TC-049,Date picker,Native date picker opens and applies,Functional,transaction edit,Dialog opens and sets the date,Opened; selecting 22 Jul set 2026-07-22,[Verified],Pass,
+TC-050,Buttons,Icon renders beside the label not stacked,Regression,Budgets and Expense/Income chips,Icon beside label,Icon beside label on all,[Verified],Pass,
+TC-051,Notifications,Loan reminder schedules and delivers,Functional,loan 1 due 2026-08-27,Notification scheduled and delivered,Not implemented (FR-19 planned / AR-5 not wired); permission never requested; no scheduled alarms,[Untested],Blocked,
+TC-052,Login,OAuth sign-in flow,Functional,n/a,Sign in completes,No OAuth issuer available in this environment,[Untested],Blocked,
+TC-053,Biometrics,Face unlock authenticates,Security,Face unlock enabled,Biometric prompt unlocks the app,Toggle and persistence verified; the OS prompt cannot be satisfied by automation,[Untested],Blocked,
+TC-054,TalkBack,Focus order and announcements,Accessibility,n/a,Logical focus order and correct announcements,Accessibility tree inspected only; screen reader not run,[Untested],Not Tested,
+TC-055,Import/Export,CSV import and CSV/JSON export end to end,Functional,n/a,File imported/exported,Overlays opened and audited; no file transferred,[Untested],Not Tested,
+TC-056,Forms,Negative and boundary input validation,Negative/Boundary,long strings special chars duplicates,Rejected with clear errors,Only category and account creation tested negatively,[Untested],Not Tested,
+TC-057,dev/theme-lab,Tier-override buttons meet 44dp,Accessibility,theme-lab perf panel,>=44dp,62.9-82.1 x 33.6dp,[Verified],Fail,SP-113

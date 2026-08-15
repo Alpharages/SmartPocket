@@ -296,6 +296,39 @@ describe("AppLockGate", () => {
     expect(coveredWrapperUnlocked.props.importantForAccessibility).toBe("auto");
   });
 
+  // SP-102: `importantForAccessibility="no-hide-descendants"` above is not
+  // enough on device — React Navigation's native-stack hosts each route in a
+  // react-native-screens container the ancestor flag does not reach, so a
+  // locked app still dumped 146 accessibility nodes including every balance and
+  // transaction amount. `display: "none"` is what actually severs the subtree
+  // (locked dump drops to 53 nodes, 0 sensitive) while keeping it mounted so
+  // the navigator — and `dismissPresentedRoutes()` — survive.
+  it("takes the covered content out of the tree with display:none while locked (SP-102)", async () => {
+    appLock.isPinSet.mockResolvedValue(true);
+    appLock.verifyPin.mockResolvedValue(true);
+    const root = renderGate();
+    await flush();
+
+    const wrapper = root.findAll(
+      (n) =>
+        typeof n.type === "string" &&
+        n.props.importantForAccessibility !== undefined,
+    )[0];
+    expect(StyleSheet.flatten(wrapper.props.style).display).toBe("none");
+
+    enterPin(root, "1234");
+    await flush();
+
+    const unlockedWrapper = root.findAll(
+      (n) =>
+        typeof n.type === "string" &&
+        n.props.importantForAccessibility !== undefined,
+    )[0];
+    expect(StyleSheet.flatten(unlockedWrapper.props.style).display).not.toBe(
+      "none",
+    );
+  });
+
   it("does nothing at all when app lock is unsupported (web)", async () => {
     // isAppLockSupported is read once synchronously to decide initial state;
     // simulate the web case where it returns false up front.

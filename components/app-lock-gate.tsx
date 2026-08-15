@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   BackHandler,
+  StyleSheet,
   Text,
   View,
   type AppStateStatus,
@@ -298,8 +299,27 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      {/*
+        SP-102: `no-hide-descendants` alone does NOT sever the accessibility
+        tree here — measured on a physical device, the locked app still exposed
+        146 nodes including every balance, category and transaction amount
+        ("Salary, income, +Rs 500.00, July 2"), so TalkBack could read the
+        user's finances aloud from behind the lock screen. React Navigation's
+        native-stack hosts each route in a react-native-screens container that
+        the ancestor flag does not reach, and `accessibilityViewIsModal` on the
+        overlay below is iOS-only.
+
+        `display: "none"` is what actually severs it: the subtree leaves layout
+        and the a11y tree (locked dump drops to 53 nodes, 0 sensitive) while
+        React keeps it *mounted* — so the navigator survives and
+        `dismissPresentedRoutes()` above still works on the same still-mounted
+        navigator, exactly as the comment at the top of this file requires.
+        Unmounting `children` instead would close the leak too, but it breaks
+        that contract (`POP_TO_TOP was not handled by any navigator`) and would
+        drop the user's place in the app on every relock.
+      */}
       <View
-        style={{ flex: 1 }}
+        style={state === "locked" ? styles.hidden : styles.host}
         importantForAccessibility={
           state !== "unlocked" ? "no-hide-descendants" : "auto"
         }
@@ -384,3 +404,9 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  host: { flex: 1 },
+  // SP-102 — see the comment at the render site.
+  hidden: { flex: 1, display: "none" },
+});

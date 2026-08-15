@@ -164,14 +164,32 @@ describe("Sheet", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("wraps content in KeyboardAvoidingView with iOS padding behavior", () => {
-    const root = render(
-      <Sheet visible onClose={vi.fn()} title="T">
-        <></>
-      </Sheet>,
-    );
-    const kav = root.find((n) => String(n.type) === "KeyboardAvoidingView");
-    expect(kav.props.behavior).toBe("padding");
+  // SP-101: the sheet used to delegate keyboard avoidance to a
+  // KeyboardAvoidingView, which is inert on Android under `edgeToEdgeEnabled`
+  // (the window is never resized) and inside a RN `Modal` (its own window never
+  // inherited `adjustResize`). On device the keyboard simply covered the sheet,
+  // Save button included. The panel now consumes the IME inset itself, so the
+  // contract to protect is "panel grows by the keyboard height", not "a KAV is
+  // present".
+  it("lifts the panel above the keyboard by its height", () => {
+    const spy = vi
+      .spyOn(Reanimated, "useAnimatedKeyboard")
+      .mockReturnValue({ height: { value: 300 }, state: { value: 2 } } as never);
+    try {
+      const root = render(
+        <Sheet visible onClose={vi.fn()} title="T">
+          <></>
+        </Sheet>,
+      );
+      const panel = findByTestId(root, "smartpocket-sheet-panel");
+      const flat = Array.isArray(panel.props.style)
+        ? Object.assign({}, ...panel.props.style.filter(Boolean))
+        : panel.props.style;
+      // base 16dp gutter + the 300 the keyboard occupies
+      expect(flat.paddingBottom).toBe(316);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("applies bottom safe-area padding via panel style", () => {
