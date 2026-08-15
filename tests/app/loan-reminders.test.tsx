@@ -7,8 +7,8 @@ const mocks = vi.hoisted(() => {
   const refetch = vi.fn().mockResolvedValue({ data: [] });
   const settingsData = { aiEnabled: false, remindersEnabled: true };
   const sampleLoan = {
-    id: 5,
-    userId: 1,
+    id: "00000000000000000000000005",
+    userId: "00000000000000000000000001",
     direction: "borrow" as const,
     counterparty: null,
     principal: "100.00",
@@ -160,6 +160,7 @@ vi.mock("@/lib/trpc", () => ({
 }));
 
 import { ExpenseProvider, useExpense } from "@/lib/expense-context";
+import { testId, syncColumns } from "../helpers/ids";
 
 function SyncProbe({
   onLoansLoaded,

@@ -8,9 +8,10 @@ import TestRenderer, {
 
 import LoanDetailScreen from "@/app/loan/loan-detail-screen";
 import { useLoanDetail } from "@/lib/expense-context";
+import { testId, syncColumns } from "../helpers/ids";
 
 const mockBack = vi.fn();
-const mockUseLocalSearchParams = vi.fn(() => ({ id: "1" }));
+const mockUseLocalSearchParams = vi.fn(() => ({ id: testId(1) }));
 const mockFormatCurrency = vi.hoisted(() =>
   vi.fn((amount: number, code?: string) => {
     const symbol = code === "EUR" ? "€" : "$";
@@ -111,8 +112,8 @@ vi.mock("@/components/ui/StatCard", () => ({
 }));
 
 const mockLoanDetail = {
-  id: 1,
-  userId: 1,
+  id: testId(1),
+  userId: testId(1),
   direction: "lend" as const,
   counterparty: "Alex",
   principal: "1000.00",
@@ -128,9 +129,9 @@ const mockLoanDetail = {
   remainingBalance: "600.00",
   repayments: [
     {
-      id: 1,
-      loanId: 1,
-      userId: 1,
+      id: testId(1),
+      loanId: testId(1),
+      userId: testId(1),
       amount: "250.00",
       date: new Date("2026-05-01T00:00:00.000Z"),
       note: "First payment",
@@ -138,9 +139,9 @@ const mockLoanDetail = {
       updatedAt: new Date(),
     },
     {
-      id: 2,
-      loanId: 1,
-      userId: 1,
+      id: testId(2),
+      loanId: testId(1),
+      userId: testId(1),
       amount: "150.00",
       date: new Date("2026-04-01T00:00:00.000Z"),
       note: null,
@@ -171,7 +172,7 @@ describe("LoanDetailScreen", () => {
   beforeEach(() => {
     mockCurrency.current = "USD";
     mockFormatCurrency.mockClear();
-    mockUseLocalSearchParams.mockReturnValue({ id: "1" });
+    mockUseLocalSearchParams.mockReturnValue({ id: testId(1) });
     vi.mocked(useLoanDetail).mockReturnValue({
       loanDetail: mockLoanDetail,
       loadingLoanDetail: false,
@@ -252,7 +253,7 @@ describe("LoanDetailScreen", () => {
   it("does not fetch with an invalid route id", () => {
     mockUseLocalSearchParams.mockReturnValue({ id: "abc" });
     renderScreen();
-    expect(useLoanDetail).toHaveBeenCalledWith(Number.NaN);
+    expect(useLoanDetail).toHaveBeenCalledWith(null);
   });
 
   it("shows Settled next due label for settled loans", () => {

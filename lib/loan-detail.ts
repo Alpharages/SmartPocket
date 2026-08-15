@@ -16,9 +16,7 @@ type LoanScheduleFields = Pick<
  * `if (!id)` would have silently accepted it. `null` makes the invalid case
  * impossible to use by accident.
  */
-export function parseLoanRouteId(
-  id: string | string[] | undefined,
-): Id | null {
+export function parseLoanRouteId(id: string | string[] | undefined): Id | null {
   const raw = Array.isArray(id) ? id[0] : id;
   return isUlid(raw) ? raw : null;
 }

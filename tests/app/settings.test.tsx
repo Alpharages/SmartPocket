@@ -7,6 +7,7 @@ import TestRenderer, {
 } from "react-test-renderer";
 
 import SettingsScreen from "@/app/settings";
+import { testId, syncColumns } from "../helpers/ids";
 
 const mockBack = vi.fn();
 const mockPush = vi.fn();
@@ -151,7 +152,7 @@ vi.mock("@/lib/expense-context", () => ({
 // Settings now surfaces the signed-in identity and a Sign out action (SP-024).
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({
-    user: { id: 1, name: "Dev User", email: "dev@localhost" },
+    user: { id: testId(1), name: "Dev User", email: "dev@localhost" },
     loading: false,
     isAuthenticated: true,
     logout: vi.fn().mockResolvedValue(undefined),

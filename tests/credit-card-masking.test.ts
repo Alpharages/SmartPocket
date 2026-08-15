@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { testId, syncColumns } from "./helpers/ids";
 
 const TEST_KEY_HEX =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -10,8 +11,8 @@ vi.mock("@/server/_core/dataApi", () => ({
 }));
 
 const baseRow = {
-  id: 1,
-  userId: 1,
+  id: testId(1),
+  userId: testId(1),
   name: "Test",
   cardholderName: "Tester",
   expiryMonth: 12,
@@ -39,7 +40,7 @@ describe("credit card response masking", () => {
     ]);
 
     const { getUserCreditCards } = await import("@/server/db");
-    const cards = await getUserCreditCards(1);
+    const cards = await getUserCreditCards(testId(1));
 
     expect(cards).toHaveLength(1);
     expect(cards[0]?.cardNumberLast4).toBe("1111");
@@ -52,7 +53,7 @@ describe("credit card response masking", () => {
     ]);
 
     const { getCreditCardById } = await import("@/server/db");
-    const card = await getCreditCardById(1, 1);
+    const card = await getCreditCardById(testId(1), testId(1));
 
     expect(card?.cardNumberLast4).toBe("4444");
     expect(card && "cardNumber" in card).toBe(false);
@@ -62,12 +63,12 @@ describe("credit card response masking", () => {
     callDataApi
       .mockResolvedValueOnce({ insertId: 42 })
       .mockResolvedValueOnce([
-        { ...baseRow, id: 42, cardNumber: "4111111111111111" },
+        { ...baseRow, id: testId(42), cardNumber: "4111111111111111" },
       ]);
 
     const { createCreditCard } = await import("@/server/db");
     const created = await createCreditCard({
-      userId: 1,
+      userId: testId(1),
       name: "Test",
       cardNumber: "4111111111111111",
       cardholderName: "Tester",
@@ -90,7 +91,9 @@ describe("credit card response masking", () => {
       ]);
 
     const { updateCreditCard } = await import("@/server/db");
-    const updated = await updateCreditCard(1, 1, { name: "Renamed" });
+    const updated = await updateCreditCard(testId(1), testId(1), {
+      name: "Renamed",
+    });
 
     expect(updated?.cardNumberLast4).toBe("0005");
     expect(updated && "cardNumber" in updated).toBe(false);

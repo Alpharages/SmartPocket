@@ -69,9 +69,7 @@ export default function SummaryScreen() {
   } = useExpense();
   const { isLg } = useBreakpoints();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedCategoryId, setSelectedCategoryId] = useState<Id | null>(
-    null,
-  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState<Id | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;

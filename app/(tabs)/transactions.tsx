@@ -302,9 +302,9 @@ export default function TransactionsScreen() {
   } = useExpense();
   const [searchText, setSearchText] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
-  const [selectedTransactionId, setSelectedTransactionId] = useState<
-    Id | null
-  >(null);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<Id | null>(
+    null,
+  );
   // Same active-theme token source the surface primitives read — never
   // the theme-agnostic useColors() (frozen to the default theme; AC1).
   const { colors } = useThemeTokens();

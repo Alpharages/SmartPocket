@@ -12,10 +12,12 @@ const dbMock = vi.hoisted(() => ({
 vi.mock("@/server/db", () => dbMock);
 
 import { appRouter } from "@/server/routers";
+import type { Id } from "@/drizzle/schema";
+import { testId, syncColumns } from "./helpers/ids";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
-function createUserContext(userId: number): TrpcContext {
+function createUserContext(userId: Id): TrpcContext {
   const user: AuthenticatedUser = {
     id: userId,
     openId: `user-${userId}`,
@@ -41,7 +43,7 @@ function createUserContext(userId: number): TrpcContext {
 }
 
 const validCreateInput = {
-  categoryId: 1,
+  categoryId: testId(1),
   type: "expense" as const,
   amount: "50.00",
   frequency: "monthly" as const,
@@ -61,7 +63,7 @@ describe("recurringTransactions router", () => {
   });
 
   it("creates a recurring transaction scoped to ctx.user.id", async () => {
-    const caller = appRouter.createCaller(createUserContext(42));
+    const caller = appRouter.createCaller(createUserContext(testId(42)));
     const startDate = validCreateInput.startDate;
 
     await caller.recurringTransactions.create({
@@ -72,14 +74,14 @@ describe("recurringTransactions router", () => {
 
     expect(dbMock.createRecurringTransaction).toHaveBeenCalledWith(
       expect.objectContaining({
-        userId: 42,
+        userId: testId(42),
         nextRunDate: startDate,
       }),
     );
   });
 
   it("rejects count endCondition without occurrenceCount", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(
       caller.recurringTransactions.create({
@@ -90,7 +92,7 @@ describe("recurringTransactions router", () => {
   });
 
   it("rejects endDate endCondition when endDate is not after startDate", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     const startDate = new Date("2026-06-17T00:00:00.000Z");
 
     await expect(
@@ -104,7 +106,7 @@ describe("recurringTransactions router", () => {
   });
 
   it("rejects zero interval", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(
       caller.recurringTransactions.create({
@@ -115,7 +117,7 @@ describe("recurringTransactions router", () => {
   });
 
   it("rejects invalid amount precision", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(
       caller.recurringTransactions.create({
@@ -126,27 +128,33 @@ describe("recurringTransactions router", () => {
   });
 
   it("user B cannot see or mutate user A recurrence", async () => {
-    const callerB = appRouter.createCaller(createUserContext(2));
+    const callerB = appRouter.createCaller(createUserContext(testId(2)));
 
     await expect(callerB.recurringTransactions.list()).resolves.toEqual([]);
-    expect(dbMock.getUserRecurringTransactions).toHaveBeenCalledWith(2);
+    expect(dbMock.getUserRecurringTransactions).toHaveBeenCalledWith(testId(2));
 
     await expect(
-      callerB.recurringTransactions.getById({ id: 5 }),
+      callerB.recurringTransactions.getById({ id: testId(5) }),
     ).resolves.toBeNull();
-    expect(dbMock.getRecurringTransactionById).toHaveBeenCalledWith(5, 2);
+    expect(dbMock.getRecurringTransactionById).toHaveBeenCalledWith(
+      testId(5),
+      testId(2),
+    );
 
     await callerB.recurringTransactions.update({
-      id: 5,
+      id: testId(5),
       ...validCreateInput,
     });
     expect(dbMock.updateRecurringTransaction).toHaveBeenCalledWith(
-      5,
-      2,
+      testId(5),
+      testId(2),
       expect.any(Object),
     );
 
-    await callerB.recurringTransactions.delete({ id: 5 });
-    expect(dbMock.deleteRecurringTransaction).toHaveBeenCalledWith(5, 2);
+    await callerB.recurringTransactions.delete({ id: testId(5) });
+    expect(dbMock.deleteRecurringTransaction).toHaveBeenCalledWith(
+      testId(5),
+      testId(2),
+    );
   });
 });

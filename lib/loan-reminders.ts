@@ -89,10 +89,7 @@ export function overdueReminderTriggerAt(now: Date = new Date()): Date {
 }
 
 /** @deprecated Use dueReminderTriggerAt */
-export function reminderTriggerAt(
-  dueDate: Date,
-  now: Date = new Date(),
-): Date {
+export function reminderTriggerAt(dueDate: Date, now: Date = new Date()): Date {
   return dueReminderTriggerAt(dueDate, now);
 }
 

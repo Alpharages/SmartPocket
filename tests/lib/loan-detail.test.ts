@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { testId } from "../helpers/ids";
 import {
   calculateRemainingBalance,
   formatLoanCounterparty,
@@ -10,15 +11,25 @@ import {
 } from "@/lib/loan-detail";
 
 describe("parseLoanRouteId", () => {
-  it("parses a positive integer id", () => {
-    expect(parseLoanRouteId("42")).toBe(42);
+  it("returns the segment when it is a well-formed ULID", () => {
+    expect(parseLoanRouteId(testId(42))).toBe(testId(42));
+    expect(parseLoanRouteId("01ARZ3NDEKTSV4RRFFQ69G5FAV")).toBe(
+      "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+    );
   });
 
-  it("returns NaN for invalid ids", () => {
-    expect(Number.isNaN(parseLoanRouteId("abc"))).toBe(true);
-    expect(Number.isNaN(parseLoanRouteId("0"))).toBe(true);
-    expect(Number.isNaN(parseLoanRouteId("-1"))).toBe(true);
-    expect(Number.isNaN(parseLoanRouteId(undefined))).toBe(true);
+  it("takes the first segment when the router hands back an array", () => {
+    expect(parseLoanRouteId([testId(42), testId(43)])).toBe(testId(42));
+  });
+
+  it("returns null for anything that is not a ULID", () => {
+    expect(parseLoanRouteId("abc")).toBeNull();
+    // A leftover deep link from before the id migration.
+    expect(parseLoanRouteId("42")).toBeNull();
+    expect(parseLoanRouteId("0")).toBeNull();
+    expect(parseLoanRouteId("-1")).toBeNull();
+    expect(parseLoanRouteId(undefined)).toBeNull();
+    expect(parseLoanRouteId("01ARZ3NDEKTSV4RRFFQ69G5FAL")).toBeNull();
   });
 });
 

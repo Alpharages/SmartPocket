@@ -1,6 +1,9 @@
+import type { Id } from "@/drizzle/schema";
 import { describe, expect, it } from "vitest";
 
 import { devQuery } from "@/server/_core/devDb";
+import { testId } from "./helpers/ids";
+import { isUlid } from "@shared/ulid";
 
 describe("devDb accounts", () => {
   it("inserts and lists accounts", async () => {
@@ -9,19 +12,19 @@ describe("devDb accounts", () => {
         INSERT INTO accounts (userId, name, type, currency, isDefault)
         VALUES (?, ?, ?, ?, ?)
       `,
-      [1, "Cash", "cash", "USD", true],
-    )) as { insertId: number };
+      [testId(1), "Cash", "cash", "USD", true],
+    )) as { insertId: Id };
 
-    expect(insert.insertId).toBeGreaterThan(0);
+    expect(isUlid(insert.insertId)).toBe(true);
 
     const rows = (await devQuery(
-      "SELECT * FROM accounts WHERE userId = ? ORDER BY name",
-      [1],
+      "SELECT * FROM accounts WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
+      [testId(1)],
     )) as Array<Record<string, unknown>>;
 
     expect(rows.some((row) => row.id === insert.insertId)).toBe(true);
     expect(rows.find((row) => row.id === insert.insertId)).toMatchObject({
-      userId: 1,
+      userId: testId(1),
       name: "Cash",
       type: "cash",
       currency: "USD",

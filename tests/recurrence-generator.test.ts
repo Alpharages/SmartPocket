@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { testId, syncColumns } from "./helpers/ids";
 
 const dbMock = vi.hoisted(() => ({
   getDueRecurringTransactions: vi.fn(),
@@ -9,9 +10,9 @@ const dbMock = vi.hoisted(() => ({
 vi.mock("@/server/db", () => dbMock);
 
 const baseRule = {
-  id: 10,
-  userId: 1,
-  categoryId: 2,
+  id: testId(10),
+  userId: testId(1),
+  categoryId: testId(2),
   creditCardId: null,
   type: "expense" as const,
   amount: "50.00",
@@ -98,7 +99,7 @@ describe("recurrenceGenerator", () => {
     dbMock.getDueRecurringTransactions.mockResolvedValue([
       {
         ...baseRule,
-        id: 12,
+        id: testId(12),
         amount: "10.00",
         description: "Coffee",
         endCondition: "count",
@@ -114,7 +115,7 @@ describe("recurrenceGenerator", () => {
     expect(result).toEqual({ processedRules: 1, createdCount: 3 });
     expect(dbMock.createTransaction).toHaveBeenCalledTimes(3);
     expect(dbMock.advanceRecurringTransaction).toHaveBeenCalledWith(
-      12,
+      testId(12),
       expect.objectContaining({
         generatedCount: 3,
         isActive: false,
@@ -130,7 +131,7 @@ describe("recurrenceGenerator", () => {
     dbMock.getDueRecurringTransactions.mockResolvedValue([
       {
         ...baseRule,
-        id: 20,
+        id: testId(20),
         endCondition: "endDate",
         endDate,
         nextRunDate: new Date("2026-06-15T00:00:00.000Z"),
@@ -144,7 +145,7 @@ describe("recurrenceGenerator", () => {
     expect(result.createdCount).toBe(2);
     expect(dbMock.createTransaction).toHaveBeenCalledTimes(2);
     expect(dbMock.advanceRecurringTransaction).toHaveBeenCalledWith(
-      20,
+      testId(20),
       expect.objectContaining({ isActive: false }),
     );
   });

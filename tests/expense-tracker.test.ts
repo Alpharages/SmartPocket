@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { testId, syncColumns } from "./helpers/ids";
 
 /**
  * Expense Tracker API Tests
@@ -14,7 +15,7 @@ describe("Expense Tracker", () => {
   describe("Transactions", () => {
     it("should create a transaction with required fields", () => {
       const transaction = {
-        categoryId: 1,
+        categoryId: testId(1),
         type: "expense" as const,
         amount: "50.00",
         date: new Date(),
@@ -35,7 +36,7 @@ describe("Expense Tracker", () => {
 
     it("should allow optional description field", () => {
       const transaction = {
-        categoryId: 1,
+        categoryId: testId(1),
         type: "expense" as const,
         amount: "25.50",
         description: "Lunch at cafe",
@@ -135,19 +136,19 @@ describe("Expense Tracker", () => {
 
     it("should calculate category-wise spending", () => {
       const expenses = [
-        { categoryId: 1, amount: 50 },
-        { categoryId: 1, amount: 30 },
-        { categoryId: 2, amount: 100 },
+        { categoryId: testId(1), amount: 50 },
+        { categoryId: testId(1), amount: 30 },
+        { categoryId: testId(2), amount: 100 },
       ];
 
-      const categorySpending: { [key: number]: number } = {};
+      const categorySpending: { [key: string]: number } = {};
       expenses.forEach((exp) => {
         categorySpending[exp.categoryId] =
           (categorySpending[exp.categoryId] || 0) + exp.amount;
       });
 
-      expect(categorySpending[1]).toBe(80);
-      expect(categorySpending[2]).toBe(100);
+      expect(categorySpending[testId(1)]).toBe(80);
+      expect(categorySpending[testId(2)]).toBe(100);
     });
 
     it("should calculate spending percentages", () => {
@@ -169,7 +170,7 @@ describe("Expense Tracker", () => {
 
     it("should validate required fields are present", () => {
       const transaction = {
-        categoryId: 1,
+        categoryId: testId(1),
         type: "expense" as const,
         amount: "50.00",
         date: new Date(),

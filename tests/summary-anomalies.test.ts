@@ -1,3 +1,4 @@
+import type { Id } from "@/drizzle/schema";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const callDataApi = vi.fn();
@@ -7,13 +8,14 @@ vi.mock("../server/_core/dataApi", () => ({
 }));
 
 import { getCategoryAnomalies } from "../server/db";
+import { testId } from "./helpers/ids";
 
-const DINING = 1;
-const GROCERIES = 2;
-const NEW_CAT = 3;
+const DINING = testId(1);
+const GROCERIES = testId(2);
+const NEW_CAT = testId(3);
 
 function expense(
-  categoryId: number,
+  categoryId: Id,
   amount: string,
   date: Date,
 ): Record<string, unknown> {
@@ -33,7 +35,7 @@ describe("getCategoryAnomalies", () => {
       expense(DINING, "300", new Date(2026, 3, 10)),
     ]);
 
-    const result = await getCategoryAnomalies(1, 2026, 4, 3);
+    const result = await getCategoryAnomalies(testId(1), 2026, 4, 3);
 
     const dining = result.find((r) => r.categoryId === DINING);
     expect(dining).toMatchObject({
@@ -49,7 +51,7 @@ describe("getCategoryAnomalies", () => {
       expense(NEW_CAT, "250", new Date(2026, 3, 10)),
     ]);
 
-    const result = await getCategoryAnomalies(1, 2026, 4, 3);
+    const result = await getCategoryAnomalies(testId(1), 2026, 4, 3);
 
     const row = result.find((r) => r.categoryId === NEW_CAT);
     expect(row?.isAnomaly).toBe(false);
@@ -61,7 +63,7 @@ describe("getCategoryAnomalies", () => {
       expense(DINING, "500", new Date(2026, 3, 10)),
     ]);
 
-    const result = await getCategoryAnomalies(1, 2026, 4, 3);
+    const result = await getCategoryAnomalies(testId(1), 2026, 4, 3);
 
     expect(result.find((r) => r.categoryId === DINING)?.isAnomaly).toBe(false);
   });
@@ -73,7 +75,7 @@ describe("getCategoryAnomalies", () => {
       expense(DINING, "150", new Date(2026, 3, 10)),
     ]);
 
-    const result = await getCategoryAnomalies(1, 2026, 4, 3, 1.5);
+    const result = await getCategoryAnomalies(testId(1), 2026, 4, 3, 1.5);
 
     expect(result.find((r) => r.categoryId === DINING)?.isAnomaly).toBe(false);
   });
@@ -85,7 +87,7 @@ describe("getCategoryAnomalies", () => {
       expense(GROCERIES, "50", new Date(2026, 3, 10)),
     ]);
 
-    const result = await getCategoryAnomalies(1, 2026, 4, 3);
+    const result = await getCategoryAnomalies(testId(1), 2026, 4, 3);
 
     expect(result.find((r) => r.categoryId === GROCERIES)?.isAnomaly).toBe(
       false,
@@ -100,7 +102,7 @@ describe("getCategoryAnomalies", () => {
       expense(DINING, "300", new Date(2026, 1, 10)),
     ]);
 
-    const result = await getCategoryAnomalies(1, 2026, 2, 3);
+    const result = await getCategoryAnomalies(testId(1), 2026, 2, 3);
 
     expect(result.find((r) => r.categoryId === DINING)?.isAnomaly).toBe(true);
   });
@@ -109,19 +111,25 @@ describe("getCategoryAnomalies", () => {
     // SP-014: silently returning [] made an outage look like clean spending.
     callDataApi.mockRejectedValue(new Error("db down"));
 
-    await expect(getCategoryAnomalies(1, 2026, 4)).rejects.toThrow("db down");
+    await expect(getCategoryAnomalies(testId(1), 2026, 4)).rejects.toThrow(
+      "db down",
+    );
   });
 
   it("scopes the query to the user and date window", async () => {
     callDataApi.mockResolvedValue([]);
 
-    await getCategoryAnomalies(42, 2026, 6, 3);
+    await getCategoryAnomalies(testId(42), 2026, 6, 3);
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
-          "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ?",
-        params: [42, new Date(2026, 2, 1), new Date(2026, 6, 0, 23, 59, 59)],
+          "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",
+        params: [
+          testId(42),
+          new Date(2026, 2, 1),
+          new Date(2026, 6, 0, 23, 59, 59),
+        ],
       },
     });
   });

@@ -6,6 +6,7 @@ import {
   handleLoanNotificationResponse,
   LOAN_REMINDER_DATA_TYPE,
 } from "@/lib/notification-routing";
+import { testId, syncColumns } from "../helpers/ids";
 
 describe("notification-routing", () => {
   it("extracts loan id from loan reminder notification data", () => {
@@ -15,16 +16,32 @@ describe("notification-routing", () => {
           content: {
             data: {
               type: LOAN_REMINDER_DATA_TYPE,
-              loanId: 7,
-              route: "/loan/7",
+              loanId: testId(7),
+              route: `/loan/${testId(7)}`,
             },
           },
         },
       },
     } as never);
 
-    expect(loanId).toBe(7);
-    expect(buildLoanDetailPath(7)).toBe("/loan/7");
+    expect(loanId).toBe(testId(7));
+    expect(buildLoanDetailPath(testId(7))).toBe(`/loan/${testId(7)}`);
+  });
+
+  it("rejects a numeric loanId left over from before the id migration", () => {
+    // Notifications outlive an app upgrade: a reminder scheduled against an
+    // autoincrement id must not route to a URL that resolves to nothing.
+    expect(
+      extractLoanIdFromNotificationResponse({
+        notification: {
+          request: {
+            content: {
+              data: { type: LOAN_REMINDER_DATA_TYPE, loanId: 7 },
+            },
+          },
+        },
+      } as never),
+    ).toBeNull();
   });
 
   it("returns null for unrelated notification payloads", () => {
@@ -33,7 +50,7 @@ describe("notification-routing", () => {
         notification: {
           request: {
             content: {
-              data: { type: "other", loanId: 7 },
+              data: { type: "other", loanId: testId(7) },
             },
           },
         },
@@ -50,7 +67,7 @@ describe("notification-routing", () => {
             content: {
               data: {
                 type: LOAN_REMINDER_DATA_TYPE,
-                loanId: 12,
+                loanId: testId(12),
               },
             },
           },
@@ -60,6 +77,6 @@ describe("notification-routing", () => {
     );
 
     expect(handled).toBe(true);
-    expect(navigate).toHaveBeenCalledWith("/loan/12");
+    expect(navigate).toHaveBeenCalledWith(`/loan/${testId(12)}`);
   });
 });

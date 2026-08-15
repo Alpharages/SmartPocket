@@ -43,7 +43,9 @@ export function isUlid(value: unknown): value is string {
  */
 function fillRandom(bytes: Uint8Array): Uint8Array {
   const webCrypto = (
-    globalThis as { crypto?: { getRandomValues?: (a: Uint8Array) => Uint8Array } }
+    globalThis as {
+      crypto?: { getRandomValues?: (a: Uint8Array) => Uint8Array };
+    }
   ).crypto;
   if (typeof webCrypto?.getRandomValues === "function") {
     webCrypto.getRandomValues(bytes);

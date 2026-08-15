@@ -288,15 +288,9 @@ interface ExpenseContextType {
   loadingAccounts: boolean;
   refreshAccounts: () => Promise<void>;
   addAccount: (data: CreateAccountInput) => Promise<void>;
-  updateAccount: (
-    id: Id,
-    data: Partial<CreateAccountInput>,
-  ) => Promise<void>;
+  updateAccount: (id: Id, data: Partial<CreateAccountInput>) => Promise<void>;
   deleteAccount: (id: Id) => Promise<void>;
-  reassignAndDeleteAccount: (
-    id: Id,
-    targetAccountId: Id,
-  ) => Promise<void>;
+  reassignAndDeleteAccount: (id: Id, targetAccountId: Id) => Promise<void>;
   fetchAccountTransactionCount: (id: Id) => Promise<number>;
   fetchAccountTransferCount: (id: Id) => Promise<number>;
   getAccountBalance: (accountId: Id) => number;
@@ -364,7 +358,6 @@ interface ExpenseContextType {
 }
 
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
-
 
 export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const toast = useToast();
@@ -1615,10 +1608,7 @@ export function useCardTransactions(creditCardId: Id | null) {
 /** User-scoped loan detail with repayments and remaining balance (Story 8.3). */
 export function useLoanDetail(loanId: Id | null) {
   const enabled = isUlid(loanId);
-  const query = trpc.loans.getById.useQuery(
-    { id: loanId ?? "" },
-    { enabled },
-  );
+  const query = trpc.loans.getById.useQuery({ id: loanId ?? "" }, { enabled });
 
   const refreshLoanDetail = useCallback(async () => {
     await query.refetch();

@@ -6,8 +6,8 @@ const mocks = vi.hoisted(() => {
   const accountsRefetch = vi.fn().mockResolvedValue({
     data: [
       {
-        id: 1,
-        userId: 1,
+        id: "00000000000000000000000001",
+        userId: "00000000000000000000000001",
         name: "Cash",
         type: "cash",
         currency: "USD",
@@ -21,8 +21,8 @@ const mocks = vi.hoisted(() => {
   const transfersRefetch = vi.fn().mockResolvedValue({ data: [] });
   const createTransferMutateAsync = vi.fn().mockResolvedValue(undefined);
   const createAccountMutateAsync = vi.fn().mockResolvedValue({
-    id: 2,
-    userId: 1,
+    id: "00000000000000000000000002",
+    userId: "00000000000000000000000001",
     name: "Bank",
     type: "bank",
     currency: "USD",
@@ -207,6 +207,7 @@ vi.mock("@/lib/trpc", () => ({
 }));
 
 import { ExpenseProvider, useExpense } from "@/lib/expense-context";
+import { testId, syncColumns } from "../helpers/ids";
 
 function Probe({
   onReady,
@@ -266,9 +267,9 @@ describe("expense context accounts", () => {
     });
 
     await act(async () => {
-      await expect(api!.reassignAndDeleteAccount(1, 2)).rejects.toThrow(
-        "reassignAndDeleteAccount failed",
-      );
+      await expect(
+        api!.reassignAndDeleteAccount(testId(1), testId(2)),
+      ).rejects.toThrow("reassignAndDeleteAccount failed");
     });
 
     expect(mocks.toastShow).toHaveBeenCalledWith({
@@ -289,11 +290,11 @@ describe("expense context accounts", () => {
     });
 
     await act(async () => {
-      await api!.updateAccount(1, { name: "Updated Cash" });
+      await api!.updateAccount(testId(1), { name: "Updated Cash" });
     });
 
     expect(mocks.updateAccountMutateAsync).toHaveBeenCalledWith({
-      id: 1,
+      id: testId(1),
       name: "Updated Cash",
     });
     expect(mocks.toastShow).toHaveBeenCalledWith({
@@ -314,10 +315,12 @@ describe("expense context accounts", () => {
     });
 
     await act(async () => {
-      await api!.deleteAccount(1);
+      await api!.deleteAccount(testId(1));
     });
 
-    expect(mocks.deleteAccountMutateAsync).toHaveBeenCalledWith({ id: 1 });
+    expect(mocks.deleteAccountMutateAsync).toHaveBeenCalledWith({
+      id: testId(1),
+    });
     expect(mocks.toastShow).toHaveBeenCalledWith({
       type: "success",
       message: "Account deleted",
@@ -341,12 +344,12 @@ describe("expense context accounts", () => {
     mocks.accountBalancesRefetch.mockClear();
 
     await act(async () => {
-      await api!.updateTransaction(7, { accountId: 2 });
+      await api!.updateTransaction(testId(7), { accountId: testId(2) });
     });
 
     expect(mocks.updateTransactionMutateAsync).toHaveBeenCalledWith({
-      id: 7,
-      accountId: 2,
+      id: testId(7),
+      accountId: testId(2),
     });
     expect(mocks.accountBalancesRefetch).toHaveBeenCalled();
     expect(mocks.toastShow).toHaveBeenCalledWith({
@@ -370,11 +373,11 @@ describe("expense context accounts", () => {
     mocks.accountBalancesRefetch.mockClear();
 
     await act(async () => {
-      await api!.updateTransaction(7, { accountId: null });
+      await api!.updateTransaction(testId(7), { accountId: null });
     });
 
     expect(mocks.updateTransactionMutateAsync).toHaveBeenCalledWith({
-      id: 7,
+      id: testId(7),
       accountId: null,
     });
     expect(mocks.accountBalancesRefetch).toHaveBeenCalled();

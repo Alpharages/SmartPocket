@@ -9,6 +9,7 @@ import TestRenderer, {
 import { isPositiveBudgetAmount } from "@/lib/budget-validation";
 import { useExpense } from "@/lib/expense-context";
 import { BudgetFormSheet } from "@/components/budgets/BudgetFormSheet";
+import { testId, syncColumns } from "../helpers/ids";
 
 vi.mock("@/lib/expense-context", () => ({
   useExpense: vi.fn(),
@@ -121,8 +122,8 @@ vi.mock("@/lib/_core/theme", () => ({
 }));
 
 const mockExpenseCategory = {
-  id: 10,
-  userId: 1,
+  id: testId(10),
+  userId: testId(1),
   name: "Food",
   type: "expense" as const,
   color: "#E11D48",
@@ -238,7 +239,7 @@ describe("BudgetFormSheet", () => {
     });
 
     expect(mockAddBudget).toHaveBeenCalledWith({
-      categoryId: 10,
+      categoryId: testId(10),
       period: "monthly",
       amount: "100",
     });

@@ -5,13 +5,14 @@ import {
   transactionToJsonExportRow,
 } from "@/lib/json-export";
 import type { Category, CreditCard, Transaction } from "@/lib/expense-context";
+import { testId, syncColumns } from "../helpers/ids";
 
 function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
   return {
-    id: 1,
-    userId: 1,
-    categoryId: 10,
-    creditCardId: 20,
+    id: testId(1),
+    userId: testId(1),
+    categoryId: testId(10),
+    creditCardId: testId(20),
     type: "expense",
     amount: "1234.5",
     description: 'Coffee, "large"\n☕',
@@ -24,8 +25,8 @@ function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
 
 function makeCategory(overrides: Partial<Category> = {}): Category {
   return {
-    id: 10,
-    userId: 1,
+    id: testId(10),
+    userId: testId(1),
     name: "Food",
     type: "expense",
     color: "#ff0000",
@@ -39,8 +40,8 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
 
 function makeCard(overrides: Partial<CreditCard> = {}): CreditCard {
   return {
-    id: 20,
-    userId: 1,
+    id: testId(20),
+    userId: testId(1),
     name: "Visa Gold",
     cardNumberLast4: "1234",
     cardholderName: "Test User",
@@ -66,7 +67,7 @@ describe("toTransactionJson", () => {
         [makeCard()],
       ),
       transactionToJsonExportRow(
-        makeTransaction({ id: 2, creditCardId: undefined }),
+        makeTransaction({ id: testId(2), creditCardId: undefined }),
         [makeCategory()],
         [makeCard()],
       ),
@@ -82,19 +83,19 @@ describe("toTransactionJson", () => {
     });
     expect(new Date(parsed.exportedAt).toISOString()).toBe(parsed.exportedAt);
     expect(parsed.transactions[0]).toMatchObject({
-      id: 1,
+      id: testId(1),
       type: "expense",
       amount: "1234.50",
       date: "2026-06-16",
       description: 'Coffee, "large"\n☕',
       category: {
-        id: 10,
+        id: testId(10),
         name: "Food",
         type: "expense",
         color: "#ff0000",
         icon: "food",
       },
-      card: { id: 20, name: "Visa Gold" },
+      card: { id: testId(20), name: "Visa Gold" },
     });
     expect(parsed.transactions[1].card).toBeNull();
   });
@@ -124,7 +125,7 @@ describe("toTransactionJson", () => {
 
   it("serializes unresolved cards as null", () => {
     const row = transactionToJsonExportRow(
-      makeTransaction({ creditCardId: 999 }),
+      makeTransaction({ creditCardId: testId(999) }),
       [makeCategory()],
       [makeCard()],
     );

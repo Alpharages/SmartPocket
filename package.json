@@ -16,6 +16,7 @@
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:seed": "tsx drizzle/seed.ts",
     "db:migrate:encrypt-cards": "tsx scripts/migrate-encrypt-card-numbers.ts",
+    "db:migrate:ulid-ids": "tsx scripts/migrate-ulid-ids.ts",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "qr": "node scripts/generate_qr.mjs"

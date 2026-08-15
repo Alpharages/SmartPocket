@@ -19,6 +19,8 @@ import { useExpense } from "@/lib/expense-context";
 import TransactionsScreen, {
   groupTransactionsByDate,
 } from "@/app/(tabs)/transactions";
+import type { Id } from "@/drizzle/schema";
+import { testId, syncColumns } from "../helpers/ids";
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -136,8 +138,8 @@ const LAST_WEEK = new Date("2026-05-28T10:00:00Z");
 
 const mockCategories = [
   {
-    id: 1,
-    userId: 1,
+    id: testId(1),
+    userId: testId(1),
     name: "Salary",
     type: "income" as const,
     color: "#059669",
@@ -147,8 +149,8 @@ const mockCategories = [
     updatedAt: new Date(),
   },
   {
-    id: 2,
-    userId: 1,
+    id: testId(2),
+    userId: testId(1),
     name: "Food",
     type: "expense" as const,
     color: "#DC2626",
@@ -161,8 +163,8 @@ const mockCategories = [
 
 function makeTransaction(
   overrides: Partial<{
-    id: number;
-    categoryId: number | null;
+    id: Id;
+    categoryId: Id | null;
     type: "income" | "expense";
     amount: string;
     description: string | null;
@@ -183,7 +185,7 @@ function makeTransaction(
     amount: overrides.amount ?? "50.00",
     description: overrides.description ?? null,
     date: overrides.date ?? NOW,
-    userId: 1,
+    userId: testId(1),
     createdAt: new Date(),
     updatedAt: new Date(),
   } as unknown as Parameters<typeof groupTransactionsByDate>[0][number];
@@ -275,8 +277,8 @@ describe("groupTransactionsByDate", () => {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    const t1 = makeTransaction({ id: 1, date: today });
-    const t2 = makeTransaction({ id: 2, date: yesterday });
+    const t1 = makeTransaction({ id: testId(1), date: today });
+    const t2 = makeTransaction({ id: testId(2), date: yesterday });
 
     // Already sorted newest-first
     const sections = groupTransactionsByDate([t1, t2]);
@@ -286,8 +288,8 @@ describe("groupTransactionsByDate", () => {
 
   it("groups multiple transactions on the same day into one section", () => {
     const today = new Date();
-    const t1 = makeTransaction({ id: 1, date: today });
-    const t2 = makeTransaction({ id: 2, date: today });
+    const t1 = makeTransaction({ id: testId(1), date: today });
+    const t2 = makeTransaction({ id: testId(2), date: today });
     const sections = groupTransactionsByDate([t1, t2]);
     expect(sections).toHaveLength(1);
     expect(sections[0].data).toHaveLength(2);
@@ -343,7 +345,10 @@ describe("TransactionsScreen", () => {
 
     it("shows 'N transactions' (plural) for multiple", () => {
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
-        transactions: [makeTransaction({ id: 1 }), makeTransaction({ id: 2 })],
+        transactions: [
+          makeTransaction({ id: testId(1) }),
+          makeTransaction({ id: testId(2) }),
+        ],
         categories: mockCategories,
         loadingTransactions: false,
         deleteTransaction: mockDeleteTransaction,
@@ -371,12 +376,12 @@ describe("TransactionsScreen", () => {
 
     it("filters transactions by description when search text is typed", () => {
       const lunch = makeTransaction({
-        id: 1,
+        id: testId(1),
         description: "Lunch at work",
         date: NOW,
       });
       const coffee = makeTransaction({
-        id: 2,
+        id: testId(2),
         description: "Coffee",
         date: NOW,
       });
@@ -402,8 +407,16 @@ describe("TransactionsScreen", () => {
     });
 
     it("filters by amount substring", () => {
-      const t1 = makeTransaction({ id: 1, amount: "123.00", date: NOW });
-      const t2 = makeTransaction({ id: 2, amount: "456.00", date: NOW });
+      const t1 = makeTransaction({
+        id: testId(1),
+        amount: "123.00",
+        date: NOW,
+      });
+      const t2 = makeTransaction({
+        id: testId(2),
+        amount: "456.00",
+        date: NOW,
+      });
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
         transactions: [t1, t2],
         categories: mockCategories,
@@ -465,27 +478,27 @@ describe("TransactionsScreen", () => {
   describe("Filter chips", () => {
     function seedTransactions() {
       const incomeNow = makeTransaction({
-        id: 1,
+        id: testId(1),
         type: "income",
-        categoryId: 1,
+        categoryId: testId(1),
         date: NOW,
       });
       const expenseNow = makeTransaction({
-        id: 2,
+        id: testId(2),
         type: "expense",
-        categoryId: 2,
+        categoryId: testId(2),
         date: NOW,
       });
       const lastMonth = makeTransaction({
-        id: 3,
+        id: testId(3),
         type: "expense",
-        categoryId: 2,
+        categoryId: testId(2),
         date: LAST_MONTH,
       });
       const lastWeek = makeTransaction({
-        id: 4,
+        id: testId(4),
         type: "expense",
-        categoryId: 2,
+        categoryId: testId(2),
         date: LAST_WEEK,
       });
       return [incomeNow, expenseNow, lastMonth, lastWeek];
@@ -598,8 +611,8 @@ describe("TransactionsScreen", () => {
 
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
         transactions: [
-          makeTransaction({ id: 1, date: today }),
-          makeTransaction({ id: 2, date: yesterday }),
+          makeTransaction({ id: testId(1), date: today }),
+          makeTransaction({ id: testId(2), date: yesterday }),
         ],
         categories: mockCategories,
         loadingTransactions: false,
@@ -619,7 +632,7 @@ describe("TransactionsScreen", () => {
   describe("Category resolution", () => {
     it("shows category name instead of 'Category {id}'", () => {
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
-        transactions: [makeTransaction({ categoryId: 2 })],
+        transactions: [makeTransaction({ categoryId: testId(2) })],
         categories: mockCategories,
         loadingTransactions: false,
         deleteTransaction: mockDeleteTransaction,
@@ -645,7 +658,7 @@ describe("TransactionsScreen", () => {
 
     it("shows 'Uncategorized' when category was deleted (id not in list)", () => {
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
-        transactions: [makeTransaction({ categoryId: 999 })],
+        transactions: [makeTransaction({ categoryId: testId(999) })],
         categories: mockCategories,
         loadingTransactions: false,
         deleteTransaction: mockDeleteTransaction,
@@ -664,7 +677,9 @@ describe("TransactionsScreen", () => {
     beforeEach(() => {
       mockConfirmDestructive.mockReset().mockResolvedValue(true);
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
-        transactions: [makeTransaction({ id: 42, categoryId: 2 })],
+        transactions: [
+          makeTransaction({ id: testId(42), categoryId: testId(2) }),
+        ],
         categories: mockCategories,
         loadingTransactions: false,
         deleteTransaction: mockDeleteTransaction,
@@ -700,7 +715,11 @@ describe("TransactionsScreen", () => {
     it("confirmation message names the transaction's description, not its category (AC-1, AC-8)", async () => {
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
         transactions: [
-          makeTransaction({ id: 42, categoryId: 2, description: "Snacks" }),
+          makeTransaction({
+            id: testId(42),
+            categoryId: testId(2),
+            description: "Snacks",
+          }),
         ],
         categories: mockCategories,
         loadingTransactions: false,
@@ -746,7 +765,7 @@ describe("TransactionsScreen", () => {
       });
 
       expect(mockDeleteTransaction).toHaveBeenCalledOnce();
-      expect(mockDeleteTransaction).toHaveBeenCalledWith(42);
+      expect(mockDeleteTransaction).toHaveBeenCalledWith(testId(42));
     });
 
     it("cancelling delete does NOT call deleteTransaction", async () => {
@@ -774,7 +793,9 @@ describe("TransactionsScreen", () => {
 
     it("renders 'No results found' when filter is active and no matches", () => {
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
-        transactions: [makeTransaction({ type: "income", categoryId: 1 })],
+        transactions: [
+          makeTransaction({ type: "income", categoryId: testId(1) }),
+        ],
         categories: mockCategories,
         loadingTransactions: false,
         deleteTransaction: mockDeleteTransaction,
@@ -794,7 +815,9 @@ describe("TransactionsScreen", () => {
 
     it("'No results found' empty state has no action button", () => {
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
-        transactions: [makeTransaction({ type: "income", categoryId: 1 })],
+        transactions: [
+          makeTransaction({ type: "income", categoryId: testId(1) }),
+        ],
         categories: mockCategories,
         loadingTransactions: false,
         deleteTransaction: mockDeleteTransaction,

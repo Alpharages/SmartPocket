@@ -43,7 +43,8 @@ export function getCategoryColors(
  * so existing consumers and tests are untouched — it now aliases the default
  * theme's per-theme map.
  */
-export const CategoryColors: readonly CategoryColorToken[] = getCategoryColors();
+export const CategoryColors: readonly CategoryColorToken[] =
+  getCategoryColors();
 
 /**
  * All light-mode category hex values (default theme) as a flat array.
@@ -167,5 +168,9 @@ export function getCategoryColorForName(
   scheme: Scheme = "light",
   themeId: ThemeId = DEFAULT_THEME_ID,
 ): string {
-  return getCategoryColorByIndex(hashToPaletteIndex(name, themeId), scheme, themeId);
+  return getCategoryColorByIndex(
+    hashToPaletteIndex(name, themeId),
+    scheme,
+    themeId,
+  );
 }

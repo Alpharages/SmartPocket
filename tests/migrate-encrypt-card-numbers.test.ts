@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { testId, syncColumns } from "./helpers/ids";
 
 const TEST_KEY_HEX =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -27,7 +28,9 @@ describe("migrateEncryptCardNumbers", () => {
 
   it("encrypts plaintext rows and updates the database", async () => {
     callDataApi
-      .mockResolvedValueOnce([{ id: 1, cardNumber: "4111111111111111" }])
+      .mockResolvedValueOnce([
+        { id: testId(1), cardNumber: "4111111111111111" },
+      ])
       .mockResolvedValueOnce(undefined);
 
     const { migrateEncryptCardNumbers } =
@@ -57,7 +60,9 @@ describe("migrateEncryptCardNumbers", () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
     const encrypted = encryptCardNumber("4111111111111111");
 
-    callDataApi.mockResolvedValueOnce([{ id: 2, cardNumber: encrypted }]);
+    callDataApi.mockResolvedValueOnce([
+      { id: testId(2), cardNumber: encrypted },
+    ]);
 
     const { migrateEncryptCardNumbers } =
       await import("@/server/migrate-encrypt-card-numbers");
@@ -78,9 +83,9 @@ describe("migrateEncryptCardNumbers", () => {
 
     callDataApi
       .mockResolvedValueOnce([
-        { id: 1, cardNumber: "4111111111111111" },
-        { id: 2, cardNumber: encrypted },
-        { id: 3, cardNumber: "378282246310005" },
+        { id: testId(1), cardNumber: "4111111111111111" },
+        { id: testId(2), cardNumber: encrypted },
+        { id: testId(3), cardNumber: "378282246310005" },
       ])
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined);
@@ -133,7 +138,9 @@ describe("migrateEncryptCardNumbers", () => {
     const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     callDataApi
-      .mockResolvedValueOnce([{ id: 7, cardNumber: "4111111111111111" }])
+      .mockResolvedValueOnce([
+        { id: testId(7), cardNumber: "4111111111111111" },
+      ])
       .mockResolvedValueOnce(undefined);
 
     const { migrateEncryptCardNumbers, formatMigrationSummary } =
@@ -160,8 +167,8 @@ describe("migrateEncryptCardNumbers", () => {
   it("isolates per-row failures and continues processing", async () => {
     callDataApi
       .mockResolvedValueOnce([
-        { id: 10, cardNumber: "4111111111111111" },
-        { id: 11, cardNumber: "5555555555554444" },
+        { id: testId(10), cardNumber: "4111111111111111" },
+        { id: testId(11), cardNumber: "5555555555554444" },
       ])
       .mockRejectedValueOnce(new Error("update failed"))
       .mockResolvedValueOnce(undefined);
@@ -177,7 +184,7 @@ describe("migrateEncryptCardNumbers", () => {
       failed: 1,
     });
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "Card encryption migration failed for row id=10",
+      `Card encryption migration failed for row id=${testId(10)}`,
     );
     const logged = consoleErrorSpy.mock.calls.flat().join(" ");
     expect(logged).not.toMatch(/4111111111111111/);

@@ -205,10 +205,7 @@ export async function getUserPinState(userId: Id): Promise<UserPinState> {
 }
 
 /** Stores the salted hash and resets attempt/lockout state — a fresh PIN starts with a clean slate. */
-export async function setUserPin(
-  userId: Id,
-  pinHash: string,
-): Promise<void> {
+export async function setUserPin(userId: Id, pinHash: string): Promise<void> {
   await callDataApi("Database/query", {
     body: {
       query:
@@ -461,7 +458,8 @@ export async function getCategoryById(id: Id, userId: Id) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM categories WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        query:
+          "SELECT * FROM categories WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -492,7 +490,8 @@ export async function getUserCreditCards(
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM creditCards WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
+        query:
+          "SELECT * FROM creditCards WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
         params: [userId],
       },
     });
@@ -576,7 +575,8 @@ export async function getCreditCardById(
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM creditCards WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        query:
+          "SELECT * FROM creditCards WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -595,7 +595,8 @@ export async function getUserAccounts(userId: Id): Promise<Account[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM accounts WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
+        query:
+          "SELECT * FROM accounts WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
         params: [userId],
       },
     });
@@ -669,7 +670,8 @@ export async function getAccountById(
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        query:
+          "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -747,7 +749,8 @@ export async function getTransferById(
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM transfers WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        query:
+          "SELECT * FROM transfers WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -795,15 +798,13 @@ export async function reassignAccountTransfers(
   });
   await callDataApi("Database/query", {
     body: {
-      query:
-        `UPDATE transfers SET fromAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND fromAccountId = ? AND deletedAt IS NULL`,
+      query: `UPDATE transfers SET fromAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND fromAccountId = ? AND deletedAt IS NULL`,
       params: [toAccountId, writeStamp(), userId, fromAccountId],
     },
   });
   await callDataApi("Database/query", {
     body: {
-      query:
-        `UPDATE transfers SET toAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND toAccountId = ? AND deletedAt IS NULL`,
+      query: `UPDATE transfers SET toAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND toAccountId = ? AND deletedAt IS NULL`,
       params: [toAccountId, writeStamp(), userId, fromAccountId],
     },
   });
@@ -816,8 +817,7 @@ export async function reassignAccountTransactions(
 ): Promise<void> {
   await callDataApi("Database/query", {
     body: {
-      query:
-        `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId = ? AND deletedAt IS NULL`,
+      query: `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId = ? AND deletedAt IS NULL`,
       params: [toAccountId, writeStamp(), userId, fromAccountId],
     },
   });
@@ -847,7 +847,8 @@ export async function reassignAndDeleteAccount(
 export async function ensureDefaultAccount(userId: Id): Promise<void> {
   const countResult = await callDataApi("Database/query", {
     body: {
-      query: "SELECT COUNT(*) as accountCount FROM accounts WHERE userId = ? AND deletedAt IS NULL",
+      query:
+        "SELECT COUNT(*) as accountCount FROM accounts WHERE userId = ? AND deletedAt IS NULL",
       params: [userId],
     },
   });
@@ -874,8 +875,7 @@ export async function ensureDefaultAccount(userId: Id): Promise<void> {
 
   await callDataApi("Database/query", {
     body: {
-      query:
-        `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId IS NULL AND deletedAt IS NULL`,
+      query: `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId IS NULL AND deletedAt IS NULL`,
       params: [created.id, writeStamp(), userId],
     },
   });
@@ -932,10 +932,7 @@ export async function getTransactionsByDateRange(
   }
 }
 
-export async function getTransactionsByCategory(
-  userId: Id,
-  categoryId: Id,
-) {
+export async function getTransactionsByCategory(userId: Id, categoryId: Id) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
@@ -1084,7 +1081,8 @@ export async function getTransactionById(id: Id, userId: Id) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM transactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        query:
+          "SELECT * FROM transactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -1260,7 +1258,8 @@ export async function getUserBudgets(userId: Id): Promise<Budget[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM budgets WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
+        query:
+          "SELECT * FROM budgets WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
         params: [userId],
       },
     });
@@ -1331,7 +1330,8 @@ export async function getBudgetById(
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM budgets WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        query:
+          "SELECT * FROM budgets WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -1527,8 +1527,7 @@ export async function getAccountBalances(
     const rows = Array.isArray(result) ? result : [];
     const txnBalances = reduceAccountBalances(
       rows.map((row: Record<string, unknown>) => ({
-        accountId:
-          row.accountId == null ? null : (row.accountId as Id),
+        accountId: row.accountId == null ? null : (row.accountId as Id),
         type: String(row.type ?? ""),
         amount: String(row.amount ?? "0"),
       })),
@@ -1552,11 +1551,7 @@ export async function getAccountBalances(
  * Get monthly statistics for a user.
  * Calculates total income, expenses, and net balance for a given month.
  */
-export async function getMonthlyStats(
-  userId: Id,
-  year: number,
-  month: number,
-) {
+export async function getMonthlyStats(userId: Id, year: number, month: number) {
   try {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
@@ -1852,7 +1847,8 @@ export async function getUserLoans(userId: Id): Promise<Loan[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM loans WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
+        query:
+          "SELECT * FROM loans WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
         params: [userId],
       },
     });
@@ -1892,14 +1888,12 @@ export async function createLoan(data: InsertLoan): Promise<Loan | null> {
   return getLoanById(id, data.userId);
 }
 
-export async function getLoanById(
-  id: Id,
-  userId: Id,
-): Promise<Loan | null> {
+export async function getLoanById(id: Id, userId: Id): Promise<Loan | null> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM loans WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        query:
+          "SELECT * FROM loans WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -2041,7 +2035,8 @@ export async function getRepaymentById(
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM repayments WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        query:
+          "SELECT * FROM repayments WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -2070,10 +2065,7 @@ export async function getRepaymentsByLoan(
   }
 }
 
-export async function deleteRepayment(
-  id: Id,
-  userId: Id,
-): Promise<void> {
+export async function deleteRepayment(id: Id, userId: Id): Promise<void> {
   const stamp = writeStamp();
   await callDataApi("Database/query", {
     body: {

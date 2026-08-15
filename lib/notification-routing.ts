@@ -13,10 +13,7 @@ export function extractLoanIdFromNotificationResponse(
   // notification payloads survive across app upgrades, so a reminder scheduled
   // before the id migration will still carry a number here and must be
   // rejected rather than routed to a URL that resolves to nothing.
-  if (
-    data?.type === LOAN_REMINDER_DATA_TYPE &&
-    isUlid(data.loanId)
-  ) {
+  if (data?.type === LOAN_REMINDER_DATA_TYPE && isUlid(data.loanId)) {
     return data.loanId;
   }
   return null;

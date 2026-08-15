@@ -8,6 +8,7 @@ import TestRenderer, {
 
 import { useExpense } from "@/lib/expense-context";
 import LoansScreen from "@/app/(tabs)/loans";
+import { testId, syncColumns } from "../helpers/ids";
 
 const mockPush = vi.hoisted(() => vi.fn());
 
@@ -131,8 +132,8 @@ vi.mock("@/lib/expense-context", () => ({
 }));
 
 const mockLoan = {
-  id: 1,
-  userId: 1,
+  id: testId(1),
+  userId: testId(1),
   direction: "lend" as const,
   counterparty: "Alex",
   principal: "250.00",
@@ -375,6 +376,6 @@ describe("LoansScreen", () => {
     act(() => {
       pressable.props.onPress();
     });
-    expect(mockPush).toHaveBeenCalledWith("/loan/1");
+    expect(mockPush).toHaveBeenCalledWith(`/loan/${testId(1)}`);
   });
 });

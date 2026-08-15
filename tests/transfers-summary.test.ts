@@ -13,20 +13,21 @@ import {
   getMonthlyTrend,
   getRecentTransactions,
 } from "../server/db";
+import { testId, syncColumns } from "./helpers/ids";
 
 const juneTxns = [
   {
-    id: 1,
-    userId: 1,
-    categoryId: 1,
+    id: testId(1),
+    userId: testId(1),
+    categoryId: testId(1),
     type: "income",
     amount: "1000.00",
     date: new Date(2026, 5, 10),
   },
   {
-    id: 2,
-    userId: 1,
-    categoryId: 2,
+    id: testId(2),
+    userId: testId(1),
+    categoryId: testId(2),
     type: "expense",
     amount: "250.00",
     date: new Date(2026, 5, 15),
@@ -40,11 +41,11 @@ describe("transfers do not affect income/expense summaries (AC2)", () => {
 
   it("getMonthlyStats only queries transactions and is unchanged when transfers exist", async () => {
     callDataApi.mockResolvedValue(juneTxns);
-    const before = await getMonthlyStats(1, 2026, 6);
+    const before = await getMonthlyStats(testId(1), 2026, 6);
 
     callDataApi.mockClear();
     callDataApi.mockResolvedValue(juneTxns);
-    const after = await getMonthlyStats(1, 2026, 6);
+    const after = await getMonthlyStats(testId(1), 2026, 6);
 
     expect(after).toEqual(before);
     expect(after).toEqual({
@@ -66,7 +67,7 @@ describe("transfers do not affect income/expense summaries (AC2)", () => {
   it("getMonthlyTrend only queries transactions", async () => {
     callDataApi.mockResolvedValue(juneTxns);
 
-    await getMonthlyTrend(1, 2026, 6, 3);
+    await getMonthlyTrend(testId(1), 2026, 6, 3);
 
     expect(callDataApi).toHaveBeenCalledTimes(1);
     expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).toMatch(
@@ -80,7 +81,7 @@ describe("transfers do not affect income/expense summaries (AC2)", () => {
   it("getExpensesByCategory only queries transactions", async () => {
     callDataApi.mockResolvedValue(juneTxns);
 
-    await getExpensesByCategory(1, 2026, 6);
+    await getExpensesByCategory(testId(1), 2026, 6);
 
     expect(callDataApi).toHaveBeenCalledTimes(1);
     expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).toMatch(
@@ -94,7 +95,7 @@ describe("transfers do not affect income/expense summaries (AC2)", () => {
   it("getCategoryAnomalies only queries transactions", async () => {
     callDataApi.mockResolvedValue(juneTxns);
 
-    await getCategoryAnomalies(1, 2026, 6, 3);
+    await getCategoryAnomalies(testId(1), 2026, 6, 3);
 
     expect(callDataApi).toHaveBeenCalledTimes(1);
     expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).toMatch(
@@ -108,7 +109,7 @@ describe("transfers do not affect income/expense summaries (AC2)", () => {
   it("getRecentTransactions only queries transactions", async () => {
     callDataApi.mockResolvedValue(juneTxns);
 
-    await getRecentTransactions(1, 5);
+    await getRecentTransactions(testId(1), 5);
 
     expect(callDataApi).toHaveBeenCalledTimes(1);
     expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).toMatch(

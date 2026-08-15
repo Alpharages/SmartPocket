@@ -6,13 +6,14 @@ import {
   validateRecurringForm,
   type RecurringFormValues,
 } from "@/lib/recurring-form-validation";
+import { testId, syncColumns } from "./helpers/ids";
 
 const startDate = new Date(2026, 5, 17);
 
 const validBase: RecurringFormValues = {
   type: "expense",
   amount: "50.00",
-  categoryId: 1,
+  categoryId: testId(1),
   creditCardId: null,
   description: "",
   frequency: "monthly",

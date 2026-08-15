@@ -8,10 +8,11 @@ import {
 } from "@/lib/csv-import";
 import { toTransactionCsv, transactionToExportRow } from "@/lib/csv-export";
 import type { Category, CreditCard, Transaction } from "@/lib/expense-context";
+import { testId, syncColumns } from "../helpers/ids";
 
 const food: Category = {
-  id: 10,
-  userId: 1,
+  id: testId(10),
+  userId: testId(1),
   name: "Food",
   type: "expense",
   color: "#f00",
@@ -23,14 +24,14 @@ const food: Category = {
 
 const salary: Category = {
   ...food,
-  id: 11,
+  id: testId(11),
   name: "Salary",
   type: "income",
 };
 
 const card: CreditCard = {
-  id: 20,
-  userId: 1,
+  id: testId(20),
+  userId: testId(1),
   name: "Visa Gold",
   cardNumberLast4: "1234",
   cardholderName: "Test User",
@@ -47,8 +48,8 @@ const card: CreditCard = {
 
 function tx(overrides: Partial<Transaction> = {}): Transaction {
   return {
-    id: 1,
-    userId: 1,
+    id: testId(1),
+    userId: testId(1),
     categoryId: food.id,
     type: "expense",
     amount: "50.00",
@@ -165,8 +166,8 @@ describe("validateRow", () => {
   });
 
   it("resolves the correctly-typed category when a same-named category exists for the other type", () => {
-    const otherExpense = { ...food, id: 30, name: "Other" };
-    const otherIncome = { ...salary, id: 31, name: "Other" };
+    const otherExpense = { ...food, id: testId(30), name: "Other" };
+    const otherIncome = { ...salary, id: testId(31), name: "Other" };
 
     const result = validateRow(
       ["2026-06-16", "income", "100", "Other", "", ""],
@@ -178,11 +179,14 @@ describe("validateRow", () => {
       },
     );
 
-    expect(result).toMatchObject({ ok: true, value: { categoryId: 31 } });
+    expect(result).toMatchObject({
+      ok: true,
+      value: { categoryId: testId(31) },
+    });
   });
 
   it("reports a type-mismatch reason when only the wrong-typed category shares the name", () => {
-    const otherExpense = { ...food, id: 30, name: "Other" };
+    const otherExpense = { ...food, id: testId(30), name: "Other" };
 
     expect(
       validateRow(["2026-06-16", "income", "100", "Other", "", ""], map, {

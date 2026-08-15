@@ -48,8 +48,7 @@ export default function BudgetFormScreen() {
 
   const budgetId = isUlid(id) ? id : undefined;
   const budget = useMemo(
-    () =>
-      budgetId ? budgets.find((item) => item.id === budgetId) : undefined,
+    () => (budgetId ? budgets.find((item) => item.id === budgetId) : undefined),
     [budgetId, budgets],
   );
 
