@@ -94,19 +94,37 @@ function lightToDark(themeId: ThemeId): Map<string, string> {
 }
 
 /**
- * Deterministic category color assignment by numeric ID/index.
- * Returns a stable hex for the given index, wrapping when it exceeds the
- * palette length. Pass `scheme` to get the theme-appropriate variant and
- * `themeId` to select a theme's palette (defaults to the default theme).
+ * Deterministic category color assignment by ID/index.
+ *
+ * Accepts a ULID as well as a number: ids became strings with the local-first
+ * migration, and this fallback (used whenever a category has no stored color)
+ * has to keep giving the *same* category the *same* colour across renders and
+ * devices. A string id is folded to a palette index instead of being wrapped
+ * with `%`, which a `Number("01ARZ…")` would have turned into NaN — and NaN
+ * indexes the palette to `undefined`, which crashed on `.light`.
  */
 export function getCategoryColorByIndex(
-  index: number,
+  index: number | string,
   scheme: Scheme = "light",
   themeId: ThemeId = DEFAULT_THEME_ID,
 ): string {
   const palette = getCategoryColors(themeId);
-  const token = palette[index % palette.length];
+  const slot =
+    typeof index === "number" && Number.isFinite(index)
+      ? Math.abs(Math.trunc(index)) % palette.length
+      : hashToIndex(String(index), palette.length);
+  const token = palette[slot];
   return scheme === "dark" ? token.dark : token.light;
+}
+
+/** FNV-1a, kept in 32-bit unsigned range so the result is stable everywhere. */
+function hashToIndex(value: string, buckets: number): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash % buckets;
 }
 
 /**

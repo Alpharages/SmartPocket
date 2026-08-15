@@ -2,10 +2,11 @@
 // amount that no money column can hold.
 import { isValidMoneyString } from "@shared/money";
 import { formatDateInput, parseDateInput } from "./recurring-form-validation";
+import type { Id } from "@/drizzle/schema";
 
 export type TransferFormValues = {
-  fromAccountId: number | null;
-  toAccountId: number | null;
+  fromAccountId: Id | null;
+  toAccountId: Id | null;
   amount: string;
   description: string;
   date: string;

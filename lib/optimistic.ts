@@ -1,7 +1,8 @@
+import type { Id } from "@/drizzle/schema";
 export type OptimisticOp<T> =
   | { type: "add"; item: T; position?: "start" | "end" }
-  | { type: "update"; id: number; data: Partial<T> }
-  | { type: "delete"; id: number };
+  | { type: "update"; id: Id; data: Partial<T> }
+  | { type: "delete"; id: Id };
 
 /**
  * Apply an optimistic operation to a list, returning the modified list.
@@ -12,7 +13,7 @@ export type OptimisticOp<T> =
  * each caller can preserve its list's existing ordering (e.g. transactions
  * prepend newest-first, while categories/cards append). Defaults to "start".
  */
-export function applyOptimistic<T extends { id: number }>(
+export function applyOptimistic<T extends { id: Id }>(
   list: T[],
   op: OptimisticOp<T>,
 ): T[] {

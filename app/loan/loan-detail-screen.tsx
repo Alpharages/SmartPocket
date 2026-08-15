@@ -148,7 +148,7 @@ export default function LoanDetailScreen() {
   const { refreshLoans, deleteLoan } = useExpense();
 
   const handleDelete = useCallback(async () => {
-    if (Number.isNaN(loanId)) return;
+    if (loanId === null) return;
     const confirmed = await confirmDestructive({
       title: "Delete loan?",
       message:
@@ -184,7 +184,7 @@ export default function LoanDetailScreen() {
     [loanDetail],
   );
 
-  if (Number.isNaN(loanId)) {
+  if (loanId === null) {
     return (
       <ScreenContainer
         className="flex-1 bg-background"

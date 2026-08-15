@@ -50,6 +50,7 @@ import {
 } from "@/lib/transfer-form-validation";
 import { parseDateInput } from "@/lib/recurring-form-validation";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import type { Id } from "@/drizzle/schema";
 
 type SheetMode = "add" | "edit" | null;
 
@@ -328,9 +329,9 @@ function AccountPickerSheet({
   visible: boolean;
   title: string;
   accounts: Account[];
-  selectedId: number | null;
+  selectedId: Id | null;
   onClose: () => void;
-  onSelect: (id: number) => void;
+  onSelect: (id: Id) => void;
   testID: string;
 }) {
   const colors = useColors();
@@ -581,8 +582,8 @@ function ReassignAccountSheet({
   visible: boolean;
   sourceAccount: Account | null;
   candidates: Account[];
-  selectedTargetId: number | null;
-  onSelectTarget: (id: number) => void;
+  selectedTargetId: Id | null;
+  onSelectTarget: (id: Id) => void;
   onClose: () => void;
   onConfirm: () => void;
   confirming: boolean;
@@ -684,7 +685,7 @@ export default function AccountsScreen() {
   const [currencyPickerVisible, setCurrencyPickerVisible] = useState(false);
   const [reassignVisible, setReassignVisible] = useState(false);
   const [reassignSource, setReassignSource] = useState<Account | null>(null);
-  const [reassignTargetId, setReassignTargetId] = useState<number | null>(null);
+  const [reassignTargetId, setReassignTargetId] = useState<Id | null>(null);
   const [reassigning, setReassigning] = useState(false);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);

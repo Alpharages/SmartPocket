@@ -20,6 +20,7 @@ import {
   formatDateInput,
   parseDateInput,
 } from "@/lib/recurring-form-validation";
+import type { Id } from "@/drizzle/schema";
 
 /**
  * Edit an existing transaction.
@@ -48,10 +49,10 @@ export function TransactionEditSheet({
 
   const [type, setType] = useState<"income" | "expense">(transaction.type);
   const [amount, setAmount] = useState(transaction.amount);
-  const [categoryId, setCategoryId] = useState<number | null>(
+  const [categoryId, setCategoryId] = useState<Id | null>(
     transaction.categoryId,
   );
-  const [cardId, setCardId] = useState<number | null>(
+  const [cardId, setCardId] = useState<Id | null>(
     transaction.creditCardId ?? null,
   );
   const [description, setDescription] = useState(transaction.description ?? "");

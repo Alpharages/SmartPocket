@@ -1,5 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { isUlid } from "../shared/ulid";
+import type { Id } from "../drizzle/schema";
 import { router, protectedProcedure, publicProcedure } from "./_core/trpc";
 import * as db from "./db";
 import {
@@ -71,6 +73,15 @@ const moneySchema = z
 const positiveMoneySchema = moneySchema.refine((v) => Number(v) > 0, {
   message: "Amount must be greater than zero",
 });
+
+/**
+ * Every id crossing this API is a client-generated ULID. Validating the shape
+ * here (rather than accepting any string) keeps a malformed or hand-crafted id
+ * from reaching the ownership checks in `server/db.ts`, and makes the
+ * autoincrement-era `z.number()` inputs fail loudly instead of silently
+ * coercing.
+ */
+const idSchema = z.string().refine(isUlid, { message: "Invalid id" });
 
 /** Unwrapped card fields — `creditCardSchema` is a ZodEffects and has no `.shape`. */
 const creditCardFields = {
@@ -149,8 +160,8 @@ const accountSchema = z.object({
 
 const transferSchema = z
   .object({
-    fromAccountId: z.number(),
-    toAccountId: z.number(),
+    fromAccountId: idSchema,
+    toAccountId: idSchema,
     amount: positiveMoneySchema,
     description: z.string().max(500).optional(),
     date: z.date(),
@@ -160,19 +171,19 @@ const transferSchema = z
   });
 
 const transactionSchema = z.object({
-  categoryId: z.number(),
+  categoryId: idSchema,
   type: z.enum(["income", "expense"]),
   // SP-041: was `regex` only, which accepts "0" and "0.00". Every other money
   // field in this file already refines to > 0; transactions were the outlier.
   amount: positiveMoneySchema,
   description: z.string().max(500).optional(),
   date: z.date(),
-  creditCardId: z.number().optional(),
-  accountId: z.number().nullable().optional(),
+  creditCardId: idSchema.optional(),
+  accountId: idSchema.nullable().optional(),
 });
 
 const budgetSchema = z.object({
-  categoryId: z.number(),
+  categoryId: idSchema,
   period: z.enum(["monthly", "weekly"]),
   amount: positiveMoneySchema,
   startDate: z.date().optional(),
@@ -233,15 +244,15 @@ const loanSchema = z
   });
 
 const repaymentInputSchema = z.object({
-  loanId: z.number(),
+  loanId: idSchema,
   amount: positiveMoneySchema,
   date: z.date(),
   note: z.string().max(2000).nullable().optional(),
 });
 
 const recurringTransactionSchemaBase = z.object({
-  categoryId: z.number(),
-  creditCardId: z.number().nullable().optional(),
+  categoryId: idSchema,
+  creditCardId: idSchema.nullable().optional(),
   type: z.enum(["income", "expense"]),
   amount: moneySchema,
   description: z.string().max(500).nullable().optional(),
@@ -319,7 +330,7 @@ const recurringTransactionSchema = recurringTransactionSchemaBase.superRefine(
  * `userId`, so these guards exist to turn a silent no-op into an explicit
  * NOT_FOUND — and to keep single-row writes consistent with the bulk paths.
  */
-async function assertOwnedCategory(id: number, userId: number) {
+async function assertOwnedCategory(id: Id, userId: Id) {
   const category = await db.getCategoryById(id, userId);
   if (!category) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Category not found" });
@@ -331,12 +342,12 @@ async function assertOwnedCategory(id: number, userId: number) {
 async function assertCategoryNameAvailable(
   name: string,
   type: "income" | "expense",
-  userId: number,
-  excludeId?: number,
+  userId: Id,
+  excludeId?: Id,
 ) {
   const existing = await db.getUserCategories(userId, type);
   const clash = existing.find(
-    (category: { id: number; name: string }) =>
+    (category: { id: Id; name: string }) =>
       category.id !== excludeId &&
       category.name.trim().toLowerCase() === name.trim().toLowerCase(),
   );
@@ -348,7 +359,7 @@ async function assertCategoryNameAvailable(
   }
 }
 
-async function assertOwnedCard(id: number, userId: number) {
+async function assertOwnedCard(id: Id, userId: Id) {
   const card = await db.getCreditCardById(id, userId);
   if (!card) {
     throw new TRPCError({
@@ -387,7 +398,7 @@ const categoriesRouter = router({
     }),
 
   update: protectedProcedure
-    .input(z.object({ id: z.number(), ...categorySchema.shape }))
+    .input(z.object({ id: idSchema, ...categorySchema.shape }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
       await assertOwnedCategory(id, ctx.user.id);
@@ -396,14 +407,14 @@ const categoriesRouter = router({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .mutation(async ({ ctx, input }) => {
       await assertOwnedCategory(input.id, ctx.user.id);
       return db.deleteCategory(input.id, ctx.user.id);
     }),
 
   getById: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .query(({ ctx, input }) => {
       return db.getCategoryById(input.id, ctx.user.id);
     }),
@@ -438,7 +449,7 @@ const creditCardsRouter = router({
     .input(
       z
         .object({
-          id: z.number(),
+          id: idSchema,
           name: creditCardFields.name,
           cardNumber: creditCardFields.cardNumber.optional(),
           cardholderName: creditCardFields.cardholderName,
@@ -469,14 +480,14 @@ const creditCardsRouter = router({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .mutation(async ({ ctx, input }) => {
       await assertOwnedCard(input.id, ctx.user.id);
       return db.deleteCreditCard(input.id, ctx.user.id);
     }),
 
   getById: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .query(({ ctx, input }) => {
       return db.getCreditCardById(input.id, ctx.user.id);
     }),
@@ -501,14 +512,14 @@ const accountsRouter = router({
   }),
 
   update: protectedProcedure
-    .input(z.object({ id: z.number(), ...accountSchema.partial().shape }))
+    .input(z.object({ id: idSchema, ...accountSchema.partial().shape }))
     .mutation(({ ctx, input }) => {
       const { id, ...data } = input;
       return db.updateAccount(id, ctx.user.id, data);
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .mutation(async ({ ctx, input }) => {
       const account = await db.getAccountById(input.id, ctx.user.id);
       if (!account) {
@@ -544,7 +555,7 @@ const accountsRouter = router({
     }),
 
   transactionCount: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .query(async ({ ctx, input }) => {
       const account = await db.getAccountById(input.id, ctx.user.id);
       if (!account) {
@@ -557,7 +568,7 @@ const accountsRouter = router({
     }),
 
   transferCount: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .query(async ({ ctx, input }) => {
       const account = await db.getAccountById(input.id, ctx.user.id);
       if (!account) {
@@ -573,8 +584,8 @@ const accountsRouter = router({
     .input(
       z
         .object({
-          id: z.number(),
-          targetAccountId: z.number(),
+          id: idSchema,
+          targetAccountId: idSchema,
         })
         .refine((value) => value.id !== value.targetAccountId, {
           message: "Cannot reassign to the same account",
@@ -601,7 +612,7 @@ const accountsRouter = router({
     }),
 
   getById: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .query(({ ctx, input }) => {
       return db.getAccountById(input.id, ctx.user.id);
     }),
@@ -609,7 +620,7 @@ const accountsRouter = router({
   balances: protectedProcedure.query(async ({ ctx }) => {
     const balances = await db.getAccountBalances(ctx.user.id);
     return Object.entries(balances).map(([accountId, balance]) => ({
-      accountId: Number(accountId),
+      accountId,
       balance,
     }));
   }),
@@ -695,13 +706,13 @@ const transactionsRouter = router({
     }),
 
   listByCategory: protectedProcedure
-    .input(z.object({ categoryId: z.number() }))
+    .input(z.object({ categoryId: idSchema }))
     .query(({ ctx, input }) => {
       return db.getTransactionsByCategory(ctx.user.id, input.categoryId);
     }),
 
   listByCreditCard: protectedProcedure
-    .input(z.object({ creditCardId: z.number() }))
+    .input(z.object({ creditCardId: idSchema }))
     .query(({ ctx, input }) => {
       return db.getTransactionsByCreditCard(ctx.user.id, input.creditCardId);
     }),
@@ -749,7 +760,7 @@ const transactionsRouter = router({
         new Set(
           input
             .map((row) => row.accountId)
-            .filter((id): id is number => id != null),
+            .filter((id): id is Id => id != null),
         ),
       );
       for (const accountId of accountIds) {
@@ -773,7 +784,7 @@ const transactionsRouter = router({
         new Set(
           input
             .map((row) => row.creditCardId)
-            .filter((id): id is number => id != null),
+            .filter((id): id is Id => id != null),
         ),
       );
       for (const creditCardId of creditCardIds) {
@@ -795,7 +806,7 @@ const transactionsRouter = router({
     }),
 
   update: protectedProcedure
-    .input(z.object({ id: z.number(), ...transactionSchema.partial().shape }))
+    .input(z.object({ id: idSchema, ...transactionSchema.partial().shape }))
     .mutation(async ({ ctx, input }) => {
       if (input.accountId != null) {
         const account = await db.getAccountById(input.accountId, ctx.user.id);
@@ -817,13 +828,13 @@ const transactionsRouter = router({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .mutation(({ ctx, input }) => {
       return db.deleteTransaction(input.id, ctx.user.id);
     }),
 
   getById: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .query(({ ctx, input }) => {
       return db.getTransactionById(input.id, ctx.user.id);
     }),
@@ -857,7 +868,7 @@ const recurringTransactionsRouter = router({
   update: protectedProcedure
     .input(
       z
-        .object({ id: z.number(), isActive: z.boolean().optional() })
+        .object({ id: idSchema, isActive: z.boolean().optional() })
         .and(recurringTransactionSchema),
     )
     .mutation(({ ctx, input }) => {
@@ -873,13 +884,13 @@ const recurringTransactionsRouter = router({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .mutation(({ ctx, input }) => {
       return db.deleteRecurringTransaction(input.id, ctx.user.id);
     }),
 
   getById: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .query(({ ctx, input }) => {
       return db.getRecurringTransactionById(input.id, ctx.user.id);
     }),
@@ -978,7 +989,7 @@ const budgetsRouter = router({
     }),
 
   update: protectedProcedure
-    .input(z.object({ id: z.number(), ...budgetSchema.shape }))
+    .input(z.object({ id: idSchema, ...budgetSchema.shape }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
       const existing = await db.findActiveBudget(
@@ -998,13 +1009,13 @@ const budgetsRouter = router({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .mutation(({ ctx, input }) => {
       return db.deleteBudget(input.id, ctx.user.id);
     }),
 
   getById: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .query(({ ctx, input }) => {
       return db.getBudgetById(input.id, ctx.user.id);
     }),
@@ -1039,7 +1050,7 @@ const loansRouter = router({
   }),
 
   getById: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .query(({ ctx, input }) => {
       return db.getLoanWithBalance(input.id, ctx.user.id);
     }),
@@ -1061,7 +1072,7 @@ const loansRouter = router({
   }),
 
   update: protectedProcedure
-    .input(z.object({ id: z.number(), ...loanSchema.partial().shape }))
+    .input(z.object({ id: idSchema, ...loanSchema.partial().shape }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
       await db.updateLoan(id, ctx.user.id, data);
@@ -1069,7 +1080,7 @@ const loansRouter = router({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .mutation(({ ctx, input }) => {
       return db.deleteLoan(input.id, ctx.user.id);
     }),
@@ -1138,13 +1149,13 @@ const loansRouter = router({
     }),
 
   listRepayments: protectedProcedure
-    .input(z.object({ loanId: z.number() }))
+    .input(z.object({ loanId: idSchema }))
     .query(({ ctx, input }) => {
       return db.getRepaymentsByLoan(input.loanId, ctx.user.id);
     }),
 
   deleteRepayment: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: idSchema }))
     .mutation(({ ctx, input }) => {
       return db.deleteRepayment(input.id, ctx.user.id);
     }),
@@ -1200,7 +1211,7 @@ const PIN_WRITE_INPUT = PIN_INPUT.extend({
  * boundary for "unsync this device's PIN", same as any other sign-out action.
  */
 async function assertCurrentPinProof(
-  userId: number,
+  userId: Id,
   existingHash: string | null,
   currentPin: string | undefined,
 ): Promise<void> {

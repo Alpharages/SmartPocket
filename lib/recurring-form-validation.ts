@@ -5,6 +5,7 @@ import {
   MONEY_PATTERN,
   isWithinMoneyRange,
 } from "@shared/money";
+import type { Id } from "@/drizzle/schema";
 export type RecurringEndCondition = "count" | "endDate" | "never";
 
 export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly";
@@ -12,8 +13,8 @@ export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly";
 export type RecurringFormValues = {
   type: "income" | "expense";
   amount: string;
-  categoryId: number | null;
-  creditCardId: number | null;
+  categoryId: Id | null;
+  creditCardId: Id | null;
   description: string;
   frequency: RecurringFrequency;
   interval: number;

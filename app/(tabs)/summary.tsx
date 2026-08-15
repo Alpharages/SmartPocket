@@ -49,6 +49,7 @@ import { formatCurrency } from "@/lib/currency";
 import { computeMonthEndForecastState } from "@/lib/forecast";
 import { trpc } from "@/lib/trpc";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import type { Id } from "@/drizzle/schema";
 
 export default function SummaryScreen() {
   const router = useRouter();
@@ -68,7 +69,7 @@ export default function SummaryScreen() {
   } = useExpense();
   const { isLg } = useBreakpoints();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+  const [selectedCategoryId, setSelectedCategoryId] = useState<Id | null>(
     null,
   );
 
@@ -87,7 +88,7 @@ export default function SummaryScreen() {
     month,
   });
   const anomalyCategoryIds = useMemo(() => {
-    const ids = new Set<number>();
+    const ids = new Set<Id>();
     for (const row of anomaliesQuery.data ?? []) {
       if (row.isAnomaly) {
         ids.add(row.categoryId);
@@ -206,7 +207,7 @@ export default function SummaryScreen() {
   }, [selectedCategoryId, selectedCategory]);
 
   const categoryById = useMemo(() => {
-    const map = new Map<number, (typeof categories)[number]>();
+    const map = new Map<Id, (typeof categories)[number]>();
     for (const cat of categories) map.set(cat.id, cat);
     return map;
   }, [categories]);
@@ -420,7 +421,7 @@ export default function SummaryScreen() {
 
   // Category list data derived from monthly expenses query.
   const categoryExpenses = useMemo(() => {
-    const map = new Map<number, number>();
+    const map = new Map<Id, number>();
     for (const t of monthTransactions) {
       if (t.type === "expense") {
         map.set(
@@ -451,7 +452,7 @@ export default function SummaryScreen() {
     [categoryExpenses],
   );
 
-  const handleCategoryPress = (categoryId: number) => {
+  const handleCategoryPress = (categoryId: Id) => {
     if (isLg) {
       setSelectedCategoryId((prev) =>
         prev === categoryId ? null : categoryId,

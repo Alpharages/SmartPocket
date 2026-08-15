@@ -23,6 +23,7 @@ import { resolveCategoryColor } from "@/constants/theme";
 import { isPositiveBudgetAmount } from "@/lib/budget-validation";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { confirmDestructive } from "@/lib/confirm-dialog";
+import type { Id } from "@/drizzle/schema";
 
 export { isPositiveBudgetAmount };
 
@@ -65,7 +66,7 @@ export function BudgetFormSheet({
     budget?.period ?? "monthly",
   );
   const [amount, setAmount] = useState(budget?.amount ?? "");
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(
+  const [selectedCategory, setSelectedCategory] = useState<Id | null>(
     budget?.categoryId ?? null,
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

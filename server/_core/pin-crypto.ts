@@ -1,5 +1,6 @@
 import { randomBytes, scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import type { Id } from "../../drizzle/schema";
 
 const scryptAsync = promisify(scrypt) as (
   password: string,
@@ -89,7 +90,7 @@ export function isPinLocked(state: PinAttemptState, now: Date): boolean {
 // ============================================================================
 
 const SET_PIN_MIN_INTERVAL_MS = 2000;
-const lastSetPinAt = new Map<number, number>();
+const lastSetPinAt = new Map<Id, number>();
 
 /**
  * Evicts every entry outside the throttle window. Called from the read side
@@ -104,13 +105,13 @@ function evictExpiredSetPinEntries(now: number): void {
   }
 }
 
-export function isSetPinThrottled(userId: number, now: number): boolean {
+export function isSetPinThrottled(userId: Id, now: number): boolean {
   evictExpiredSetPinEntries(now);
   const last = lastSetPinAt.get(userId);
   return last !== undefined && now - last < SET_PIN_MIN_INTERVAL_MS;
 }
 
-export function recordSetPinAttempt(userId: number, now: number): void {
+export function recordSetPinAttempt(userId: Id, now: number): void {
   lastSetPinAt.set(userId, now);
 }
 

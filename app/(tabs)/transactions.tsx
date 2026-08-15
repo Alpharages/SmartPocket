@@ -42,6 +42,7 @@ import {
 import { TAB_BAR_CLEARANCE } from "@/lib/_core/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { confirmDestructive } from "@/lib/confirm-dialog";
+import type { Id } from "@/drizzle/schema";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -302,7 +303,7 @@ export default function TransactionsScreen() {
   const [searchText, setSearchText] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [selectedTransactionId, setSelectedTransactionId] = useState<
-    number | null
+    Id | null
   >(null);
   // Same active-theme token source the surface primitives read — never
   // the theme-agnostic useColors() (frozen to the default theme; AC1).
@@ -319,7 +320,7 @@ export default function TransactionsScreen() {
 
   // Build category lookup map for O(1) resolution per row.
   const categoryById = useMemo(() => {
-    const map = new Map<number, (typeof categories)[number]>();
+    const map = new Map<Id, (typeof categories)[number]>();
     for (const cat of categories) {
       map.set(cat.id, cat);
     }
@@ -377,7 +378,7 @@ export default function TransactionsScreen() {
   );
 
   const handleDelete = useCallback(
-    async (id: number, title: string) => {
+    async (id: Id, title: string) => {
       // SP-007: this used Alert.alert, whose buttons never fire on web — the
       // affordance was present, labelled, and completely inert.
       const confirmed = await confirmDestructive({
@@ -392,7 +393,7 @@ export default function TransactionsScreen() {
   );
 
   const handleTransactionPress = useCallback(
-    (id: number) => {
+    (id: Id) => {
       if (isLg) {
         setSelectedTransactionId(id);
       } else {
