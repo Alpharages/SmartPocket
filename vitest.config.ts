@@ -76,5 +76,15 @@ export default defineConfig({
     globals: true,
     environment: "node",
     setupFiles: ["./tests/setup.ts"],
+    server: {
+      deps: {
+        // `node:sqlite` is a newer built-in that Vite's default externalization
+        // list doesn't yet recognize, so it tries to bundle it as if it were an
+        // npm package named "sqlite" and fails to resolve. Only the local-first
+        // SQLite engine tests (tests/sqlite-engine.test.ts and its driver) touch
+        // this module — everything else is unaffected.
+        external: [/^node:sqlite$/],
+      },
+    },
   },
 });

@@ -83,7 +83,14 @@ export async function upsertUser(data: {
   loginMethod?: string | null;
   lastSignedIn?: Date;
 }) {
+  // This is a raw INSERT, not a drizzle-builder one — the schema's
+  // `.$defaultFn(() => ulid())` on `users.id` only fires through drizzle's
+  // query builder, never for a hand-written statement like this one. `id` is
+  // minted here and included in the column list so a first-time signup gets a
+  // real id; it is deliberately excluded from the ON DUPLICATE KEY UPDATE
+  // clause below so a returning user's existing id is never overwritten.
   const fields = [
+    ["id", ulid()],
     ["openId", data.openId],
     ["name", data.name],
     ["email", data.email],
@@ -93,7 +100,7 @@ export async function upsertUser(data: {
   const columns = fields.map(([column]) => column);
   const values = fields.map(([, value]) => value);
   const updates = columns
-    .filter((column) => column !== "openId")
+    .filter((column) => column !== "openId" && column !== "id")
     .map((column) => `${column} = VALUES(${column})`);
 
   await callDataApi("Database/query", {
