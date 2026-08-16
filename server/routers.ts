@@ -1,9 +1,14 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { isUlid } from "../shared/ulid";
-import type { Id } from "../drizzle/schema";
+import { SYNC_TABLES, type Id } from "../drizzle/schema";
 import { router, protectedProcedure, publicProcedure } from "./_core/trpc";
 import * as db from "./db";
+import {
+  accountHasAnyData,
+  applyPushedRows,
+  getRowsSince,
+} from "./_core/sync-engine";
 import {
   CATEGORY_DEFAULT_COLOR,
   DEFAULT_CATEGORY_ICON,
@@ -1344,6 +1349,43 @@ const dataRouter = router({
 });
 
 // ============================================================================
+// SYNC ROUTER (local-first-sync-plan.md phase 4)
+// ============================================================================
+
+const syncTableSchema = z.enum(SYNC_TABLES);
+
+const syncRouter = router({
+  /** Applies this device's dirty rows for one table, returning each row's assigned serverSeq. */
+  push: protectedProcedure
+    .input(
+      z.object({
+        table: syncTableSchema,
+        rows: z.array(z.record(z.string(), z.unknown())).max(500),
+      }),
+    )
+    .mutation(({ ctx, input }) => {
+      return applyPushedRows(input.table, ctx.user.id, input.rows);
+    }),
+
+  /** Rows this account has above `sinceSeq` for one table, oldest first. */
+  pull: protectedProcedure
+    .input(
+      z.object({
+        table: syncTableSchema,
+        sinceSeq: z.number().int().min(0),
+      }),
+    )
+    .query(({ ctx, input }) => {
+      return getRowsSince(input.table, ctx.user.id, input.sinceSeq);
+    }),
+
+  /** Whether this account already holds any data — drives the first-sync choice. */
+  accountHasData: protectedProcedure.query(({ ctx }) => {
+    return accountHasAnyData(SYNC_TABLES, ctx.user.id);
+  }),
+});
+
+// ============================================================================
 // APP ROUTER
 // ============================================================================
 
@@ -1361,6 +1403,7 @@ export const appRouter = router({
   settings: settingsRouter,
   security: securityRouter,
   data: dataRouter,
+  sync: syncRouter,
 });
 
 export type AppRouter = typeof appRouter;

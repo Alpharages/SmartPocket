@@ -105,6 +105,20 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /**
+ * A single-column, row-per-tick counter that exists purely so its
+ * AUTO_INCREMENT PK can hand out `serverSeq` values. MySQL allocates a
+ * contiguous block of ids for a single multi-row INSERT under the default
+ * `innodb_autoinc_lock_mode`, so a sync push inserts N blank rows in one
+ * statement and derives `serverSeq` for its N dirty rows from the returned
+ * `insertId` — atomic and connection-pool-safe, with no explicit
+ * transaction or session-scoped `LAST_INSERT_ID()` call required.
+ */
+export const syncSequence = mysqlTable("syncSequence", {
+  seq: bigint("seq", { mode: "number" }).autoincrement().primaryKey(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/**
  * Categories table for transaction categorization.
  * Supports both predefined and custom categories.
  */

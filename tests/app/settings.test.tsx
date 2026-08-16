@@ -161,6 +161,16 @@ vi.mock("@/hooks/use-auth", () => ({
   }),
 }));
 
+// The real component pulls in lib/sync/sync-state.ts's expo-secure-store
+// dependency, which throws outside a native runtime — covered on its own in
+// tests/components/sync-settings.test.tsx.
+vi.mock("@/components/sync-settings", () => ({
+  SyncSettingsSection: () => null,
+}));
+vi.mock("@/lib/sync/sync-state", () => ({
+  isSyncSupported: () => true,
+}));
+
 vi.mock("@/lib/settings-provider", () => ({
   useSettings: () => ({
     aiEnabled: false,

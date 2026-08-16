@@ -274,13 +274,24 @@ export const SQLITE_DATE_COLUMNS: ReadonlySet<string> = new Set([
  * Tables whose `INSERT ... ON DUPLICATE KEY UPDATE` targets a UNIQUE column
  * other than the primary key — MySQL upsert syntax resolves the conflict
  * implicitly by whichever constraint collides, but SQLite's
- * `ON CONFLICT (...) DO UPDATE` must name the column. `server/db.ts` only
- * ever upserts `users` (keyed on `openId`, Story: OAuth sign-in must not
- * create a duplicate row for a returning user); add an entry here if a
- * future upsert targets another table.
+ * `ON CONFLICT (...) DO UPDATE` must name the column. `users` is keyed on
+ * `openId` (OAuth sign-in must not create a duplicate row for a returning
+ * user); every synced table (local-first-sync-plan.md phase 4's
+ * server/_core/sync-engine.ts, applyIncomingRow) upserts by `id` — the row
+ * either already exists locally with that primary key or it doesn't.
  */
 export const UPSERT_CONFLICT_COLUMN: Readonly<Record<string, string>> = {
   users: "openId",
+  categories: "id",
+  creditCards: "id",
+  accounts: "id",
+  loans: "id",
+  budgets: "id",
+  monthlySummaries: "id",
+  transactions: "id",
+  transfers: "id",
+  recurringTransactions: "id",
+  repayments: "id",
 };
 
 /**

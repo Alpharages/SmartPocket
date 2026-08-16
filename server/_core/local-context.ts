@@ -1,4 +1,4 @@
-import type { User } from "../../drizzle/schema";
+import type { Id, User } from "../../drizzle/schema";
 import type { TrpcContext } from "./context";
 import * as db from "../db";
 import { ensureUserSeeded } from "./user-seeding";
@@ -52,6 +52,17 @@ export async function createLocalContext(): Promise<TrpcContext> {
     res: {} as TrpcContext["res"],
     user,
   };
+}
+
+/**
+ * The local device user's id — used by the sync worker (lib/sync/sync-worker.ts)
+ * to read this device's dirty rows and, on first sync, to re-own them under
+ * the signed-in account's id (local-first-sync-plan.md's "signing in later
+ * associates that local user with the account").
+ */
+export async function getLocalUserId(): Promise<Id> {
+  const user = await getLocalUser();
+  return user.id;
 }
 
 /** Test-only: undo the in-memory memoization between cases. */
