@@ -119,6 +119,23 @@ export const syncSequence = mysqlTable("syncSequence", {
 });
 
 /**
+ * Singleton row (id is always 1) recording the highest `serverSeq` that has
+ * ever been swept up by the tombstone purge job. A device whose own pull
+ * cursor (`lastPulledSeq`, stored locally) falls behind this value can no
+ * longer resume incrementally — a tombstone it needed may already be gone —
+ * so `sync.getPurgeWatermark` lets it detect that and fall back to the same
+ * first-sync-style choice (keep this device's data / keep the account's /
+ * merge) instead of silently risking a deleted row's resurrection.
+ */
+export const syncPurgeWatermark = mysqlTable("syncPurgeWatermark", {
+  id: int("id").primaryKey(),
+  purgedUpToSeq: bigint("purgedUpToSeq", { mode: "number" })
+    .default(0)
+    .notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
  * Categories table for transaction categorization.
  * Supports both predefined and custom categories.
  */

@@ -224,6 +224,28 @@ export async function reownLocalData(
 }
 
 /**
+ * Client-only: marks every one of this user's local rows dirty again,
+ * regardless of their current state. Used by the stale-cursor "keep this
+ * device's data" choice — this device's rows are already owned by the
+ * account (a prior sync re-owned them), so there's nothing to reown, just a
+ * need to re-push everything as canonical after the account's current data
+ * has been wiped (lib/sync/sync-worker.ts's resolveStaleCursor).
+ */
+export async function markAllDirty(
+  tables: readonly SyncTable[],
+  userId: Id,
+): Promise<void> {
+  for (const table of tables) {
+    await callDataApi("Database/query", {
+      body: {
+        query: `UPDATE ${table} SET dirty = 1 WHERE userId = ?`,
+        params: [userId],
+      },
+    });
+  }
+}
+
+/**
  * Client-only: the first-sync "keep the account's data" choice — the local
  * device's pre-sync rows were never shared with anything else, so discarding
  * them is a hard delete, not a tombstone (there is nothing downstream that
@@ -258,4 +280,81 @@ export async function accountHasAnyData(
     if (Array.isArray(result) && result.length > 0) return true;
   }
   return false;
+}
+
+// ============================================================================
+// TOMBSTONE PURGE (local-first-sync-plan.md "Purging tombstones" open risk)
+// ============================================================================
+
+const PURGE_WATERMARK_ID = 1;
+
+/**
+ * Server-only: the highest `serverSeq` the purge job has ever swept.
+ * `lib/sync/sync-worker.ts` compares this to a device's own pull cursor —
+ * a device behind this value can no longer trust an incremental pull to
+ * have carried every tombstone it needed.
+ */
+export async function getPurgeWatermark(): Promise<number> {
+  const rows = (await callDataApi("Database/query", {
+    body: {
+      query: "SELECT purgedUpToSeq FROM syncPurgeWatermark WHERE id = ?",
+      params: [PURGE_WATERMARK_ID],
+    },
+  })) as Array<{ purgedUpToSeq: number }>;
+  return rows[0]?.purgedUpToSeq ?? 0;
+}
+
+/**
+ * Server-only: hard-deletes tombstoned rows older than `olderThan` across
+ * every synced table, then advances the purge watermark to the highest
+ * `serverSeq` among the rows it just removed (never backwards — two
+ * concurrent runs, or a run that finds nothing, must not lower it). Safe to
+ * call on any schedule: the watermark is what makes an *arbitrary* schedule
+ * safe, by turning "purged too early" into a detectable stale-cursor
+ * condition instead of a silent resurrection.
+ */
+export async function purgeOldTombstones(
+  tables: readonly SyncTable[],
+  olderThan: Date,
+): Promise<{ purgedCount: number; newWatermark: number }> {
+  let purgedCount = 0;
+  let maxSeqSeen = await getPurgeWatermark();
+
+  for (const table of tables) {
+    const candidates = (await callDataApi("Database/query", {
+      body: {
+        query: `SELECT id, serverSeq FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`,
+        params: [olderThan],
+      },
+    })) as Array<{ id: string; serverSeq: number | null }>;
+
+    if (candidates.length === 0) continue;
+
+    for (const candidate of candidates) {
+      if (
+        typeof candidate.serverSeq === "number" &&
+        candidate.serverSeq > maxSeqSeen
+      ) {
+        maxSeqSeen = candidate.serverSeq;
+      }
+    }
+
+    await callDataApi("Database/query", {
+      body: {
+        query: `DELETE FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`,
+        params: [olderThan],
+      },
+    });
+    purgedCount += candidates.length;
+  }
+
+  await callDataApi("Database/query", {
+    body: {
+      query:
+        "UPDATE syncPurgeWatermark SET purgedUpToSeq = ? WHERE id = ? AND purgedUpToSeq < ?",
+      params: [maxSeqSeen, PURGE_WATERMARK_ID, maxSeqSeen],
+    },
+  });
+
+  return { purgedCount, newWatermark: maxSeqSeen };
 }

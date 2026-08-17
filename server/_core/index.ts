@@ -12,6 +12,8 @@ import { sdk } from "./sdk";
 import * as db from "../db";
 import { ENV } from "./env";
 import { buildAllowedOrigins, isOriginAllowed } from "./cors";
+import { purgeOldTombstones } from "./sync-engine";
+import { SYNC_TABLES } from "../../drizzle/schema";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -124,6 +126,30 @@ async function startServer() {
     } catch (error) {
       console.error("[scheduled/generate-recurring] failed:", error);
       res.status(500).json({ ok: false, error: "Recurring generation failed" });
+    }
+  });
+
+  // local-first-sync-plan.md "Purging tombstones" open risk: hard-deletes
+  // tombstoned rows past TOMBSTONE_RETENTION_MS and advances the purge
+  // watermark (server/_core/sync-engine.ts) so a device that fell behind it
+  // gets caught and prompted, instead of silently resurrecting a deletion.
+  // The window itself no longer has to be "long enough" for safety — a
+  // stale cursor is now detected — so it's picked for reasonable tidiness,
+  // not as the last line of defense.
+  const TOMBSTONE_RETENTION_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+  app.post("/api/scheduled/purge-tombstones", async (req, res) => {
+    const authorized = await isCronRequestAuthorized(req);
+    if (!authorized) {
+      res.status(401).json({ ok: false, error: "Unauthorized" });
+      return;
+    }
+    try {
+      const olderThan = new Date(Date.now() - TOMBSTONE_RETENTION_MS);
+      const result = await purgeOldTombstones(SYNC_TABLES, olderThan);
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      console.error("[scheduled/purge-tombstones] failed:", error);
+      res.status(500).json({ ok: false, error: "Tombstone purge failed" });
     }
   });
 

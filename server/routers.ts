@@ -7,6 +7,7 @@ import * as db from "./db";
 import {
   accountHasAnyData,
   applyPushedRows,
+  getPurgeWatermark,
   getRowsSince,
 } from "./_core/sync-engine";
 import {
@@ -1382,6 +1383,16 @@ const syncRouter = router({
   /** Whether this account already holds any data — drives the first-sync choice. */
   accountHasData: protectedProcedure.query(({ ctx }) => {
     return accountHasAnyData(SYNC_TABLES, ctx.user.id);
+  }),
+
+  /**
+   * The tombstone purge job's high-water mark. A device whose own pull
+   * cursor is behind this can no longer resume incrementally — it may be
+   * missing a deletion that has already been purged — so the sync worker
+   * treats that the same as a first sync: ask the user which side to keep.
+   */
+  getPurgeWatermark: protectedProcedure.query(() => {
+    return getPurgeWatermark();
   }),
 });
 

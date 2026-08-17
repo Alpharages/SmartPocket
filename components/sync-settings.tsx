@@ -14,43 +14,64 @@ import {
 } from "@/lib/sync/sync-state";
 import {
   resolveFirstSync,
+  resolveStaleCursor,
   runSync,
   type FirstSyncChoice,
+  type SyncChoiceReason,
 } from "@/lib/sync/sync-worker";
 
 const SYNC_EXPLANATION =
   "Keep this phone's data backed up and available on your other devices.";
 
+const CHOICE_SHEET_COPY: Record<
+  SyncChoiceReason,
+  { title: string; body: string; keepPhoneLabel: string; keepPhoneHint: string }
+> = {
+  "first-sync": {
+    title: "This account already has data",
+    body: "This phone and this account both have expense data already. Choose what to do before turning sync on.",
+    keepPhoneLabel: "Keep this phone's data",
+    keepPhoneHint: "Keep this phone's data, replacing the account's",
+  },
+  "stale-cursor": {
+    title: "This phone hasn't synced in a while",
+    body: "Other devices on this account may have made changes since this phone last synced. Choosing this phone's data will overwrite whatever they added.",
+    keepPhoneLabel: "Keep this phone's data anyway",
+    keepPhoneHint:
+      "Keep this phone's data, overwriting changes made on other devices",
+  },
+};
+
 function FirstSyncChoiceSheet({
   visible,
   busy,
+  reason,
   onChoose,
   onClose,
 }: {
   visible: boolean;
   busy: boolean;
+  reason: SyncChoiceReason;
   onChoose: (choice: FirstSyncChoice) => void;
   onClose: () => void;
 }) {
+  const copy = CHOICE_SHEET_COPY[reason];
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="This account already has data"
+      title={copy.title}
       testID="first-sync-choice-sheet"
     >
       <View className="px-lg pb-lg">
-        <Text className="mb-lg text-body text-muted">
-          This phone and this account both have expense data already. Choose
-          what to do before turning sync on.
-        </Text>
+        <Text className="mb-lg text-body text-muted">{copy.body}</Text>
         <View className="gap-md">
           <Button
             variant="secondary"
-            label="Keep this phone's data"
+            label={copy.keepPhoneLabel}
             onPress={() => onChoose("keep-phone")}
             disabled={busy}
-            accessibilityLabel="Keep this phone's data, replacing the account's"
+            accessibilityLabel={copy.keepPhoneHint}
           />
           <Button
             variant="secondary"
@@ -90,7 +111,9 @@ export function SyncSettingsSection() {
 
   const [enabled, setEnabled] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [choiceVisible, setChoiceVisible] = useState(false);
+  const [choiceReason, setChoiceReason] = useState<SyncChoiceReason | null>(
+    null,
+  );
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -105,7 +128,7 @@ export function SyncSettingsSection() {
       const client = createRemoteSyncClient();
       const outcome = await runSync(client, user.id);
       if (outcome.status === "needs-first-sync-choice") {
-        setChoiceVisible(true);
+        setChoiceReason(outcome.reason);
         return;
       }
       if (outcome.status === "synced") {
@@ -131,12 +154,17 @@ export function SyncSettingsSection() {
 
   const handleChoice = useCallback(
     async (choice: FirstSyncChoice) => {
-      if (!user) return;
-      setChoiceVisible(false);
+      if (!user || !choiceReason) return;
+      const reason = choiceReason;
+      setChoiceReason(null);
       setSyncing(true);
       try {
         const client = createRemoteSyncClient();
-        await resolveFirstSync(client, choice, user.id);
+        if (reason === "stale-cursor") {
+          await resolveStaleCursor(client, choice, user.id);
+        } else {
+          await resolveFirstSync(client, choice, user.id);
+        }
         const outcome = await runSync(client, user.id);
         if (outcome.status === "synced") {
           setLastSyncedAt(new Date());
@@ -151,7 +179,7 @@ export function SyncSettingsSection() {
         setSyncing(false);
       }
     },
-    [user, toast],
+    [user, toast, choiceReason],
   );
 
   if (!isSyncSupported()) return null;
@@ -211,10 +239,11 @@ export function SyncSettingsSection() {
         </View>
       ) : null}
       <FirstSyncChoiceSheet
-        visible={choiceVisible}
+        visible={choiceReason !== null}
         busy={syncing}
+        reason={choiceReason ?? "first-sync"}
         onChoose={handleChoice}
-        onClose={() => setChoiceVisible(false)}
+        onClose={() => setChoiceReason(null)}
       />
     </>
   );

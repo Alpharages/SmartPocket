@@ -316,4 +316,110 @@ describe("sync-engine against real SQLite (the device-side operations)", () => {
     await db.deleteCategory(catId, userId);
     expect(await accountHasAnyData(SYNC_TABLES, userId)).toBe(false);
   });
+
+  it("markAllDirty flags every one of this user's rows across every synced table, regardless of current state", async () => {
+    const db = await import("@/server/db");
+    const { markAllDirty, getDirtyRows, markRowsSynced } =
+      await import("@/server/_core/sync-engine");
+    const userId = testId(1);
+
+    const catId = await db.createCategory({
+      userId,
+      name: "Groceries",
+      type: "expense",
+      color: "#111111",
+      icon: "cart",
+      isDefault: false,
+    });
+    await markRowsSynced("categories", [{ id: catId, serverSeq: 1 }]);
+    expect(await getDirtyRows("categories", userId)).toEqual([]);
+
+    await markAllDirty(SYNC_TABLES, userId);
+
+    const dirty = await getDirtyRows("categories", userId);
+    expect(dirty.map((r) => r.id)).toEqual([catId]);
+  });
+});
+
+describe("tombstone purge (mocked MySQL — watermark-driven, server-only)", () => {
+  beforeEach(() => {
+    // The previous describe block's beforeEach left @/server/_core/dataApi
+    // doMock'd to a real SQLite backend. `vi.doUnmock` reverts all the way to
+    // the *real* module (not just back to the top-level `vi.mock`), so
+    // re-doMock the same callDataApi proxy explicitly — this block asserts
+    // SQL shape against a mocked callDataApi, exactly like the "push
+    // mechanics" block above, since syncPurgeWatermark, like syncSequence,
+    // is server-only and never part of the device's schema.
+    vi.resetModules();
+    vi.doMock("@/server/_core/dataApi", () => ({
+      callDataApi: (...args: unknown[]) => callDataApi(...args),
+    }));
+    callDataApi.mockReset();
+  });
+
+  it("getPurgeWatermark returns 0 for an unseeded/missing watermark row", async () => {
+    callDataApi.mockResolvedValueOnce([]);
+    const { getPurgeWatermark } = await import("@/server/_core/sync-engine");
+    expect(await getPurgeWatermark()).toBe(0);
+  });
+
+  it("getPurgeWatermark returns the stored value", async () => {
+    callDataApi.mockResolvedValueOnce([{ purgedUpToSeq: 42 }]);
+    const { getPurgeWatermark } = await import("@/server/_core/sync-engine");
+    expect(await getPurgeWatermark()).toBe(42);
+  });
+
+  it("purgeOldTombstones deletes old tombstones per table and advances the watermark to the highest seq purged", async () => {
+    const cutoff = new Date("2026-01-01");
+    callDataApi
+      .mockResolvedValueOnce([{ purgedUpToSeq: 0 }]) // getPurgeWatermark
+      .mockResolvedValueOnce([
+        { id: testId(1), serverSeq: 5 },
+        { id: testId(2), serverSeq: 8 },
+      ]) // categories candidates
+      .mockResolvedValueOnce(undefined) // categories DELETE
+      .mockResolvedValueOnce([]) // creditCards candidates: none
+      .mockResolvedValue([]); // every remaining table: none, then the final UPDATE
+
+    const { purgeOldTombstones } = await import("@/server/_core/sync-engine");
+    const result = await purgeOldTombstones(SYNC_TABLES, cutoff);
+
+    expect(result).toEqual({ purgedCount: 2, newWatermark: 8 });
+
+    const deleteCall = callDataApi.mock.calls.find(([, opts]) =>
+      (opts as { body: { query: string } }).body.query.includes(
+        "DELETE FROM categories",
+      ),
+    );
+    expect(deleteCall).toBeDefined();
+    const watermarkUpdateCall = callDataApi.mock.calls.find(([, opts]) =>
+      (opts as { body: { query: string } }).body.query.includes(
+        "UPDATE syncPurgeWatermark",
+      ),
+    );
+    expect(
+      (watermarkUpdateCall![1] as { body: { params: unknown[] } }).body.params,
+    ).toEqual([8, 1, 8]);
+  });
+
+  it("purgeOldTombstones never moves the watermark backwards", async () => {
+    callDataApi
+      .mockResolvedValueOnce([{ purgedUpToSeq: 100 }]) // watermark already ahead
+      .mockResolvedValue([]); // no candidates in any table
+
+    const { purgeOldTombstones } = await import("@/server/_core/sync-engine");
+    const result = await purgeOldTombstones(SYNC_TABLES, new Date());
+
+    expect(result).toEqual({ purgedCount: 0, newWatermark: 100 });
+    const watermarkUpdateCall = callDataApi.mock.calls.find(([, opts]) =>
+      (opts as { body: { query: string } }).body.query.includes(
+        "UPDATE syncPurgeWatermark",
+      ),
+    );
+    // WHERE purgedUpToSeq < ? guards this from ever lowering the watermark,
+    // even though it's still issued with the unchanged value.
+    expect(
+      (watermarkUpdateCall![1] as { body: { params: unknown[] } }).body.params,
+    ).toEqual([100, 1, 100]);
+  });
 });

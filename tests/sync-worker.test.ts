@@ -6,6 +6,7 @@ const syncEngine = vi.hoisted(() => ({
   applyIncomingRow: vi.fn(),
   discardLocalData: vi.fn(),
   getDirtyRows: vi.fn(),
+  markAllDirty: vi.fn(),
   markRowsSynced: vi.fn(),
   reownLocalData: vi.fn(),
 }));
@@ -31,6 +32,7 @@ function fakeClient() {
       push: { mutate: vi.fn().mockResolvedValue([]) },
       pull: { query: vi.fn().mockResolvedValue([]) },
       accountHasData: { query: vi.fn().mockResolvedValue(false) },
+      getPurgeWatermark: { query: vi.fn().mockResolvedValue(0) },
     },
     data: {
       clearAll: { mutate: vi.fn().mockResolvedValue(undefined) },
@@ -107,7 +109,10 @@ describe("runSync", () => {
 
     const outcome = await runSync(client as never, accountUserId);
 
-    expect(outcome).toEqual({ status: "needs-first-sync-choice" });
+    expect(outcome).toEqual({
+      status: "needs-first-sync-choice",
+      reason: "first-sync",
+    });
     expect(syncEngine.reownLocalData).not.toHaveBeenCalled();
     expect(syncState.markFirstSyncComplete).not.toHaveBeenCalled();
     expect(client.sync.push.mutate).not.toHaveBeenCalled();
@@ -166,6 +171,92 @@ describe("runSync", () => {
 
     expect(outcome).toEqual({ status: "synced", pushed: 200, pulled: 0 });
     expect(client.sync.push.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports needs-first-sync-choice with reason stale-cursor when the pull cursor is behind the purge watermark", async () => {
+    syncState.getLastPulledSeq.mockResolvedValue(10);
+    const { runSync } = await import("@/lib/sync/sync-worker");
+    const client = fakeClient();
+    client.sync.getPurgeWatermark.query.mockResolvedValue(50);
+
+    const outcome = await runSync(client as never, accountUserId);
+
+    expect(outcome).toEqual({
+      status: "needs-first-sync-choice",
+      reason: "stale-cursor",
+    });
+    expect(client.sync.push.mutate).not.toHaveBeenCalled();
+    expect(client.sync.pull.query).not.toHaveBeenCalled();
+  });
+
+  it("proceeds normally when the pull cursor is at or ahead of the purge watermark", async () => {
+    syncState.getLastPulledSeq.mockResolvedValue(50);
+    const { runSync } = await import("@/lib/sync/sync-worker");
+    const client = fakeClient();
+    client.sync.getPurgeWatermark.query.mockResolvedValue(50);
+
+    const outcome = await runSync(client as never, accountUserId);
+
+    expect(outcome).toEqual({ status: "synced", pushed: 0, pulled: 0 });
+  });
+
+  it("never checks the purge watermark before the first sync has completed (reconciliation is the only gate)", async () => {
+    syncState.hasCompletedFirstSync.mockResolvedValue(false);
+    syncEngine.accountHasAnyData.mockResolvedValue(false);
+    const { runSync } = await import("@/lib/sync/sync-worker");
+    const client = fakeClient();
+
+    await runSync(client as never, accountUserId);
+
+    expect(client.sync.getPurgeWatermark.query).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveStaleCursor", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("keep-account: discards this device's copy of the account's data and resets the cursor", async () => {
+    const { resolveStaleCursor } = await import("@/lib/sync/sync-worker");
+    const client = fakeClient();
+
+    await resolveStaleCursor(client as never, "keep-account", accountUserId);
+
+    expect(syncEngine.discardLocalData).toHaveBeenCalledWith(
+      expect.arrayContaining(["categories"]),
+      accountUserId,
+    );
+    expect(syncEngine.markAllDirty).not.toHaveBeenCalled();
+    expect(client.data.clearAll.mutate).not.toHaveBeenCalled();
+    expect(syncState.setLastPulledSeq).toHaveBeenCalledWith(0);
+  });
+
+  it("keep-phone: wipes the account's current data, marks every local row dirty again, and resets the cursor", async () => {
+    const { resolveStaleCursor } = await import("@/lib/sync/sync-worker");
+    const client = fakeClient();
+
+    await resolveStaleCursor(client as never, "keep-phone", accountUserId);
+
+    expect(client.data.clearAll.mutate).toHaveBeenCalledTimes(1);
+    expect(syncEngine.markAllDirty).toHaveBeenCalledWith(
+      expect.arrayContaining(["categories"]),
+      accountUserId,
+    );
+    expect(syncEngine.discardLocalData).not.toHaveBeenCalled();
+    expect(syncState.setLastPulledSeq).toHaveBeenCalledWith(0);
+  });
+
+  it("merge: touches nothing locally except resetting the cursor for a full reconciling pull", async () => {
+    const { resolveStaleCursor } = await import("@/lib/sync/sync-worker");
+    const client = fakeClient();
+
+    await resolveStaleCursor(client as never, "merge", accountUserId);
+
+    expect(client.data.clearAll.mutate).not.toHaveBeenCalled();
+    expect(syncEngine.markAllDirty).not.toHaveBeenCalled();
+    expect(syncEngine.discardLocalData).not.toHaveBeenCalled();
+    expect(syncState.setLastPulledSeq).toHaveBeenCalledWith(0);
   });
 });
 

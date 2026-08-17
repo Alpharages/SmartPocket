@@ -4,6 +4,7 @@ import {
   applyIncomingRow,
   discardLocalData,
   getDirtyRows,
+  markAllDirty,
   markRowsSynced,
   reownLocalData,
 } from "@/server/_core/sync-engine";
@@ -29,9 +30,21 @@ const BATCH_LIMIT = 200;
 
 export type FirstSyncChoice = "keep-phone" | "keep-account" | "merge";
 
+/**
+ * "first-sync": this device has never synced before and both it and the
+ * account already hold data — the original first-sync-choice case.
+ * "stale-cursor": this device *has* synced before, but its pull cursor has
+ * fallen behind the tombstone purge watermark (server/_core/sync-engine.ts's
+ * getPurgeWatermark) — it can no longer trust an incremental pull to have
+ * carried every deletion, so it's treated the same way, just with a
+ * different (and more consequential — "keep phone's" here can discard other
+ * devices' contributions) prompt.
+ */
+export type SyncChoiceReason = "first-sync" | "stale-cursor";
+
 export type SyncOutcome =
   | { status: "disabled" }
-  | { status: "needs-first-sync-choice" }
+  | { status: "needs-first-sync-choice"; reason: SyncChoiceReason }
   | { status: "synced"; pushed: number; pulled: number };
 
 async function reconcileFirstSync(
@@ -86,6 +99,31 @@ export async function resolveFirstSync(
   }
 
   await markFirstSyncComplete();
+}
+
+/**
+ * Resolves a `reason: "stale-cursor"` prompt. Unlike `resolveFirstSync`,
+ * this device's local rows are already owned by the account (a previous
+ * sync re-owned them), so there is nothing to re-own here — only whichever
+ * side needs discarding, plus resetting the pull cursor to 0 so the normal
+ * pull phase that follows re-fetches the account's current data from
+ * scratch instead of resuming from a cursor that can no longer be trusted.
+ * "merge" needs no local mutation at all: the reset cursor and the
+ * push-then-pull that follows already reconcile both sides row by row via
+ * `applyIncomingRow`'s last-write-wins.
+ */
+export async function resolveStaleCursor(
+  client: RemoteSyncClient,
+  choice: FirstSyncChoice,
+  accountUserId: Id,
+): Promise<void> {
+  if (choice === "keep-account") {
+    await discardLocalData(SYNC_TABLES, accountUserId);
+  } else if (choice === "keep-phone") {
+    await client.data.clearAll.mutate();
+    await markAllDirty(SYNC_TABLES, accountUserId);
+  }
+  await setLastPulledSeq(0);
 }
 
 async function pushAll(
@@ -152,9 +190,20 @@ export async function runSync(
     return { status: "disabled" };
   }
 
-  const reconciled = await reconcileFirstSync(client, accountUserId);
-  if (reconciled === "needs-choice") {
-    return { status: "needs-first-sync-choice" };
+  const firstSyncDone = await hasCompletedFirstSync();
+  if (!firstSyncDone) {
+    const reconciled = await reconcileFirstSync(client, accountUserId);
+    if (reconciled === "needs-choice") {
+      return { status: "needs-first-sync-choice", reason: "first-sync" };
+    }
+  } else {
+    const [purgedUpToSeq, lastPulledSeq] = await Promise.all([
+      client.sync.getPurgeWatermark.query(),
+      getLastPulledSeq(),
+    ]);
+    if (lastPulledSeq < purgedUpToSeq) {
+      return { status: "needs-first-sync-choice", reason: "stale-cursor" };
+    }
   }
 
   const pushed = await pushAll(client, accountUserId);

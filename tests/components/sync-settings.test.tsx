@@ -54,6 +54,7 @@ vi.mock("@/lib/sync/remote-client", () => remoteClient);
 const syncWorker = vi.hoisted(() => ({
   runSync: vi.fn(),
   resolveFirstSync: vi.fn(),
+  resolveStaleCursor: vi.fn(),
 }));
 vi.mock("@/lib/sync/sync-worker", () => syncWorker);
 
@@ -136,7 +137,10 @@ describe("SyncSettingsSection", () => {
   it("shows the first-sync choice sheet when runSync reports a conflict", async () => {
     auth.user = { id: testId(1) };
     auth.isAuthenticated = true;
-    syncWorker.runSync.mockResolvedValue({ status: "needs-first-sync-choice" });
+    syncWorker.runSync.mockResolvedValue({
+      status: "needs-first-sync-choice",
+      reason: "first-sync",
+    });
 
     const root = render();
     await settle();
@@ -153,13 +157,27 @@ describe("SyncSettingsSection", () => {
         .findAllByProps({ testID: "first-sync-choice-sheet" })
         .filter((i) => (i.type as unknown) === "View"),
     ).toHaveLength(1);
+    // The mocked Sheet only renders `children`, not the `title` prop, so the
+    // reason-specific copy is asserted via the sheet's body text.
+    expect(
+      root
+        .findAllByType(Text)
+        .some((t) =>
+          /This phone and this account both have expense data already/.test(
+            String(t.props.children),
+          ),
+        ),
+    ).toBe(true);
   });
 
-  it("resolving the first-sync choice calls resolveFirstSync then re-runs sync", async () => {
+  it("resolving the first-sync choice calls resolveFirstSync (not resolveStaleCursor) then re-runs sync", async () => {
     auth.user = { id: testId(1) };
     auth.isAuthenticated = true;
     syncWorker.runSync
-      .mockResolvedValueOnce({ status: "needs-first-sync-choice" })
+      .mockResolvedValueOnce({
+        status: "needs-first-sync-choice",
+        reason: "first-sync",
+      })
       .mockResolvedValueOnce({ status: "synced", pushed: 1, pulled: 0 });
     syncWorker.resolveFirstSync.mockResolvedValue(undefined);
 
@@ -188,7 +206,59 @@ describe("SyncSettingsSection", () => {
       "merge",
       testId(1),
     );
+    expect(syncWorker.resolveStaleCursor).not.toHaveBeenCalled();
     expect(syncWorker.runSync).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows the stale-cursor warning copy and calls resolveStaleCursor (not resolveFirstSync) when the reason is stale-cursor", async () => {
+    auth.user = { id: testId(1) };
+    auth.isAuthenticated = true;
+    syncWorker.runSync
+      .mockResolvedValueOnce({
+        status: "needs-first-sync-choice",
+        reason: "stale-cursor",
+      })
+      .mockResolvedValueOnce({ status: "synced", pushed: 0, pulled: 3 });
+    syncWorker.resolveStaleCursor.mockResolvedValue(undefined);
+
+    const root = render();
+    await settle();
+    await act(async () => {
+      root.findByType(Switch).props.onValueChange(true);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The mocked Sheet only renders `children`, not the `title` prop, so the
+    // reason-specific copy is asserted via the sheet's body text.
+    expect(
+      root
+        .findAllByType(Text)
+        .some((t) =>
+          /Other devices on this account may have made changes/.test(
+            String(t.props.children),
+          ),
+        ),
+    ).toBe(true);
+
+    const keepAccountButton = root
+      .findAllByProps({
+        accessibilityLabel: "Keep the account's data, discarding this phone's",
+      })
+      .at(0)!;
+    await act(async () => {
+      keepAccountButton.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(syncWorker.resolveStaleCursor).toHaveBeenCalledWith(
+      expect.anything(),
+      "keep-account",
+      testId(1),
+    );
+    expect(syncWorker.resolveFirstSync).not.toHaveBeenCalled();
   });
 
   it("shows an error toast when a sync cycle throws", async () => {
