@@ -8,6 +8,7 @@ import TestRenderer, {
 
 import { CategoryPickerGrid } from "@/components/ui/CategoryPickerGrid";
 import type { Category } from "@/lib/expense-context";
+import { testId, syncColumns } from "../helpers/ids";
 
 const mockColors = {
   primary: "#4F46E5",
@@ -106,8 +107,8 @@ function queryText(root: ReactTestInstance, text: string): ReactTestInstance[] {
 
 const mockCategories: Category[] = [
   {
-    id: 1,
-    userId: 1,
+    id: testId(1),
+    userId: testId(1),
     name: "Food",
     type: "expense",
     color: "#E11D48",
@@ -117,8 +118,8 @@ const mockCategories: Category[] = [
     updatedAt: new Date(),
   },
   {
-    id: 2,
-    userId: 1,
+    id: testId(2),
+    userId: testId(1),
     name: "Transport",
     type: "expense",
     color: "#2563EB",
@@ -128,8 +129,8 @@ const mockCategories: Category[] = [
     updatedAt: new Date(),
   },
   {
-    id: 3,
-    userId: 1,
+    id: testId(3),
+    userId: testId(1),
     name: "Salary",
     type: "income",
     color: "#059669",
@@ -200,7 +201,7 @@ describe("CategoryPickerGrid", () => {
       const root = render(
         <CategoryPickerGrid
           categories={mockCategories}
-          selectedId={2}
+          selectedId={testId(2)}
           onSelect={() => {}}
         />,
       );
@@ -223,16 +224,16 @@ describe("CategoryPickerGrid", () => {
       const tokens = getTokens(root);
       press(tokens[0]);
       expect(onSelect).toHaveBeenCalledTimes(1);
-      expect(onSelect).toHaveBeenCalledWith(1);
+      expect(onSelect).toHaveBeenCalledWith(testId(1));
     });
   });
 
   describe("recently-used ordering (AC3)", () => {
     it("floats recently-used categories to the front", () => {
       const transactions = [
-        { categoryId: 3, date: new Date("2024-01-03") },
-        { categoryId: 1, date: new Date("2024-01-02") },
-        { categoryId: 2, date: new Date("2024-01-01") },
+        { categoryId: testId(3), date: new Date("2024-01-03") },
+        { categoryId: testId(1), date: new Date("2024-01-02") },
+        { categoryId: testId(2), date: new Date("2024-01-01") },
       ];
       const onSelect = vi.fn();
       const root = render(
@@ -246,18 +247,18 @@ describe("CategoryPickerGrid", () => {
       const tokens = getTokens(root);
       // Order should be: Salary (3), Food (1), Transport (2)
       press(tokens[0]);
-      expect(onSelect).toHaveBeenCalledWith(3);
+      expect(onSelect).toHaveBeenCalledWith(testId(3));
       press(tokens[1]);
-      expect(onSelect).toHaveBeenCalledWith(1);
+      expect(onSelect).toHaveBeenCalledWith(testId(1));
       press(tokens[2]);
-      expect(onSelect).toHaveBeenCalledWith(2);
+      expect(onSelect).toHaveBeenCalledWith(testId(2));
     });
 
     it("deduplicates recent category ids", () => {
       const transactions = [
-        { categoryId: 1, date: new Date("2024-01-03") },
-        { categoryId: 1, date: new Date("2024-01-02") },
-        { categoryId: 2, date: new Date("2024-01-01") },
+        { categoryId: testId(1), date: new Date("2024-01-03") },
+        { categoryId: testId(1), date: new Date("2024-01-02") },
+        { categoryId: testId(2), date: new Date("2024-01-01") },
       ];
       const onSelect = vi.fn();
       const root = render(
@@ -271,18 +272,18 @@ describe("CategoryPickerGrid", () => {
       const tokens = getTokens(root);
       // Order should be: Food (1), Transport (2), Salary (3)
       press(tokens[0]);
-      expect(onSelect).toHaveBeenCalledWith(1);
+      expect(onSelect).toHaveBeenCalledWith(testId(1));
       press(tokens[1]);
-      expect(onSelect).toHaveBeenCalledWith(2);
+      expect(onSelect).toHaveBeenCalledWith(testId(2));
       press(tokens[2]);
-      expect(onSelect).toHaveBeenCalledWith(3);
+      expect(onSelect).toHaveBeenCalledWith(testId(3));
     });
 
     it("respects recentLimit", () => {
       const transactions = [
-        { categoryId: 3, date: new Date("2024-01-03") },
-        { categoryId: 1, date: new Date("2024-01-02") },
-        { categoryId: 2, date: new Date("2024-01-01") },
+        { categoryId: testId(3), date: new Date("2024-01-03") },
+        { categoryId: testId(1), date: new Date("2024-01-02") },
+        { categoryId: testId(2), date: new Date("2024-01-01") },
       ];
       const onSelect = vi.fn();
       const root = render(
@@ -297,11 +298,11 @@ describe("CategoryPickerGrid", () => {
       const tokens = getTokens(root);
       // Only the most recent (Salary, id=3) should float
       press(tokens[0]);
-      expect(onSelect).toHaveBeenCalledWith(3);
+      expect(onSelect).toHaveBeenCalledWith(testId(3));
       press(tokens[1]);
-      expect(onSelect).toHaveBeenCalledWith(1);
+      expect(onSelect).toHaveBeenCalledWith(testId(1));
       press(tokens[2]);
-      expect(onSelect).toHaveBeenCalledWith(2);
+      expect(onSelect).toHaveBeenCalledWith(testId(2));
     });
 
     it("falls back to original order when no transactions provided", () => {
@@ -315,11 +316,11 @@ describe("CategoryPickerGrid", () => {
       );
       const tokens = getTokens(root);
       press(tokens[0]);
-      expect(onSelect).toHaveBeenCalledWith(1);
+      expect(onSelect).toHaveBeenCalledWith(testId(1));
       press(tokens[1]);
-      expect(onSelect).toHaveBeenCalledWith(2);
+      expect(onSelect).toHaveBeenCalledWith(testId(2));
       press(tokens[2]);
-      expect(onSelect).toHaveBeenCalledWith(3);
+      expect(onSelect).toHaveBeenCalledWith(testId(3));
     });
 
     it("is a no-op when transactions is empty", () => {
@@ -334,7 +335,7 @@ describe("CategoryPickerGrid", () => {
       );
       const tokens = getTokens(root);
       press(tokens[0]);
-      expect(onSelect).toHaveBeenCalledWith(1);
+      expect(onSelect).toHaveBeenCalledWith(testId(1));
     });
   });
 
@@ -342,8 +343,8 @@ describe("CategoryPickerGrid", () => {
     it("handles categories with missing icons gracefully", () => {
       const categories: Category[] = [
         {
-          id: 1,
-          userId: 1,
+          id: testId(1),
+          userId: testId(1),
           name: "Misc",
           type: "expense",
           color: "#6B7280",

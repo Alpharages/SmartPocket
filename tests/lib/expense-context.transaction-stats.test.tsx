@@ -187,14 +187,16 @@ vi.mock("@/lib/trpc", () => ({
 }));
 
 import { ExpenseProvider, useExpense } from "@/lib/expense-context";
+import type { Id } from "@/drizzle/schema";
+import { testId, syncColumns } from "../helpers/ids";
 
 interface Handlers {
   addTransaction: (data: CreateTransactionInput) => Promise<void>;
   updateTransaction: (
-    id: number,
+    id: Id,
     data: Partial<CreateTransactionInput>,
   ) => Promise<void>;
-  deleteTransaction: (id: number) => Promise<void>;
+  deleteTransaction: (id: Id) => Promise<void>;
 }
 
 function TransactionHarness({
@@ -236,7 +238,7 @@ async function render(): Promise<Handlers> {
 }
 
 const sampleInput: CreateTransactionInput = {
-  categoryId: 1,
+  categoryId: testId(1),
   type: "income",
   amount: "250.00",
   date: new Date("2026-07-01"),
@@ -257,7 +259,7 @@ describe("ExpenseProvider monthlyStats refresh on transaction mutations", () => 
     const { updateTransaction } = await render();
 
     await act(async () => {
-      await updateTransaction(1, { amount: "300.00" });
+      await updateTransaction(testId(1), { amount: "300.00" });
     });
 
     expect(mocks.monthlyStatsRefetch).toHaveBeenCalled();
@@ -267,7 +269,7 @@ describe("ExpenseProvider monthlyStats refresh on transaction mutations", () => 
     const { deleteTransaction } = await render();
 
     await act(async () => {
-      await deleteTransaction(1);
+      await deleteTransaction(testId(1));
     });
 
     expect(mocks.monthlyStatsRefetch).toHaveBeenCalled();

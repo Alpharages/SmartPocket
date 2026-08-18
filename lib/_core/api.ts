@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "./auth";
+import type { Id } from "@/drizzle/schema";
 
 /**
  * Thrown for any non-2xx response, carrying the status so callers can tell
@@ -129,7 +130,7 @@ export async function logout(): Promise<void> {
 // Get current authenticated user. `apiCall` will attach the stored token on web
 // or native when one is available, so this stays transport-agnostic here.
 export async function getMe(): Promise<{
-  id: number;
+  id: Id;
   openId: string;
   name: string | null;
   email: string | null;

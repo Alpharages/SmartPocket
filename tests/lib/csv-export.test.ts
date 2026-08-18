@@ -6,12 +6,13 @@ import {
   type ExportRow,
 } from "@/lib/csv-export";
 import type { Transaction, Category, CreditCard } from "@/lib/expense-context";
+import { testId, syncColumns } from "../helpers/ids";
 
 function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
   return {
-    id: 1,
-    userId: 1,
-    categoryId: 10,
+    id: testId(1),
+    userId: testId(1),
+    categoryId: testId(10),
     type: "expense",
     amount: "50.00",
     description: "Coffee",
@@ -24,8 +25,8 @@ function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
 
 function makeCategory(overrides: Partial<Category> = {}): Category {
   return {
-    id: 10,
-    userId: 1,
+    id: testId(10),
+    userId: testId(1),
     name: "Food",
     type: "expense",
     color: "#ff0000",
@@ -39,8 +40,8 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
 
 function makeCard(overrides: Partial<CreditCard> = {}): CreditCard {
   return {
-    id: 20,
-    userId: 1,
+    id: testId(20),
+    userId: testId(1),
     name: "Visa Gold",
     cardNumberLast4: "1234",
     cardholderName: "Test User",
@@ -94,7 +95,7 @@ describe("transactionToExportRow", () => {
   const cards = [makeCard()];
 
   it("maps all fields correctly for an expense with card", () => {
-    const tx = makeTransaction({ creditCardId: 20 });
+    const tx = makeTransaction({ creditCardId: testId(20) });
     const row = transactionToExportRow(tx, categories, cards);
     expect(row.date).toBe("2026-06-16");
     expect(row.type).toBe("expense");
@@ -111,7 +112,7 @@ describe("transactionToExportRow", () => {
   });
 
   it("leaves card blank when creditCardId does not resolve to a known card", () => {
-    const tx = makeTransaction({ creditCardId: 999 });
+    const tx = makeTransaction({ creditCardId: testId(999) });
     const row = transactionToExportRow(tx, categories, cards);
     expect(row.card).toBe("");
   });
@@ -137,8 +138,12 @@ describe("transactionToExportRow", () => {
   });
 
   it("resolves income type correctly", () => {
-    const incomeCat = makeCategory({ id: 11, type: "income", name: "Salary" });
-    const tx = makeTransaction({ type: "income", categoryId: 11 });
+    const incomeCat = makeCategory({
+      id: testId(11),
+      type: "income",
+      name: "Salary",
+    });
+    const tx = makeTransaction({ type: "income", categoryId: testId(11) });
     const row = transactionToExportRow(tx, [incomeCat], []);
     expect(row.type).toBe("income");
     expect(row.category).toBe("Salary");
@@ -171,9 +176,30 @@ describe("toTransactionCsv", () => {
 
   it("produces correct row count for 3 transactions (AC1 spec)", () => {
     const rows: ExportRow[] = [
-      { date: "2026-06-01", type: "expense", amount: "10.00", category: "Food", card: "", description: "A" },
-      { date: "2026-06-02", type: "income", amount: "500.00", category: "Salary", card: "", description: "B" },
-      { date: "2026-06-03", type: "expense", amount: "25.00", category: "Food", card: "Visa Gold", description: "C" },
+      {
+        date: "2026-06-01",
+        type: "expense",
+        amount: "10.00",
+        category: "Food",
+        card: "",
+        description: "A",
+      },
+      {
+        date: "2026-06-02",
+        type: "income",
+        amount: "500.00",
+        category: "Salary",
+        card: "",
+        description: "B",
+      },
+      {
+        date: "2026-06-03",
+        type: "expense",
+        amount: "25.00",
+        category: "Food",
+        card: "Visa Gold",
+        description: "C",
+      },
     ];
     const result = toTransactionCsv(rows);
     const lines = result.split("\n");
@@ -197,7 +223,14 @@ describe("toTransactionCsv", () => {
 
   it("does not add thousands separators to large amounts", () => {
     const rows: ExportRow[] = [
-      { date: "2026-01-01", type: "income", amount: "100000.00", category: "Salary", card: "", description: "" },
+      {
+        date: "2026-01-01",
+        type: "income",
+        amount: "100000.00",
+        category: "Salary",
+        card: "",
+        description: "",
+      },
     ];
     const result = toTransactionCsv(rows);
     expect(result).toContain("100000.00");
@@ -207,7 +240,14 @@ describe("toTransactionCsv", () => {
 
   it("each data row has exactly 6 comma-delimited columns (AC1)", () => {
     const rows: ExportRow[] = [
-      { date: "2026-06-01", type: "expense", amount: "5.00", category: "A,B", card: "", description: "" },
+      {
+        date: "2026-06-01",
+        type: "expense",
+        amount: "5.00",
+        category: "A,B",
+        card: "",
+        description: "",
+      },
     ];
     const result = toTransactionCsv(rows);
     const dataLine = result.split("\n")[1];

@@ -7,6 +7,7 @@ vi.mock("../server/_core/dataApi", () => ({
 }));
 
 import { getMonthlyTrend } from "../server/db";
+import { testId } from "./helpers/ids";
 
 describe("getMonthlyTrend", () => {
   beforeEach(() => {
@@ -16,7 +17,7 @@ describe("getMonthlyTrend", () => {
   it("returns zero-filled months oldest to newest for the anchor window", async () => {
     callDataApi.mockResolvedValue([]);
 
-    const trend = await getMonthlyTrend(1, 2026, 6, 6);
+    const trend = await getMonthlyTrend(testId(1), 2026, 6, 6);
 
     expect(trend).toHaveLength(6);
     expect(trend[0]).toEqual({
@@ -59,7 +60,7 @@ describe("getMonthlyTrend", () => {
       },
     ]);
 
-    const trend = await getMonthlyTrend(1, 2026, 2, 2);
+    const trend = await getMonthlyTrend(testId(1), 2026, 2, 2);
 
     expect(trend).toEqual([
       {
@@ -88,7 +89,7 @@ describe("getMonthlyTrend", () => {
       },
     ]);
 
-    const trend = await getMonthlyTrend(1, 2026, 2, 6);
+    const trend = await getMonthlyTrend(testId(1), 2026, 2, 6);
 
     expect(trend.map((m) => `${m.year}-${m.month}`)).toEqual([
       "2025-9",
@@ -110,19 +111,25 @@ describe("getMonthlyTrend", () => {
     // SP-014: silently returning [] rendered "No spending history".
     callDataApi.mockRejectedValue(new Error("db down"));
 
-    await expect(getMonthlyTrend(1, 2026, 6, 6)).rejects.toThrow("db down");
+    await expect(getMonthlyTrend(testId(1), 2026, 6, 6)).rejects.toThrow(
+      "db down",
+    );
   });
 
   it("scopes the query to the user and date window", async () => {
     callDataApi.mockResolvedValue([]);
 
-    await getMonthlyTrend(42, 2026, 6, 6);
+    await getMonthlyTrend(testId(42), 2026, 6, 6);
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
-          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ?",
-        params: [42, new Date(2026, 0, 1), new Date(2026, 6, 0, 23, 59, 59)],
+          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
+        params: [
+          testId(42),
+          new Date(2026, 0, 1),
+          new Date(2026, 6, 0, 23, 59, 59),
+        ],
       },
     });
   });

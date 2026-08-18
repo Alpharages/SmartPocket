@@ -48,6 +48,8 @@ import {
 import { useThemeContext } from "@/lib/theme-provider";
 import { useExpense } from "@/lib/expense-context";
 import { useAuth } from "@/hooks/use-auth";
+import { SyncSettingsSection } from "@/components/sync-settings";
+import { isSyncSupported } from "@/lib/sync/sync-state";
 import { useColors } from "@/hooks/use-colors";
 import { useTheme } from "@/hooks/use-theme";
 import { Spacing } from "@/lib/_core/theme";
@@ -729,6 +731,12 @@ export default function SettingsScreen() {
             onChange={handleToggleAi}
           />
         </SettingsSectionGroup>
+
+        {isSyncSupported() ? (
+          <SettingsSectionGroup title="Sync">
+            <SyncSettingsSection />
+          </SettingsSectionGroup>
+        ) : null}
 
         <SettingsSectionGroup title="Account">
           {user ? (

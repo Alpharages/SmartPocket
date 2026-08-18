@@ -26,6 +26,7 @@ import { readableTextOn } from "@/lib/_core/contrast";
 import { resolveCategoryColor } from "@/constants/theme";
 import { Spacing } from "@/lib/_core/theme";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import type { Id } from "@/drizzle/schema";
 
 export default function RecurringScreen() {
   const router = useRouter();
@@ -55,7 +56,7 @@ export default function RecurringScreen() {
   const [cancelling, setCancelling] = useState(false);
 
   const categoryById = useMemo(() => {
-    const map = new Map<number, (typeof categories)[number]>();
+    const map = new Map<Id, (typeof categories)[number]>();
     for (const category of categories) {
       map.set(category.id, category);
     }

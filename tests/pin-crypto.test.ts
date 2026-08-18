@@ -9,6 +9,7 @@ import {
   __resetSetPinThrottleForTests,
   __setPinThrottleSizeForTests,
 } from "@/server/_core/pin-crypto";
+import { testId } from "./helpers/ids";
 
 describe("hashPin / verifyPinHash", () => {
   it("round-trips a correct PIN", async () => {
@@ -89,17 +90,17 @@ describe("setPin throttle eviction (round-2 review R7)", () => {
   });
 
   it("evicts an expired entry instead of retaining it forever", () => {
-    recordSetPinAttempt(1, 0);
+    recordSetPinAttempt(testId(1), 0);
     expect(__setPinThrottleSizeForTests()).toBe(1);
 
     // Any later call to isSetPinThrottled evicts expired entries first.
-    isSetPinThrottled(2, 10_000);
+    isSetPinThrottled(testId(2), 10_000);
     expect(__setPinThrottleSizeForTests()).toBe(0);
   });
 
   it("does not evict an entry still inside the throttle window", () => {
-    recordSetPinAttempt(1, 0);
-    isSetPinThrottled(2, 500);
+    recordSetPinAttempt(testId(1), 0);
+    isSetPinThrottled(testId(2), 500);
     expect(__setPinThrottleSizeForTests()).toBe(1);
   });
 });

@@ -1,12 +1,14 @@
+import type { Id } from "@/drizzle/schema";
+
 export type AccountMoneyRow = {
-  accountId: number | null;
+  accountId: Id | null;
   type: string;
   amount: string;
 };
 
 export type TransferLeg = {
-  fromAccountId: number;
-  toAccountId: number;
+  fromAccountId: Id;
+  toAccountId: Id;
   amount: string;
 };
 
@@ -16,20 +18,27 @@ function parseMoneyAmount(amount: string): number {
 }
 
 /**
+ * Account ids are ULIDs now, so the "is this a usable key" check is a non-empty
+ * string rather than `Number.isFinite`. Rows whose account reference is blank
+ * are skipped exactly as unparseable numeric ids used to be.
+ */
+function isUsableAccountId(value: unknown): value is Id {
+  return typeof value === "string" && value.length > 0;
+}
+
+/**
  * Derive per-account balances from transaction rows in JS (no SQL GROUP BY).
  * Single fold point — extend the switch for Story 9.4 transfer legs.
  */
 export function reduceAccountBalances(
   rows: AccountMoneyRow[],
-): Record<number, number> {
-  const balances = new Map<number, number>();
+): Record<Id, number> {
+  const balances = new Map<Id, number>();
 
   for (const row of rows) {
-    if (row.accountId == null) continue;
+    if (!isUsableAccountId(row.accountId)) continue;
 
-    const accountId = Number(row.accountId);
-    if (!Number.isFinite(accountId)) continue;
-
+    const accountId = row.accountId;
     const amount = parseMoneyAmount(row.amount);
     const current = balances.get(accountId) ?? 0;
 
@@ -53,17 +62,15 @@ export function reduceAccountBalances(
  * Single reduce point for Story 9.4 — called after transaction fold in getAccountBalances.
  */
 export function applyTransferLegs(
-  balances: Record<number, number>,
+  balances: Record<Id, number>,
   transfers: TransferLeg[],
-): Record<number, number> {
-  const map = new Map<number, number>(
-    Object.entries(balances).map(([id, balance]) => [Number(id), balance]),
-  );
+): Record<Id, number> {
+  const map = new Map<Id, number>(Object.entries(balances));
 
   for (const transfer of transfers) {
-    const fromId = Number(transfer.fromAccountId);
-    const toId = Number(transfer.toAccountId);
-    if (!Number.isFinite(fromId) || !Number.isFinite(toId)) continue;
+    const fromId = transfer.fromAccountId;
+    const toId = transfer.toAccountId;
+    if (!isUsableAccountId(fromId) || !isUsableAccountId(toId)) continue;
 
     const amount = parseMoneyAmount(transfer.amount);
     if (amount === 0) continue;

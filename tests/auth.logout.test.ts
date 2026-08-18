@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { appRouter } from "../server/routers";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "../server/_core/context";
+import { testId, syncColumns } from "./helpers/ids";
 
 type CookieCall = {
   name: string;
@@ -17,7 +18,7 @@ function createAuthContext(): {
   const clearedCookies: CookieCall[] = [];
 
   const user: AuthenticatedUser = {
-    id: 1,
+    id: testId(1),
     openId: "sample-user",
     email: "sample@example.com",
     name: "Sample User",

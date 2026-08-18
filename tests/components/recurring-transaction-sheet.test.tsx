@@ -4,6 +4,7 @@ import TestRenderer, { act, type ReactTestRenderer } from "react-test-renderer";
 
 import { RecurringTransactionSheet } from "@/components/ui/RecurringTransactionSheet";
 import { useExpense } from "@/lib/expense-context";
+import { testId, syncColumns } from "../helpers/ids";
 
 vi.mock("@/lib/expense-context", () => ({
   useExpense: vi.fn(),
@@ -148,8 +149,8 @@ describe("RecurringTransactionSheet", () => {
     vi.mocked(useExpense).mockReturnValue({
       categories: [
         {
-          id: 1,
-          userId: 1,
+          id: testId(1),
+          userId: testId(1),
           name: "Rent",
           type: "expense",
           color: "#4F46E5",
@@ -265,7 +266,7 @@ describe("RecurringTransactionSheet", () => {
     expect(addRecurringTransaction).toHaveBeenCalledWith(
       expect.objectContaining({
         amount: "50.00",
-        categoryId: 1,
+        categoryId: testId(1),
         type: "expense",
         frequency: "monthly",
         interval: 1,

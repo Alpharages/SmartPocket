@@ -13,6 +13,23 @@ import { getMonthBoundaries, getWeekBoundaries } from "./budget-period";
 import { useFirstDayOfWeek } from "./first-day-of-week-provider";
 import { syncLoanReminderState } from "./loan-reminders";
 import { getMutationErrorMessage } from "./mutation-error";
+import type { Id } from "@/drizzle/schema";
+import { ulid, isUlid } from "@shared/ulid";
+
+/**
+ * Identity stamped on a row rendered optimistically, before the server has
+ * confirmed it.
+ *
+ * Under autoincrement ids this was `-Date.now()` — a negative number chosen
+ * precisely because the database would never mint one. A client-generated ULID
+ * needs no such trick: it is already globally unique, so the placeholder is
+ * indistinguishable from a persisted id and sorts into the right place
+ * immediately. `userId` stays blank because the whole row is replaced by the
+ * server's copy on the next refresh.
+ */
+function optimisticIdentity(): { id: Id; userId: Id } {
+  return { id: ulid(), userId: "" };
+}
 
 function toRecurringMutationInput(
   rule: RecurringTransaction,
@@ -37,8 +54,8 @@ function toRecurringMutationInput(
 }
 
 export interface Category {
-  id: number;
-  userId: number;
+  id: Id;
+  userId: Id;
   name: string;
   type: "income" | "expense";
   color: string;
@@ -49,8 +66,8 @@ export interface Category {
 }
 
 export interface CreditCard {
-  id: number;
-  userId: number;
+  id: Id;
+  userId: Id;
   name: string;
   cardNumberLast4: string;
   cardholderName: string;
@@ -66,8 +83,8 @@ export interface CreditCard {
 }
 
 export interface Account {
-  id: number;
-  userId: number;
+  id: Id;
+  userId: Id;
   name: string;
   type: "cash" | "bank" | "wallet";
   currency: string;
@@ -83,10 +100,10 @@ export type CreateAccountInput = {
 };
 
 export interface Transfer {
-  id: number;
-  userId: number;
-  fromAccountId: number;
-  toAccountId: number;
+  id: Id;
+  userId: Id;
+  fromAccountId: Id;
+  toAccountId: Id;
   amount: string;
   description?: string | null;
   date: Date;
@@ -95,8 +112,8 @@ export interface Transfer {
 }
 
 export type CreateTransferInput = {
-  fromAccountId: number;
-  toAccountId: number;
+  fromAccountId: Id;
+  toAccountId: Id;
   amount: string;
   description?: string;
   date: Date;
@@ -108,11 +125,11 @@ export type CreateCreditCardInput = Omit<
 > & { cardNumber: string };
 
 export interface Transaction {
-  id: number;
-  userId: number;
-  categoryId: number;
-  creditCardId?: number;
-  accountId?: number | null;
+  id: Id;
+  userId: Id;
+  categoryId: Id;
+  creditCardId?: Id;
+  accountId?: Id | null;
   type: "income" | "expense";
   amount: string;
   description?: string;
@@ -127,9 +144,9 @@ export type CreateTransactionInput = Omit<
 >;
 
 export interface Budget {
-  id: number;
-  userId: number;
-  categoryId: number;
+  id: Id;
+  userId: Id;
+  categoryId: Id;
   period: "monthly" | "weekly";
   amount: string;
   startDate?: Date | null;
@@ -139,7 +156,7 @@ export interface Budget {
 }
 
 export type CreateBudgetInput = {
-  categoryId: number;
+  categoryId: Id;
   period: "monthly" | "weekly";
   amount: string;
   startDate?: Date;
@@ -147,10 +164,10 @@ export type CreateBudgetInput = {
 };
 
 export interface RecurringTransaction {
-  id: number;
-  userId: number;
-  categoryId: number;
-  creditCardId?: number | null;
+  id: Id;
+  userId: Id;
+  categoryId: Id;
+  creditCardId?: Id | null;
   type: "income" | "expense";
   amount: string;
   description?: string | null;
@@ -181,8 +198,8 @@ export type CreateRecurringTransactionInput = Omit<
 >;
 
 export interface Loan {
-  id: number;
-  userId: number;
+  id: Id;
+  userId: Id;
   direction: "lend" | "borrow";
   counterparty: string | null;
   principal: string;
@@ -210,16 +227,16 @@ export type CreateLoanInput = {
 };
 
 export type RecordRepaymentInput = {
-  loanId: number;
+  loanId: Id;
   amount: string;
   date: Date;
   note?: string | null;
 };
 
 export interface LoanRepayment {
-  id: number;
-  loanId: number;
-  userId: number;
+  id: Id;
+  loanId: Id;
+  userId: Id;
   amount: string;
   date: Date;
   note: string | null;
@@ -233,7 +250,7 @@ export type LoanDetail = Loan & {
 };
 
 export interface BudgetProgress {
-  budgetId: number;
+  budgetId: Id;
   spent: string;
   limit: string;
 }
@@ -252,8 +269,8 @@ interface ExpenseContextType {
   addCategory: (
     data: Omit<Category, "id" | "userId" | "createdAt" | "updatedAt">,
   ) => Promise<void>;
-  updateCategory: (id: number, data: Partial<Category>) => Promise<void>;
-  deleteCategory: (id: number) => Promise<void>;
+  updateCategory: (id: Id, data: Partial<Category>) => Promise<void>;
+  deleteCategory: (id: Id) => Promise<void>;
 
   // Credit Cards
   creditCards: CreditCard[];
@@ -261,28 +278,22 @@ interface ExpenseContextType {
   refreshCreditCards: () => Promise<void>;
   addCreditCard: (data: CreateCreditCardInput) => Promise<void>;
   updateCreditCard: (
-    id: number,
+    id: Id,
     data: Partial<CreditCard> & { cardNumber?: string },
   ) => Promise<void>;
-  deleteCreditCard: (id: number) => Promise<void>;
+  deleteCreditCard: (id: Id) => Promise<void>;
 
   // Accounts
   accounts: Account[];
   loadingAccounts: boolean;
   refreshAccounts: () => Promise<void>;
   addAccount: (data: CreateAccountInput) => Promise<void>;
-  updateAccount: (
-    id: number,
-    data: Partial<CreateAccountInput>,
-  ) => Promise<void>;
-  deleteAccount: (id: number) => Promise<void>;
-  reassignAndDeleteAccount: (
-    id: number,
-    targetAccountId: number,
-  ) => Promise<void>;
-  fetchAccountTransactionCount: (id: number) => Promise<number>;
-  fetchAccountTransferCount: (id: number) => Promise<number>;
-  getAccountBalance: (accountId: number) => number;
+  updateAccount: (id: Id, data: Partial<CreateAccountInput>) => Promise<void>;
+  deleteAccount: (id: Id) => Promise<void>;
+  reassignAndDeleteAccount: (id: Id, targetAccountId: Id) => Promise<void>;
+  fetchAccountTransactionCount: (id: Id) => Promise<number>;
+  fetchAccountTransferCount: (id: Id) => Promise<number>;
+  getAccountBalance: (accountId: Id) => number;
   loadingAccountBalances: boolean;
   refreshAccountBalances: () => Promise<void>;
   transfers: Transfer[];
@@ -296,8 +307,8 @@ interface ExpenseContextType {
   refreshTransactions: () => Promise<void>;
   addTransaction: (data: CreateTransactionInput) => Promise<void>;
   importTransactions: (rows: CreateTransactionInput[]) => Promise<void>;
-  updateTransaction: (id: number, data: Partial<Transaction>) => Promise<void>;
-  deleteTransaction: (id: number) => Promise<void>;
+  updateTransaction: (id: Id, data: Partial<Transaction>) => Promise<void>;
+  deleteTransaction: (id: Id) => Promise<void>;
   clearAllData: () => Promise<void>;
 
   // Budgets
@@ -305,10 +316,10 @@ interface ExpenseContextType {
   loadingBudgets: boolean;
   refreshBudgets: () => Promise<void>;
   addBudget: (data: CreateBudgetInput) => Promise<void>;
-  updateBudget: (id: number, data: CreateBudgetInput) => Promise<void>;
-  deleteBudget: (id: number) => Promise<void>;
+  updateBudget: (id: Id, data: CreateBudgetInput) => Promise<void>;
+  deleteBudget: (id: Id) => Promise<void>;
   budgetProgress: BudgetProgress[];
-  progressByBudgetId: Map<number, BudgetProgress>;
+  progressByBudgetId: Map<Id, BudgetProgress>;
   loadingBudgetProgress: boolean;
   refreshBudgetProgress: () => Promise<void>;
 
@@ -328,18 +339,18 @@ interface ExpenseContextType {
     data: CreateRecurringTransactionInput,
   ) => Promise<void>;
   updateRecurringTransaction: (
-    id: number,
+    id: Id,
     data: CreateRecurringTransactionInput,
   ) => Promise<void>;
-  cancelRecurringTransaction: (id: number) => Promise<void>;
+  cancelRecurringTransaction: (id: Id) => Promise<void>;
 
   // Loans
   loans: Loan[];
   loadingLoans: boolean;
   refreshLoans: () => Promise<void>;
   addLoan: (data: CreateLoanInput) => Promise<void>;
-  updateLoan: (id: number, data: Partial<CreateLoanInput>) => Promise<void>;
-  deleteLoan: (id: number) => Promise<void>;
+  updateLoan: (id: Id, data: Partial<CreateLoanInput>) => Promise<void>;
+  deleteLoan: (id: Id) => Promise<void>;
   recordRepayment: (data: RecordRepaymentInput) => Promise<LoanDetail>;
 
   /** Refetch all expense-tracker data (categories, cards, transactions, etc.). */
@@ -347,7 +358,6 @@ interface ExpenseContextType {
 }
 
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
-
 
 export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const toast = useToast();
@@ -367,7 +377,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadingCards, setLoadingCards] = useState(false);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
-  const [accountBalances, setAccountBalances] = useState<Map<number, number>>(
+  const [accountBalances, setAccountBalances] = useState<Map<Id, number>>(
     () => new Map(),
   );
   // Starts true: balances are unknown until the on-mount refresh resolves, so
@@ -425,8 +435,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       const now = new Date();
       const optimistic: Category = {
         ...data,
-        id: -Date.now(),
-        userId: 0,
+        ...optimisticIdentity(),
         createdAt: now,
         updatedAt: now,
       };
@@ -455,7 +464,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateCategory = useCallback(
-    async (id: number, data: Partial<Category>) => {
+    async (id: Id, data: Partial<Category>) => {
       const snapshot = snapshotList(categories);
       setCategories((prev) =>
         applyOptimistic(prev, { type: "update", id, data }),
@@ -476,7 +485,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const deleteCategory = useCallback(
-    async (id: number) => {
+    async (id: Id) => {
       const snapshot = snapshotList(categories);
       setCategories((prev) => applyOptimistic(prev, { type: "delete", id }));
       try {
@@ -520,8 +529,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       const optimistic: CreditCard = {
         ...rest,
         cardNumberLast4: cardNumber.slice(-4),
-        id: -Date.now(),
-        userId: 0,
+        ...optimisticIdentity(),
         createdAt: now,
         updatedAt: now,
       };
@@ -559,7 +567,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateCreditCard = useCallback(
-    async (id: number, data: Partial<CreditCard> & { cardNumber?: string }) => {
+    async (id: Id, data: Partial<CreditCard> & { cardNumber?: string }) => {
       const snapshot = snapshotList(creditCards);
       const { cardNumber, ...rest } = data;
       setCreditCards((prev) =>
@@ -585,7 +593,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const deleteCreditCard = useCallback(
-    async (id: number) => {
+    async (id: Id) => {
       const snapshot = snapshotList(creditCards);
       setCreditCards((prev) => applyOptimistic(prev, { type: "delete", id }));
       try {
@@ -642,7 +650,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   }, [transfersQuery]);
 
   const getAccountBalance = useCallback(
-    (accountId: number) => accountBalances.get(accountId) ?? 0,
+    (accountId: Id) => accountBalances.get(accountId) ?? 0,
     [accountBalances],
   );
 
@@ -662,8 +670,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     async (data: CreateAccountInput) => {
       const now = new Date();
       const optimistic: Account = {
-        id: -Date.now(),
-        userId: 0,
+        ...optimisticIdentity(),
         name: data.name,
         type: data.type,
         currency: data.currency,
@@ -696,7 +703,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateAccount = useCallback(
-    async (id: number, data: Partial<CreateAccountInput>) => {
+    async (id: Id, data: Partial<CreateAccountInput>) => {
       const snapshot = snapshotList(accounts);
       setAccounts((prev) =>
         applyOptimistic(prev, {
@@ -721,7 +728,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const deleteAccount = useCallback(
-    async (id: number) => {
+    async (id: Id) => {
       const snapshot = snapshotList(accounts);
       setAccounts((prev) => applyOptimistic(prev, { type: "delete", id }));
       try {
@@ -745,7 +752,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const reassignAndDeleteAccount = useCallback(
-    async (id: number, targetAccountId: number) => {
+    async (id: Id, targetAccountId: Id) => {
       const snapshot = snapshotList(accounts);
       setAccounts((prev) => applyOptimistic(prev, { type: "delete", id }));
       try {
@@ -768,14 +775,14 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const fetchAccountTransactionCount = useCallback(
-    async (id: number) => {
+    async (id: Id) => {
       return trpcUtils.accounts.transactionCount.fetch({ id });
     },
     [trpcUtils],
   );
 
   const fetchAccountTransferCount = useCallback(
-    async (id: number) => {
+    async (id: Id) => {
       return trpcUtils.accounts.transferCount.fetch({ id });
     },
     [trpcUtils],
@@ -823,8 +830,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
     async (data: CreateLoanInput) => {
       const now = new Date();
       const optimistic: Loan = {
-        id: -Date.now(),
-        userId: 0,
+        ...optimisticIdentity(),
         direction: data.direction,
         counterparty: data.counterparty ?? null,
         principal: data.principal,
@@ -873,7 +879,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateLoan = useCallback(
-    async (id: number, data: Partial<CreateLoanInput>) => {
+    async (id: Id, data: Partial<CreateLoanInput>) => {
       const snapshot = snapshotList(loans);
       setLoans((prev) =>
         applyOptimistic(prev, {
@@ -899,7 +905,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const deleteLoan = useCallback(
-    async (id: number) => {
+    async (id: Id) => {
       const snapshot = snapshotList(loans);
       setLoans((prev) => applyOptimistic(prev, { type: "delete", id }));
       try {
@@ -1030,8 +1036,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       const now = new Date();
       const optimistic: Budget = {
         ...data,
-        id: -Date.now(),
-        userId: 0,
+        ...optimisticIdentity(),
         createdAt: now,
         updatedAt: now,
       };
@@ -1063,7 +1068,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateBudget = useCallback(
-    async (id: number, data: CreateBudgetInput) => {
+    async (id: Id, data: CreateBudgetInput) => {
       const snapshot = snapshotList(budgets);
       setBudgets((prev) => applyOptimistic(prev, { type: "update", id, data }));
       try {
@@ -1088,7 +1093,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const deleteBudget = useCallback(
-    async (id: number) => {
+    async (id: Id) => {
       const snapshot = snapshotList(budgets);
       setBudgets((prev) => applyOptimistic(prev, { type: "delete", id }));
       try {
@@ -1130,8 +1135,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       const now = new Date();
       const optimistic: Transaction = {
         ...data,
-        id: -Date.now(),
-        userId: 0,
+        ...optimisticIdentity(),
         createdAt: now,
         updatedAt: now,
       };
@@ -1194,7 +1198,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
 
   const updateTransaction = useCallback(
     async (
-      id: number,
+      id: Id,
       data: Partial<
         Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">
       >,
@@ -1233,7 +1237,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const deleteTransaction = useCallback(
-    async (id: number) => {
+    async (id: Id) => {
       const snapshot = snapshotList(transactions);
       setTransactions((prev) => applyOptimistic(prev, { type: "delete", id }));
       try {
@@ -1282,8 +1286,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
       const now = new Date();
       const optimistic: RecurringTransaction = {
         ...data,
-        id: -Date.now(),
-        userId: 0,
+        ...optimisticIdentity(),
         creditCardId: data.creditCardId ?? null,
         description: data.description ?? null,
         occurrenceCount: data.occurrenceCount ?? null,
@@ -1325,7 +1328,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateRecurringTransaction = useCallback(
-    async (id: number, data: CreateRecurringTransactionInput) => {
+    async (id: Id, data: CreateRecurringTransactionInput) => {
       const snapshot = snapshotList(recurringTransactions);
       setRecurringTransactions((prev) =>
         applyOptimistic(prev, {
@@ -1365,7 +1368,7 @@ export function ExpenseProvider({ children }: { children: React.ReactNode }) {
   );
 
   const cancelRecurringTransaction = useCallback(
-    async (id: number) => {
+    async (id: Id) => {
       const rule = recurringTransactions.find((item) => item.id === id);
       if (!rule) {
         throw new Error("cancelRecurringTransaction: rule not found");
@@ -1584,10 +1587,10 @@ export function useExpense() {
 }
 
 /** User-scoped transactions linked to a single credit card (Story 2.2). */
-export function useCardTransactions(creditCardId: number) {
-  const enabled = Number.isFinite(creditCardId) && creditCardId > 0;
+export function useCardTransactions(creditCardId: Id | null) {
+  const enabled = isUlid(creditCardId);
   const query = trpc.transactions.listByCreditCard.useQuery(
-    { creditCardId },
+    { creditCardId: creditCardId ?? "" },
     { enabled },
   );
 
@@ -1603,9 +1606,9 @@ export function useCardTransactions(creditCardId: number) {
 }
 
 /** User-scoped loan detail with repayments and remaining balance (Story 8.3). */
-export function useLoanDetail(loanId: number) {
-  const enabled = Number.isFinite(loanId) && loanId > 0;
-  const query = trpc.loans.getById.useQuery({ id: loanId }, { enabled });
+export function useLoanDetail(loanId: Id | null) {
+  const enabled = isUlid(loanId);
+  const query = trpc.loans.getById.useQuery({ id: loanId ?? "" }, { enabled });
 
   const refreshLoanDetail = useCallback(async () => {
     await query.refetch();

@@ -1,3 +1,4 @@
+import type { Id } from "@/drizzle/schema";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { appRouter } from "../server/routers";
 import type { TrpcContext } from "../server/_core/context";
@@ -22,10 +23,11 @@ import {
   resetExpiredPinLockout,
   recordFailedPinAttempt,
 } from "../server/db";
+import { testId } from "./helpers/ids";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
-function createUserContext(userId: number): TrpcContext {
+function createUserContext(userId: Id): TrpcContext {
   const user: AuthenticatedUser = {
     id: userId,
     openId: `user-${userId}`,
@@ -68,7 +70,7 @@ describe("getUserPinState", () => {
       { pinHash: null, pinFailedAttempts: 0, pinLockedUntil: null },
     ]);
 
-    await expect(getUserPinState(1)).resolves.toEqual({
+    await expect(getUserPinState(testId(1))).resolves.toEqual({
       pinHash: null,
       pinFailedAttempts: 0,
       pinLockedUntil: null,
@@ -78,7 +80,7 @@ describe("getUserPinState", () => {
       body: {
         query:
           "SELECT pinHash, pinFailedAttempts, pinLockedUntil FROM users WHERE id = ?",
-        params: [1],
+        params: [testId(1)],
       },
     });
   });
@@ -92,7 +94,7 @@ describe("getUserPinState", () => {
       },
     ]);
 
-    await expect(getUserPinState(1)).resolves.toEqual({
+    await expect(getUserPinState(testId(1))).resolves.toEqual({
       pinHash: "scrypt:v1:abc:def",
       pinFailedAttempts: 3,
       pinLockedUntil: new Date("2026-01-01T00:00:00.000Z"),
@@ -102,7 +104,7 @@ describe("getUserPinState", () => {
   it("defaults to no PIN when the user row is missing", async () => {
     callDataApi.mockResolvedValueOnce([]);
 
-    await expect(getUserPinState(404)).resolves.toEqual({
+    await expect(getUserPinState(testId(404))).resolves.toEqual({
       pinHash: null,
       pinFailedAttempts: 0,
       pinLockedUntil: null,
@@ -118,13 +120,13 @@ describe("setUserPin / clearUserPin / resetPinAttempts", () => {
   it("setUserPin stores the hash and resets attempt state, scoped by id", async () => {
     callDataApi.mockResolvedValueOnce(undefined);
 
-    await setUserPin(5, "scrypt:v1:salt:hash");
+    await setUserPin(testId(5), "scrypt:v1:salt:hash");
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
           "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-        params: ["scrypt:v1:salt:hash", 0, null, 5],
+        params: ["scrypt:v1:salt:hash", 0, null, testId(5)],
       },
     });
   });
@@ -132,13 +134,13 @@ describe("setUserPin / clearUserPin / resetPinAttempts", () => {
   it("clearUserPin nulls the hash and resets attempt state, scoped by id", async () => {
     callDataApi.mockResolvedValueOnce(undefined);
 
-    await clearUserPin(5);
+    await clearUserPin(testId(5));
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
           "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-        params: [null, 0, null, 5],
+        params: [null, 0, null, testId(5)],
       },
     });
   });
@@ -146,13 +148,13 @@ describe("setUserPin / clearUserPin / resetPinAttempts", () => {
   it("resetPinAttempts clears failedAttempts and lockedUntil without touching the hash", async () => {
     callDataApi.mockResolvedValueOnce(undefined);
 
-    await resetPinAttempts(5);
+    await resetPinAttempts(testId(5));
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
           "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-        params: [0, null, 5],
+        params: [0, null, testId(5)],
       },
     });
   });
@@ -167,13 +169,13 @@ describe("resetExpiredPinLockout (B2)", () => {
     callDataApi.mockResolvedValueOnce({ affectedRows: 1 });
     const now = new Date("2026-01-01T00:00:00Z");
 
-    await resetExpiredPinLockout(5, now);
+    await resetExpiredPinLockout(testId(5), now);
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
           "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ? AND pinLockedUntil IS NOT NULL AND pinLockedUntil <= ?",
-        params: [0, null, 5, now],
+        params: [0, null, testId(5), now],
       },
     });
   });
@@ -189,7 +191,7 @@ describe("recordFailedPinAttempt (B1 — atomic, guarded increment)", () => {
     const now = new Date("2026-01-01T00:00:00Z");
     const lockedUntilIfTripped = new Date(now.getTime() + PIN_LOCKOUT_MS);
 
-    const result = await recordFailedPinAttempt(5, {
+    const result = await recordFailedPinAttempt(testId(5), {
       maxAttempts: MAX_PIN_ATTEMPTS,
       lockedUntilIfTripped,
       now,
@@ -203,7 +205,7 @@ describe("recordFailedPinAttempt (B1 — atomic, guarded increment)", () => {
           // MySQL evaluates SET assignments left to right, so this order is
           // what makes the IF() read the pre-increment count (round-2 R1).
           "UPDATE users SET pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL), pinFailedAttempts = pinFailedAttempts + 1 WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
-        params: [MAX_PIN_ATTEMPTS, lockedUntilIfTripped, 5, now],
+        params: [MAX_PIN_ATTEMPTS, lockedUntilIfTripped, testId(5), now],
       },
     });
   });
@@ -212,7 +214,7 @@ describe("recordFailedPinAttempt (B1 — atomic, guarded increment)", () => {
     callDataApi.mockResolvedValueOnce({ affectedRows: 0 });
     const now = new Date("2026-01-01T00:00:00Z");
 
-    const result = await recordFailedPinAttempt(5, {
+    const result = await recordFailedPinAttempt(testId(5), {
       maxAttempts: MAX_PIN_ATTEMPTS,
       lockedUntilIfTripped: new Date(now.getTime() + PIN_LOCKOUT_MS),
       now,
@@ -234,7 +236,7 @@ describe("security router", () => {
     callDataApi.mockResolvedValueOnce([
       { pinHash: null, pinFailedAttempts: 0, pinLockedUntil: null },
     ]);
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(caller.security.getPinStatus()).resolves.toEqual({
       pinSet: false,
@@ -245,7 +247,7 @@ describe("security router", () => {
     callDataApi.mockResolvedValueOnce([
       { pinHash: "scrypt:v1:a:b", pinFailedAttempts: 0, pinLockedUntil: null },
     ]);
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(caller.security.getPinStatus()).resolves.toEqual({
       pinSet: true,
@@ -258,7 +260,7 @@ describe("security router", () => {
         { pinHash: null, pinFailedAttempts: 0, pinLockedUntil: null },
       ])
       .mockResolvedValueOnce(undefined);
-    const caller = appRouter.createCaller(createUserContext(7));
+    const caller = appRouter.createCaller(createUserContext(testId(7)));
 
     await expect(caller.security.setPin({ pin: "1234" })).resolves.toEqual({
       pinSet: true,
@@ -279,7 +281,7 @@ describe("security router", () => {
     callDataApi.mockResolvedValueOnce([
       { pinHash: existingHash, pinFailedAttempts: 0, pinLockedUntil: null },
     ]);
-    const caller = appRouter.createCaller(createUserContext(7));
+    const caller = appRouter.createCaller(createUserContext(testId(7)));
 
     // CONFLICT, not BAD_REQUEST — the client discriminates on this code to
     // explain that another device already set the account PIN, and Zod input
@@ -297,7 +299,7 @@ describe("security router", () => {
     callDataApi.mockResolvedValueOnce([
       { pinHash: existingHash, pinFailedAttempts: 0, pinLockedUntil: null },
     ]);
-    const caller = appRouter.createCaller(createUserContext(7));
+    const caller = appRouter.createCaller(createUserContext(testId(7)));
 
     await expect(
       caller.security.setPin({ pin: "5678", currentPin: "0000" }),
@@ -311,7 +313,7 @@ describe("security router", () => {
         { pinHash: existingHash, pinFailedAttempts: 0, pinLockedUntil: null },
       ])
       .mockResolvedValueOnce(undefined);
-    const caller = appRouter.createCaller(createUserContext(7));
+    const caller = appRouter.createCaller(createUserContext(testId(7)));
 
     await expect(
       caller.security.setPin({ pin: "5678", currentPin: "1234" }),
@@ -324,7 +326,7 @@ describe("security router", () => {
         { pinHash: null, pinFailedAttempts: 0, pinLockedUntil: null },
       ])
       .mockResolvedValueOnce(undefined);
-    const caller = appRouter.createCaller(createUserContext(7));
+    const caller = appRouter.createCaller(createUserContext(testId(7)));
 
     await expect(caller.security.setPin({ pin: "1234" })).resolves.toEqual({
       pinSet: true,
@@ -332,7 +334,7 @@ describe("security router", () => {
   });
 
   it("rejects a non-4-digit PIN at the input boundary", async () => {
-    const caller = appRouter.createCaller(createUserContext(7));
+    const caller = appRouter.createCaller(createUserContext(testId(7)));
     await expect(caller.security.setPin({ pin: "12" })).rejects.toMatchObject({
       code: "BAD_REQUEST",
     });
@@ -345,7 +347,7 @@ describe("security router", () => {
         { pinHash: null, pinFailedAttempts: 0, pinLockedUntil: null },
       ])
       .mockResolvedValueOnce(undefined);
-    const caller = appRouter.createCaller(createUserContext(9));
+    const caller = appRouter.createCaller(createUserContext(testId(9)));
 
     await expect(caller.security.setPin({ pin: "1234" })).resolves.toEqual({
       pinSet: true,
@@ -362,8 +364,8 @@ describe("security router", () => {
     callDataApi.mockResolvedValue([
       { pinHash: null, pinFailedAttempts: 0, pinLockedUntil: null },
     ]);
-    const callerA = appRouter.createCaller(createUserContext(101));
-    const callerB = appRouter.createCaller(createUserContext(102));
+    const callerA = appRouter.createCaller(createUserContext(testId(101)));
+    const callerB = appRouter.createCaller(createUserContext(testId(102)));
 
     await expect(callerA.security.setPin({ pin: "1234" })).resolves.toEqual({
       pinSet: true,
@@ -379,7 +381,7 @@ describe("security router", () => {
     // authenticated session is the trust boundary here, same as any other
     // sign-out action — see the router's assertCurrentPinProof comment.
     callDataApi.mockResolvedValueOnce(undefined);
-    const caller = appRouter.createCaller(createUserContext(7));
+    const caller = appRouter.createCaller(createUserContext(testId(7)));
 
     await expect(caller.security.clearPin()).resolves.toEqual({
       pinSet: false,
@@ -388,7 +390,7 @@ describe("security router", () => {
       body: {
         query:
           "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-        params: [null, 0, null, 7],
+        params: [null, 0, null, testId(7)],
       },
     });
   });
@@ -401,7 +403,7 @@ describe("security router", () => {
         { pinHash: stored, pinFailedAttempts: 2, pinLockedUntil: null },
       ])
       .mockResolvedValueOnce(undefined); // resetPinAttempts
-    const caller = appRouter.createCaller(createUserContext(3));
+    const caller = appRouter.createCaller(createUserContext(testId(3)));
 
     await expect(caller.security.verifyPin({ pin: "1234" })).resolves.toEqual({
       valid: true,
@@ -411,7 +413,7 @@ describe("security router", () => {
       body: {
         query:
           "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-        params: [0, null, 3],
+        params: [0, null, testId(3)],
       },
     });
   });
@@ -427,7 +429,7 @@ describe("security router", () => {
       .mockResolvedValueOnce([
         { pinHash: stored, pinFailedAttempts: 1, pinLockedUntil: null },
       ]); // final read for the response
-    const caller = appRouter.createCaller(createUserContext(3));
+    const caller = appRouter.createCaller(createUserContext(testId(3)));
 
     const result = await caller.security.verifyPin({ pin: "0000" });
     expect(result.valid).toBe(false);
@@ -455,7 +457,7 @@ describe("security router", () => {
           pinLockedUntil: lockedUntil.toISOString(),
         },
       ]);
-    const caller = appRouter.createCaller(createUserContext(3));
+    const caller = appRouter.createCaller(createUserContext(testId(3)));
 
     const result = await caller.security.verifyPin({ pin: "0000" });
     expect(result.valid).toBe(false);
@@ -474,7 +476,7 @@ describe("security router", () => {
           pinLockedUntil: lockedUntil.toISOString(),
         },
       ]);
-    const caller = appRouter.createCaller(createUserContext(3));
+    const caller = appRouter.createCaller(createUserContext(testId(3)));
 
     const result = await caller.security.verifyPin({ pin: "1234" });
     expect(result).toEqual({
@@ -506,7 +508,7 @@ describe("security router", () => {
           pinLockedUntil: lockedUntil.toISOString(),
         },
       ]); // re-fetch to report the lock
-    const caller = appRouter.createCaller(createUserContext(3));
+    const caller = appRouter.createCaller(createUserContext(testId(3)));
 
     const result = await caller.security.verifyPin({ pin: "0000" });
     expect(result).toEqual({
@@ -522,7 +524,7 @@ describe("security router", () => {
       .mockResolvedValueOnce([
         { pinHash: null, pinFailedAttempts: 0, pinLockedUntil: null },
       ]);
-    const caller = appRouter.createCaller(createUserContext(3));
+    const caller = appRouter.createCaller(createUserContext(testId(3)));
 
     await expect(
       caller.security.verifyPin({ pin: "1234" }),
@@ -537,7 +539,7 @@ describe("security router", () => {
         { pinHash: stored, pinFailedAttempts: 0, pinLockedUntil: null },
       ]) // read reflects the reset state
       .mockResolvedValueOnce(undefined); // resetPinAttempts on success
-    const caller = appRouter.createCaller(createUserContext(3));
+    const caller = appRouter.createCaller(createUserContext(testId(3)));
 
     // A correct PIN right after an expired lockout must succeed, not stay locked.
     await expect(caller.security.verifyPin({ pin: "1234" })).resolves.toEqual({

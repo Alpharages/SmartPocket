@@ -9,12 +9,13 @@ import TestRenderer, {
 import CardDetailScreen from "@/app/card/card-detail-screen";
 import { useExpense } from "@/lib/expense-context";
 import { useCardTransactions } from "@/lib/expense-context";
+import { testId, syncColumns } from "../helpers/ids";
 
 const mockBack = vi.fn();
 
 vi.mock("expo-router", () => ({
   useRouter: () => ({ back: mockBack, push: vi.fn() }),
-  useLocalSearchParams: () => ({ id: "1" }),
+  useLocalSearchParams: () => ({ id: testId(1) }),
 }));
 
 vi.mock("@/components/screen-container", () => ({
@@ -82,8 +83,8 @@ vi.mock("@/components/ui/EmptyState", () => ({
 }));
 
 const mockCard = {
-  id: 1,
-  userId: 1,
+  id: testId(1),
+  userId: testId(1),
   name: "My Visa",
   cardNumberLast4: "3456",
   cardholderName: "John Doe",
@@ -100,8 +101,8 @@ const mockCard = {
 
 const mockCategories = [
   {
-    id: 10,
-    userId: 1,
+    id: testId(10),
+    userId: testId(1),
     name: "Food",
     type: "expense" as const,
     color: "#DC2626",
@@ -114,10 +115,10 @@ const mockCategories = [
 
 const mockTransactions = [
   {
-    id: 100,
-    userId: 1,
-    categoryId: 10,
-    creditCardId: 1,
+    id: testId(100),
+    userId: testId(1),
+    categoryId: testId(10),
+    creditCardId: testId(1),
     type: "expense" as const,
     amount: "10.50",
     description: "Groceries",
@@ -126,10 +127,10 @@ const mockTransactions = [
     updatedAt: new Date(),
   },
   {
-    id: 101,
-    userId: 1,
-    categoryId: 10,
-    creditCardId: 1,
+    id: testId(101),
+    userId: testId(1),
+    categoryId: testId(10),
+    creditCardId: testId(1),
     type: "expense" as const,
     amount: "5.25",
     description: "Coffee",

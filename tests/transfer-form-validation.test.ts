@@ -6,11 +6,12 @@ import {
   validateTransferForm,
   type TransferFormValues,
 } from "@/lib/transfer-form-validation";
+import { testId, syncColumns } from "./helpers/ids";
 
 describe("transfer-form-validation", () => {
   const valid: TransferFormValues = {
-    fromAccountId: 1,
-    toAccountId: 2,
+    fromAccountId: testId(1),
+    toAccountId: testId(2),
     amount: "50.00",
     description: "",
     date: "2026-06-19",
@@ -22,7 +23,7 @@ describe("transfer-form-validation", () => {
   });
 
   it("rejects same source and destination (AC3)", () => {
-    const values = { ...valid, toAccountId: 1 };
+    const values = { ...valid, toAccountId: testId(1) };
     expect(isTransferFormValid(values)).toBe(false);
     expect(validateTransferForm(values)).toContainEqual({
       field: "toAccountId",
@@ -34,9 +35,9 @@ describe("transfer-form-validation", () => {
     for (const amount of ["0", "-5", "", "abc", "12.345"]) {
       const values = { ...valid, amount };
       expect(isTransferFormValid(values)).toBe(false);
-      expect(validateTransferForm(values).some((e) => e.field === "amount")).toBe(
-        true,
-      );
+      expect(
+        validateTransferForm(values).some((e) => e.field === "amount"),
+      ).toBe(true);
     }
   });
 

@@ -352,12 +352,20 @@ export type AuthenticatedUser = User & {
   isCron?: boolean;
 };
 
+/**
+ * Stand-in id for a Manus scheduled-task principal, which authenticates without
+ * being a row in `users`. Was `-1` while ids were autoincrement integers; now
+ * that they are ULIDs the sentinel has to be a string that no generator can
+ * ever mint — lowercase is enough, since Crockford base32 is uppercase-only.
+ */
+export const CRON_USER_ID = "cron-task-principal";
+
 function buildCronUser(
   userInfo: GetUserInfoWithJwtResponse,
 ): AuthenticatedUser {
   const now = new Date();
   return {
-    id: -1,
+    id: CRON_USER_ID,
     openId: userInfo.openId,
     name: userInfo.name || "Manus Scheduled Task",
     email: null,

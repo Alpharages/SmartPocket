@@ -9,6 +9,8 @@ import TestRenderer, {
 import { useExpense } from "@/lib/expense-context";
 import { formatCurrency } from "@/lib/currency";
 import AccountsScreen from "@/app/accounts";
+import type { Id } from "@/drizzle/schema";
+import { testId, syncColumns } from "../helpers/ids";
 
 const mockBack = vi.hoisted(() => vi.fn());
 
@@ -157,8 +159,8 @@ vi.mock("@/components/ui/ToastProvider", () => ({
 }));
 
 const sampleAccount = {
-  id: 1,
-  userId: 1,
+  id: testId(1),
+  userId: testId(1),
   name: "Cash Wallet",
   type: "cash" as const,
   currency: "USD",
@@ -169,7 +171,7 @@ const sampleAccount = {
 
 const secondAccount = {
   ...sampleAccount,
-  id: 2,
+  id: testId(2),
   name: "Main Bank",
   type: "bank" as const,
 };
@@ -210,7 +212,7 @@ describe("AccountsScreen", () => {
   const fetchAccountTransferCount = vi.fn().mockResolvedValue(0);
   const refreshAccounts = vi.fn().mockResolvedValue(undefined);
   const refreshAccountBalances = vi.fn().mockResolvedValue(undefined);
-  const getAccountBalance = vi.fn((id: number) => (id === 1 ? 125.5 : 0));
+  const getAccountBalance = vi.fn((id: Id) => (id === testId(1) ? 125.5 : 0));
   const addTransfer = vi.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
@@ -256,7 +258,7 @@ describe("AccountsScreen", () => {
   it("formats every account balance in the display currency (SP-D08)", async () => {
     const euroAccount = {
       ...sampleAccount,
-      id: 3,
+      id: testId(3),
       name: "Euro Bank",
       currency: "EUR",
       type: "bank" as const,
@@ -289,7 +291,7 @@ describe("AccountsScreen", () => {
   it("formats a foreign-labelled account in the display currency (SP-D08)", async () => {
     const yenAccount = {
       ...sampleAccount,
-      id: 4,
+      id: testId(4),
       name: "Yen Wallet",
       currency: "JPY",
       type: "cash" as const,
@@ -369,7 +371,7 @@ describe("AccountsScreen", () => {
     });
 
     expect(
-      findByTestId(renderer.root, "account-balance-loading-1"),
+      findByTestId(renderer.root, `account-balance-loading-${testId(1)}`),
     ).not.toBeNull();
     expect(
       findByAccessibilityLabel(
@@ -439,13 +441,16 @@ describe("AccountsScreen", () => {
       renderer = TestRenderer.create(<AccountsScreen />);
     });
 
-    const deleteButton = findByTestId(renderer.root, "delete-account-1");
+    const deleteButton = findByTestId(
+      renderer.root,
+      `delete-account-${testId(1)}`,
+    );
     await act(async () => {
       await deleteButton?.props.onPress();
     });
 
     expect(mockConfirm).toHaveBeenCalled();
-    expect(deleteAccount).toHaveBeenCalledWith(1);
+    expect(deleteAccount).toHaveBeenCalledWith(testId(1));
   });
 
   it("shows reassignment sheet when deleting an account with transactions", async () => {
@@ -455,7 +460,10 @@ describe("AccountsScreen", () => {
       renderer = TestRenderer.create(<AccountsScreen />);
     });
 
-    const deleteButton = findByTestId(renderer.root, "delete-account-1");
+    const deleteButton = findByTestId(
+      renderer.root,
+      `delete-account-${testId(1)}`,
+    );
     await act(async () => {
       await deleteButton?.props.onPress();
     });
@@ -471,7 +479,7 @@ describe("AccountsScreen", () => {
       renderer = TestRenderer.create(<AccountsScreen />);
     });
 
-    const editButton = findByTestId(renderer.root, "edit-account-1");
+    const editButton = findByTestId(renderer.root, `edit-account-${testId(1)}`);
     await act(async () => {
       editButton?.props.onPress();
     });
@@ -488,7 +496,7 @@ describe("AccountsScreen", () => {
       await saveButton?.props.onPress();
     });
 
-    expect(updateAccount).toHaveBeenCalledWith(1, {
+    expect(updateAccount).toHaveBeenCalledWith(testId(1), {
       name: "Updated Wallet",
       type: "cash",
       currency: "USD",
@@ -502,7 +510,10 @@ describe("AccountsScreen", () => {
       renderer = TestRenderer.create(<AccountsScreen />);
     });
 
-    const deleteButton = findByTestId(renderer.root, "delete-account-1");
+    const deleteButton = findByTestId(
+      renderer.root,
+      `delete-account-${testId(1)}`,
+    );
     await act(async () => {
       await deleteButton?.props.onPress();
     });
@@ -515,7 +526,7 @@ describe("AccountsScreen", () => {
       await confirmReassign?.props.onPress();
     });
 
-    expect(reassignAndDeleteAccount).toHaveBeenCalledWith(1, 2);
+    expect(reassignAndDeleteAccount).toHaveBeenCalledWith(testId(1), testId(2));
   });
 
   it("shows reassignment sheet when deleting an account with transfers only", async () => {
@@ -526,7 +537,10 @@ describe("AccountsScreen", () => {
       renderer = TestRenderer.create(<AccountsScreen />);
     });
 
-    const deleteButton = findByTestId(renderer.root, "delete-account-1");
+    const deleteButton = findByTestId(
+      renderer.root,
+      `delete-account-${testId(1)}`,
+    );
     await act(async () => {
       await deleteButton?.props.onPress();
     });
@@ -546,7 +560,10 @@ describe("AccountsScreen", () => {
       renderer = TestRenderer.create(<AccountsScreen />);
     });
 
-    const deleteButton = findByTestId(renderer.root, "delete-account-1");
+    const deleteButton = findByTestId(
+      renderer.root,
+      `delete-account-${testId(1)}`,
+    );
     await act(async () => {
       await deleteButton?.props.onPress();
     });
@@ -638,8 +655,8 @@ describe("AccountsScreen", () => {
 
     expect(addTransfer).toHaveBeenCalledWith(
       expect.objectContaining({
-        fromAccountId: 1,
-        toAccountId: 2,
+        fromAccountId: testId(1),
+        toAccountId: testId(2),
         amount: "25.00",
       }),
     );

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { testId, syncColumns } from "../helpers/ids";
 
 const callDataApi = vi.fn();
 
@@ -16,13 +17,15 @@ describe("account db helpers", () => {
     callDataApi.mockResolvedValueOnce([{ txCount: 4 }]);
     const { getAccountTransactionCount } = await import("@/server/db");
 
-    await expect(getAccountTransactionCount(7, 42)).resolves.toBe(4);
+    await expect(
+      getAccountTransactionCount(testId(7), testId(42)),
+    ).resolves.toBe(4);
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
-          "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ?",
-        params: [42, 7],
+          "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ? AND deletedAt IS NULL",
+        params: [testId(42), testId(7)],
       },
     });
   });
@@ -31,22 +34,23 @@ describe("account db helpers", () => {
     callDataApi.mockRejectedValueOnce(new Error("database unavailable"));
     const { getAccountTransactionCount } = await import("@/server/db");
 
-    await expect(getAccountTransactionCount(1, 1)).rejects.toThrow(
-      "database unavailable",
-    );
+    await expect(
+      getAccountTransactionCount(testId(1), testId(1)),
+    ).rejects.toThrow("database unavailable");
   });
 
   it("reassigns transactions with user-scoped predicates", async () => {
     callDataApi.mockResolvedValueOnce(undefined);
     const { reassignAccountTransactions } = await import("@/server/db");
 
-    await reassignAccountTransactions(3, 9, 42);
+    await reassignAccountTransactions(testId(3), testId(9), testId(42));
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query:
-          "UPDATE transactions SET accountId = ? WHERE userId = ? AND accountId = ?",
-        params: [9, 42, 3],
+        query: expect.stringContaining(
+          "UPDATE transactions SET accountId = ?, updatedAt = ?, dirty = 1 WHERE userId = ? AND accountId = ?",
+        ),
+        params: [testId(9), expect.any(Date), testId(42), testId(3)],
       },
     });
   });
@@ -54,31 +58,31 @@ describe("account db helpers", () => {
   it("rejects reassign-and-delete when source and target are the same account", async () => {
     const { reassignAndDeleteAccount } = await import("@/server/db");
 
-    await expect(reassignAndDeleteAccount(5, 5, 1)).rejects.toThrow(
-      "Cannot reassign to the same account",
-    );
+    await expect(
+      reassignAndDeleteAccount(testId(5), testId(5), testId(1)),
+    ).rejects.toThrow("Cannot reassign to the same account");
     expect(callDataApi).not.toHaveBeenCalled();
   });
 
   it("derives per-account balances from user transactions", async () => {
     callDataApi.mockResolvedValueOnce([
-      { id: 1, accountId: 1, type: "income", amount: "100.00" },
-      { id: 2, accountId: 1, type: "expense", amount: "40.00" },
-      { id: 3, accountId: 2, type: "income", amount: "25.00" },
-      { id: 4, accountId: null, type: "income", amount: "999.00" },
+      { id: testId(1), accountId: testId(1), type: "income", amount: "100.00" },
+      { id: testId(2), accountId: testId(1), type: "expense", amount: "40.00" },
+      { id: testId(3), accountId: testId(2), type: "income", amount: "25.00" },
+      { id: testId(4), accountId: null, type: "income", amount: "999.00" },
     ]);
     const { getAccountBalances } = await import("@/server/db");
 
-    await expect(getAccountBalances(42)).resolves.toEqual({
-      1: 60,
-      2: 25,
+    await expect(getAccountBalances(testId(42))).resolves.toEqual({
+      [testId(1)]: 60,
+      [testId(2)]: 25,
     });
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
-          "SELECT id, accountId, type, amount FROM transactions WHERE userId = ?",
-        params: [42],
+          "SELECT id, accountId, type, amount FROM transactions WHERE userId = ? AND deletedAt IS NULL",
+        params: [testId(42)],
       },
     });
   });
@@ -90,6 +94,8 @@ describe("account db helpers", () => {
     callDataApi.mockRejectedValueOnce(new Error("database unavailable"));
     const { getAccountBalances } = await import("@/server/db");
 
-    await expect(getAccountBalances(1)).rejects.toThrow("database unavailable");
+    await expect(getAccountBalances(testId(1))).rejects.toThrow(
+      "database unavailable",
+    );
   });
 });

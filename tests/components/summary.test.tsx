@@ -8,6 +8,7 @@ import TestRenderer, {
 
 import { useExpense } from "@/lib/expense-context";
 import SummaryScreen from "@/app/(tabs)/summary";
+import { testId, syncColumns } from "../helpers/ids";
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -139,8 +140,8 @@ const NOW = new Date("2026-06-15T10:00:00Z");
 
 const mockCategories = [
   {
-    id: 1,
-    userId: 1,
+    id: testId(1),
+    userId: testId(1),
     name: "Salary",
     type: "income" as const,
     color: "#059669",
@@ -150,8 +151,8 @@ const mockCategories = [
     updatedAt: new Date(),
   },
   {
-    id: 2,
-    userId: 1,
+    id: testId(2),
+    userId: testId(1),
     name: "Food",
     type: "expense" as const,
     color: "#DC2626",
@@ -161,8 +162,8 @@ const mockCategories = [
     updatedAt: new Date(),
   },
   {
-    id: 3,
-    userId: 1,
+    id: testId(3),
+    userId: testId(1),
     name: "Transport",
     type: "expense" as const,
     color: "#2563EB",
@@ -197,9 +198,9 @@ const defaultExpenseState = {
   refreshMonthlyStats: vi.fn(),
   categories: mockCategories,
   transactions: [
-    makeTransaction({ id: 1, categoryId: 2, amount: "120.00" }),
-    makeTransaction({ id: 2, categoryId: 3, amount: "60.00" }),
-    makeTransaction({ id: 3, categoryId: 2, amount: "30.00" }),
+    makeTransaction({ id: testId(1), categoryId: testId(2), amount: "120.00" }),
+    makeTransaction({ id: testId(2), categoryId: testId(3), amount: "60.00" }),
+    makeTransaction({ id: testId(3), categoryId: testId(2), amount: "30.00" }),
   ],
   refreshTransactions: vi.fn(),
 };

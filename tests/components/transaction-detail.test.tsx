@@ -8,12 +8,13 @@ import TestRenderer, {
 
 import TransactionDetailScreen from "@/app/transaction/[id]";
 import { useExpense } from "@/lib/expense-context";
+import { testId, syncColumns } from "../helpers/ids";
 
 const mockBack = vi.fn();
 
 vi.mock("expo-router", () => ({
   useRouter: () => ({ back: mockBack }),
-  useLocalSearchParams: () => ({ id: "7" }),
+  useLocalSearchParams: () => ({ id: testId(7) }),
 }));
 
 vi.mock("@/components/screen-container", () => ({
@@ -78,8 +79,8 @@ vi.mock("@/lib/expense-context", () => ({
 
 const accounts = [
   {
-    id: 10,
-    userId: 1,
+    id: testId(10),
+    userId: testId(1),
     name: "Cash Wallet",
     type: "cash" as const,
     currency: "USD",
@@ -88,8 +89,8 @@ const accounts = [
     updatedAt: new Date(),
   },
   {
-    id: 11,
-    userId: 1,
+    id: testId(11),
+    userId: testId(1),
     name: "Main Bank",
     type: "bank" as const,
     currency: "USD",
@@ -100,10 +101,10 @@ const accounts = [
 ];
 
 const transaction = {
-  id: 7,
-  userId: 1,
-  categoryId: 2,
-  accountId: 10,
+  id: testId(7),
+  userId: testId(1),
+  categoryId: testId(2),
+  accountId: testId(10),
   type: "expense" as const,
   amount: "20.00",
   description: "Lunch",
@@ -143,8 +144,8 @@ describe("TransactionDetailScreen account assignment", () => {
       transactions: [transaction],
       categories: [
         {
-          id: 2,
-          userId: 1,
+          id: testId(2),
+          userId: testId(1),
           name: "Food",
           type: "expense",
           color: "#DC2626",
@@ -195,7 +196,9 @@ describe("TransactionDetailScreen account assignment", () => {
       save!.props.onPress();
     });
 
-    expect(updateTransaction).toHaveBeenCalledWith(7, { accountId: 11 });
+    expect(updateTransaction).toHaveBeenCalledWith(testId(7), {
+      accountId: testId(11),
+    });
   });
 
   it("can clear the account assignment", async () => {
@@ -215,6 +218,8 @@ describe("TransactionDetailScreen account assignment", () => {
       save!.props.onPress();
     });
 
-    expect(updateTransaction).toHaveBeenCalledWith(7, { accountId: null });
+    expect(updateTransaction).toHaveBeenCalledWith(testId(7), {
+      accountId: null,
+    });
   });
 });

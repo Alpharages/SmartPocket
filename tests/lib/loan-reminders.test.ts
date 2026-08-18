@@ -32,10 +32,11 @@ import {
   scheduleLoanReminder,
   syncLoanReminderState,
 } from "@/lib/loan-reminders";
+import { testId, syncColumns } from "../helpers/ids";
 
 const baseLoan: Loan = {
-  id: 42,
-  userId: 1,
+  id: testId(42),
+  userId: testId(1),
   direction: "lend",
   counterparty: "Alex",
   principal: "500.00",
@@ -95,15 +96,15 @@ describe("loan-reminders", () => {
 
     expect(result.scheduled).toBe("due");
     expect(deps.cancelScheduledNotification).toHaveBeenCalledWith(
-      loanOverdueReminderIdentifier(42),
+      loanOverdueReminderIdentifier(testId(42)),
     );
     expect(deps.scheduleLocalNotification).toHaveBeenCalledWith(
       expect.objectContaining({
-        identifier: loanDueReminderIdentifier(42),
+        identifier: loanDueReminderIdentifier(testId(42)),
         title: "Loan repayment due",
         body: expect.stringContaining("due on"),
         triggerAt: dueReminderTriggerAt(baseLoan.nextDueDate as Date),
-        data: buildLoanReminderNotificationData(42),
+        data: buildLoanReminderNotificationData(testId(42)),
       }),
     );
   });
@@ -124,11 +125,11 @@ describe("loan-reminders", () => {
 
     expect(result.scheduled).toBe("overdue");
     expect(deps.cancelScheduledNotification).toHaveBeenCalledWith(
-      loanDueReminderIdentifier(42),
+      loanDueReminderIdentifier(testId(42)),
     );
     expect(deps.scheduleLocalNotification).toHaveBeenCalledWith(
       expect.objectContaining({
-        identifier: loanOverdueReminderIdentifier(42),
+        identifier: loanOverdueReminderIdentifier(testId(42)),
         title: "Loan repayment overdue",
         triggerAt: overdueReminderTriggerAt(new Date("2026-06-10T15:00:00")),
       }),
@@ -151,10 +152,10 @@ describe("loan-reminders", () => {
     expect(result.scheduled).toBe("cleared");
     expect(deps.scheduleLocalNotification).not.toHaveBeenCalled();
     expect(deps.cancelScheduledNotification).toHaveBeenCalledWith(
-      loanDueReminderIdentifier(42),
+      loanDueReminderIdentifier(testId(42)),
     );
     expect(deps.cancelScheduledNotification).toHaveBeenCalledWith(
-      loanOverdueReminderIdentifier(42),
+      loanOverdueReminderIdentifier(testId(42)),
     );
   });
 
@@ -181,34 +182,40 @@ describe("loan-reminders", () => {
     };
 
     await scheduleLoanReminder(overdueLoan, { remindersEnabled: true }, deps);
-    const firstTrigger = deps.scheduleLocalNotification.mock.calls[0][0].triggerAt;
+    const firstTrigger =
+      deps.scheduleLocalNotification.mock.calls[0][0].triggerAt;
     deps.scheduleLocalNotification.mockClear();
 
     await scheduleLoanReminder(overdueLoan, { remindersEnabled: true }, deps);
-    const secondTrigger = deps.scheduleLocalNotification.mock.calls[0][0].triggerAt;
+    const secondTrigger =
+      deps.scheduleLocalNotification.mock.calls[0][0].triggerAt;
 
     expect(firstTrigger.getTime()).toBe(secondTrigger.getTime());
   });
 
   it("syncLoanReminderState clears all loans when reminders are disabled", async () => {
     const deps = createDeps();
-    await syncLoanReminderState([baseLoan, { ...baseLoan, id: 99 }], {
-      remindersEnabled: false,
-    }, deps);
+    await syncLoanReminderState(
+      [baseLoan, { ...baseLoan, id: testId(99) }],
+      {
+        remindersEnabled: false,
+      },
+      deps,
+    );
 
     expect(deps.scheduleLocalNotification).not.toHaveBeenCalled();
     expect(deps.cancelScheduledNotification).toHaveBeenCalledWith(
-      loanDueReminderIdentifier(42),
+      loanDueReminderIdentifier(testId(42)),
     );
     expect(deps.cancelScheduledNotification).toHaveBeenCalledWith(
-      loanOverdueReminderIdentifier(99),
+      loanOverdueReminderIdentifier(testId(99)),
     );
   });
 
   it("clears reminders for loans removed from the synced list", async () => {
     const deps = createDeps();
     await syncLoanReminderState(
-      [baseLoan, { ...baseLoan, id: 99 }],
+      [baseLoan, { ...baseLoan, id: testId(99) }],
       { remindersEnabled: true },
       deps,
     );
@@ -217,10 +224,10 @@ describe("loan-reminders", () => {
     await syncLoanReminderState([baseLoan], { remindersEnabled: true }, deps);
 
     expect(deps.cancelScheduledNotification).toHaveBeenCalledWith(
-      loanDueReminderIdentifier(99),
+      loanDueReminderIdentifier(testId(99)),
     );
     expect(deps.cancelScheduledNotification).toHaveBeenCalledWith(
-      loanOverdueReminderIdentifier(99),
+      loanOverdueReminderIdentifier(testId(99)),
     );
   });
 
@@ -232,10 +239,10 @@ describe("loan-reminders", () => {
     await syncLoanReminderState([], { remindersEnabled: true }, deps);
 
     expect(deps.cancelScheduledNotification).toHaveBeenCalledWith(
-      loanDueReminderIdentifier(42),
+      loanDueReminderIdentifier(testId(42)),
     );
     expect(deps.cancelScheduledNotification).toHaveBeenCalledWith(
-      loanOverdueReminderIdentifier(42),
+      loanOverdueReminderIdentifier(testId(42)),
     );
   });
 

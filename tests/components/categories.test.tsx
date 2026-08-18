@@ -9,6 +9,7 @@ import TestRenderer, {
 
 import { useExpense } from "@/lib/expense-context";
 import CategoriesScreen from "@/app/(tabs)/categories";
+import { testId, syncColumns } from "../helpers/ids";
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -162,8 +163,8 @@ vi.mock("@/hooks/use-confirm", () => ({
 // ---------------------------------------------------------------------------
 
 const mockExpenseCategory = {
-  id: 1,
-  userId: 1,
+  id: testId(1),
+  userId: testId(1),
   name: "Food",
   type: "expense" as const,
   color: "#E11D48",
@@ -174,8 +175,8 @@ const mockExpenseCategory = {
 };
 
 const mockIncomeCategory = {
-  id: 2,
-  userId: 1,
+  id: testId(2),
+  userId: testId(1),
   name: "Salary",
   type: "income" as const,
   color: "#047857",

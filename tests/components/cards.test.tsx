@@ -9,6 +9,8 @@ import TestRenderer, {
 
 import { useExpense } from "@/lib/expense-context";
 import CardsScreen from "@/app/(tabs)/cards";
+import type { Id } from "@/drizzle/schema";
+import { testId, syncColumns } from "../helpers/ids";
 
 const mockPush = vi.hoisted(() => vi.fn());
 
@@ -172,8 +174,8 @@ vi.mock("@/components/ui/ToastProvider", () => ({
 }));
 
 const mockCard1 = {
-  id: 1,
-  userId: 1,
+  id: testId(1),
+  userId: testId(1),
   name: "My Visa",
   cardNumberLast4: "3456",
   cardholderName: "John Doe",
@@ -189,8 +191,8 @@ const mockCard1 = {
 };
 
 const mockCard2 = {
-  id: 2,
-  userId: 1,
+  id: testId(2),
+  userId: testId(1),
   name: "Mastercard",
   cardNumberLast4: "7654",
   cardholderName: "Jane Doe",
@@ -246,21 +248,19 @@ function renderScreen(
 
 function renderWithLiveCards(initialCards = [mockCard1, mockCard2]) {
   let cards = initialCards.map((c) => ({ ...c }));
-  const liveUpdate = vi.fn(
-    async (id: number, data: Partial<typeof mockCard1>) => {
-      cards = cards.map((c) =>
-        c.id === id
-          ? {
-              ...c,
-              ...data,
-              name: data.name ?? c.name,
-              color: data.color ?? c.color,
-              cardType: data.cardType ?? c.cardType,
-            }
-          : c,
-      );
-    },
-  );
+  const liveUpdate = vi.fn(async (id: Id, data: Partial<typeof mockCard1>) => {
+    cards = cards.map((c) =>
+      c.id === id
+        ? {
+            ...c,
+            ...data,
+            name: data.name ?? c.name,
+            color: data.color ?? c.color,
+            cardType: data.cardType ?? c.cardType,
+          }
+        : c,
+    );
+  });
   (useExpense as ReturnType<typeof vi.fn>).mockImplementation(() => ({
     ...baseContext,
     creditCards: cards,
@@ -616,7 +616,7 @@ describe("CardsScreen", () => {
       act(() => {
         cardPressable.props.onPress?.();
       });
-      expect(mockPush).toHaveBeenCalledWith("/card/1");
+      expect(mockPush).toHaveBeenCalledWith(`/card/${testId(1)}`);
     });
 
     it("long-press delete still calls deleteCreditCard after confirm", async () => {

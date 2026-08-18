@@ -1,6 +1,9 @@
+import type { Id } from "@/drizzle/schema";
 import { describe, expect, it } from "vitest";
 
 import { devQuery } from "@/server/_core/devDb";
+import { testId } from "./helpers/ids";
+import { isUlid } from "@shared/ulid";
 
 describe("devDb loans", () => {
   it("inserts and lists loans", async () => {
@@ -15,7 +18,7 @@ describe("devDb loans", () => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
-        1,
+        testId(1),
         "lend",
         "Alex",
         "250.00",
@@ -27,19 +30,21 @@ describe("devDb loans", () => {
         "active",
         null,
       ],
-    )) as { insertId: number };
+    )) as { insertId: Id };
 
-    expect(insert.insertId).toBeGreaterThan(0);
+    // The id is minted by devQuery itself (no `id` column supplied) — assert
+    // the shape rather than a specific value, exactly as the real INSERT does.
+    expect(isUlid(insert.insertId)).toBe(true);
 
     const rows = (await devQuery(
-      "SELECT * FROM loans WHERE userId = ? ORDER BY createdAt DESC",
-      [1],
+      "SELECT * FROM loans WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
+      [testId(1)],
     )) as Array<Record<string, unknown>>;
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       id: insert.insertId,
-      userId: 1,
+      userId: testId(1),
       direction: "lend",
       counterparty: "Alex",
       principal: "250.00",
@@ -49,8 +54,8 @@ describe("devDb loans", () => {
     });
 
     const byId = (await devQuery(
-      "SELECT * FROM loans WHERE id = ? AND userId = ?",
-      [insert.insertId, 1],
+      "SELECT * FROM loans WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [insert.insertId, testId(1)],
     )) as Array<Record<string, unknown>>;
 
     expect(byId).toHaveLength(1);
@@ -67,7 +72,7 @@ describe("devDb loans", () => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
-        1,
+        testId(1),
         "borrow",
         null,
         "1000.00",
@@ -79,27 +84,27 @@ describe("devDb loans", () => {
         "active",
         null,
       ],
-    )) as { insertId: number };
+    )) as { insertId: Id };
 
     const repaymentInsert = (await devQuery(
       `
         INSERT INTO repayments (loanId, userId, amount, date, note)
         VALUES (?, ?, ?, ?, ?)
       `,
-      [loanInsert.insertId, 1, "100.00", new Date("2026-06-01"), null],
-    )) as { insertId: number };
+      [loanInsert.insertId, testId(1), "100.00", new Date("2026-06-01"), null],
+    )) as { insertId: Id };
 
-    expect(repaymentInsert.insertId).toBeGreaterThan(0);
+    expect(isUlid(repaymentInsert.insertId)).toBe(true);
 
     const rows = (await devQuery(
-      "SELECT * FROM repayments WHERE loanId = ? AND userId = ? ORDER BY date DESC",
-      [loanInsert.insertId, 1],
+      "SELECT * FROM repayments WHERE loanId = ? AND userId = ? AND deletedAt IS NULL ORDER BY date DESC",
+      [loanInsert.insertId, testId(1)],
     )) as Array<Record<string, unknown>>;
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       loanId: loanInsert.insertId,
-      userId: 1,
+      userId: testId(1),
       amount: "100.00",
     });
   });

@@ -35,6 +35,7 @@ import {
   type RecurringFormValues,
   type RecurringFrequency,
 } from "@/lib/recurring-form-validation";
+import type { Id } from "@/drizzle/schema";
 
 const FREQUENCY_OPTIONS: { value: RecurringFrequency; label: string }[] = [
   { value: "daily", label: "Daily" },
@@ -126,8 +127,8 @@ export function RecurringTransactionSheet({
   const isEditing = editing != null;
   const [type, setType] = useState<"income" | "expense">("expense");
   const [amount, setAmount] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [creditCardId, setCreditCardId] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Id | null>(null);
+  const [creditCardId, setCreditCardId] = useState<Id | null>(null);
   const [description, setDescription] = useState("");
   const [frequency, setFrequency] = useState<RecurringFrequency>("monthly");
   const [interval, setInterval] = useState(1);

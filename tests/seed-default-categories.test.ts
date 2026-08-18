@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CATEGORIES } from "@/server/_core/default-categories";
+import { testId } from "./helpers/ids";
 
 const callDataApi = vi.fn();
 
@@ -37,12 +38,12 @@ describe("seedDefaultCategories", () => {
       .mockResolvedValue({ insertId: 1 });
 
     const { seedDefaultCategories } = await import("@/server/db");
-    await seedDefaultCategories(42);
+    await seedDefaultCategories(testId(42));
 
     expect(countQueryBody(0).query).toMatch(
       /SELECT COUNT\(\*\) as categoryCount FROM categories WHERE userId = \?/,
     );
-    expect(countQueryBody(0).params).toEqual([42]);
+    expect(countQueryBody(0).params).toEqual([testId(42)]);
 
     const inserts = insertQueryBodies();
     expect(inserts).toHaveLength(DEFAULT_CATEGORIES.length);
@@ -50,7 +51,8 @@ describe("seedDefaultCategories", () => {
     inserts.forEach((body, index) => {
       const def = DEFAULT_CATEGORIES[index];
       expect(body.params).toEqual([
-        42,
+        expect.any(String),
+        testId(42),
         def.name,
         def.type,
         def.color,
@@ -59,7 +61,7 @@ describe("seedDefaultCategories", () => {
       ]);
     });
 
-    const types = inserts.map((body) => body.params[2]);
+    const types = inserts.map((body) => body.params[3]);
     expect(types).toContain("income");
     expect(types).toContain("expense");
   });
@@ -68,7 +70,7 @@ describe("seedDefaultCategories", () => {
     callDataApi.mockResolvedValueOnce([{ categoryCount: 3 }]);
 
     const { seedDefaultCategories } = await import("@/server/db");
-    await seedDefaultCategories(7);
+    await seedDefaultCategories(testId(7));
 
     expect(callDataApi).toHaveBeenCalledTimes(1);
     expect(insertQueryBodies()).toHaveLength(0);
@@ -80,13 +82,13 @@ describe("seedDefaultCategories", () => {
       .mockResolvedValue({ insertId: 1 });
 
     const { seedDefaultCategories } = await import("@/server/db");
-    await seedDefaultCategories(99);
+    await seedDefaultCategories(testId(99));
     const callsAfterFirst = callDataApi.mock.calls.length;
 
     callDataApi.mockResolvedValueOnce([
       { categoryCount: DEFAULT_CATEGORIES.length },
     ]);
-    await seedDefaultCategories(99);
+    await seedDefaultCategories(testId(99));
 
     expect(insertQueryBodies()).toHaveLength(DEFAULT_CATEGORIES.length);
     expect(callDataApi.mock.calls.length).toBe(callsAfterFirst + 1);
@@ -106,7 +108,7 @@ describe("ensureUserSeeded", () => {
     callDataApi.mockRejectedValueOnce(new Error("db down"));
 
     const { ensureUserSeeded } = await import("@/server/_core/user-seeding");
-    await expect(ensureUserSeeded(1)).resolves.toBeUndefined();
+    await expect(ensureUserSeeded(testId(1))).resolves.toBeUndefined();
 
     expect(consoleError).toHaveBeenCalledWith(
       "[seed] failed to seed default user data",

@@ -49,6 +49,7 @@ import {
   isWithinMoneyRange,
   sanitizeAmountInput,
 } from "@shared/money";
+import type { Id } from "@/drizzle/schema";
 
 const MIN_TOUCH_TARGET = 44;
 
@@ -78,13 +79,13 @@ export default function AddTransactionScreen() {
   );
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Id | null>(null);
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<number | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<Id | null>(null);
   // SP-010: cards could be created but never attached to a transaction, so the
   // whole Cards module produced no data.
-  const [selectedCard, setSelectedCard] = useState<number | null>(null);
+  const [selectedCard, setSelectedCard] = useState<Id | null>(null);
   // SP-008: this was `useState(new Date())` with no setter and no field, so
   // every entry was stamped at the moment of saving — yesterday's coffee could
   // not be recorded, and a mis-entered date could not be corrected.

@@ -4,6 +4,7 @@ import {
   reduceAccountBalances,
 } from "@/lib/account-balances";
 import { callDataApi } from "./_core/dataApi";
+import { ulid } from "@shared/ulid";
 import {
   decryptCardNumber,
   encryptCardNumber,
@@ -43,6 +44,7 @@ import {
   InsertAccount,
   Transfer,
   InsertTransfer,
+  Id,
 } from "@/drizzle/schema";
 
 /**
@@ -81,7 +83,14 @@ export async function upsertUser(data: {
   loginMethod?: string | null;
   lastSignedIn?: Date;
 }) {
+  // This is a raw INSERT, not a drizzle-builder one — the schema's
+  // `.$defaultFn(() => ulid())` on `users.id` only fires through drizzle's
+  // query builder, never for a hand-written statement like this one. `id` is
+  // minted here and included in the column list so a first-time signup gets a
+  // real id; it is deliberately excluded from the ON DUPLICATE KEY UPDATE
+  // clause below so a returning user's existing id is never overwritten.
   const fields = [
+    ["id", ulid()],
     ["openId", data.openId],
     ["name", data.name],
     ["email", data.email],
@@ -91,7 +100,7 @@ export async function upsertUser(data: {
   const columns = fields.map(([column]) => column);
   const values = fields.map(([, value]) => value);
   const updates = columns
-    .filter((column) => column !== "openId")
+    .filter((column) => column !== "openId" && column !== "id")
     .map((column) => `${column} = VALUES(${column})`);
 
   await callDataApi("Database/query", {
@@ -107,13 +116,37 @@ export async function upsertUser(data: {
   });
 }
 
+/**
+ * Appended to the SET clause of every write against a synced table.
+ *
+ * `updatedAt` is stamped explicitly rather than left to MySQL's
+ * `ON UPDATE CURRENT_TIMESTAMP`, because these same statements now run against
+ * the on-device SQLite, which has no such column attribute — and because
+ * last-write-wins conflict resolution is only as trustworthy as the timestamp
+ * it compares. `dirty = 1` marks the row as not yet pushed; the sync worker is
+ * the only thing that clears it.
+ */
+const TOUCH_SET = "updatedAt = ?, dirty = 1";
+
+/**
+ * Soft delete. A hard `DELETE` cannot propagate to another device: the sync
+ * would see "row absent locally" and be unable to tell a deletion from a row
+ * it has simply never pulled. The tombstone is what carries the intent.
+ */
+const TOMBSTONE_SET = "deletedAt = ?, updatedAt = ?, dirty = 1";
+
+/** Timestamp shared by every column a single write stamps, so they cannot disagree. */
+function writeStamp(): Date {
+  return new Date();
+}
+
 /** Coerce MySQL tinyint (0/1) or boolean — never use Boolean() (string "0" is truthy). */
 function coerceDbBoolean(value: unknown): boolean {
   return value === 1 || value === true;
 }
 
 export async function getUserSettings(
-  userId: number,
+  userId: Id,
 ): Promise<{ aiEnabled: boolean; remindersEnabled: boolean }> {
   const result = await callDataApi("Database/query", {
     body: {
@@ -134,7 +167,7 @@ export async function getUserSettings(
 }
 
 export async function updateAiEnabled(
-  userId: number,
+  userId: Id,
   enabled: boolean,
 ): Promise<void> {
   await callDataApi("Database/query", {
@@ -155,7 +188,7 @@ export interface UserPinState {
   pinLockedUntil: Date | null;
 }
 
-export async function getUserPinState(userId: number): Promise<UserPinState> {
+export async function getUserPinState(userId: Id): Promise<UserPinState> {
   const result = await callDataApi("Database/query", {
     body: {
       query:
@@ -179,10 +212,7 @@ export async function getUserPinState(userId: number): Promise<UserPinState> {
 }
 
 /** Stores the salted hash and resets attempt/lockout state — a fresh PIN starts with a clean slate. */
-export async function setUserPin(
-  userId: number,
-  pinHash: string,
-): Promise<void> {
+export async function setUserPin(userId: Id, pinHash: string): Promise<void> {
   await callDataApi("Database/query", {
     body: {
       query:
@@ -192,7 +222,7 @@ export async function setUserPin(
   });
 }
 
-export async function clearUserPin(userId: number): Promise<void> {
+export async function clearUserPin(userId: Id): Promise<void> {
   await callDataApi("Database/query", {
     body: {
       query:
@@ -203,7 +233,7 @@ export async function clearUserPin(userId: number): Promise<void> {
 }
 
 /** Clears failed-attempt/lockout state without touching the hash — used after a successful verify. */
-export async function resetPinAttempts(userId: number): Promise<void> {
+export async function resetPinAttempts(userId: Id): Promise<void> {
   await callDataApi("Database/query", {
     body: {
       query:
@@ -220,7 +250,7 @@ export async function resetPinAttempts(userId: number): Promise<void> {
  * permanently re-trigger on the next failure (round-2 review B2).
  */
 export async function resetExpiredPinLockout(
-  userId: number,
+  userId: Id,
   now: Date,
 ): Promise<void> {
   await callDataApi("Database/query", {
@@ -254,7 +284,7 @@ export async function resetExpiredPinLockout(
  * pre-increment `pinFailedAttempts`.
  */
 export async function recordFailedPinAttempt(
-  userId: number,
+  userId: Id,
   data: { maxAttempts: number; lockedUntilIfTripped: Date; now: Date },
 ): Promise<{ counted: boolean }> {
   const result = await callDataApi("Database/query", {
@@ -289,13 +319,13 @@ function rethrowReadFailure(operation: string, error: unknown): never {
 }
 
 export async function getUserCategories(
-  userId: number,
+  userId: Id,
   type?: "income" | "expense",
 ) {
   try {
     const query = type
-      ? "SELECT * FROM categories WHERE userId = ? AND type = ? ORDER BY name"
-      : "SELECT * FROM categories WHERE userId = ? ORDER BY name";
+      ? "SELECT * FROM categories WHERE userId = ? AND type = ? AND deletedAt IS NULL ORDER BY name"
+      : "SELECT * FROM categories WHERE userId = ? AND deletedAt IS NULL ORDER BY name";
     const params = type ? [userId, type] : [userId];
 
     const result = await callDataApi("Database/query", {
@@ -308,13 +338,15 @@ export async function getUserCategories(
 }
 
 export async function createCategory(data: InsertCategory) {
-  const result = await callDataApi("Database/query", {
+  const id = ulid();
+  await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO categories (userId, name, type, color, icon, isDefault)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO categories (id, userId, name, type, color, icon, isDefault)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
+        id,
         data.userId,
         data.name,
         data.type,
@@ -325,17 +357,15 @@ export async function createCategory(data: InsertCategory) {
       ],
     },
   });
-  return result && typeof result === "object" && "insertId" in result
-    ? (result as { insertId: number }).insertId
-    : 0;
+  return id;
 }
 
 /** Idempotent: seeds DEFAULT_CATEGORIES once per user when they have zero categories. */
-export async function seedDefaultCategories(userId: number): Promise<void> {
+export async function seedDefaultCategories(userId: Id): Promise<void> {
   const countResult = await callDataApi("Database/query", {
     body: {
       query:
-        "SELECT COUNT(*) as categoryCount FROM categories WHERE userId = ?",
+        "SELECT COUNT(*) as categoryCount FROM categories WHERE userId = ? AND deletedAt IS NULL",
       params: [userId],
     },
   });
@@ -406,8 +436,8 @@ function buildUpdate(
  * user's categories (QA report SP-001).
  */
 export async function updateCategory(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
   data: Partial<InsertCategory>,
 ) {
   const { clause, values } = buildUpdate("categories", data);
@@ -415,26 +445,28 @@ export async function updateCategory(
 
   await callDataApi("Database/query", {
     body: {
-      query: `UPDATE categories SET ${clause} WHERE id = ? AND userId = ?`,
-      params: [...values, id, userId],
+      query: `UPDATE categories SET ${clause}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [...values, writeStamp(), id, userId],
     },
   });
 }
 
-export async function deleteCategory(id: number, userId: number) {
+export async function deleteCategory(id: Id, userId: Id) {
+  const stamp = writeStamp();
   await callDataApi("Database/query", {
     body: {
-      query: "DELETE FROM categories WHERE id = ? AND userId = ?",
-      params: [id, userId],
+      query: `UPDATE categories SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [stamp, stamp, id, userId],
     },
   });
 }
 
-export async function getCategoryById(id: number, userId: number) {
+export async function getCategoryById(id: Id, userId: Id) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM categories WHERE id = ? AND userId = ?",
+        query:
+          "SELECT * FROM categories WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -453,24 +485,27 @@ export type SafeCreditCard = Omit<CreditCard, "cardNumber"> & {
   cardNumberLast4: string;
 };
 
-function toSafeCreditCard(row: CreditCard): SafeCreditCard {
-  const plain = row.cardNumber ? decryptCardNumber(row.cardNumber) : "";
+async function toSafeCreditCard(row: CreditCard): Promise<SafeCreditCard> {
+  const plain = row.cardNumber ? await decryptCardNumber(row.cardNumber) : "";
   const { cardNumber: _removed, ...rest } = row;
   return { ...rest, cardNumberLast4: maskCardNumber(plain) };
 }
 
 export async function getUserCreditCards(
-  userId: number,
+  userId: Id,
 ): Promise<SafeCreditCard[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM creditCards WHERE userId = ? ORDER BY name",
+        query:
+          "SELECT * FROM creditCards WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
         params: [userId],
       },
     });
     const rows = Array.isArray(result) ? result : [];
-    return rows.map((row) => toSafeCreditCard(row as CreditCard));
+    return await Promise.all(
+      rows.map((row) => toSafeCreditCard(row as CreditCard)),
+    );
   } catch (error) {
     rethrowReadFailure("getUserCreditCards", error);
   }
@@ -479,16 +514,18 @@ export async function getUserCreditCards(
 export async function createCreditCard(
   data: InsertCreditCard,
 ): Promise<SafeCreditCard | null> {
-  const result = await callDataApi("Database/query", {
+  const id = ulid();
+  await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO creditCards (userId, name, cardNumber, cardholderName, expiryMonth, expiryYear, creditLimit, color, cardType)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO creditCards (id, userId, name, cardNumber, cardholderName, expiryMonth, expiryYear, creditLimit, color, cardType)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
+        id,
         data.userId,
         data.name,
-        encryptCardNumber(data.cardNumber),
+        await encryptCardNumber(data.cardNumber),
         data.cardholderName,
         data.expiryMonth,
         data.expiryYear,
@@ -498,14 +535,7 @@ export async function createCreditCard(
       ],
     },
   });
-  const insertId =
-    result && typeof result === "object" && "insertId" in result
-      ? (result as { insertId: number }).insertId
-      : 0;
-  if (!insertId) {
-    return null;
-  }
-  return getCreditCardById(insertId, data.userId);
+  return getCreditCardById(id, data.userId);
 }
 
 /**
@@ -514,13 +544,13 @@ export async function createCreditCard(
  * their stored PAN (QA report SP-002).
  */
 export async function updateCreditCard(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
   data: Partial<InsertCreditCard>,
 ): Promise<SafeCreditCard | null> {
   const payload: Partial<InsertCreditCard> = { ...data };
   if (payload.cardNumber !== undefined) {
-    payload.cardNumber = encryptCardNumber(payload.cardNumber);
+    payload.cardNumber = await encryptCardNumber(payload.cardNumber);
   }
 
   const { clause, values } = buildUpdate("creditCards", payload);
@@ -528,8 +558,8 @@ export async function updateCreditCard(
   if (clause) {
     await callDataApi("Database/query", {
       body: {
-        query: `UPDATE creditCards SET ${clause} WHERE id = ? AND userId = ?`,
-        params: [...values, id, userId],
+        query: `UPDATE creditCards SET ${clause}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+        params: [...values, writeStamp(), id, userId],
       },
     });
   }
@@ -537,28 +567,30 @@ export async function updateCreditCard(
   return getCreditCardById(id, userId);
 }
 
-export async function deleteCreditCard(id: number, userId: number) {
+export async function deleteCreditCard(id: Id, userId: Id) {
+  const stamp = writeStamp();
   await callDataApi("Database/query", {
     body: {
-      query: "DELETE FROM creditCards WHERE id = ? AND userId = ?",
-      params: [id, userId],
+      query: `UPDATE creditCards SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [stamp, stamp, id, userId],
     },
   });
 }
 
 export async function getCreditCardById(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
 ): Promise<SafeCreditCard | null> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM creditCards WHERE id = ? AND userId = ?",
+        query:
+          "SELECT * FROM creditCards WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
     const row = Array.isArray(result) ? result[0] : null;
-    return row ? toSafeCreditCard(row as CreditCard) : null;
+    return row ? await toSafeCreditCard(row as CreditCard) : null;
   } catch (error) {
     rethrowReadFailure("getCreditCardById", error);
   }
@@ -568,11 +600,12 @@ export async function getCreditCardById(
 // ACCOUNTS
 // ============================================================================
 
-export async function getUserAccounts(userId: number): Promise<Account[]> {
+export async function getUserAccounts(userId: Id): Promise<Account[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM accounts WHERE userId = ? ORDER BY name",
+        query:
+          "SELECT * FROM accounts WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
         params: [userId],
       },
     });
@@ -585,13 +618,15 @@ export async function getUserAccounts(userId: number): Promise<Account[]> {
 export async function createAccount(
   data: InsertAccount,
 ): Promise<Account | null> {
-  const result = await callDataApi("Database/query", {
+  const id = ulid();
+  await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO accounts (userId, name, type, currency, isDefault)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO accounts (id, userId, name, type, currency, isDefault)
+        VALUES (?, ?, ?, ?, ?, ?)
       `,
       params: [
+        id,
         data.userId,
         data.name,
         data.type,
@@ -600,19 +635,12 @@ export async function createAccount(
       ],
     },
   });
-  const insertId =
-    result && typeof result === "object" && "insertId" in result
-      ? (result as { insertId: number }).insertId
-      : 0;
-  if (!insertId) {
-    return null;
-  }
-  return getAccountById(insertId, data.userId);
+  return getAccountById(id, data.userId);
 }
 
 export async function updateAccount(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
   data: Partial<InsertAccount>,
 ): Promise<Account | null> {
   const updates = Object.entries(data)
@@ -626,31 +654,33 @@ export async function updateAccount(
 
   await callDataApi("Database/query", {
     body: {
-      query: `UPDATE accounts SET ${updates} WHERE id = ? AND userId = ?`,
-      params: [...values, id, userId],
+      query: `UPDATE accounts SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [...values, writeStamp(), id, userId],
     },
   });
 
   return getAccountById(id, userId);
 }
 
-export async function deleteAccount(id: number, userId: number): Promise<void> {
+export async function deleteAccount(id: Id, userId: Id): Promise<void> {
+  const stamp = writeStamp();
   await callDataApi("Database/query", {
     body: {
-      query: "DELETE FROM accounts WHERE id = ? AND userId = ?",
-      params: [id, userId],
+      query: `UPDATE accounts SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [stamp, stamp, id, userId],
     },
   });
 }
 
 export async function getAccountById(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
 ): Promise<Account | null> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM accounts WHERE id = ? AND userId = ?",
+        query:
+          "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -662,13 +692,13 @@ export async function getAccountById(
 }
 
 export async function getAccountTransactionCount(
-  accountId: number,
-  userId: number,
+  accountId: Id,
+  userId: Id,
 ): Promise<number> {
   const result = await callDataApi("Database/query", {
     body: {
       query:
-        "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ?",
+        "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ? AND deletedAt IS NULL",
       params: [userId, accountId],
     },
   });
@@ -680,13 +710,13 @@ export async function getAccountTransactionCount(
 }
 
 export async function getAccountTransferCount(
-  accountId: number,
-  userId: number,
+  accountId: Id,
+  userId: Id,
 ): Promise<number> {
   const result = await callDataApi("Database/query", {
     body: {
       query:
-        "SELECT COUNT(*) as transferCount FROM transfers WHERE userId = ? AND (fromAccountId = ? OR toAccountId = ?)",
+        "SELECT COUNT(*) as transferCount FROM transfers WHERE userId = ? AND (fromAccountId = ? OR toAccountId = ?) AND deletedAt IS NULL",
       params: [userId, accountId, accountId],
     },
   });
@@ -700,13 +730,15 @@ export async function getAccountTransferCount(
 export async function createTransfer(
   data: InsertTransfer,
 ): Promise<Transfer | null> {
-  const result = await callDataApi("Database/query", {
+  const id = ulid();
+  await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO transfers (userId, fromAccountId, toAccountId, amount, description, date)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO transfers (id, userId, fromAccountId, toAccountId, amount, description, date)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
+        id,
         data.userId,
         data.fromAccountId,
         data.toAccountId,
@@ -716,24 +748,18 @@ export async function createTransfer(
       ],
     },
   });
-  const insertId =
-    result && typeof result === "object" && "insertId" in result
-      ? (result as { insertId: number }).insertId
-      : 0;
-  if (!insertId) {
-    return null;
-  }
-  return getTransferById(insertId, data.userId);
+  return getTransferById(id, data.userId);
 }
 
 export async function getTransferById(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
 ): Promise<Transfer | null> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM transfers WHERE id = ? AND userId = ?",
+        query:
+          "SELECT * FROM transfers WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -744,12 +770,12 @@ export async function getTransferById(
   }
 }
 
-export async function getUserTransfers(userId: number): Promise<Transfer[]> {
+export async function getUserTransfers(userId: Id): Promise<Transfer[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM transfers WHERE userId = ? ORDER BY date DESC, id DESC",
+          "SELECT * FROM transfers WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC, id DESC",
         params: [userId],
       },
     });
@@ -760,59 +786,56 @@ export async function getUserTransfers(userId: number): Promise<Transfer[]> {
 }
 
 export async function reassignAccountTransfers(
-  fromAccountId: number,
-  toAccountId: number,
-  userId: number,
+  fromAccountId: Id,
+  toAccountId: Id,
+  userId: Id,
 ): Promise<void> {
   // Direct legs between source and target are absorbed when merging accounts.
+  // Tombstoned rather than dropped so the absorption reaches other devices.
+  const stamp = writeStamp();
   await callDataApi("Database/query", {
     body: {
-      query:
-        "DELETE FROM transfers WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
-      params: [userId, fromAccountId, toAccountId],
+      query: `UPDATE transfers SET ${TOMBSTONE_SET} WHERE userId = ? AND fromAccountId = ? AND toAccountId = ? AND deletedAt IS NULL`,
+      params: [stamp, stamp, userId, fromAccountId, toAccountId],
     },
   });
   await callDataApi("Database/query", {
     body: {
-      query:
-        "DELETE FROM transfers WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
-      params: [userId, toAccountId, fromAccountId],
+      query: `UPDATE transfers SET ${TOMBSTONE_SET} WHERE userId = ? AND fromAccountId = ? AND toAccountId = ? AND deletedAt IS NULL`,
+      params: [stamp, stamp, userId, toAccountId, fromAccountId],
     },
   });
   await callDataApi("Database/query", {
     body: {
-      query:
-        "UPDATE transfers SET fromAccountId = ? WHERE userId = ? AND fromAccountId = ?",
-      params: [toAccountId, userId, fromAccountId],
+      query: `UPDATE transfers SET fromAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND fromAccountId = ? AND deletedAt IS NULL`,
+      params: [toAccountId, writeStamp(), userId, fromAccountId],
     },
   });
   await callDataApi("Database/query", {
     body: {
-      query:
-        "UPDATE transfers SET toAccountId = ? WHERE userId = ? AND toAccountId = ?",
-      params: [toAccountId, userId, fromAccountId],
+      query: `UPDATE transfers SET toAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND toAccountId = ? AND deletedAt IS NULL`,
+      params: [toAccountId, writeStamp(), userId, fromAccountId],
     },
   });
 }
 
 export async function reassignAccountTransactions(
-  fromAccountId: number,
-  toAccountId: number,
-  userId: number,
+  fromAccountId: Id,
+  toAccountId: Id,
+  userId: Id,
 ): Promise<void> {
   await callDataApi("Database/query", {
     body: {
-      query:
-        "UPDATE transactions SET accountId = ? WHERE userId = ? AND accountId = ?",
-      params: [toAccountId, userId, fromAccountId],
+      query: `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId = ? AND deletedAt IS NULL`,
+      params: [toAccountId, writeStamp(), userId, fromAccountId],
     },
   });
 }
 
 export async function reassignAndDeleteAccount(
-  accountId: number,
-  targetAccountId: number,
-  userId: number,
+  accountId: Id,
+  targetAccountId: Id,
+  userId: Id,
 ): Promise<void> {
   if (accountId === targetAccountId) {
     throw new Error("Cannot reassign to the same account");
@@ -830,10 +853,11 @@ export async function reassignAndDeleteAccount(
 }
 
 /** Idempotent: creates a default Cash account and backfills null accountId rows. */
-export async function ensureDefaultAccount(userId: number): Promise<void> {
+export async function ensureDefaultAccount(userId: Id): Promise<void> {
   const countResult = await callDataApi("Database/query", {
     body: {
-      query: "SELECT COUNT(*) as accountCount FROM accounts WHERE userId = ?",
+      query:
+        "SELECT COUNT(*) as accountCount FROM accounts WHERE userId = ? AND deletedAt IS NULL",
       params: [userId],
     },
   });
@@ -860,9 +884,8 @@ export async function ensureDefaultAccount(userId: number): Promise<void> {
 
   await callDataApi("Database/query", {
     body: {
-      query:
-        "UPDATE transactions SET accountId = ? WHERE userId = ? AND accountId IS NULL",
-      params: [created.id, userId],
+      query: `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId IS NULL AND deletedAt IS NULL`,
+      params: [created.id, writeStamp(), userId],
     },
   });
 }
@@ -872,13 +895,13 @@ export async function ensureDefaultAccount(userId: number): Promise<void> {
 // ============================================================================
 
 export async function getUserTransactions(
-  userId: number,
+  userId: Id,
   limit?: number,
   offset?: number,
 ) {
   try {
     let query =
-      "SELECT * FROM transactions WHERE userId = ? ORDER BY date DESC";
+      "SELECT * FROM transactions WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC";
     const params: unknown[] = [userId];
 
     if (limit) {
@@ -900,7 +923,7 @@ export async function getUserTransactions(
 }
 
 export async function getTransactionsByDateRange(
-  userId: number,
+  userId: Id,
   startDate: Date,
   endDate: Date,
 ) {
@@ -908,7 +931,7 @@ export async function getTransactionsByDateRange(
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? ORDER BY date DESC",
+          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL ORDER BY date DESC",
         params: [userId, startDate, endDate],
       },
     });
@@ -918,15 +941,12 @@ export async function getTransactionsByDateRange(
   }
 }
 
-export async function getTransactionsByCategory(
-  userId: number,
-  categoryId: number,
-) {
+export async function getTransactionsByCategory(userId: Id, categoryId: Id) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM transactions WHERE userId = ? AND categoryId = ? ORDER BY date DESC",
+          "SELECT * FROM transactions WHERE userId = ? AND categoryId = ? AND deletedAt IS NULL ORDER BY date DESC",
         params: [userId, categoryId],
       },
     });
@@ -937,14 +957,14 @@ export async function getTransactionsByCategory(
 }
 
 export async function getTransactionsByCreditCard(
-  userId: number,
-  creditCardId: number,
+  userId: Id,
+  creditCardId: Id,
 ) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM transactions WHERE userId = ? AND creditCardId = ? ORDER BY date DESC",
+          "SELECT * FROM transactions WHERE userId = ? AND creditCardId = ? AND deletedAt IS NULL ORDER BY date DESC",
         params: [userId, creditCardId],
       },
     });
@@ -955,13 +975,15 @@ export async function getTransactionsByCreditCard(
 }
 
 export async function createTransaction(data: InsertTransaction) {
-  const result = await callDataApi("Database/query", {
+  const id = ulid();
+  await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO transactions (userId, categoryId, creditCardId, accountId, type, amount, description, date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO transactions (id, userId, categoryId, creditCardId, accountId, type, amount, description, date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
+        id,
         data.userId,
         data.categoryId,
         data.creditCardId || null,
@@ -973,15 +995,14 @@ export async function createTransaction(data: InsertTransaction) {
       ],
     },
   });
-  return result && typeof result === "object" && "insertId" in result
-    ? (result as { insertId: number }).insertId
-    : 0;
+  return id;
 }
 
 export async function createTransactionsBulk(rows: InsertTransaction[]) {
   if (rows.length === 0) return 0;
 
   const params = rows.flatMap((data) => [
+    ulid(),
     data.userId,
     data.categoryId,
     data.creditCardId || null,
@@ -995,8 +1016,8 @@ export async function createTransactionsBulk(rows: InsertTransaction[]) {
   await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO transactions (userId, categoryId, creditCardId, accountId, type, amount, description, date)
-        VALUES ${rows.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}
+        INSERT INTO transactions (id, userId, categoryId, creditCardId, accountId, type, amount, description, date)
+        VALUES ${rows.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}
       `,
       params,
     },
@@ -1005,8 +1026,8 @@ export async function createTransactionsBulk(rows: InsertTransaction[]) {
 }
 
 export async function updateTransaction(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
   data: Partial<InsertTransaction>,
 ) {
   const entries = Object.entries(data);
@@ -1019,69 +1040,58 @@ export async function updateTransaction(
 
   await callDataApi("Database/query", {
     body: {
-      query: `UPDATE transactions SET ${updates} WHERE id = ? AND userId = ?`,
-      params: [...values, id, userId],
+      query: `UPDATE transactions SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [...values, writeStamp(), id, userId],
     },
   });
 }
 
-export async function deleteTransaction(id: number, userId: number) {
+export async function deleteTransaction(id: Id, userId: Id) {
+  const stamp = writeStamp();
   await callDataApi("Database/query", {
     body: {
-      query: "DELETE FROM transactions WHERE id = ? AND userId = ?",
-      params: [id, userId],
+      query: `UPDATE transactions SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [stamp, stamp, id, userId],
     },
   });
 }
 
 /** Wipes all user-owned rows. Three separate DELETEs (not transactional) — on partial failure, retry clears any remainder. */
-export async function deleteAllUserData(userId: number) {
-  await callDataApi("Database/query", {
-    body: {
-      query: "DELETE FROM recurringTransactions WHERE userId = ?",
-      params: [userId],
-    },
-  });
-  await callDataApi("Database/query", {
-    body: {
-      query: "DELETE FROM transactions WHERE userId = ?",
-      params: [userId],
-    },
-  });
-  await callDataApi("Database/query", {
-    body: {
-      query: "DELETE FROM transfers WHERE userId = ?",
-      params: [userId],
-    },
-  });
-  await callDataApi("Database/query", {
-    body: {
-      query: "DELETE FROM accounts WHERE userId = ?",
-      params: [userId],
-    },
-  });
-  await callDataApi("Database/query", {
-    body: {
-      query: "DELETE FROM creditCards WHERE userId = ?",
-      params: [userId],
-    },
-  });
-  await callDataApi("Database/query", {
-    body: {
-      query: "DELETE FROM categories WHERE userId = ?",
-      params: [userId],
-    },
-  });
+export async function deleteAllUserData(userId: Id) {
+  const stamp = writeStamp();
+  // Tombstoned, not dropped: "clear all data" is a user action like any other
+  // and has to reach the account's other devices. Rows leave the database for
+  // good only when the tombstone retention window expires.
+  for (const table of [
+    "recurringTransactions",
+    "repayments",
+    "loans",
+    "budgets",
+    "monthlySummaries",
+    "transactions",
+    "transfers",
+    "accounts",
+    "creditCards",
+    "categories",
+  ]) {
+    await callDataApi("Database/query", {
+      body: {
+        query: `UPDATE ${table} SET ${TOMBSTONE_SET} WHERE userId = ? AND deletedAt IS NULL`,
+        params: [stamp, stamp, userId],
+      },
+    });
+  }
   // N7: "clear all data" must also drop the account-linked PIN — otherwise a
   // wiped account keeps a stale hash and lockout state.
   await clearUserPin(userId);
 }
 
-export async function getTransactionById(id: number, userId: number) {
+export async function getTransactionById(id: Id, userId: Id) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM transactions WHERE id = ? AND userId = ?",
+        query:
+          "SELECT * FROM transactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -1096,13 +1106,13 @@ export async function getTransactionById(id: number, userId: number) {
 // ============================================================================
 
 export async function getUserRecurringTransactions(
-  userId: number,
+  userId: Id,
 ): Promise<RecurringTransaction[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM recurringTransactions WHERE userId = ? ORDER BY createdAt DESC",
+          "SELECT * FROM recurringTransactions WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
         params: [userId],
       },
     });
@@ -1114,18 +1124,20 @@ export async function getUserRecurringTransactions(
 
 export async function createRecurringTransaction(
   data: InsertRecurringTransaction,
-): Promise<number> {
-  const result = await callDataApi("Database/query", {
+): Promise<Id> {
+  const id = ulid();
+  await callDataApi("Database/query", {
     body: {
       query: `
         INSERT INTO recurringTransactions (
-          userId, categoryId, creditCardId, type, amount, description, frequency, \`interval\`,
+          id, userId, categoryId, creditCardId, type, amount, description, frequency, \`interval\`,
           endCondition, occurrenceCount, endDate, startDate, nextRunDate, lastRunDate,
           generatedCount, isActive
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
+        id,
         data.userId,
         data.categoryId,
         data.creditCardId ?? null,
@@ -1145,9 +1157,7 @@ export async function createRecurringTransaction(
       ],
     },
   });
-  return result && typeof result === "object" && "insertId" in result
-    ? (result as { insertId: number }).insertId
-    : 0;
+  return id;
 }
 
 function sqlColumnName(column: string): string {
@@ -1155,8 +1165,8 @@ function sqlColumnName(column: string): string {
 }
 
 export async function updateRecurringTransaction(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
   data: Partial<InsertRecurringTransaction>,
 ): Promise<void> {
   const updates = Object.entries(data)
@@ -1168,33 +1178,34 @@ export async function updateRecurringTransaction(
   const values = Object.values(data);
   await callDataApi("Database/query", {
     body: {
-      query: `UPDATE recurringTransactions SET ${updates} WHERE id = ? AND userId = ?`,
-      params: [...values, id, userId],
+      query: `UPDATE recurringTransactions SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [...values, writeStamp(), id, userId],
     },
   });
 }
 
 export async function deleteRecurringTransaction(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
 ): Promise<void> {
+  const stamp = writeStamp();
   await callDataApi("Database/query", {
     body: {
-      query: "DELETE FROM recurringTransactions WHERE id = ? AND userId = ?",
-      params: [id, userId],
+      query: `UPDATE recurringTransactions SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [stamp, stamp, id, userId],
     },
   });
 }
 
 export async function getRecurringTransactionById(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
 ): Promise<RecurringTransaction | null> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM recurringTransactions WHERE id = ? AND userId = ?",
+          "SELECT * FROM recurringTransactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -1212,7 +1223,7 @@ export async function getDueRecurringTransactions(
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM recurringTransactions WHERE isActive = 1 AND nextRunDate <= ? ORDER BY nextRunDate ASC",
+          "SELECT * FROM recurringTransactions WHERE isActive = 1 AND nextRunDate <= ? AND deletedAt IS NULL ORDER BY nextRunDate ASC",
         params: [now],
       },
     });
@@ -1223,7 +1234,7 @@ export async function getDueRecurringTransactions(
 }
 
 export async function advanceRecurringTransaction(
-  id: number,
+  id: Id,
   updates: Pick<
     InsertRecurringTransaction,
     "nextRunDate" | "lastRunDate" | "generatedCount" | "isActive"
@@ -1233,14 +1244,15 @@ export async function advanceRecurringTransaction(
     body: {
       query: `
         UPDATE recurringTransactions
-        SET nextRunDate = ?, lastRunDate = ?, generatedCount = ?, isActive = ?
-        WHERE id = ?
+        SET nextRunDate = ?, lastRunDate = ?, generatedCount = ?, isActive = ?, ${TOUCH_SET}
+        WHERE id = ? AND deletedAt IS NULL
       `,
       params: [
         updates.nextRunDate,
         updates.lastRunDate ?? null,
         updates.generatedCount,
         updates.isActive,
+        writeStamp(),
         id,
       ],
     },
@@ -1251,11 +1263,12 @@ export async function advanceRecurringTransaction(
 // BUDGETS
 // ============================================================================
 
-export async function getUserBudgets(userId: number): Promise<Budget[]> {
+export async function getUserBudgets(userId: Id): Promise<Budget[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM budgets WHERE userId = ? ORDER BY createdAt DESC",
+        query:
+          "SELECT * FROM budgets WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
         params: [userId],
       },
     });
@@ -1265,14 +1278,16 @@ export async function getUserBudgets(userId: number): Promise<Budget[]> {
   }
 }
 
-export async function createBudget(data: InsertBudget): Promise<number> {
-  const result = await callDataApi("Database/query", {
+export async function createBudget(data: InsertBudget): Promise<Id> {
+  const id = ulid();
+  await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO budgets (userId, categoryId, period, amount, startDate, endDate)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO budgets (id, userId, categoryId, period, amount, startDate, endDate)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
+        id,
         data.userId,
         data.categoryId,
         data.period,
@@ -1282,14 +1297,12 @@ export async function createBudget(data: InsertBudget): Promise<number> {
       ],
     },
   });
-  return result && typeof result === "object" && "insertId" in result
-    ? (result as { insertId: number }).insertId
-    : 0;
+  return id;
 }
 
 export async function updateBudget(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
   data: Partial<InsertBudget>,
 ): Promise<void> {
   const updates = Object.entries(data)
@@ -1303,29 +1316,31 @@ export async function updateBudget(
 
   await callDataApi("Database/query", {
     body: {
-      query: `UPDATE budgets SET ${updates} WHERE id = ? AND userId = ?`,
-      params: [...values, id, userId],
+      query: `UPDATE budgets SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [...values, writeStamp(), id, userId],
     },
   });
 }
 
-export async function deleteBudget(id: number, userId: number): Promise<void> {
+export async function deleteBudget(id: Id, userId: Id): Promise<void> {
+  const stamp = writeStamp();
   await callDataApi("Database/query", {
     body: {
-      query: "DELETE FROM budgets WHERE id = ? AND userId = ?",
-      params: [id, userId],
+      query: `UPDATE budgets SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [stamp, stamp, id, userId],
     },
   });
 }
 
 export async function getBudgetById(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
 ): Promise<Budget | null> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM budgets WHERE id = ? AND userId = ?",
+        query:
+          "SELECT * FROM budgets WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -1337,7 +1352,7 @@ export async function getBudgetById(
 }
 
 export interface BudgetProgressRow {
-  budgetId: number;
+  budgetId: Id;
   spent: string;
   limit: string;
 }
@@ -1350,7 +1365,7 @@ function toDate(value: Date | string | null | undefined): Date | null {
 }
 
 export async function getBudgetProgress(
-  userId: number,
+  userId: Id,
   monthStart: Date,
   monthEnd: Date,
   weekStart: Date,
@@ -1380,7 +1395,7 @@ export async function getBudgetProgress(
         const result = await callDataApi("Database/query", {
           body: {
             query:
-              "SELECT amount FROM transactions WHERE userId = ? AND type = 'expense' AND categoryId = ? AND date >= ? AND date <= ?",
+              "SELECT amount FROM transactions WHERE userId = ? AND type = 'expense' AND categoryId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
             params: [userId, budget.categoryId, start, end],
           },
         });
@@ -1404,10 +1419,10 @@ export async function getBudgetProgress(
 }
 
 export async function findActiveBudget(
-  userId: number,
-  categoryId: number,
+  userId: Id,
+  categoryId: Id,
   period: "monthly" | "weekly",
-  options?: { excludeId?: number },
+  options?: { excludeId?: Id },
 ): Promise<Budget | null> {
   try {
     const excludeClause = options?.excludeId != null ? " AND id <> ?" : "";
@@ -1421,6 +1436,7 @@ export async function findActiveBudget(
         query: `
           SELECT * FROM budgets
           WHERE userId = ? AND categoryId = ? AND period = ?
+            AND deletedAt IS NULL
             AND (startDate IS NULL OR startDate <= NOW())
             AND (endDate IS NULL OR endDate >= NOW())
             ${excludeClause}
@@ -1441,7 +1457,7 @@ export async function findActiveBudget(
 // ============================================================================
 
 export async function getMonthlySummary(
-  userId: number,
+  userId: Id,
   year: number,
   month: number,
 ) {
@@ -1449,7 +1465,7 @@ export async function getMonthlySummary(
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM monthlySummaries WHERE userId = ? AND year = ? AND month = ?",
+          "SELECT * FROM monthlySummaries WHERE userId = ? AND year = ? AND month = ? AND deletedAt IS NULL",
         params: [userId, year, month],
       },
     });
@@ -1460,13 +1476,15 @@ export async function getMonthlySummary(
 }
 
 export async function createMonthlySummary(data: InsertMonthlySummary) {
-  const result = await callDataApi("Database/query", {
+  const id = ulid();
+  await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO monthlySummaries (userId, year, month, totalIncome, totalExpense, netBalance)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO monthlySummaries (id, userId, year, month, totalIncome, totalExpense, netBalance)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
+        id,
         data.userId,
         data.year,
         data.month,
@@ -1476,13 +1494,11 @@ export async function createMonthlySummary(data: InsertMonthlySummary) {
       ],
     },
   });
-  return result && typeof result === "object" && "insertId" in result
-    ? (result as { insertId: number }).insertId
-    : 0;
+  return id;
 }
 
 export async function updateMonthlySummary(
-  id: number,
+  id: Id,
   data: Partial<InsertMonthlySummary>,
 ) {
   const updates = Object.entries(data)
@@ -1492,8 +1508,8 @@ export async function updateMonthlySummary(
 
   await callDataApi("Database/query", {
     body: {
-      query: `UPDATE monthlySummaries SET ${updates} WHERE id = ?`,
-      params: [...values, id],
+      query: `UPDATE monthlySummaries SET ${updates}, ${TOUCH_SET} WHERE id = ? AND deletedAt IS NULL`,
+      params: [...values, writeStamp(), id],
     },
   });
 }
@@ -1506,13 +1522,13 @@ export async function updateMonthlySummary(
  * Derive per-account balances from all user transactions (JS reduce, no GROUP BY).
  */
 export async function getAccountBalances(
-  userId: number,
-): Promise<Record<number, number>> {
+  userId: Id,
+): Promise<Record<Id, number>> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT id, accountId, type, amount FROM transactions WHERE userId = ?",
+          "SELECT id, accountId, type, amount FROM transactions WHERE userId = ? AND deletedAt IS NULL",
         params: [userId],
       },
     });
@@ -1520,8 +1536,7 @@ export async function getAccountBalances(
     const rows = Array.isArray(result) ? result : [];
     const txnBalances = reduceAccountBalances(
       rows.map((row: Record<string, unknown>) => ({
-        accountId:
-          row.accountId == null ? null : Number(row.accountId as number),
+        accountId: row.accountId == null ? null : (row.accountId as Id),
         type: String(row.type ?? ""),
         amount: String(row.amount ?? "0"),
       })),
@@ -1545,11 +1560,7 @@ export async function getAccountBalances(
  * Get monthly statistics for a user.
  * Calculates total income, expenses, and net balance for a given month.
  */
-export async function getMonthlyStats(
-  userId: number,
-  year: number,
-  month: number,
-) {
+export async function getMonthlyStats(userId: Id, year: number, month: number) {
   try {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
@@ -1557,7 +1568,7 @@ export async function getMonthlyStats(
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ?",
+          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
         params: [userId, startDate, endDate],
       },
     });
@@ -1597,7 +1608,7 @@ export interface MonthlyTrendPoint {
  * Get income, expense, and net balance for the last N months ending at the anchor month.
  */
 export async function getMonthlyTrend(
-  userId: number,
+  userId: Id,
   year: number,
   month: number,
   count = 6,
@@ -1609,7 +1620,7 @@ export async function getMonthlyTrend(
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ?",
+          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
         params: [userId, startDate, endDate],
       },
     });
@@ -1658,7 +1669,7 @@ export async function getMonthlyTrend(
 }
 
 export interface CategoryAnomalyResult {
-  categoryId: number;
+  categoryId: Id;
   current: number;
   mean: number;
   deltaPct: number;
@@ -1681,7 +1692,7 @@ function monthKey(year: number, month: number): string {
  * their recent per-category mean (prior lookback window, months with spend only).
  */
 export async function getCategoryAnomalies(
-  userId: number,
+  userId: Id,
   year: number,
   month: number,
   lookbackMonths = 3,
@@ -1694,26 +1705,26 @@ export async function getCategoryAnomalies(
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ?",
+          "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",
         params: [userId, startDate, endDate],
       },
     });
 
     const txns = Array.isArray(result) ? result : [];
-    const monthSpend = new Map<string, Map<number, number>>();
+    const monthSpend = new Map<string, Map<Id, number>>();
 
     txns.forEach((txn: Record<string, unknown>) => {
       const txnDate = new Date(txn.date as string);
       const key = monthKeyFromDate(txnDate);
-      const categoryId = txn.categoryId as number;
+      const categoryId = txn.categoryId as Id;
       const amount = parseFloat(txn.amount as string);
-      const bucket = monthSpend.get(key) ?? new Map<number, number>();
+      const bucket = monthSpend.get(key) ?? new Map<Id, number>();
       bucket.set(categoryId, (bucket.get(categoryId) ?? 0) + amount);
       monthSpend.set(key, bucket);
     });
 
     const targetKey = monthKey(year, month);
-    const targetSpend = monthSpend.get(targetKey) ?? new Map<number, number>();
+    const targetSpend = monthSpend.get(targetKey) ?? new Map<Id, number>();
     const results: CategoryAnomalyResult[] = [];
 
     for (const [categoryId, current] of targetSpend.entries()) {
@@ -1757,7 +1768,7 @@ export async function getCategoryAnomalies(
  * Get expense breakdown by category for a given month.
  */
 export async function getExpensesByCategory(
-  userId: number,
+  userId: Id,
   year: number,
   month: number,
 ) {
@@ -1768,17 +1779,17 @@ export async function getExpensesByCategory(
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ?",
+          "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",
         params: [userId, startDate, endDate],
       },
     });
 
     const txns = Array.isArray(result) ? result : [];
-    const categoryMap = new Map<number, { total: number; count: number }>();
+    const categoryMap = new Map<Id, { total: number; count: number }>();
 
     txns.forEach((txn: Record<string, unknown>) => {
       const amount = parseFloat(txn.amount as string);
-      const categoryId = txn.categoryId as number;
+      const categoryId = txn.categoryId as Id;
       const existing = categoryMap.get(categoryId) || { total: 0, count: 0 };
       categoryMap.set(categoryId, {
         total: existing.total + amount,
@@ -1799,12 +1810,12 @@ export async function getExpensesByCategory(
 /**
  * Get recent transactions for dashboard.
  */
-export async function getRecentTransactions(userId: number, limit: number = 7) {
+export async function getRecentTransactions(userId: Id, limit: number = 7) {
   try {
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM transactions WHERE userId = ? ORDER BY date DESC LIMIT ?",
+          "SELECT * FROM transactions WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC LIMIT ?",
         params: [userId, limit],
       },
     });
@@ -1841,11 +1852,12 @@ export class RepaymentExceedsBalanceError extends Error {
   }
 }
 
-export async function getUserLoans(userId: number): Promise<Loan[]> {
+export async function getUserLoans(userId: Id): Promise<Loan[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM loans WHERE userId = ? ORDER BY createdAt DESC",
+        query:
+          "SELECT * FROM loans WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
         params: [userId],
       },
     });
@@ -1856,16 +1868,18 @@ export async function getUserLoans(userId: number): Promise<Loan[]> {
 }
 
 export async function createLoan(data: InsertLoan): Promise<Loan | null> {
-  const result = await callDataApi("Database/query", {
+  const id = ulid();
+  await callDataApi("Database/query", {
     body: {
       query: `
         INSERT INTO loans (
-          userId, direction, counterparty, principal, rate, periodicity,
+          id, userId, direction, counterparty, principal, rate, periodicity,
           installmentCount, endDate, nextDueDate, status, note
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
+        id,
         data.userId,
         data.direction,
         data.counterparty ?? null,
@@ -1880,24 +1894,15 @@ export async function createLoan(data: InsertLoan): Promise<Loan | null> {
       ],
     },
   });
-  const insertId =
-    result && typeof result === "object" && "insertId" in result
-      ? (result as { insertId: number }).insertId
-      : 0;
-  if (!insertId) {
-    return null;
-  }
-  return getLoanById(insertId, data.userId);
+  return getLoanById(id, data.userId);
 }
 
-export async function getLoanById(
-  id: number,
-  userId: number,
-): Promise<Loan | null> {
+export async function getLoanById(id: Id, userId: Id): Promise<Loan | null> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM loans WHERE id = ? AND userId = ?",
+        query:
+          "SELECT * FROM loans WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -1909,8 +1914,8 @@ export async function getLoanById(
 }
 
 export async function updateLoan(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
   data: Partial<InsertLoan>,
 ): Promise<void> {
   const updates = Object.entries(data)
@@ -1924,17 +1929,18 @@ export async function updateLoan(
 
   await callDataApi("Database/query", {
     body: {
-      query: `UPDATE loans SET ${updates} WHERE id = ? AND userId = ?`,
-      params: [...values, id, userId],
+      query: `UPDATE loans SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [...values, writeStamp(), id, userId],
     },
   });
 }
 
-export async function deleteLoan(id: number, userId: number): Promise<void> {
+export async function deleteLoan(id: Id, userId: Id): Promise<void> {
+  const stamp = writeStamp();
   await callDataApi("Database/query", {
     body: {
-      query: "DELETE FROM loans WHERE id = ? AND userId = ?",
-      params: [id, userId],
+      query: `UPDATE loans SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [stamp, stamp, id, userId],
     },
   });
 }
@@ -1947,13 +1953,15 @@ export async function createRepayment(
     return null;
   }
 
-  const result = await callDataApi("Database/query", {
+  const id = ulid();
+  await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO repayments (loanId, userId, amount, date, note)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO repayments (id, loanId, userId, amount, date, note)
+        VALUES (?, ?, ?, ?, ?, ?)
       `,
       params: [
+        id,
         data.loanId,
         data.userId,
         data.amount,
@@ -1962,14 +1970,7 @@ export async function createRepayment(
       ],
     },
   });
-  const insertId =
-    result && typeof result === "object" && "insertId" in result
-      ? (result as { insertId: number }).insertId
-      : 0;
-  if (!insertId) {
-    return null;
-  }
-  return getRepaymentById(insertId, data.userId);
+  return getRepaymentById(id, data.userId);
 }
 
 export async function recordRepayment(
@@ -1993,13 +1994,14 @@ export async function recordRepayment(
     throw new RepaymentExceedsBalanceError(remainingBefore);
   }
 
-  const result = await callDataApi("Database/query", {
+  await callDataApi("Database/query", {
     body: {
       query: `
-        INSERT INTO repayments (loanId, userId, amount, date, note)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO repayments (id, loanId, userId, amount, date, note)
+        VALUES (?, ?, ?, ?, ?, ?)
       `,
       params: [
+        ulid(),
         data.loanId,
         data.userId,
         data.amount,
@@ -2008,13 +2010,6 @@ export async function recordRepayment(
       ],
     },
   });
-  const insertId =
-    result && typeof result === "object" && "insertId" in result
-      ? (result as { insertId: number }).insertId
-      : 0;
-  if (!insertId) {
-    return null;
-  }
 
   const remainingAfter = computeRemainingBalance(loan.principal, [
     ...existingRepayments,
@@ -2043,13 +2038,14 @@ export async function recordRepayment(
 }
 
 export async function getRepaymentById(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
 ): Promise<Repayment | null> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
-        query: "SELECT * FROM repayments WHERE id = ? AND userId = ?",
+        query:
+          "SELECT * FROM repayments WHERE id = ? AND userId = ? AND deletedAt IS NULL",
         params: [id, userId],
       },
     });
@@ -2061,14 +2057,14 @@ export async function getRepaymentById(
 }
 
 export async function getRepaymentsByLoan(
-  loanId: number,
-  userId: number,
+  loanId: Id,
+  userId: Id,
 ): Promise<Repayment[]> {
   try {
     const result = await callDataApi("Database/query", {
       body: {
         query:
-          "SELECT * FROM repayments WHERE loanId = ? AND userId = ? ORDER BY date DESC",
+          "SELECT * FROM repayments WHERE loanId = ? AND userId = ? AND deletedAt IS NULL ORDER BY date DESC",
         params: [loanId, userId],
       },
     });
@@ -2078,21 +2074,19 @@ export async function getRepaymentsByLoan(
   }
 }
 
-export async function deleteRepayment(
-  id: number,
-  userId: number,
-): Promise<void> {
+export async function deleteRepayment(id: Id, userId: Id): Promise<void> {
+  const stamp = writeStamp();
   await callDataApi("Database/query", {
     body: {
-      query: "DELETE FROM repayments WHERE id = ? AND userId = ?",
-      params: [id, userId],
+      query: `UPDATE repayments SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      params: [stamp, stamp, id, userId],
     },
   });
 }
 
 export async function getLoanWithBalance(
-  id: number,
-  userId: number,
+  id: Id,
+  userId: Id,
 ): Promise<LoanWithBalance | null> {
   const loan = await getLoanById(id, userId);
   if (!loan) {

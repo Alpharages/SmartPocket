@@ -1,5 +1,7 @@
 import { DEFAULT_CATEGORY_ICON } from "../../shared/theme";
 import { encryptCardNumber } from "./crypto";
+import { ulid } from "../../shared/ulid";
+import type { Id } from "../../drizzle/schema";
 
 /**
  * Dev-only in-memory database shim.
@@ -41,21 +43,35 @@ const DATE_COLUMNS = new Set([
   "nextDueDate",
   "pinLockedUntil",
 ]);
+// Ids left this set when they became ULIDs: `Number("01ARZ3ND…")` is NaN, and a
+// NaN on both sides of `=` compares false, so every id-scoped WHERE in the app
+// would have silently matched nothing.
 const NUMERIC_COLUMNS = new Set([
-  "id",
-  "userId",
-  "categoryId",
-  "creditCardId",
-  "accountId",
-  "fromAccountId",
-  "toAccountId",
-  "loanId",
   "year",
   "month",
   "expiryMonth",
   "expiryYear",
   "installmentCount",
   "pinFailedAttempts",
+  "interval",
+  "generatedCount",
+  "occurrenceCount",
+  "serverSeq",
+]);
+
+/**
+ * Columns MySQL stores as `tinyint(1)`. The app writes them as SQL literals
+ * (`dirty = 1`) and reads them back expecting the driver's coercion, so both
+ * sides are normalised to a JS boolean here — otherwise `WHERE dirty = 1`
+ * would compare the string "true" against "1" in the default branch of
+ * `compare` and never match.
+ */
+const BOOLEAN_COLUMNS = new Set([
+  "dirty",
+  "isDefault",
+  "isActive",
+  "aiEnabled",
+  "remindersEnabled",
 ]);
 
 const store: Record<TableName, Row[]> = {
@@ -70,20 +86,6 @@ const store: Record<TableName, Row[]> = {
   accounts: [],
   transfers: [],
   recurringTransactions: [],
-};
-
-const nextId: Record<TableName, number> = {
-  users: 1,
-  categories: 1,
-  creditCards: 1,
-  transactions: 1,
-  budgets: 1,
-  monthlySummaries: 1,
-  loans: 1,
-  repayments: 1,
-  accounts: 1,
-  transfers: 1,
-  recurringTransactions: 1,
 };
 
 /**
@@ -103,9 +105,14 @@ function tableRows(table: TableName): Row[] {
   return rows;
 }
 
-function insertRow(table: TableName, row: Row): number {
-  const id = nextId[table]++;
-  tableRows(table).push({ id, ...row });
+/**
+ * Ids arrive with the row now — `server/db.ts` mints a ULID and includes it in
+ * the INSERT, exactly as it will against the on-device SQLite. One is minted
+ * here only for the seed data below, which builds rows directly.
+ */
+function insertRow(table: TableName, row: Row): Id {
+  const id = (row.id as Id | undefined) ?? ulid();
+  tableRows(table).push({ ...row, id });
   return id;
 }
 
@@ -119,7 +126,9 @@ function seedOnce() {
   seeded = true;
 
   const now = new Date();
-  insertRow("users", {
+  // The dev user's id is captured rather than assumed to be 1 — ids are ULIDs
+  // now, so nothing downstream can hard-code it.
+  const devUserId = insertRow("users", {
     openId: "dev_local_user",
     name: "Dev User",
     email: "dev@localhost",
@@ -137,7 +146,7 @@ function seedOnce() {
     icon: string,
   ) =>
     insertRow("categories", {
-      userId: 1,
+      userId: devUserId,
       name,
       type,
       color,
@@ -153,7 +162,7 @@ function seedOnce() {
   const salary = cat("Salary", "income", "#6366F1", "cash");
 
   insertRow("creditCards", {
-    userId: 1,
+    userId: devUserId,
     name: "Everyday Visa",
     cardNumber: encryptCardNumber("4111111111111234"),
     cardholderName: "Dev User",
@@ -169,7 +178,7 @@ function seedOnce() {
   });
 
   const txn = (
-    categoryId: number,
+    categoryId: Id,
     type: "income" | "expense",
     amount: string,
     description: string,
@@ -178,7 +187,7 @@ function seedOnce() {
     const d = new Date(now);
     d.setDate(d.getDate() - daysAgo);
     insertRow("transactions", {
-      userId: 1,
+      userId: devUserId,
       categoryId,
       creditCardId: null,
       type,
@@ -206,6 +215,9 @@ function coerce(column: string, value: unknown): unknown {
   }
   if (NUMERIC_COLUMNS.has(column)) {
     return typeof value === "number" ? value : Number(value);
+  }
+  if (BOOLEAN_COLUMNS.has(column)) {
+    return value === true || value === 1 || value === "1";
   }
   return value;
 }
@@ -237,6 +249,10 @@ function compare(
     if (op === ">=") return l >= r;
     if (op === "<=") return l <= r;
     return false;
+  }
+  if (BOOLEAN_COLUMNS.has(column)) {
+    const toBool = (v: unknown) => v === true || v === 1 || v === "1";
+    return op === "=" && toBool(left) === toBool(right);
   }
   // string / default
   if (op === "=") return String(left) === String(right);
@@ -551,7 +567,7 @@ export async function devQuery(
           existing[col] = row[col];
         }
         existing.updatedAt = new Date();
-        return { insertId: existing.id as number, affectedRows: 2 };
+        return { insertId: existing.id as Id, affectedRows: 2 };
       }
     }
 
@@ -579,14 +595,26 @@ export async function devQuery(
     const setParamCount = (setClause.match(/\?/g) ?? []).length;
     const whereCursor = { i: setParamCount };
     const conditions = parseConditions(whereBody);
-    const matched = applyWhere(tableRows(table), conditions, params, whereCursor);
+    const matched = applyWhere(
+      tableRows(table),
+      conditions,
+      params,
+      whereCursor,
+    );
+    // Only stand in for MySQL's `ON UPDATE CURRENT_TIMESTAMP` when the
+    // statement did not assign `updatedAt` itself. Every synced write now sets
+    // it explicitly, and overwriting that here would replace the timestamp
+    // last-write-wins compares with devDb's own clock.
+    const assignsUpdatedAt = setAssignments.some(
+      (a) => a.column === "updatedAt",
+    );
     matched.forEach((row) => {
       const setCursor = { i: 0 };
       for (const { column, expr } of setAssignments) {
         const rawValue = evalSetValue(expr, row, params, setCursor);
         row[column] = coerce(column, rawValue);
       }
-      row.updatedAt = new Date();
+      if (!assignsUpdatedAt) row.updatedAt = new Date();
     });
     return { affectedRows: matched.length };
   }
@@ -650,22 +678,39 @@ export async function devQuery(
       : [...tableRows(table)];
 
     if (orderBy) {
-      const [col, dirRaw] = orderBy.trim().split(/\s+/);
-      const dir = (dirRaw || "ASC").toUpperCase() === "DESC" ? -1 : 1;
+      // `ORDER BY date DESC, id DESC` used to be split on whitespace alone, so
+      // the direction token came out as "DESC," — which never equals "DESC" —
+      // and the whole clause silently sorted ascending on the first column.
+      // The tiebreaker matters now that ids are time-ordered ULIDs.
+      const terms = orderBy
+        .split(",")
+        .map((term) => term.trim())
+        .filter(Boolean)
+        .map((term) => {
+          const [col, dirRaw] = term.split(/\s+/);
+          return {
+            col,
+            dir: (dirRaw || "ASC").toUpperCase() === "DESC" ? -1 : 1,
+          };
+        });
+
       rows = [...rows].sort((a, b) => {
-        const av = a[col];
-        const bv = b[col];
-        if (DATE_COLUMNS.has(col)) {
-          return (
-            (new Date(av as string).getTime() -
-              new Date(bv as string).getTime()) *
-            dir
-          );
+        for (const { col, dir } of terms) {
+          const av = a[col];
+          const bv = b[col];
+          let cmp: number;
+          if (DATE_COLUMNS.has(col)) {
+            cmp =
+              new Date(av as string).getTime() -
+              new Date(bv as string).getTime();
+          } else if (NUMERIC_COLUMNS.has(col)) {
+            cmp = Number(av) - Number(bv);
+          } else {
+            cmp = String(av).localeCompare(String(bv));
+          }
+          if (cmp !== 0) return cmp * dir;
         }
-        if (NUMERIC_COLUMNS.has(col)) {
-          return (Number(av) - Number(bv)) * dir;
-        }
-        return String(av).localeCompare(String(bv)) * dir;
+        return 0;
       });
     }
 
@@ -703,6 +748,12 @@ function applyInsertDefaults(table: TableName, row: Row): void {
   const now = new Date();
   if (!("createdAt" in row) || row.createdAt == null) row.createdAt = now;
   if (!("updatedAt" in row) || row.updatedAt == null) row.updatedAt = now;
+  // Mirrors the schema defaults: a freshly inserted row is live and unpushed.
+  if (table !== "users") {
+    if (row.deletedAt === undefined) row.deletedAt = null;
+    if (row.dirty === undefined) row.dirty = true;
+    if (row.serverSeq === undefined) row.serverSeq = null;
+  }
   switch (table) {
     case "users":
       if (row.role == null) row.role = "user";

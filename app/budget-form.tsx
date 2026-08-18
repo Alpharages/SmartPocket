@@ -31,6 +31,7 @@ import {
   Spacing,
   Typography,
 } from "@/lib/_core/theme";
+import { isUlid } from "@shared/ulid";
 
 const SCREEN_DURATION = Motion.screen.durationMs;
 const SLIDE_DISTANCE = 700;
@@ -45,12 +46,9 @@ export default function BudgetFormScreen() {
   const { budgets } = useExpense();
   const closingRef = useRef(false);
 
-  const budgetId = id ? Number(id) : undefined;
+  const budgetId = isUlid(id) ? id : undefined;
   const budget = useMemo(
-    () =>
-      budgetId != null && Number.isFinite(budgetId)
-        ? budgets.find((item) => item.id === budgetId)
-        : undefined,
+    () => (budgetId ? budgets.find((item) => item.id === budgetId) : undefined),
     [budgetId, budgets],
   );
 

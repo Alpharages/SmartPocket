@@ -9,6 +9,7 @@ import { isPositiveBudgetAmount } from "@/lib/budget-validation";
 import { isPositiveMoney } from "@/lib/loan-form-validation";
 import { isValidRepaymentAmount } from "@/lib/repayment-form-validation";
 import { validateRecurringForm } from "@/lib/recurring-form-validation";
+import { testId, syncColumns } from "./helpers/ids";
 
 // SP-D18: the money regex was duplicated across seven client validators and
 // seven server schemas with no upper bound, so a 15-digit amount passed every
@@ -39,7 +40,7 @@ describe("money upper bound (SP-D18)", () => {
       validateRecurringForm({
         type: "expense",
         amount: FIFTEEN_DIGITS,
-        categoryId: 1,
+        categoryId: testId(1),
         creditCardId: null,
         description: "",
         frequency: "monthly",

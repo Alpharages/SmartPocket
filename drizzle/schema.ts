@@ -1,4 +1,5 @@
 import {
+  bigint,
   int,
   mysqlEnum,
   mysqlTable,
@@ -9,6 +10,57 @@ import {
   boolean,
 } from "drizzle-orm/mysql-core";
 import { CATEGORY_DEFAULT_COLOR } from "../shared/theme";
+import { ULID_LENGTH, ulid } from "../shared/ulid";
+
+/**
+ * Every primary key here is a client-generated ULID, not a database
+ * autoincrement. Multi-device sync is what forces this: two phones editing
+ * offline would both be handed `id = 5` by their local SQLite and one would
+ * silently overwrite the other on push. The client mints the id, so the id is
+ * already globally unique before it ever reaches a server.
+ *
+ * The three sync columns on every data table below exist for the same reason:
+ *
+ * - `deletedAt` — a tombstone. Without one, a delete made offline cannot
+ *   propagate: the sync sees "row absent locally" and cannot tell *deleted*
+ *   from *not yet pulled*. Rows are soft-deleted and only purged once the
+ *   delete has been acknowledged and the retention window has passed.
+ * - `dirty` — set by every local write, cleared by a successful push. This is
+ *   a flag rather than a timestamp comparison because it is clock-independent,
+ *   and it gives "push the backlog when sync is re-enabled" for free: anything
+ *   written while sync was off is simply still dirty. No outbox table needed.
+ * - `serverSeq` — a server-assigned monotonic sequence. The client pulls
+ *   everything above its `lastPulledSeq`. Deliberately *not* wall-clock paging:
+ *   device clocks drift, and a phone with a wrong clock would silently skip or
+ *   re-fetch records.
+ *
+ * `users` carries none of the three — an account row is not a synced record,
+ * it is the thing records belong to.
+ */
+
+/** A ULID primary key. Aliased so id parameters read differently from counts. */
+export type Id = string;
+
+/**
+ * Tables the sync worker walks, in foreign-key order.
+ *
+ * Order matters on the pull side: applying a transaction before the category it
+ * references would leave a dangling reference for as long as the batch takes.
+ */
+export const SYNC_TABLES = [
+  "categories",
+  "creditCards",
+  "accounts",
+  "loans",
+  "budgets",
+  "monthlySummaries",
+  "transactions",
+  "transfers",
+  "recurringTransactions",
+  "repayments",
+] as const;
+
+export type SyncTable = (typeof SYNC_TABLES)[number];
 
 /**
  * Core user table backing auth flow.
@@ -17,10 +69,12 @@ import { CATEGORY_DEFAULT_COLOR } from "../shared/theme";
  */
 export const users = mysqlTable("users", {
   /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
+   * Surrogate primary key — a client-generated ULID, not a database
+   * autoincrement. Use this for relations between tables.
    */
-  id: int("id").autoincrement().primaryKey(),
+  id: varchar("id", { length: ULID_LENGTH })
+    .primaryKey()
+    .$defaultFn(() => ulid()),
   /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
@@ -51,12 +105,45 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /**
+ * A single-column, row-per-tick counter that exists purely so its
+ * AUTO_INCREMENT PK can hand out `serverSeq` values. MySQL allocates a
+ * contiguous block of ids for a single multi-row INSERT under the default
+ * `innodb_autoinc_lock_mode`, so a sync push inserts N blank rows in one
+ * statement and derives `serverSeq` for its N dirty rows from the returned
+ * `insertId` — atomic and connection-pool-safe, with no explicit
+ * transaction or session-scoped `LAST_INSERT_ID()` call required.
+ */
+export const syncSequence = mysqlTable("syncSequence", {
+  seq: bigint("seq", { mode: "number" }).autoincrement().primaryKey(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/**
+ * Singleton row (id is always 1) recording the highest `serverSeq` that has
+ * ever been swept up by the tombstone purge job. A device whose own pull
+ * cursor (`lastPulledSeq`, stored locally) falls behind this value can no
+ * longer resume incrementally — a tombstone it needed may already be gone —
+ * so `sync.getPurgeWatermark` lets it detect that and fall back to the same
+ * first-sync-style choice (keep this device's data / keep the account's /
+ * merge) instead of silently risking a deleted row's resurrection.
+ */
+export const syncPurgeWatermark = mysqlTable("syncPurgeWatermark", {
+  id: int("id").primaryKey(),
+  purgedUpToSeq: bigint("purgedUpToSeq", { mode: "number" })
+    .default(0)
+    .notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
  * Categories table for transaction categorization.
  * Supports both predefined and custom categories.
  */
 export const categories = mysqlTable("categories", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  id: varchar("id", { length: ULID_LENGTH })
+    .primaryKey()
+    .$defaultFn(() => ulid()),
+  userId: varchar("userId", { length: ULID_LENGTH }).notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   type: mysqlEnum("type", ["income", "expense"]).notNull(),
   color: varchar("color", { length: 7 })
@@ -66,6 +153,9 @@ export const categories = mysqlTable("categories", {
   isDefault: boolean("isDefault").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: timestamp("deletedAt"),
+  dirty: boolean("dirty").default(true).notNull(),
+  serverSeq: bigint("serverSeq", { mode: "number" }),
 });
 
 export type Category = typeof categories.$inferSelect;
@@ -75,8 +165,10 @@ export type InsertCategory = typeof categories.$inferInsert;
  * Credit cards table for managing user's credit cards.
  */
 export const creditCards = mysqlTable("creditCards", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  id: varchar("id", { length: ULID_LENGTH })
+    .primaryKey()
+    .$defaultFn(() => ulid()),
+  userId: varchar("userId", { length: ULID_LENGTH }).notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   cardNumber: varchar("cardNumber", { length: 255 }).notNull(), // Encrypted
   cardholderName: varchar("cardholderName", { length: 100 }).notNull(),
@@ -93,6 +185,9 @@ export const creditCards = mysqlTable("creditCards", {
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: timestamp("deletedAt"),
+  dirty: boolean("dirty").default(true).notNull(),
+  serverSeq: bigint("serverSeq", { mode: "number" }),
 });
 
 export type CreditCard = typeof creditCards.$inferSelect;
@@ -102,14 +197,19 @@ export type InsertCreditCard = typeof creditCards.$inferInsert;
  * Accounts table for tracking cash, bank, and wallet balances per user.
  */
 export const accounts = mysqlTable("accounts", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  id: varchar("id", { length: ULID_LENGTH })
+    .primaryKey()
+    .$defaultFn(() => ulid()),
+  userId: varchar("userId", { length: ULID_LENGTH }).notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   type: mysqlEnum("type", ["cash", "bank", "wallet"]).notNull(),
   currency: varchar("currency", { length: 3 }).default("USD").notNull(),
   isDefault: boolean("isDefault").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: timestamp("deletedAt"),
+  dirty: boolean("dirty").default(true).notNull(),
+  serverSeq: bigint("serverSeq", { mode: "number" }),
 });
 
 export type Account = typeof accounts.$inferSelect;
@@ -119,15 +219,20 @@ export type InsertAccount = typeof accounts.$inferInsert;
  * Transfers table for moving money between accounts without affecting income/expense summaries.
  */
 export const transfers = mysqlTable("transfers", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  fromAccountId: int("fromAccountId").notNull(),
-  toAccountId: int("toAccountId").notNull(),
+  id: varchar("id", { length: ULID_LENGTH })
+    .primaryKey()
+    .$defaultFn(() => ulid()),
+  userId: varchar("userId", { length: ULID_LENGTH }).notNull(),
+  fromAccountId: varchar("fromAccountId", { length: ULID_LENGTH }).notNull(),
+  toAccountId: varchar("toAccountId", { length: ULID_LENGTH }).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   description: text("description"),
   date: timestamp("date").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: timestamp("deletedAt"),
+  dirty: boolean("dirty").default(true).notNull(),
+  serverSeq: bigint("serverSeq", { mode: "number" }),
 });
 
 export type Transfer = typeof transfers.$inferSelect;
@@ -137,17 +242,22 @@ export type InsertTransfer = typeof transfers.$inferInsert;
  * Transactions table for logging income and expenses.
  */
 export const transactions = mysqlTable("transactions", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  categoryId: int("categoryId").notNull(),
-  creditCardId: int("creditCardId"), // Optional: link to credit card
-  accountId: int("accountId"), // Optional: link to account
+  id: varchar("id", { length: ULID_LENGTH })
+    .primaryKey()
+    .$defaultFn(() => ulid()),
+  userId: varchar("userId", { length: ULID_LENGTH }).notNull(),
+  categoryId: varchar("categoryId", { length: ULID_LENGTH }).notNull(),
+  creditCardId: varchar("creditCardId", { length: ULID_LENGTH }), // Optional: link to credit card
+  accountId: varchar("accountId", { length: ULID_LENGTH }), // Optional: link to account
   type: mysqlEnum("type", ["income", "expense"]).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   description: text("description"),
   date: timestamp("date").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: timestamp("deletedAt"),
+  dirty: boolean("dirty").default(true).notNull(),
+  serverSeq: bigint("serverSeq", { mode: "number" }),
 });
 
 export type Transaction = typeof transactions.$inferSelect;
@@ -157,10 +267,12 @@ export type InsertTransaction = typeof transactions.$inferInsert;
  * Recurring transactions table for scheduled transaction generation.
  */
 export const recurringTransactions = mysqlTable("recurringTransactions", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  categoryId: int("categoryId").notNull(),
-  creditCardId: int("creditCardId"),
+  id: varchar("id", { length: ULID_LENGTH })
+    .primaryKey()
+    .$defaultFn(() => ulid()),
+  userId: varchar("userId", { length: ULID_LENGTH }).notNull(),
+  categoryId: varchar("categoryId", { length: ULID_LENGTH }).notNull(),
+  creditCardId: varchar("creditCardId", { length: ULID_LENGTH }),
   type: mysqlEnum("type", ["income", "expense"]).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   description: text("description"),
@@ -185,6 +297,9 @@ export const recurringTransactions = mysqlTable("recurringTransactions", {
   isActive: boolean("isActive").notNull().default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: timestamp("deletedAt"),
+  dirty: boolean("dirty").default(true).notNull(),
+  serverSeq: bigint("serverSeq", { mode: "number" }),
 });
 
 export type RecurringTransaction = typeof recurringTransactions.$inferSelect;
@@ -196,15 +311,20 @@ export type InsertRecurringTransaction =
  * Progress (spent vs. limit) is computed at read-time in Story 6.3 — not stored here.
  */
 export const budgets = mysqlTable("budgets", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  categoryId: int("categoryId").notNull(),
+  id: varchar("id", { length: ULID_LENGTH })
+    .primaryKey()
+    .$defaultFn(() => ulid()),
+  userId: varchar("userId", { length: ULID_LENGTH }).notNull(),
+  categoryId: varchar("categoryId", { length: ULID_LENGTH }).notNull(),
   period: mysqlEnum("period", ["monthly", "weekly"]).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   startDate: timestamp("startDate"),
   endDate: timestamp("endDate"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: timestamp("deletedAt"),
+  dirty: boolean("dirty").default(true).notNull(),
+  serverSeq: bigint("serverSeq", { mode: "number" }),
 });
 
 export type Budget = typeof budgets.$inferSelect;
@@ -215,8 +335,10 @@ export type InsertBudget = typeof budgets.$inferInsert;
  * Helps optimize dashboard and summary queries.
  */
 export const monthlySummaries = mysqlTable("monthlySummaries", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  id: varchar("id", { length: ULID_LENGTH })
+    .primaryKey()
+    .$defaultFn(() => ulid()),
+  userId: varchar("userId", { length: ULID_LENGTH }).notNull(),
   year: int("year").notNull(),
   month: int("month").notNull(), // 1-12
   totalIncome: decimal("totalIncome", { precision: 12, scale: 2 })
@@ -230,6 +352,9 @@ export const monthlySummaries = mysqlTable("monthlySummaries", {
     .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: timestamp("deletedAt"),
+  dirty: boolean("dirty").default(true).notNull(),
+  serverSeq: bigint("serverSeq", { mode: "number" }),
 });
 
 export type MonthlySummary = typeof monthlySummaries.$inferSelect;
@@ -239,8 +364,10 @@ export type InsertMonthlySummary = typeof monthlySummaries.$inferInsert;
  * Loans table for tracking money lent to or borrowed from others.
  */
 export const loans = mysqlTable("loans", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  id: varchar("id", { length: ULID_LENGTH })
+    .primaryKey()
+    .$defaultFn(() => ulid()),
+  userId: varchar("userId", { length: ULID_LENGTH }).notNull(),
   direction: mysqlEnum("direction", ["lend", "borrow"]).notNull(),
   counterparty: varchar("counterparty", { length: 100 }),
   principal: decimal("principal", { precision: 12, scale: 2 }).notNull(),
@@ -260,6 +387,9 @@ export const loans = mysqlTable("loans", {
   note: text("note"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: timestamp("deletedAt"),
+  dirty: boolean("dirty").default(true).notNull(),
+  serverSeq: bigint("serverSeq", { mode: "number" }),
 });
 
 export type Loan = typeof loans.$inferSelect;
@@ -269,14 +399,19 @@ export type InsertLoan = typeof loans.$inferInsert;
  * Repayments table for logging payments against a loan.
  */
 export const repayments = mysqlTable("repayments", {
-  id: int("id").autoincrement().primaryKey(),
-  loanId: int("loanId").notNull(),
-  userId: int("userId").notNull(),
+  id: varchar("id", { length: ULID_LENGTH })
+    .primaryKey()
+    .$defaultFn(() => ulid()),
+  loanId: varchar("loanId", { length: ULID_LENGTH }).notNull(),
+  userId: varchar("userId", { length: ULID_LENGTH }).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   date: timestamp("date").notNull(),
   note: text("note"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: timestamp("deletedAt"),
+  dirty: boolean("dirty").default(true).notNull(),
+  serverSeq: bigint("serverSeq", { mode: "number" }),
 });
 
 export type Repayment = typeof repayments.$inferSelect;

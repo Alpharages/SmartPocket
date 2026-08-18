@@ -76,7 +76,7 @@ export default function CardDetailScreen() {
   const utilisationAccessibleLabel =
     utilisation > 0 && utilisation < 0.01 ? "less than 1%" : utilisationLabel;
 
-  if (Number.isNaN(cardId) || !card) {
+  if (cardId === null || !card) {
     return (
       <ScreenContainer
         className="flex-1 bg-background"

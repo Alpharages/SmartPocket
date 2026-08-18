@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { testId, syncColumns } from "./helpers/ids";
 
 const TEST_KEY_HEX =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -22,7 +23,7 @@ describe("credit card db encryption", () => {
     const { isEncryptedCardNumber } = await import("@/server/_core/crypto");
 
     await createCreditCard({
-      userId: 1,
+      userId: testId(1),
       name: "Test",
       cardNumber: "4111111111111111",
       cardholderName: "Tester",
@@ -36,7 +37,7 @@ describe("credit card db encryption", () => {
     const body = callDataApi.mock.calls[0][1].body as {
       params: unknown[];
     };
-    const stored = body.params[2] as string;
+    const stored = body.params[3] as string;
     expect(stored).not.toBe("4111111111111111");
     expect(isEncryptedCardNumber(stored)).toBe(true);
   });
@@ -46,7 +47,9 @@ describe("credit card db encryption", () => {
     const { updateCreditCard } = await import("@/server/db");
     const { isEncryptedCardNumber } = await import("@/server/_core/crypto");
 
-    await updateCreditCard(1, 1, { cardNumber: "5555555555554444" });
+    await updateCreditCard(testId(1), testId(1), {
+      cardNumber: "5555555555554444",
+    });
 
     const body = callDataApi.mock.calls[0][1].body as {
       params: unknown[];
@@ -59,24 +62,29 @@ describe("credit card db encryption", () => {
     callDataApi.mockResolvedValue(undefined);
     const { updateCreditCard } = await import("@/server/db");
 
-    await updateCreditCard(1, 1, { name: "Renamed" });
+    await updateCreditCard(testId(1), testId(1), { name: "Renamed" });
 
     const body = callDataApi.mock.calls[0][1].body as {
       query: string;
       params: unknown[];
     };
     expect(body.query).not.toContain("cardNumber");
-    expect(body.params).toEqual(["Renamed", 1, 1]);
+    expect(body.params).toEqual([
+      "Renamed",
+      expect.any(Date),
+      testId(1),
+      testId(1),
+    ]);
   });
 
   it("decrypts cardNumber on getCreditCardById then masks the response", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const ciphertext = encryptCardNumber("4111111111111111");
+    const ciphertext = await encryptCardNumber("4111111111111111");
 
     callDataApi.mockResolvedValue([
       {
-        id: 1,
-        userId: 1,
+        id: testId(1),
+        userId: testId(1),
         name: "Test",
         cardNumber: ciphertext,
         cardholderName: "Tester",
@@ -89,37 +97,42 @@ describe("credit card db encryption", () => {
     ]);
 
     const { getCreditCardById } = await import("@/server/db");
-    const card = await getCreditCardById(1, 1);
+    const card = await getCreditCardById(testId(1), testId(1));
     expect(card?.cardNumberLast4).toBe("1111");
     expect(card && "cardNumber" in card).toBe(false);
   });
 
   it("decrypts cardNumber on getUserCreditCards then masks each row", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const ciphertext = encryptCardNumber("4111111111111111");
+    const ciphertext = await encryptCardNumber("4111111111111111");
 
     callDataApi.mockResolvedValue([
       {
-        id: 1,
-        userId: 1,
+        id: testId(1),
+        userId: testId(1),
         name: "Test",
         cardNumber: ciphertext,
       },
     ]);
 
     const { getUserCreditCards } = await import("@/server/db");
-    const cards = await getUserCreditCards(1);
+    const cards = await getUserCreditCards(testId(1));
     expect(cards[0]?.cardNumberLast4).toBe("1111");
     expect(cards[0] && "cardNumber" in cards[0]).toBe(false);
   });
 
   it("returns legacy plaintext rows masked on read", async () => {
     callDataApi.mockResolvedValue([
-      { id: 1, userId: 1, name: "Legacy", cardNumber: "4111111111111111" },
+      {
+        id: testId(1),
+        userId: testId(1),
+        name: "Legacy",
+        cardNumber: "4111111111111111",
+      },
     ]);
 
     const { getUserCreditCards } = await import("@/server/db");
-    const cards = await getUserCreditCards(1);
+    const cards = await getUserCreditCards(testId(1));
     expect(cards[0]?.cardNumberLast4).toBe("1111");
     expect(cards[0] && "cardNumber" in cards[0]).toBe(false);
   });

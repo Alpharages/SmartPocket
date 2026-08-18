@@ -17,6 +17,8 @@ import { Animated, FadeInUp } from "@/lib/motion";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { confirmDestructive } from "@/lib/confirm-dialog";
 import { TransactionEditSheet } from "@/components/ui/TransactionEditSheet";
+import type { Id } from "@/drizzle/schema";
+import { isUlid } from "@shared/ulid";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -52,10 +54,10 @@ export default function TransactionDetailScreen() {
   }, [refreshTransactions, refreshAccounts]);
   const refreshProps = usePullToRefresh(onRefresh);
 
-  const transactionId = Number(id);
+  const transactionId = isUlid(id) ? id : null;
   const transaction = transactions.find((t) => t.id === transactionId);
   const currentAccountId = transaction?.accountId ?? null;
-  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
+  const [selectedAccountId, setSelectedAccountId] = useState<Id | null>(
     currentAccountId,
   );
   const [editing, setEditing] = useState(false);

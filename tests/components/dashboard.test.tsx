@@ -12,6 +12,7 @@ import TestRenderer, {
 import { useExpense, type MonthlyStats } from "@/lib/expense-context";
 import DashboardScreen from "@/app/(tabs)/dashboard";
 import { formatCurrency } from "@/lib/currency";
+import { testId, syncColumns } from "../helpers/ids";
 
 // ---------------------------------------------------------------------------
 // Module mocks — must appear before any imports that trigger the mocked modules
@@ -93,8 +94,8 @@ const mockStats = {
 
 const mockCategories = [
   {
-    id: 1,
-    userId: 1,
+    id: testId(1),
+    userId: testId(1),
     name: "Salary",
     type: "income" as const,
     color: "#059669",
@@ -104,8 +105,8 @@ const mockCategories = [
     updatedAt: new Date(),
   },
   {
-    id: 2,
-    userId: 1,
+    id: testId(2),
+    userId: testId(1),
     name: "Food",
     type: "expense" as const,
     color: "#DC2626",
@@ -118,9 +119,9 @@ const mockCategories = [
 
 const mockTransactions = [
   {
-    id: 1,
-    userId: 1,
-    categoryId: 1,
+    id: testId(1),
+    userId: testId(1),
+    categoryId: testId(1),
     type: "income" as const,
     amount: "3000.00",
     date: new Date("2026-06-01"),
@@ -128,9 +129,9 @@ const mockTransactions = [
     updatedAt: new Date(),
   },
   {
-    id: 2,
-    userId: 1,
-    categoryId: 2,
+    id: testId(2),
+    userId: testId(1),
+    categoryId: testId(2),
     type: "expense" as const,
     amount: "200.00",
     date: new Date("2026-06-02"),
@@ -138,9 +139,9 @@ const mockTransactions = [
     updatedAt: new Date(),
   },
   {
-    id: 3,
-    userId: 1,
-    categoryId: 2,
+    id: testId(3),
+    userId: testId(1),
+    categoryId: testId(2),
     type: "expense" as const,
     amount: "150.00",
     date: new Date("2026-06-03"),
@@ -148,9 +149,9 @@ const mockTransactions = [
     updatedAt: new Date(),
   },
   {
-    id: 4,
-    userId: 1,
-    categoryId: 1,
+    id: testId(4),
+    userId: testId(1),
+    categoryId: testId(1),
     type: "income" as const,
     amount: "500.00",
     date: new Date("2026-06-03"),
@@ -158,9 +159,9 @@ const mockTransactions = [
     updatedAt: new Date(),
   },
   {
-    id: 5,
-    userId: 1,
-    categoryId: 2,
+    id: testId(5),
+    userId: testId(1),
+    categoryId: testId(2),
     type: "expense" as const,
     amount: "80.00",
     date: new Date("2026-06-04"),
@@ -465,9 +466,9 @@ describe("DashboardScreen", () => {
       const sixTransactions = [
         ...mockTransactions,
         {
-          id: 6,
-          userId: 1,
-          categoryId: 2,
+          id: testId(6),
+          userId: testId(1),
+          categoryId: testId(2),
           type: "expense" as const,
           amount: "50.00",
           date: new Date("2026-06-05"),
@@ -531,9 +532,9 @@ describe("DashboardScreen", () => {
     it("falls back to 'Category {id}' label when categoryId has no matching category", () => {
       const txWithUnknownCategory = [
         {
-          id: 99,
-          userId: 1,
-          categoryId: 999,
+          id: testId(99),
+          userId: testId(1),
+          categoryId: testId(999),
           type: "expense" as const,
           amount: "100.00",
           date: new Date("2026-06-04"),
@@ -546,7 +547,9 @@ describe("DashboardScreen", () => {
       );
       const root = render(<DashboardScreen />);
       const fallbackTitle = root.findAll(
-        (n) => String(n.type) === "Text" && collectText(n) === "Category 999",
+        (n) =>
+          String(n.type) === "Text" &&
+          collectText(n) === `Category ${testId(999)}`,
       );
       expect(fallbackTitle.length).toBeGreaterThanOrEqual(1);
     });

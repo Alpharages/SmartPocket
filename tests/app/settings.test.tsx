@@ -7,6 +7,7 @@ import TestRenderer, {
 } from "react-test-renderer";
 
 import SettingsScreen from "@/app/settings";
+import { testId, syncColumns } from "../helpers/ids";
 
 const mockBack = vi.fn();
 const mockPush = vi.fn();
@@ -151,13 +152,23 @@ vi.mock("@/lib/expense-context", () => ({
 // Settings now surfaces the signed-in identity and a Sign out action (SP-024).
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({
-    user: { id: 1, name: "Dev User", email: "dev@localhost" },
+    user: { id: testId(1), name: "Dev User", email: "dev@localhost" },
     loading: false,
     isAuthenticated: true,
     logout: vi.fn().mockResolvedValue(undefined),
     refresh: vi.fn(),
     error: null,
   }),
+}));
+
+// The real component pulls in lib/sync/sync-state.ts's expo-secure-store
+// dependency, which throws outside a native runtime — covered on its own in
+// tests/components/sync-settings.test.tsx.
+vi.mock("@/components/sync-settings", () => ({
+  SyncSettingsSection: () => null,
+}));
+vi.mock("@/lib/sync/sync-state", () => ({
+  isSyncSupported: () => true,
 }));
 
 vi.mock("@/lib/settings-provider", () => ({

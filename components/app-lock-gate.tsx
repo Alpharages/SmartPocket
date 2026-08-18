@@ -18,6 +18,7 @@ import { useThemeTokens } from "@/lib/theme-provider";
 import { trpc } from "@/lib/trpc";
 import {
   authenticateWithBiometrics,
+  clearAppLock,
   isAppLockSupported,
   isBiometricEnabled,
   isPinSet,
@@ -279,6 +280,17 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
           "Couldn't reach your account. Check your connection and try again.",
         );
         return;
+      }
+      try {
+        // logout() no longer touches the local PIN (local-first-sync-plan.md:
+        // an ordinary sign-out must leave the device lock in place). Forgot
+        // PIN is the one path defined by the user not knowing the PIN, so it
+        // clears the local copy explicitly — logged, not fatal, since the
+        // account-linked PIN above is already gone either way and the user
+        // is being signed out regardless.
+        await clearAppLock();
+      } catch (err) {
+        console.error("[AppLockGate] Failed to clear local app lock:", err);
       }
       await logout();
       clearErrorTimer();

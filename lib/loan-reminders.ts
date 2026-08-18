@@ -5,18 +5,19 @@ import {
   cancelScheduledNotification,
   scheduleLocalNotification,
 } from "./notifications";
+import type { Id } from "@/drizzle/schema";
 
 export { LOAN_REMINDER_DATA_TYPE };
 
-export function loanDueReminderIdentifier(loanId: number): string {
+export function loanDueReminderIdentifier(loanId: Id): string {
   return `loan-due-${loanId}`;
 }
 
-export function loanOverdueReminderIdentifier(loanId: number): string {
+export function loanOverdueReminderIdentifier(loanId: Id): string {
   return `loan-overdue-${loanId}`;
 }
 
-export function buildLoanReminderNotificationData(loanId: number) {
+export function buildLoanReminderNotificationData(loanId: Id) {
   return {
     type: LOAN_REMINDER_DATA_TYPE,
     loanId,
@@ -88,10 +89,7 @@ export function overdueReminderTriggerAt(now: Date = new Date()): Date {
 }
 
 /** @deprecated Use dueReminderTriggerAt */
-export function reminderTriggerAt(
-  dueDate: Date,
-  now: Date = new Date(),
-): Date {
+export function reminderTriggerAt(dueDate: Date, now: Date = new Date()): Date {
   return dueReminderTriggerAt(dueDate, now);
 }
 
@@ -125,7 +123,7 @@ const defaultDeps: LoanReminderDeps = {
   cancelScheduledNotification,
 };
 
-let previouslySyncedLoanIds = new Set<number>();
+let previouslySyncedLoanIds = new Set<Id>();
 
 /** Resets in-memory sync tracking — for tests only. */
 export function resetLoanReminderSyncState(): void {
@@ -133,7 +131,7 @@ export function resetLoanReminderSyncState(): void {
 }
 
 export async function clearLoanReminders(
-  loanId: number,
+  loanId: Id,
   deps: LoanReminderDeps = defaultDeps,
 ): Promise<void> {
   await deps.cancelScheduledNotification(loanDueReminderIdentifier(loanId));

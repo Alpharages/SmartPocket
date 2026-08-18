@@ -1,3 +1,5 @@
+import { ulid } from "@shared/ulid";
+import type { Id } from "@/drizzle/schema";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { devQuery } from "@/server/_core/devDb";
@@ -29,12 +31,15 @@ const { getUserPinState, recordFailedPinAttempt, resetExpiredPinLockout } =
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 
-async function insertUser(): Promise<number> {
-  const result = (await devQuery(
-    "INSERT INTO users (openId, name, email, loginMethod) VALUES (?, ?, ?, ?)",
-    ["pin-attempt-test-user", "Test User", "test@example.com", "manus"],
-  )) as { insertId: number };
-  return result.insertId;
+async function insertUser(): Promise<Id> {
+  // The id travels with the row now — server/db.ts mints it client-side, so the
+  // shim is exercised the same way the real writes exercise it.
+  const id = ulid();
+  await devQuery(
+    "INSERT INTO users (id, openId, name, email, loginMethod) VALUES (?, ?, ?, ?, ?)",
+    [id, "pin-attempt-test-user", "Test User", "test@example.com", "manus"],
+  );
+  return id;
 }
 
 describe("devDb — SELECT with an explicit column list (round-2 review R3)", () => {

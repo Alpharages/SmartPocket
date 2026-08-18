@@ -1,5 +1,6 @@
 import { formatIsoDate } from "./date-utils";
 import type { Category, CreditCard, Transaction } from "./expense-context";
+import type { Id } from "@/drizzle/schema";
 
 export interface ExportRow {
   date: string;
@@ -11,7 +12,7 @@ export interface ExportRow {
 }
 
 export interface JsonExportRow {
-  id: number;
+  id: Id;
   date: string;
   type: "income" | "expense";
   amount: string;

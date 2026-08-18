@@ -6,14 +6,15 @@ import { cn } from "@/lib/utils";
 import { Radius, Spacing } from "@/constants/theme";
 import { CategoryToken } from "./CategoryToken";
 import type { Category } from "@/lib/expense-context";
+import type { Id } from "@/drizzle/schema";
 
 export interface CategoryPickerGridProps {
   /** Categories to display. */
   categories: Category[];
   /** Currently selected category ID, or null. */
-  selectedId: number | null;
+  selectedId: Id | null;
   /** Called when a category is tapped. */
-  onSelect: (id: number) => void;
+  onSelect: (id: Id) => void;
   /**
    * Optional transaction list to derive recently-used ordering.
    * When provided, categories referenced by the most-recent transactions
@@ -21,7 +22,7 @@ export interface CategoryPickerGridProps {
    * remainder in their existing order.
    */
   transactions?: {
-    categoryId: number;
+    categoryId: Id;
     date?: Date | string;
     createdAt?: Date | string;
   }[];
@@ -89,7 +90,7 @@ export function CategoryPickerGrid({
 
     // Build a recency-ordered, deduped list of visible category IDs.
     // Sort by date desc, falling back to createdAt.
-    const recentIds: number[] = [];
+    const recentIds: Id[] = [];
     const sorted = [...transactions].sort((a, b) => txTime(b) - txTime(a));
 
     for (const tx of sorted) {

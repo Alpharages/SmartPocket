@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { categories, creditCards, transactions, users } from "./schema";
+import type { Id } from "./schema";
+import { ulid } from "../shared/ulid";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const DEV_OPEN_ID = "dev_local_user";
@@ -38,7 +40,7 @@ async function ensureDatabaseExists() {
   }
 }
 
-async function ensureUser(db: Db): Promise<number> {
+async function ensureUser(db: Db): Promise<Id> {
   await db
     .insert(users)
     .values({
@@ -72,12 +74,12 @@ async function ensureUser(db: Db): Promise<number> {
 
 async function ensureCategory(
   db: Db,
-  userId: number,
+  userId: Id,
   name: string,
   type: "income" | "expense",
   color: string,
   icon: string,
-): Promise<number> {
+): Promise<Id> {
   const [existing] = await db
     .select({ id: categories.id })
     .from(categories)
@@ -92,7 +94,9 @@ async function ensureCategory(
 
   if (existing) return existing.id;
 
-  const [result] = await db.insert(categories).values({
+  const id = ulid();
+  await db.insert(categories).values({
+    id,
     userId,
     name,
     type,
@@ -101,10 +105,10 @@ async function ensureCategory(
     isDefault: true,
   });
 
-  return result.insertId;
+  return id;
 }
 
-async function ensureCreditCard(db: Db, userId: number): Promise<number> {
+async function ensureCreditCard(db: Db, userId: Id): Promise<Id> {
   const [existing] = await db
     .select({ id: creditCards.id })
     .from(creditCards)
@@ -118,7 +122,9 @@ async function ensureCreditCard(db: Db, userId: number): Promise<number> {
 
   if (existing) return existing.id;
 
-  const [result] = await db.insert(creditCards).values({
+  const id = ulid();
+  await db.insert(creditCards).values({
+    id,
     userId,
     name: "Everyday Visa",
     cardNumber: "4111111111111234",
@@ -132,13 +138,13 @@ async function ensureCreditCard(db: Db, userId: number): Promise<number> {
     isActive: true,
   });
 
-  return result.insertId;
+  return id;
 }
 
 async function ensureTransaction(
   db: Db,
-  userId: number,
-  categoryId: number,
+  userId: Id,
+  categoryId: Id,
   type: "income" | "expense",
   amount: string,
   description: string,

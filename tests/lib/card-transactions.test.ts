@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { testId } from "../helpers/ids";
 
 import {
   parseCardRouteId,
@@ -25,14 +26,25 @@ describe("sumCardTransactionTotal", () => {
 });
 
 describe("parseCardRouteId", () => {
-  it("parses a valid numeric id", () => {
-    expect(parseCardRouteId("42")).toBe(42);
+  it("returns the segment when it is a well-formed ULID", () => {
+    expect(parseCardRouteId(testId(42))).toBe(testId(42));
+    expect(parseCardRouteId("01ARZ3NDEKTSV4RRFFQ69G5FAV")).toBe(
+      "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+    );
   });
 
-  it("returns NaN for non-numeric, zero, or negative ids", () => {
-    expect(Number.isNaN(parseCardRouteId("abc"))).toBe(true);
-    expect(Number.isNaN(parseCardRouteId("0"))).toBe(true);
-    expect(Number.isNaN(parseCardRouteId("-1"))).toBe(true);
-    expect(Number.isNaN(parseCardRouteId(undefined))).toBe(true);
+  it("takes the first segment when the router hands back an array", () => {
+    expect(parseCardRouteId([testId(42), testId(43)])).toBe(testId(42));
+  });
+
+  it("returns null for anything that is not a ULID", () => {
+    expect(parseCardRouteId("abc")).toBeNull();
+    // A leftover deep link from before the id migration.
+    expect(parseCardRouteId("42")).toBeNull();
+    expect(parseCardRouteId("0")).toBeNull();
+    expect(parseCardRouteId("-1")).toBeNull();
+    expect(parseCardRouteId(undefined)).toBeNull();
+    // Right length, but uses letters Crockford base32 excludes.
+    expect(parseCardRouteId("01ARZ3NDEKTSV4RRFFQ69G5FAI")).toBeNull();
   });
 });

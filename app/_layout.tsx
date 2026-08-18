@@ -148,10 +148,15 @@ export default function RootLayout() {
   const [frame, setFrame] = useState<Rect>(initialFrame);
   // Gate the first render on dev cold starts so the tRPC client does not fire
   // authenticated requests before dev auto-login stores the session token.
+  //
+  // local-first-sync-plan.md phase 3: native no longer needs a session token
+  // at all — the in-process tRPC link (lib/trpc.native.ts) always resolves to
+  // the device's local user, with no server to log into. Only web (still
+  // server-backed over dataApi.ts) waits here.
   const [isAppShellReady, setIsAppShellReady] = useState(() => {
     if (!__DEV__) return true;
     if (Platform.OS === "web") return hasWebSessionToken();
-    return false;
+    return true;
   });
   // SP-D10/SP-D11: when dev auto-login can't reach the API the shell used to
   // stay blank with nothing to read. Keep the reason so the gate can show it.
@@ -190,8 +195,15 @@ export default function RootLayout() {
   }, [router]);
 
   // In development, automatically obtain a dev session if none exists.
+  //
+  // local-first-sync-plan.md phase 3: native is fully offline through the
+  // in-process tRPC link and never talks to server/_core/index.ts, so there
+  // is no dev-login endpoint to reach and no session token to store — running
+  // this on a real device would just fail every attempt and surface a
+  // permanent "could not reach the API" error for a state that isn't one.
   useEffect(() => {
     if (!__DEV__) return;
+    if (Platform.OS !== "web") return;
     let cancelled = false;
 
     (async () => {

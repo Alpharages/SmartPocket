@@ -1,3 +1,4 @@
+import type { Id } from "@/drizzle/schema";
 /**
  * Cross-tenant authorization regression tests.
  *
@@ -31,8 +32,8 @@ let victim: any;
 let attacker: any;
 let asVictim: Caller;
 let asAttacker: Caller;
-let victimCategoryId: number;
-let victimCardId: number;
+let victimCategoryId: Id;
+let victimCardId: Id;
 
 beforeAll(async () => {
   await db.upsertUser({

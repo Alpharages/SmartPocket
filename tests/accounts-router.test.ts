@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "../server/routers";
 import type { TrpcContext } from "../server/_core/context";
 import type { Account } from "@/drizzle/schema";
+import type { Id } from "@/drizzle/schema";
+import { testId, syncColumns } from "./helpers/ids";
+import { isUlid } from "@shared/ulid";
 
 const callDataApi = vi.fn();
 
@@ -11,7 +14,7 @@ vi.mock("../server/_core/dataApi", () => ({
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
-function createUserContext(userId: number): TrpcContext {
+function createUserContext(userId: Id): TrpcContext {
   const user: AuthenticatedUser = {
     id: userId,
     openId: `user-${userId}`,
@@ -39,19 +42,20 @@ function createUserContext(userId: number): TrpcContext {
 const now = new Date("2026-06-01T00:00:00.000Z");
 
 const sampleAccount: Account = {
-  id: 1,
-  userId: 1,
+  id: testId(1),
+  userId: testId(1),
   name: "Checking",
   type: "bank",
   currency: "USD",
   isDefault: false,
   createdAt: now,
   updatedAt: now,
+  ...syncColumns(),
 };
 
 const sampleCategory = {
-  id: 1,
-  userId: 1,
+  id: testId(1),
+  userId: testId(1),
   name: "Groceries",
   type: "expense",
   color: "#10B981",
@@ -69,35 +73,38 @@ describe("accounts router", () => {
   it("creates and returns an account scoped to the authenticated user", async () => {
     callDataApi
       .mockResolvedValueOnce({ insertId: 2 })
-      .mockResolvedValueOnce([{ ...sampleAccount, id: 2, userId: 1 }]);
+      .mockResolvedValueOnce([
+        { ...sampleAccount, id: testId(2), userId: testId(1) },
+      ]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     const created = await caller.accounts.create({
       name: "Checking",
       type: "bank",
       currency: "USD",
     });
 
-    expect(created?.userId).toBe(1);
+    expect(created?.userId).toBe(testId(1));
     expect(created?.name).toBe("Checking");
   });
 
   it("lists only the authenticated user's accounts", async () => {
     callDataApi.mockResolvedValueOnce([sampleAccount]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(caller.accounts.list()).resolves.toEqual([sampleAccount]);
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query: "SELECT * FROM accounts WHERE userId = ? ORDER BY name",
-        params: [1],
+        query:
+          "SELECT * FROM accounts WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
+        params: [testId(1)],
       },
     });
   });
 
   it("rejects invalid account type at the API boundary", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(
       caller.accounts.create({
@@ -108,7 +115,7 @@ describe("accounts router", () => {
   });
 
   it("rejects whitespace-only account names", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(
       caller.accounts.create({
@@ -123,14 +130,14 @@ describe("accounts router", () => {
       .mockResolvedValueOnce([sampleAccount])
       .mockRejectedValueOnce(new Error("database unavailable"));
 
-    const caller = appRouter.createCaller(createUserContext(1));
-    await expect(caller.accounts.transactionCount({ id: 1 })).rejects.toThrow(
-      "database unavailable",
-    );
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
+    await expect(
+      caller.accounts.transactionCount({ id: testId(1) }),
+    ).rejects.toThrow("database unavailable");
   });
 
   it("rejects invalid currency length", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(
       caller.accounts.create({
@@ -145,20 +152,26 @@ describe("accounts router", () => {
     callDataApi
       // SP-023: category ownership is verified before the insert.
       .mockResolvedValueOnce([sampleCategory])
-      .mockResolvedValueOnce({ insertId: 99 });
+      .mockResolvedValueOnce(undefined);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     const id = await caller.transactions.create({
-      categoryId: 1,
+      categoryId: testId(1),
       type: "expense",
       amount: "12.50",
       date: new Date("2026-06-10"),
     });
 
-    expect(id).toBe(99);
+    expect(isUlid(id)).toBe(true);
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: expect.objectContaining({
-        params: expect.arrayContaining([1, 1, null, "expense", "12.50"]),
+        params: expect.arrayContaining([
+          testId(1),
+          testId(1),
+          null,
+          "expense",
+          "12.50",
+        ]),
       }),
     });
   });
@@ -167,28 +180,35 @@ describe("accounts router", () => {
     callDataApi
       .mockResolvedValueOnce([sampleAccount])
       .mockResolvedValueOnce([sampleCategory])
-      .mockResolvedValueOnce({ insertId: 100 });
+      .mockResolvedValueOnce(undefined);
 
-    const caller = appRouter.createCaller(createUserContext(1));
-    await expect(
-      caller.transactions.create({
-        categoryId: 1,
-        type: "income",
-        amount: "200.00",
-        date: new Date("2026-06-10"),
-        accountId: 1,
-      }),
-    ).resolves.toBe(100);
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
+    const id = await caller.transactions.create({
+      categoryId: testId(1),
+      type: "income",
+      amount: "200.00",
+      date: new Date("2026-06-10"),
+      accountId: testId(1),
+    });
+    expect(isUlid(id)).toBe(true);
 
     expect(callDataApi).toHaveBeenNthCalledWith(1, "Database/query", {
       body: {
-        query: "SELECT * FROM accounts WHERE id = ? AND userId = ?",
-        params: [1, 1],
+        query:
+          "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        params: [testId(1), testId(1)],
       },
     });
     expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
       body: expect.objectContaining({
-        params: expect.arrayContaining([1, 1, null, 1, "income", "200.00"]),
+        params: expect.arrayContaining([
+          testId(1),
+          testId(1),
+          null,
+          testId(1),
+          "income",
+          "200.00",
+        ]),
       }),
     });
   });
@@ -196,14 +216,14 @@ describe("accounts router", () => {
   it("rejects transactions.create with another user's account", async () => {
     callDataApi.mockResolvedValueOnce([]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(
       caller.transactions.create({
-        categoryId: 1,
+        categoryId: testId(1),
         type: "expense",
         amount: "12.50",
         date: new Date("2026-06-10"),
-        accountId: 99,
+        accountId: testId(99),
       }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
@@ -213,10 +233,10 @@ describe("accounts router", () => {
   it("persists null accountId on user-scoped transactions.update", async () => {
     // SP-023: a categoryId in the patch is ownership-checked before the UPDATE.
     callDataApi.mockResolvedValueOnce([sampleCategory]);
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await caller.transactions.update({
-      id: 7,
-      categoryId: 1,
+      id: testId(7),
+      categoryId: testId(1),
       type: "expense",
       amount: "12.50",
       date: new Date("2026-06-10"),
@@ -226,7 +246,7 @@ describe("accounts router", () => {
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query: expect.stringContaining("WHERE id = ? AND userId = ?"),
-        params: expect.arrayContaining([null, 7, 1]),
+        params: expect.arrayContaining([null, testId(7), testId(1)]),
       },
     });
   });
@@ -234,15 +254,15 @@ describe("accounts router", () => {
   it("rejects transactions.update with another user's account", async () => {
     callDataApi.mockResolvedValueOnce([]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(
       caller.transactions.update({
-        id: 7,
-        categoryId: 1,
+        id: testId(7),
+        categoryId: testId(1),
         type: "expense",
         amount: "12.50",
         date: new Date("2026-06-10"),
-        accountId: 99,
+        accountId: testId(99),
       }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
@@ -255,33 +275,36 @@ describe("accounts router", () => {
   // with a Zod BAD_REQUEST before the resolver ran, so the feature never worked.
   it("accepts a partial { id, accountId } payload (the real edit-screen shape) and persists it", async () => {
     callDataApi
-      .mockResolvedValueOnce([{ ...sampleAccount, id: 11, userId: 1 }]) // ownership check
+      .mockResolvedValueOnce([
+        { ...sampleAccount, id: testId(11), userId: testId(1) },
+      ]) // ownership check
       .mockResolvedValueOnce(undefined); // UPDATE
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(
-      caller.transactions.update({ id: 7, accountId: 11 }),
+      caller.transactions.update({ id: testId(7), accountId: testId(11) }),
     ).resolves.not.toThrow();
 
     expect(callDataApi).toHaveBeenNthCalledWith(1, "Database/query", {
       body: {
-        query: "SELECT * FROM accounts WHERE id = ? AND userId = ?",
-        params: [11, 1],
+        query:
+          "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        params: [testId(11), testId(1)],
       },
     });
     expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
       body: {
         query:
-          "UPDATE transactions SET accountId = ? WHERE id = ? AND userId = ?",
-        params: [11, 7, 1],
+          "UPDATE transactions SET accountId = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        params: [testId(11), expect.any(Date), testId(7), testId(1)],
       },
     });
   });
 
   it("accepts a partial { id, accountId: null } clear payload without an ownership check", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(
-      caller.transactions.update({ id: 7, accountId: null }),
+      caller.transactions.update({ id: testId(7), accountId: null }),
     ).resolves.not.toThrow();
 
     // null accountId skips ownership lookup → exactly one call: the UPDATE.
@@ -289,28 +312,31 @@ describe("accounts router", () => {
     expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
       body: {
         query:
-          "UPDATE transactions SET accountId = ? WHERE id = ? AND userId = ?",
-        params: [null, 7, 1],
+          "UPDATE transactions SET accountId = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        params: [null, expect.any(Date), testId(7), testId(1)],
       },
     });
   });
 
   it("emits no SQL when transactions.update has no fields to change", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
-    await expect(caller.transactions.update({ id: 7 })).resolves.not.toThrow();
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
+    await expect(
+      caller.transactions.update({ id: testId(7) }),
+    ).resolves.not.toThrow();
 
     // Empty data → updateTransaction returns early, avoiding `SET  WHERE ...`.
     expect(callDataApi).not.toHaveBeenCalled();
   });
 
   it("scopes transactions.delete by the authenticated user (IDOR guard)", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
-    await caller.transactions.delete({ id: 7 });
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
+    await caller.transactions.delete({ id: testId(7) });
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query: "DELETE FROM transactions WHERE id = ? AND userId = ?",
-        params: [7, 1],
+        query:
+          "UPDATE transactions SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        params: [expect.any(Date), expect.any(Date), testId(7), testId(1)],
       },
     });
   });
@@ -318,13 +344,14 @@ describe("accounts router", () => {
   it("scopes transactions.getById by the authenticated user (IDOR guard)", async () => {
     callDataApi.mockResolvedValueOnce([]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
-    await caller.transactions.getById({ id: 7 });
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
+    await caller.transactions.getById({ id: testId(7) });
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query: "SELECT * FROM transactions WHERE id = ? AND userId = ?",
-        params: [7, 1],
+        query:
+          "SELECT * FROM transactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        params: [testId(7), testId(1)],
       },
     });
   });
@@ -334,14 +361,16 @@ describe("accounts router", () => {
       .mockResolvedValueOnce([sampleAccount])
       .mockResolvedValueOnce([{ txCount: 3 }]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
-    await expect(caller.accounts.transactionCount({ id: 1 })).resolves.toBe(3);
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
+    await expect(
+      caller.accounts.transactionCount({ id: testId(1) }),
+    ).resolves.toBe(3);
 
     expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
       body: {
         query:
-          "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ?",
-        params: [1, 1],
+          "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ? AND deletedAt IS NULL",
+        params: [testId(1), testId(1)],
       },
     });
   });
@@ -351,14 +380,16 @@ describe("accounts router", () => {
       .mockResolvedValueOnce([sampleAccount])
       .mockResolvedValueOnce([{ txCount: 2 }]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
-    await expect(caller.accounts.delete({ id: 1 })).rejects.toMatchObject({
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
+    await expect(
+      caller.accounts.delete({ id: testId(1) }),
+    ).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
     });
   });
 
   it("reassigns transactions then deletes the source account", async () => {
-    const targetAccount = { ...sampleAccount, id: 2, name: "Savings" };
+    const targetAccount = { ...sampleAccount, id: testId(2), name: "Savings" };
     callDataApi
       .mockResolvedValueOnce([sampleAccount])
       .mockResolvedValueOnce([targetAccount])
@@ -370,36 +401,42 @@ describe("accounts router", () => {
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(
-      caller.accounts.reassignAndDelete({ id: 1, targetAccountId: 2 }),
+      caller.accounts.reassignAndDelete({
+        id: testId(1),
+        targetAccountId: testId(2),
+      }),
     ).resolves.toBeUndefined();
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query:
-          "UPDATE transactions SET accountId = ? WHERE userId = ? AND accountId = ?",
-        params: [2, 1, 1],
+        query: expect.stringContaining("UPDATE transactions SET accountId = ?"),
+        params: expect.arrayContaining([testId(2), testId(1), testId(1)]),
       },
     });
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query:
-          "DELETE FROM transfers WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
-        params: [1, 1, 2],
+        query: expect.stringContaining(
+          "UPDATE transfers SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
+        ),
+        params: expect.arrayContaining([testId(1), testId(1), testId(2)]),
       },
     });
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query:
-          "DELETE FROM transfers WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
-        params: [1, 2, 1],
+        query: expect.stringContaining(
+          "UPDATE transfers SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
+        ),
+        params: expect.arrayContaining([testId(1), testId(2), testId(1)]),
       },
     });
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query: "DELETE FROM accounts WHERE id = ? AND userId = ?",
-        params: [1, 1],
+        query: expect.stringContaining(
+          "UPDATE accounts SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
+        ),
+        params: expect.arrayContaining([testId(1), testId(1)]),
       },
     });
   });
@@ -409,57 +446,72 @@ describe("accounts router", () => {
       .mockResolvedValueOnce([sampleAccount])
       .mockResolvedValueOnce([{ transferCount: 2 }]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
-    await expect(caller.accounts.transferCount({ id: 1 })).resolves.toBe(2);
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
+    await expect(
+      caller.accounts.transferCount({ id: testId(1) }),
+    ).resolves.toBe(2);
 
     expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
       body: {
         query:
-          "SELECT COUNT(*) as transferCount FROM transfers WHERE userId = ? AND (fromAccountId = ? OR toAccountId = ?)",
-        params: [1, 1, 1],
+          "SELECT COUNT(*) as transferCount FROM transfers WHERE userId = ? AND (fromAccountId = ? OR toAccountId = ?) AND deletedAt IS NULL",
+        params: [testId(1), testId(1), testId(1)],
       },
     });
   });
 
   it("rejects reassigning to the same account", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(
-      caller.accounts.reassignAndDelete({ id: 1, targetAccountId: 1 }),
+      caller.accounts.reassignAndDelete({
+        id: testId(1),
+        targetAccountId: testId(1),
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("returns derived balances scoped to the authenticated user", async () => {
     callDataApi
       .mockResolvedValueOnce([
-        { id: 1, accountId: 1, type: "income", amount: "50.00" },
-        { id: 2, accountId: 1, type: "expense", amount: "20.00" },
+        {
+          id: testId(1),
+          accountId: testId(1),
+          type: "income",
+          amount: "50.00",
+        },
+        {
+          id: testId(2),
+          accountId: testId(1),
+          type: "expense",
+          amount: "20.00",
+        },
       ])
       .mockResolvedValueOnce([]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(caller.accounts.balances()).resolves.toEqual([
-      { accountId: 1, balance: 30 },
+      { accountId: testId(1), balance: 30 },
     ]);
 
     expect(callDataApi).toHaveBeenNthCalledWith(1, "Database/query", {
       body: {
         query:
-          "SELECT id, accountId, type, amount FROM transactions WHERE userId = ?",
-        params: [1],
+          "SELECT id, accountId, type, amount FROM transactions WHERE userId = ? AND deletedAt IS NULL",
+        params: [testId(1)],
       },
     });
     expect(callDataApi).toHaveBeenNthCalledWith(2, "Database/query", {
       body: {
         query:
-          "SELECT * FROM transfers WHERE userId = ? ORDER BY date DESC, id DESC",
-        params: [1],
+          "SELECT * FROM transfers WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC, id DESC",
+        params: [testId(1)],
       },
     });
   });
 
   it("records a transfer and folds legs into balances (AC1, AC5)", async () => {
-    const fromAccount = { ...sampleAccount, id: 1 };
-    const toAccount = { ...sampleAccount, id: 2, name: "Savings" };
+    const fromAccount = { ...sampleAccount, id: testId(1) };
+    const toAccount = { ...sampleAccount, id: testId(2), name: "Savings" };
     const transferDate = new Date("2026-06-10");
 
     callDataApi
@@ -468,10 +520,10 @@ describe("accounts router", () => {
       .mockResolvedValueOnce({ insertId: 9 })
       .mockResolvedValueOnce([
         {
-          id: 9,
-          userId: 1,
-          fromAccountId: 1,
-          toAccountId: 2,
+          id: testId(9),
+          userId: testId(1),
+          fromAccountId: testId(1),
+          toAccountId: testId(2),
           amount: "50.00",
           description: null,
           date: transferDate,
@@ -480,15 +532,25 @@ describe("accounts router", () => {
         },
       ])
       .mockResolvedValueOnce([
-        { id: 1, accountId: 1, type: "income", amount: "100.00" },
-        { id: 2, accountId: 2, type: "income", amount: "20.00" },
+        {
+          id: testId(1),
+          accountId: testId(1),
+          type: "income",
+          amount: "100.00",
+        },
+        {
+          id: testId(2),
+          accountId: testId(2),
+          type: "income",
+          amount: "20.00",
+        },
       ])
       .mockResolvedValueOnce([
         {
-          id: 9,
-          userId: 1,
-          fromAccountId: 1,
-          toAccountId: 2,
+          id: testId(9),
+          userId: testId(1),
+          fromAccountId: testId(1),
+          toAccountId: testId(2),
           amount: "50.00",
           description: null,
           date: transferDate,
@@ -497,28 +559,28 @@ describe("accounts router", () => {
         },
       ]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     const created = await caller.accounts.transfer({
-      fromAccountId: 1,
-      toAccountId: 2,
+      fromAccountId: testId(1),
+      toAccountId: testId(2),
       amount: "50.00",
       date: transferDate,
     });
 
-    expect(created?.id).toBe(9);
+    expect(created?.id).toBe(testId(9));
 
     await expect(caller.accounts.balances()).resolves.toEqual([
-      { accountId: 1, balance: 50 },
-      { accountId: 2, balance: 70 },
+      { accountId: testId(1), balance: 50 },
+      { accountId: testId(2), balance: 70 },
     ]);
   });
 
   it("rejects same-account transfers (AC3)", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(
       caller.accounts.transfer({
-        fromAccountId: 1,
-        toAccountId: 1,
+        fromAccountId: testId(1),
+        toAccountId: testId(1),
         amount: "10.00",
         date: new Date("2026-06-10"),
       }),
@@ -526,11 +588,11 @@ describe("accounts router", () => {
   });
 
   it("rejects non-positive transfer amounts (AC4)", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(
       caller.accounts.transfer({
-        fromAccountId: 1,
-        toAccountId: 2,
+        fromAccountId: testId(1),
+        toAccountId: testId(2),
         amount: "0",
         date: new Date("2026-06-10"),
       }),
@@ -542,11 +604,11 @@ describe("accounts router", () => {
       .mockResolvedValueOnce([sampleAccount])
       .mockResolvedValueOnce([]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(
       caller.accounts.transfer({
-        fromAccountId: 1,
-        toAccountId: 2,
+        fromAccountId: testId(1),
+        toAccountId: testId(2),
         amount: "10.00",
         date: new Date("2026-06-10"),
       }),
@@ -556,13 +618,15 @@ describe("accounts router", () => {
   it("rejects cross-currency transfers", async () => {
     callDataApi
       .mockResolvedValueOnce([sampleAccount])
-      .mockResolvedValueOnce([{ ...sampleAccount, id: 2, currency: "EUR" }]);
+      .mockResolvedValueOnce([
+        { ...sampleAccount, id: testId(2), currency: "EUR" },
+      ]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(
       caller.accounts.transfer({
-        fromAccountId: 1,
-        toAccountId: 2,
+        fromAccountId: testId(1),
+        toAccountId: testId(2),
         amount: "10.00",
         date: new Date("2026-06-10"),
       }),

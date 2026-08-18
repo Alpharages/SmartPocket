@@ -4,6 +4,7 @@ import TestRenderer, { act, type ReactTestRenderer } from "react-test-renderer";
 
 import RecurringScreen from "@/app/recurring";
 import { useExpense, type RecurringTransaction } from "@/lib/expense-context";
+import { testId, syncColumns } from "../helpers/ids";
 
 vi.mock("expo-router", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
@@ -132,9 +133,9 @@ vi.mock("react-native-safe-area-context", () => ({
 }));
 
 const activeRule: RecurringTransaction = {
-  id: 42,
-  userId: 1,
-  categoryId: 1,
+  id: testId(42),
+  userId: testId(1),
+  categoryId: testId(1),
   creditCardId: null,
   type: "expense",
   amount: "50.00",
@@ -163,8 +164,8 @@ describe("RecurringScreen", () => {
       loadingRecurringTransactions: false,
       categories: [
         {
-          id: 1,
-          userId: 1,
+          id: testId(1),
+          userId: testId(1),
           name: "Rent",
           type: "expense",
           color: "#4F46E5",
@@ -203,6 +204,6 @@ describe("RecurringScreen", () => {
       await confirmButton.props.onPress();
     });
 
-    expect(cancelRecurringTransaction).toHaveBeenCalledWith(42);
+    expect(cancelRecurringTransaction).toHaveBeenCalledWith(testId(42));
   });
 });

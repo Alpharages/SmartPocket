@@ -11,6 +11,7 @@ import { useExpense } from "@/lib/expense-context";
 import AddTransactionScreen from "@/app/add-transaction";
 import { Motion } from "@/lib/_core/theme";
 import { MAX_FONT_SCALE } from "@/lib/_core/a11y";
+import { testId, syncColumns } from "../helpers/ids";
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -88,8 +89,8 @@ vi.mock("@/hooks/use-colors", () => ({
 
 const mockCategories = [
   {
-    id: 1,
-    userId: 1,
+    id: testId(1),
+    userId: testId(1),
     name: "Salary",
     type: "income" as const,
     color: "#059669",
@@ -99,8 +100,8 @@ const mockCategories = [
     updatedAt: new Date(),
   },
   {
-    id: 2,
-    userId: 1,
+    id: testId(2),
+    userId: testId(1),
     name: "Food",
     type: "expense" as const,
     color: "#DC2626",
@@ -113,8 +114,8 @@ const mockCategories = [
 
 const mockAccounts = [
   {
-    id: 10,
-    userId: 1,
+    id: testId(10),
+    userId: testId(1),
     name: "Cash Wallet",
     type: "cash" as const,
     currency: "USD",
@@ -123,8 +124,8 @@ const mockAccounts = [
     updatedAt: new Date(),
   },
   {
-    id: 11,
-    userId: 1,
+    id: testId(11),
+    userId: testId(1),
     name: "Main Bank",
     type: "bank" as const,
     currency: "USD",
@@ -427,7 +428,7 @@ describe("AddTransactionScreen", () => {
 
       expect(mockAddTransaction).toHaveBeenCalledOnce();
       const payload = mockAddTransaction.mock.calls[0][0];
-      expect(payload.categoryId).toBe(2);
+      expect(payload.categoryId).toBe(testId(2));
       expect(payload.type).toBe("expense");
       expect(payload.amount).toBe("99.99");
       expect(payload.description).toBeUndefined();
@@ -485,8 +486,8 @@ describe("AddTransactionScreen", () => {
       });
 
       expect(mockAddTransaction.mock.calls[0][0]).toMatchObject({
-        categoryId: 2,
-        accountId: 10,
+        categoryId: testId(2),
+        accountId: testId(10),
       });
     });
 
@@ -779,8 +780,8 @@ describe("AddTransactionScreen", () => {
       (useExpense as ReturnType<typeof vi.fn>).mockReturnValue({
         categories: [
           {
-            id: 2,
-            userId: 1,
+            id: testId(2),
+            userId: testId(1),
             name: "Food",
             type: "expense" as const,
             color: "#DC2626",

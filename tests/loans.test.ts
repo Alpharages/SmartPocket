@@ -16,6 +16,8 @@ import {
   updateLoan,
 } from "../server/db";
 import type { Loan, Repayment } from "@/drizzle/schema";
+import type { Id } from "@/drizzle/schema";
+import { testId, syncColumns } from "./helpers/ids";
 
 const callDataApi = vi.fn();
 
@@ -25,7 +27,7 @@ vi.mock("../server/_core/dataApi", () => ({
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
-function createUserContext(userId: number): TrpcContext {
+function createUserContext(userId: Id): TrpcContext {
   const user: AuthenticatedUser = {
     id: userId,
     openId: `user-${userId}`,
@@ -53,8 +55,8 @@ function createUserContext(userId: number): TrpcContext {
 const now = new Date("2026-06-01T00:00:00.000Z");
 
 const sampleLoan: Loan = {
-  id: 1,
-  userId: 1,
+  id: testId(1),
+  userId: testId(1),
   direction: "lend",
   counterparty: "Alex",
   principal: "1000.00",
@@ -67,17 +69,19 @@ const sampleLoan: Loan = {
   note: null,
   createdAt: now,
   updatedAt: now,
+  ...syncColumns(),
 };
 
 const sampleRepayment: Repayment = {
-  id: 10,
-  loanId: 1,
-  userId: 1,
+  id: testId(10),
+  loanId: testId(1),
+  userId: testId(1),
   amount: "400.00",
   date: new Date("2026-06-10T00:00:00.000Z"),
   note: "First payment",
   createdAt: now,
   updatedAt: now,
+  ...syncColumns(),
 };
 
 describe("computeRemainingBalance", () => {
@@ -103,12 +107,13 @@ describe("loans db layer", () => {
   it("getUserLoans scopes by userId", async () => {
     callDataApi.mockResolvedValueOnce([sampleLoan]);
 
-    await expect(getUserLoans(5)).resolves.toEqual([sampleLoan]);
+    await expect(getUserLoans(testId(5))).resolves.toEqual([sampleLoan]);
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query: "SELECT * FROM loans WHERE userId = ? ORDER BY createdAt DESC",
-        params: [5],
+        query:
+          "SELECT * FROM loans WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
+        params: [testId(5)],
       },
     });
   });
@@ -116,10 +121,10 @@ describe("loans db layer", () => {
   it("createLoan inserts with parameterized SQL and returns the created row", async () => {
     callDataApi
       .mockResolvedValueOnce({ insertId: 42 })
-      .mockResolvedValueOnce([{ ...sampleLoan, id: 42 }]);
+      .mockResolvedValueOnce([{ ...sampleLoan, id: testId(42) }]);
 
     const created = await createLoan({
-      userId: 1,
+      userId: testId(1),
       direction: "lend",
       counterparty: "Alex",
       principal: "1000.00",
@@ -132,11 +137,11 @@ describe("loans db layer", () => {
       note: null,
     });
 
-    expect(created?.id).toBe(42);
+    expect(created?.id).toBe(testId(42));
     expect(callDataApi).toHaveBeenNthCalledWith(1, "Database/query", {
       body: {
         query: expect.stringContaining("INSERT INTO loans"),
-        params: expect.arrayContaining([1, "lend", "Alex", "1000.00"]),
+        params: expect.arrayContaining([testId(1), "lend", "Alex", "1000.00"]),
       },
     });
   });
@@ -144,12 +149,15 @@ describe("loans db layer", () => {
   it("getLoanById scopes by userId", async () => {
     callDataApi.mockResolvedValueOnce([sampleLoan]);
 
-    await expect(getLoanById(1, 1)).resolves.toEqual(sampleLoan);
+    await expect(getLoanById(testId(1), testId(1))).resolves.toEqual(
+      sampleLoan,
+    );
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query: "SELECT * FROM loans WHERE id = ? AND userId = ?",
-        params: [1, 1],
+        query:
+          "SELECT * FROM loans WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+        params: [testId(1), testId(1)],
       },
     });
   });
@@ -157,14 +165,14 @@ describe("loans db layer", () => {
   it("updateLoan scopes by userId", async () => {
     callDataApi.mockResolvedValueOnce(undefined);
 
-    await updateLoan(7, 3, { counterparty: "Sam" });
+    await updateLoan(testId(7), testId(3), { counterparty: "Sam" });
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query: expect.stringMatching(
-          /UPDATE loans SET counterparty = \? WHERE id = \? AND userId = \?/,
+          /UPDATE loans SET counterparty = \?, updatedAt = \?, dirty = 1 WHERE id = \? AND userId = \? AND deletedAt IS NULL/,
         ),
-        params: ["Sam", 7, 3],
+        params: ["Sam", expect.any(Date), testId(7), testId(3)],
       },
     });
   });
@@ -172,12 +180,14 @@ describe("loans db layer", () => {
   it("deleteLoan scopes by userId", async () => {
     callDataApi.mockResolvedValueOnce(undefined);
 
-    await deleteLoan(7, 3);
+    await deleteLoan(testId(7), testId(3));
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query: "DELETE FROM loans WHERE id = ? AND userId = ?",
-        params: [7, 3],
+        query: expect.stringContaining(
+          "UPDATE loans SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
+        ),
+        params: [expect.any(Date), expect.any(Date), testId(7), testId(3)],
       },
     });
   });
@@ -187,8 +197,8 @@ describe("loans db layer", () => {
 
     await expect(
       createRepayment({
-        loanId: 1,
-        userId: 2,
+        loanId: testId(1),
+        userId: testId(2),
         amount: "100.00",
         date: now,
         note: null,
@@ -205,8 +215,8 @@ describe("loans db layer", () => {
       .mockResolvedValueOnce([sampleRepayment]);
 
     const created = await createRepayment({
-      loanId: 1,
-      userId: 1,
+      loanId: testId(1),
+      userId: testId(1),
       amount: "400.00",
       date: sampleRepayment.date,
       note: "First payment",
@@ -216,7 +226,14 @@ describe("loans db layer", () => {
     expect(callDataApi).toHaveBeenNthCalledWith(2, "Database/query", {
       body: {
         query: expect.stringContaining("INSERT INTO repayments"),
-        params: [1, 1, "400.00", sampleRepayment.date, "First payment"],
+        params: [
+          expect.any(String),
+          testId(1),
+          testId(1),
+          "400.00",
+          sampleRepayment.date,
+          "First payment",
+        ],
       },
     });
   });
@@ -228,8 +245,8 @@ describe("loans db layer", () => {
 
     await expect(
       recordRepayment({
-        loanId: 1,
-        userId: 1,
+        loanId: testId(1),
+        userId: testId(1),
         amount: "200.00",
         date: now,
         note: null,
@@ -254,8 +271,8 @@ describe("loans db layer", () => {
       .mockResolvedValueOnce([{ amount: "200.00" }]);
 
     const result = await recordRepayment({
-      loanId: 1,
-      userId: 1,
+      loanId: testId(1),
+      userId: testId(1),
       amount: "200.00",
       date: now,
       note: null,
@@ -267,8 +284,8 @@ describe("loans db layer", () => {
         query: expect.stringMatching(/UPDATE loans SET nextDueDate = \?/),
         params: expect.arrayContaining([
           new Date("2026-08-01T00:00:00.000Z"),
-          1,
-          1,
+          testId(1),
+          testId(1),
         ]),
       },
     });
@@ -284,8 +301,8 @@ describe("loans db layer", () => {
       .mockResolvedValueOnce([{ amount: "1000.00" }]);
 
     const result = await recordRepayment({
-      loanId: 1,
-      userId: 1,
+      loanId: testId(1),
+      userId: testId(1),
       amount: "1000.00",
       date: now,
       note: null,
@@ -295,7 +312,7 @@ describe("loans db layer", () => {
     expect(callDataApi).toHaveBeenNthCalledWith(4, "Database/query", {
       body: {
         query: expect.stringMatching(/UPDATE loans SET/),
-        params: expect.arrayContaining(["settled", 1, 1]),
+        params: expect.arrayContaining(["settled", testId(1), testId(1)]),
       },
     });
   });
@@ -303,13 +320,15 @@ describe("loans db layer", () => {
   it("getRepaymentsByLoan scopes by loanId and userId", async () => {
     callDataApi.mockResolvedValueOnce([sampleRepayment]);
 
-    await expect(getRepaymentsByLoan(1, 1)).resolves.toEqual([sampleRepayment]);
+    await expect(getRepaymentsByLoan(testId(1), testId(1))).resolves.toEqual([
+      sampleRepayment,
+    ]);
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
-          "SELECT * FROM repayments WHERE loanId = ? AND userId = ? ORDER BY date DESC",
-        params: [1, 1],
+          "SELECT * FROM repayments WHERE loanId = ? AND userId = ? AND deletedAt IS NULL ORDER BY date DESC",
+        params: [testId(1), testId(1)],
       },
     });
   });
@@ -317,12 +336,14 @@ describe("loans db layer", () => {
   it("deleteRepayment scopes by userId", async () => {
     callDataApi.mockResolvedValueOnce(undefined);
 
-    await deleteRepayment(10, 1);
+    await deleteRepayment(testId(10), testId(1));
 
     expect(callDataApi).toHaveBeenCalledWith("Database/query", {
       body: {
-        query: "DELETE FROM repayments WHERE id = ? AND userId = ?",
-        params: [10, 1],
+        query: expect.stringContaining(
+          "UPDATE repayments SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
+        ),
+        params: [expect.any(Date), expect.any(Date), testId(10), testId(1)],
       },
     });
   });
@@ -331,7 +352,7 @@ describe("loans db layer", () => {
     const repaymentA = { ...sampleRepayment, amount: "400.00" };
     const repaymentB = {
       ...sampleRepayment,
-      id: 11,
+      id: testId(11),
       amount: "100.00",
     };
 
@@ -339,7 +360,7 @@ describe("loans db layer", () => {
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce([repaymentA, repaymentB]);
 
-    await expect(getLoanWithBalance(1, 1)).resolves.toEqual({
+    await expect(getLoanWithBalance(testId(1), testId(1))).resolves.toEqual({
       ...sampleLoan,
       remainingBalance: "500.00",
       repayments: [repaymentA, repaymentB],
@@ -358,7 +379,7 @@ describe("loans router", () => {
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce([sampleLoan]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     const created = await caller.loans.create({
       direction: "lend",
@@ -370,7 +391,7 @@ describe("loans router", () => {
       nextDueDate: sampleLoan.nextDueDate!,
     });
 
-    expect(created?.userId).toBe(1);
+    expect(created?.userId).toBe(testId(1));
     expect(created?.status).toBe("active");
 
     await expect(caller.loans.list()).resolves.toEqual([sampleLoan]);
@@ -379,22 +400,22 @@ describe("loans router", () => {
   it("user B cannot read or mutate user A loan", async () => {
     callDataApi.mockResolvedValueOnce([]).mockResolvedValueOnce(null);
 
-    const callerB = appRouter.createCaller(createUserContext(2));
+    const callerB = appRouter.createCaller(createUserContext(testId(2)));
 
     await expect(callerB.loans.list()).resolves.toEqual([]);
-    await expect(callerB.loans.getById({ id: 1 })).resolves.toBeNull();
+    await expect(callerB.loans.getById({ id: testId(1) })).resolves.toBeNull();
 
     callDataApi.mockResolvedValueOnce(undefined);
-    await callerB.loans.delete({ id: 1 });
+    await callerB.loans.delete({ id: testId(1) });
     expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
       body: expect.objectContaining({
-        params: [1, 2],
+        params: [expect.any(Date), expect.any(Date), testId(1), testId(2)],
       }),
     });
   });
 
   it("rejects invalid direction and non-positive principal", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(
       caller.loans.create({
@@ -415,7 +436,7 @@ describe("loans router", () => {
   });
 
   it("rejects invalid schedule without count or end date", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(
       caller.loans.create({
@@ -438,11 +459,11 @@ describe("loans router", () => {
   it("addRepayment returns null for a foreign loan", async () => {
     callDataApi.mockResolvedValueOnce([]);
 
-    const callerB = appRouter.createCaller(createUserContext(2));
+    const callerB = appRouter.createCaller(createUserContext(testId(2)));
 
     await expect(
       callerB.loans.addRepayment({
-        loanId: 1,
+        loanId: testId(1),
         amount: "50.00",
         date: now,
       }),
@@ -460,19 +481,21 @@ describe("loans router", () => {
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce([{ amount: "400.00" }]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(
       caller.loans.addRepayment({
-        loanId: 1,
+        loanId: testId(1),
         amount: "400.00",
         date: sampleRepayment.date,
         note: "First payment",
       }),
     ).resolves.toMatchObject({ amount: "400.00" });
 
-    await expect(caller.loans.getById({ id: 1 })).resolves.toMatchObject({
-      id: 1,
+    await expect(
+      caller.loans.getById({ id: testId(1) }),
+    ).resolves.toMatchObject({
+      id: testId(1),
       remainingBalance: "600.00",
     });
   });
@@ -482,11 +505,11 @@ describe("loans router", () => {
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce([{ amount: "950.00" }]);
 
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(
       caller.loans.recordRepayment({
-        loanId: 1,
+        loanId: testId(1),
         amount: "100.00",
         date: now,
       }),
@@ -497,11 +520,11 @@ describe("loans router", () => {
   });
 
   it("rejects non-positive repayment amounts", async () => {
-    const caller = appRouter.createCaller(createUserContext(1));
+    const caller = appRouter.createCaller(createUserContext(testId(1)));
 
     await expect(
       caller.loans.recordRepayment({
-        loanId: 1,
+        loanId: testId(1),
         amount: "0",
         date: now,
       }),
@@ -509,7 +532,7 @@ describe("loans router", () => {
 
     await expect(
       caller.loans.recordRepayment({
-        loanId: 1,
+        loanId: testId(1),
         amount: "1.234",
         date: now,
       }),
