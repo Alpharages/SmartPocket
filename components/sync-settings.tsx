@@ -2,11 +2,13 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Switch, Text, View } from "react-native";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useExpense } from "@/lib/expense-context";
 import { useColors } from "@/hooks/use-colors";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { useToast } from "@/components/ui/ToastProvider";
 import { createRemoteSyncClient } from "@/lib/sync/remote-client";
+import { runGuardedSync } from "@/lib/sync/auto-sync";
 import {
   isSyncEnabled,
   isSyncSupported,
@@ -15,7 +17,6 @@ import {
 import {
   resolveFirstSync,
   resolveStaleCursor,
-  runSync,
   type FirstSyncChoice,
   type SyncChoiceReason,
 } from "@/lib/sync/sync-worker";
@@ -108,6 +109,7 @@ export function SyncSettingsSection() {
   const { user, isAuthenticated } = useAuth();
   const colors = useColors();
   const toast = useToast();
+  const { refreshAll } = useExpense();
 
   const [enabled, setEnabled] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -121,25 +123,52 @@ export function SyncSettingsSection() {
     isSyncEnabled().then(setEnabled);
   }, []);
 
-  const performSync = useCallback(async () => {
-    if (!user) return;
-    setSyncing(true);
-    try {
-      const client = createRemoteSyncClient();
-      const outcome = await runSync(client, user.id);
-      if (outcome.status === "needs-first-sync-choice") {
-        setChoiceReason(outcome.reason);
-        return;
+  // `runGuardedSync` rather than `runSync` directly: the automatic trigger
+  // (components/sync-gate.tsx) can have a cycle in flight already, and two
+  // overlapping cycles would push the same rows twice and race on the pull
+  // cursor. `silent` is the on-mount check below, which must surface a
+  // pending choice without shouting about a failure nobody asked for.
+  const performSync = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      if (!user) return;
+      setSyncing(true);
+      try {
+        const outcome = await runGuardedSync(user.id);
+        if (!outcome) return;
+        if (outcome.status === "needs-first-sync-choice") {
+          setChoiceReason(outcome.reason);
+          return;
+        }
+        if (outcome.status === "synced") {
+          setLastSyncedAt(new Date());
+          // See components/sync-gate.tsx for why this is refreshAll rather
+          // than a cache invalidation.
+          if (outcome.pulled > 0) void refreshAll();
+        }
+      } catch {
+        if (options.silent) return;
+        toast.show({
+          type: "error",
+          message: "Sync failed. Tap Sync now to try again.",
+        });
+      } finally {
+        setSyncing(false);
       }
-      if (outcome.status === "synced") {
-        setLastSyncedAt(new Date());
-      }
-    } catch {
-      toast.show({ type: "error", message: "Sync failed. Will retry later." });
-    } finally {
-      setSyncing(false);
-    }
-  }, [user, toast]);
+    },
+    [user, toast, refreshAll],
+  );
+
+  // Opening Settings with sync already on runs a cycle. This is the only
+  // place the first-sync choice sheet can appear, and the automatic trigger
+  // deliberately does not prompt from the background — without this, a device
+  // whose first sync needs an answer would sit there never syncing and never
+  // saying why.
+  useEffect(() => {
+    if (!isSyncSupported() || !user) return;
+    isSyncEnabled().then((on) => {
+      if (on) void performSync({ silent: true });
+    });
+  }, [user, performSync]);
 
   const handleToggle = useCallback(
     async (value: boolean) => {
@@ -165,21 +194,22 @@ export function SyncSettingsSection() {
         } else {
           await resolveFirstSync(client, choice, user.id);
         }
-        const outcome = await runSync(client, user.id);
-        if (outcome.status === "synced") {
+        const outcome = await runGuardedSync(user.id);
+        if (outcome?.status === "synced") {
           setLastSyncedAt(new Date());
+          if (outcome.pulled > 0) void refreshAll();
           toast.show({ type: "success", message: "Sync complete" });
         }
       } catch {
         toast.show({
           type: "error",
-          message: "Sync failed. Will retry later.",
+          message: "Sync failed. Tap Sync now to try again.",
         });
       } finally {
         setSyncing(false);
       }
     },
-    [user, toast, choiceReason],
+    [user, toast, choiceReason, refreshAll],
   );
 
   if (!isSyncSupported()) return null;
@@ -232,7 +262,7 @@ export function SyncSettingsSection() {
           <Button
             variant="secondary"
             label="Sync now"
-            onPress={performSync}
+            onPress={() => performSync()}
             loading={syncing}
             disabled={syncing}
           />

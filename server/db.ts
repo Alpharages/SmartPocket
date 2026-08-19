@@ -76,6 +76,32 @@ export async function getUserByOpenId(openId: string) {
   return result && Array.isArray(result) ? result[0] : null;
 }
 
+/**
+ * Re-points the device's local user row at the signed-in account's id.
+ *
+ * local-first-sync-plan.md's "signing in later *associates* that local user
+ * with the account": `reownLocalData` rewrites every data row's `userId`
+ * from the synthetic local id to the account's, but the row in `users` that
+ * the in-process tRPC context resolves to (server/_core/local-context.ts)
+ * still carried the old id — so after a first sync the app looked up its own
+ * data under an id nothing owned any more and every screen went blank.
+ * Moving the identity keeps `getUserByOpenId(localOpenId)` returning the
+ * same row, now answering with the account's id, which is also the id every
+ * pulled row arrives owned by.
+ *
+ * Local (SQLite) only: the device's `users` table holds exactly one row —
+ * `users` is not in SYNC_TABLES, so nothing ever inserts a second one — and
+ * the server's own `users` table is never touched by this path.
+ */
+export async function reassignUserId(fromId: Id, toId: Id) {
+  await callDataApi("Database/query", {
+    body: {
+      query: "UPDATE users SET id = ? WHERE id = ?",
+      params: [toId, fromId],
+    },
+  });
+}
+
 export async function upsertUser(data: {
   openId: string;
   name?: string | null;
@@ -486,8 +512,25 @@ export type SafeCreditCard = Omit<CreditCard, "cardNumber"> & {
 };
 
 async function toSafeCreditCard(row: CreditCard): Promise<SafeCreditCard> {
-  const plain = row.cardNumber ? await decryptCardNumber(row.cardNumber) : "";
   const { cardNumber: _removed, ...rest } = row;
+  if (!row.cardNumber) return { ...rest, cardNumberLast4: "" };
+
+  let plain: string;
+  try {
+    plain = await decryptCardNumber(row.cardNumber, row.userId);
+  } catch (error) {
+    // A PAN this side holds no key for — a row encrypted under a key that
+    // never reached this device. The client only ever needs the last four,
+    // so the cost of that is those four digits on this one card. It used to
+    // be the whole screen: these rows are mapped with `Promise.all`, so one
+    // rejection took down the entire list and the Cards tab rendered "no
+    // cards added yet" over a database that had several.
+    console.error(
+      `[cards] could not decrypt card ${row.id}; showing it without its last four`,
+      error,
+    );
+    return { ...rest, cardNumberLast4: "" };
+  }
   return { ...rest, cardNumberLast4: maskCardNumber(plain) };
 }
 
@@ -525,7 +568,7 @@ export async function createCreditCard(
         id,
         data.userId,
         data.name,
-        await encryptCardNumber(data.cardNumber),
+        await encryptCardNumber(data.cardNumber, data.userId),
         data.cardholderName,
         data.expiryMonth,
         data.expiryYear,
@@ -550,7 +593,7 @@ export async function updateCreditCard(
 ): Promise<SafeCreditCard | null> {
   const payload: Partial<InsertCreditCard> = { ...data };
   if (payload.cardNumber !== undefined) {
-    payload.cardNumber = await encryptCardNumber(payload.cardNumber);
+    payload.cardNumber = await encryptCardNumber(payload.cardNumber, userId);
   }
 
   const { clause, values } = buildUpdate("creditCards", payload);

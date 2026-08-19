@@ -8,8 +8,12 @@ import {
   markRowsSynced,
   reownLocalData,
 } from "@/server/_core/sync-engine";
-import { getLocalUserId } from "@/server/_core/local-context";
+import {
+  adoptAccountIdentity,
+  getLocalUserId,
+} from "@/server/_core/local-context";
 import type { RemoteSyncClient } from "./remote-client";
+import { adoptAccountCardKeyForDevice } from "./card-key-sync";
 import {
   getLastPulledSeq,
   hasCompletedFirstSync,
@@ -68,6 +72,8 @@ async function reconcileFirstSync(
   }
   // Neither has data, or only the account does: nothing to reown; the
   // normal pull phase below brings the account's data down if any exists.
+  await adoptAccountIdentity(accountUserId);
+  await adoptAccountCardKeyForDevice(client, accountUserId);
   await markFirstSyncComplete();
   return "resolved";
 }
@@ -98,6 +104,12 @@ export async function resolveFirstSync(
     await reownLocalData(SYNC_TABLES, localUserId, accountUserId);
   }
 
+  // Every branch above, "keep-account" included, leaves this device reading
+  // and writing under the account's id from here on — and encrypting card
+  // numbers under the account's key rather than its own, so a card entered
+  // on this phone is readable on every other device on the account.
+  await adoptAccountIdentity(accountUserId);
+  await adoptAccountCardKeyForDevice(client, accountUserId);
   await markFirstSyncComplete();
 }
 
@@ -147,10 +159,19 @@ async function pushAll(
   return pushed;
 }
 
+/**
+ * The cursor advances to the server's head-of-sequence *as it was when this
+ * cycle started*, not to the highest seq the cycle happened to see. The
+ * tables are pulled one after another, so a row written to an
+ * already-pulled table while a later table is still being pulled carries a
+ * seq below the cycle's high-water mark — advancing to that mark would step
+ * straight over it and never fetch it again. Anything written during the
+ * cycle sorts above the head read up front, so the next cycle collects it.
+ */
 async function pullAll(client: RemoteSyncClient): Promise<number> {
   let pulled = 0;
-  let cursor = await getLastPulledSeq();
-  let maxSeenSeq = cursor;
+  const cursor = await getLastPulledSeq();
+  const headSeq = await client.sync.getHeadSeq.query();
 
   for (const table of SYNC_TABLES) {
     let sinceSeq = cursor;
@@ -162,7 +183,6 @@ async function pullAll(client: RemoteSyncClient): Promise<number> {
       for (const row of rows) {
         await applyIncomingRow(table, row);
         const seq = row.serverSeq as number;
-        if (seq > maxSeenSeq) maxSeenSeq = seq;
         if (seq > sinceSeq) sinceSeq = seq;
       }
       pulled += rows.length;
@@ -171,7 +191,10 @@ async function pullAll(client: RemoteSyncClient): Promise<number> {
     }
   }
 
-  await setLastPulledSeq(maxSeenSeq);
+  // Never move the cursor backwards: a head read that somehow lags the
+  // cursor (a restored server snapshot, say) must not re-open a window
+  // this device has already closed.
+  if (headSeq > cursor) await setLastPulledSeq(headSeq);
   return pulled;
 }
 
@@ -201,7 +224,15 @@ export async function runSync(
       client.sync.getPurgeWatermark.query(),
       getLastPulledSeq(),
     ]);
-    if (lastPulledSeq < purgedUpToSeq) {
+    // `lastPulledSeq > 0` is what makes this resolvable. Answering the
+    // stale-cursor prompt resets the cursor to 0 so the next pull re-fetches
+    // the account from scratch — but 0 is below every watermark, so without
+    // this guard the very next cycle re-detects "stale" and prompts again,
+    // forever. A device that hits a purge watermark could never sync again,
+    // and no amount of choosing an option got it out. A cursor of 0 is not a
+    // stale incremental cursor: it means a full resync is in progress, which
+    // cannot miss a purged deletion the way resuming from a stale point can.
+    if (lastPulledSeq > 0 && lastPulledSeq < purgedUpToSeq) {
       return { status: "needs-first-sync-choice", reason: "stale-cursor" };
     }
   }

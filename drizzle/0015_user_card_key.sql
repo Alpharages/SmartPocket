@@ -1,0 +1,12 @@
+-- Phase 4 (local-first sync plan), blocker 3: per-account card encryption key.
+--
+-- Card numbers were encrypted with a global `CARD_ENCRYPTION_KEY` env var on
+-- the server and a per-device random key on the phone. Neither survives sync:
+-- ciphertext pushed from a device is unreadable by the server, and a card
+-- added on phone A is undecryptable on phone B.
+--
+-- The fix is one key per account, minted lazily and handed to authenticated
+-- devices. No backfill is needed — the key is minted on first use, and
+-- `server/_core/crypto.ts` still falls back to the env key when decrypting
+-- rows written before this column existed.
+ALTER TABLE `users` ADD COLUMN `cardKey` varchar(64);

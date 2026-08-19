@@ -35,6 +35,16 @@ const appLock = vi.hoisted(() => ({
   clearAppLock: vi.fn(),
 }));
 
+// logout() also resets this device's sync state, which is expo-secure-store
+// backed for the same reason app-lock is — stub it alongside.
+vi.mock("@/lib/sync/sync-state", () => ({ resetSyncState: vi.fn() }));
+
+// The root layout mounts SyncGate, whose real import chain reaches
+// expo-secure-store (the device card key) and server/db.ts. This file is
+// about the auth bootstrap; SyncGate has its own coverage in
+// tests/components/sync-gate.test.tsx.
+vi.mock("@/components/sync-gate", () => ({ SyncGate: () => null }));
+
 const oauth = vi.hoisted(() => ({
   getApiBaseUrl: vi.fn(() => "http://localhost:3000"),
   SESSION_TOKEN_KEY: "app_session_token",

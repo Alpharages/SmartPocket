@@ -1,4 +1,8 @@
 import "@/global.css";
+// Before anything that could reach for randomness: Hermes has no Web Crypto,
+// and @noble needs `crypto.getRandomValues` for card IVs, the device card key
+// and the App Lock PIN salt. See lib/_core/crypto-polyfill.ts.
+import "@/lib/_core/crypto-polyfill";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, usePathname, type Href } from "expo-router";
@@ -31,6 +35,7 @@ import {
 } from "@/lib/_core/manus-runtime";
 import { ExpenseProvider } from "@/lib/expense-context";
 import { AuthGate } from "@/components/auth-gate";
+import { SyncGate } from "@/components/sync-gate";
 import { AppLockGate } from "@/components/app-lock-gate";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
@@ -362,6 +367,7 @@ export default function RootLayout() {
                   <SettingsProvider>
                     <ExpenseProvider>
                       <AuthGate />
+                      <SyncGate />
                       <AppLockGate>
                         <Stack screenOptions={{ headerShown: false }}>
                           <Stack.Screen name="(tabs)" />

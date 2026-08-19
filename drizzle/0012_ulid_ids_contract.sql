@@ -7,6 +7,14 @@
 -- no automatic rollback — restore from a backup taken before this file runs
 -- if something here needs to be undone.
 --
+-- NOTE: each `DROP PRIMARY KEY` below is preceded by a `MODIFY id int NOT
+-- NULL` that strips AUTO_INCREMENT from the column first. MySQL refuses to
+-- drop a primary key while an AUTO_INCREMENT column depends on it (error
+-- 1075, "there can be only one auto column and it must be defined as a
+-- key"), so without that line this migration fails on its very first
+-- statement against any database that actually has the int ids it exists to
+-- replace.
+--
 -- Each table follows the same four-step shape: drop the constraints tied to
 -- the int columns, drop the int columns, rename the "*_ulid" shadow columns
 -- into place, then re-add the primary key / NOT NULL / index. FKs are
@@ -17,12 +25,14 @@
 -- are still being tombstoned themselves.
 
 -- ---------------------------------------------------------------- users
+ALTER TABLE `users` MODIFY `id` int NOT NULL;
 ALTER TABLE `users` DROP PRIMARY KEY;
 ALTER TABLE `users` DROP COLUMN `id`;
 ALTER TABLE `users` CHANGE COLUMN `id_ulid` `id` varchar(26) NOT NULL;
 ALTER TABLE `users` ADD PRIMARY KEY (`id`);
 
 -- ------------------------------------------------------------ categories
+ALTER TABLE `categories` MODIFY `id` int NOT NULL;
 ALTER TABLE `categories` DROP PRIMARY KEY;
 ALTER TABLE `categories` DROP COLUMN `id`;
 ALTER TABLE `categories` DROP COLUMN `userId`;
@@ -32,6 +42,7 @@ ALTER TABLE `categories` ADD PRIMARY KEY (`id`);
 ALTER TABLE `categories` ADD INDEX `categories_userId_idx` (`userId`);
 
 -- ------------------------------------------------------------ creditCards
+ALTER TABLE `creditCards` MODIFY `id` int NOT NULL;
 ALTER TABLE `creditCards` DROP PRIMARY KEY;
 ALTER TABLE `creditCards` DROP COLUMN `id`;
 ALTER TABLE `creditCards` DROP COLUMN `userId`;
@@ -41,6 +52,7 @@ ALTER TABLE `creditCards` ADD PRIMARY KEY (`id`);
 ALTER TABLE `creditCards` ADD INDEX `creditCards_userId_idx` (`userId`);
 
 -- ---------------------------------------------------------------- accounts
+ALTER TABLE `accounts` MODIFY `id` int NOT NULL;
 ALTER TABLE `accounts` DROP PRIMARY KEY;
 ALTER TABLE `accounts` DROP COLUMN `id`;
 ALTER TABLE `accounts` DROP COLUMN `userId`;
@@ -50,6 +62,7 @@ ALTER TABLE `accounts` ADD PRIMARY KEY (`id`);
 ALTER TABLE `accounts` ADD INDEX `accounts_userId_idx` (`userId`);
 
 -- ------------------------------------------------------------------ loans
+ALTER TABLE `loans` MODIFY `id` int NOT NULL;
 ALTER TABLE `loans` DROP PRIMARY KEY;
 ALTER TABLE `loans` DROP COLUMN `id`;
 ALTER TABLE `loans` DROP COLUMN `userId`;
@@ -59,6 +72,7 @@ ALTER TABLE `loans` ADD PRIMARY KEY (`id`);
 ALTER TABLE `loans` ADD INDEX `loans_userId_idx` (`userId`);
 
 -- ----------------------------------------------------------- transactions
+ALTER TABLE `transactions` MODIFY `id` int NOT NULL;
 ALTER TABLE `transactions` DROP PRIMARY KEY;
 ALTER TABLE `transactions` DROP COLUMN `id`;
 ALTER TABLE `transactions` DROP COLUMN `userId`;
@@ -77,6 +91,7 @@ ALTER TABLE `transactions` ADD INDEX `transactions_creditCardId_idx` (`creditCar
 ALTER TABLE `transactions` ADD INDEX `transactions_accountId_idx` (`accountId`);
 
 -- --------------------------------------------------- recurringTransactions
+ALTER TABLE `recurringTransactions` MODIFY `id` int NOT NULL;
 ALTER TABLE `recurringTransactions` DROP PRIMARY KEY;
 ALTER TABLE `recurringTransactions` DROP COLUMN `id`;
 ALTER TABLE `recurringTransactions` DROP COLUMN `userId`;
@@ -90,6 +105,7 @@ ALTER TABLE `recurringTransactions` ADD PRIMARY KEY (`id`);
 ALTER TABLE `recurringTransactions` ADD INDEX `recurringTransactions_userId_idx` (`userId`);
 
 -- ----------------------------------------------------------------- budgets
+ALTER TABLE `budgets` MODIFY `id` int NOT NULL;
 ALTER TABLE `budgets` DROP PRIMARY KEY;
 ALTER TABLE `budgets` DROP COLUMN `id`;
 ALTER TABLE `budgets` DROP COLUMN `userId`;
@@ -101,6 +117,7 @@ ALTER TABLE `budgets` ADD PRIMARY KEY (`id`);
 ALTER TABLE `budgets` ADD INDEX `budgets_userId_idx` (`userId`);
 
 -- --------------------------------------------------------- monthlySummaries
+ALTER TABLE `monthlySummaries` MODIFY `id` int NOT NULL;
 ALTER TABLE `monthlySummaries` DROP PRIMARY KEY;
 ALTER TABLE `monthlySummaries` DROP COLUMN `id`;
 ALTER TABLE `monthlySummaries` DROP COLUMN `userId`;
@@ -110,6 +127,7 @@ ALTER TABLE `monthlySummaries` ADD PRIMARY KEY (`id`);
 ALTER TABLE `monthlySummaries` ADD INDEX `monthlySummaries_userId_idx` (`userId`);
 
 -- -------------------------------------------------------------- repayments
+ALTER TABLE `repayments` MODIFY `id` int NOT NULL;
 ALTER TABLE `repayments` DROP PRIMARY KEY;
 ALTER TABLE `repayments` DROP COLUMN `id`;
 ALTER TABLE `repayments` DROP COLUMN `loanId`;
@@ -122,6 +140,7 @@ ALTER TABLE `repayments` ADD INDEX `repayments_loanId_idx` (`loanId`);
 ALTER TABLE `repayments` ADD INDEX `repayments_userId_idx` (`userId`);
 
 -- --------------------------------------------------------------- transfers
+ALTER TABLE `transfers` MODIFY `id` int NOT NULL;
 ALTER TABLE `transfers` DROP PRIMARY KEY;
 ALTER TABLE `transfers` DROP COLUMN `id`;
 ALTER TABLE `transfers` DROP COLUMN `userId`;

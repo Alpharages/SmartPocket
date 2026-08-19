@@ -2,6 +2,7 @@ import * as Api from "@/lib/_core/api";
 import * as Auth from "@/lib/_core/auth";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
+import { isUlid } from "@shared/ulid";
 
 type UseAuthOptions = {
   autoFetch?: boolean;
@@ -61,9 +62,21 @@ export function useAuth(options?: UseAuthOptions) {
       // Ask the API who this token belongs to and cache the answer, so the fix
       // covers every token writer instead of each one remembering to cache.
       const cachedUser = await Auth.getUserInfo();
-      if (cachedUser) {
+      // A cached identity is only trustworthy if its id still looks like one
+      // this build issues. Installs that predate the ULID migration cached a
+      // user whose `id` was the old integer autoincrement value, and this
+      // fast path returns before any network call — so that stale id would be
+      // trusted forever. It is not a cosmetic staleness: `runSync` re-owns
+      // every local row to `user.id`, so a cached `1` silently re-owns the
+      // whole database to an account that does not exist, hiding it from the
+      // app and from sync. Falling through re-fetches and re-caches the real
+      // one, so the install heals itself on the next launch.
+      if (cachedUser && isUlid(String(cachedUser.id))) {
         setUser(cachedUser);
         return;
+      }
+      if (cachedUser) {
+        await Auth.clearUserInfo();
       }
 
       const apiUser = await Api.getMe();
@@ -119,6 +132,18 @@ export function useAuth(options?: UseAuthOptions) {
       // (components/app-lock-gate.tsx's handleForgotPin) clears it
       // explicitly instead, since that path — and only that path — is
       // defined by the user not knowing the PIN.
+      // Drop this device's sync state too, without touching a single local
+      // row. Leaving `firstSyncDone`/`lastPulledSeq` behind meant signing
+      // into a *different* account skipped the first-sync prompt entirely
+      // and left the device reading under the previous account's id — the
+      // one case where "sign out keeps your data" quietly stopped being
+      // true. Clearing it makes the next sign-in re-run the association.
+      // Imported lazily: this hook is pulled in by the root layout and by
+      // most screens, and a static import would drag expo-secure-store (and
+      // all of expo-modules-core behind it) into every one of them — and
+      // into every test that renders one.
+      const { resetSyncState } = await import("@/lib/sync/sync-state");
+      await resetSyncState();
       setUser(null);
       setError(null);
     }

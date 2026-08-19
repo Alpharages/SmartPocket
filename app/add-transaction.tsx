@@ -171,7 +171,10 @@ export default function AddTransactionScreen() {
       savingRef.current = false;
       setSaving(false);
     }
-    toast.show({ type: "success", message: "Transaction saved" });
+    // No success toast here: expense-context's addTransaction already shows
+    // one ("Transaction added") on the same path it shows the error toast
+    // this screen defers to above. Both firing stacked two confirmations for
+    // one save.
     close();
   };
 

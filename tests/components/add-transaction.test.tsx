@@ -435,11 +435,13 @@ describe("AddTransactionScreen", () => {
       expect(payload.date).toBeInstanceOf(Date);
 
       // AC5 (Story 12.9): a successful save fires the celebration toast
-      // exactly once, before the Sheet starts closing.
-      expect(mockToastShow).toHaveBeenCalledOnce();
-      expect(mockToastShow).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "success" }),
-      );
+      // exactly once. That toast now comes from expense-context's
+      // addTransaction — the single place every entry point routes through,
+      // and already the owner of the *error* toast this screen defers to.
+      // `addTransaction` is mocked here, so "exactly once" reads as "this
+      // screen adds none of its own": it used to show a second one, which
+      // stacked two success toasts on top of each other on a real device.
+      expect(mockToastShow).not.toHaveBeenCalled();
 
       // close() hides the Sheet (setVisible(false)); the route waits for the
       // Sheet's own close animation (Motion.sheet.durationMs) before popping
@@ -630,13 +632,17 @@ describe("AddTransactionScreen", () => {
         ).length,
       ).toBe(0);
 
+      // The earlier save attempt (no category) already fired an error toast;
+      // only what the *successful* save adds is under test here.
+      const toastsBeforeSave = mockToastShow.mock.calls.length;
       await act(async () => {
         saveBtn!.props.onPress();
       });
       expect(mockAddTransaction).toHaveBeenCalledOnce();
-      expect(mockToastShow).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "success" }),
-      );
+      // The successful save raises no toast from this screen at all: the
+      // success toast belongs to expense-context's addTransaction (mocked
+      // here). See the note in the AC5 test above.
+      expect(mockToastShow.mock.calls.length).toBe(toastsBeforeSave);
     });
 
     it("AC4: the category error is announced via accessibilityLiveRegion=polite", async () => {

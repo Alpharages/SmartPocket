@@ -45,6 +45,63 @@ function Capture({ sink }: { sink: (a: ReturnType<typeof useAuth>) => void }) {
   return null;
 }
 
+// Device-local sync state, cleared by logout(). Stubbed rather than left
+// real so this file keeps its deliberate "no expo-secure-store" property —
+// see the app-lock note below, which depends on the real module throwing.
+const syncState = vi.hoisted(() => ({ resetSyncState: vi.fn() }));
+vi.mock("@/lib/sync/sync-state", () => syncState);
+
+/**
+ * Installs that predate the ULID migration cached a user whose `id` was the
+ * old integer autoincrement value. The native fast path returns that cached
+ * identity before any network call, so nothing would ever correct it — and
+ * `runSync` re-owns every local row to `user.id`, so a stale `1` re-owns the
+ * whole database to an account that does not exist. Caught on a real device.
+ */
+describe("useAuth cached identity", () => {
+  it("rejects a cached user whose id predates ULIDs, and re-fetches", async () => {
+    auth.getSessionToken.mockResolvedValue("token");
+    auth.getUserInfo.mockResolvedValue({ id: 1, openId: "x", name: "Old" });
+    api.getMe.mockResolvedValue({
+      id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      openId: "x",
+      name: "Fresh",
+      email: null,
+      loginMethod: "dev",
+      lastSignedIn: new Date().toISOString(),
+    });
+
+    let hook!: ReturnType<typeof useAuth>;
+    render(React.createElement(Capture, { sink: (a) => (hook = a) }));
+    await act(async () => {
+      await hook.refresh();
+    });
+
+    expect(auth.clearUserInfo).toHaveBeenCalled();
+    expect(api.getMe).toHaveBeenCalled();
+    expect(hook.user?.id).toBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+  });
+
+  it("keeps a cached user whose id is a ULID, without a network call", async () => {
+    auth.getSessionToken.mockResolvedValue("token");
+    auth.getUserInfo.mockResolvedValue({
+      id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      openId: "x",
+      name: "Cached",
+    });
+    api.getMe.mockClear();
+
+    let hook!: ReturnType<typeof useAuth>;
+    render(React.createElement(Capture, { sink: (a) => (hook = a) }));
+    await act(async () => {
+      await hook.refresh();
+    });
+
+    expect(api.getMe).not.toHaveBeenCalled();
+    expect(hook.user?.name).toBe("Cached");
+  });
+});
+
 describe("useAuth logout", () => {
   // Local-first-sync-plan.md: the PIN belongs to the device and its local
   // user, not to the account — there is always a local user to own it, so an
@@ -63,6 +120,22 @@ describe("useAuth logout", () => {
 
     expect(auth.removeSessionToken).toHaveBeenCalledTimes(1);
     expect(auth.clearUserInfo).toHaveBeenCalledTimes(1);
+  });
+
+  // Signing out must stop sync without deleting a single local row. Leaving
+  // this device's sync state behind meant a later sign-in with a *different*
+  // account skipped the first-sync prompt and kept reading under the
+  // previous account's id.
+  it("resets this device's sync state so the next sign-in re-runs first sync", async () => {
+    syncState.resetSyncState.mockClear();
+    let hook!: ReturnType<typeof useAuth>;
+    render(React.createElement(Capture, { sink: (a) => (hook = a) }));
+
+    await act(async () => {
+      await hook.logout();
+    });
+
+    expect(syncState.resetSyncState).toHaveBeenCalledTimes(1);
   });
 
   it("still clears the session even when the logout API call fails", async () => {

@@ -26,6 +26,55 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
     );
   });
 
+  /**
+   * The web client writes straight to MySQL and never pushes, so its edits
+   * carry whatever `serverSeq` the row already had — behind every device's
+   * cursor. Caught on real devices: a transaction deleted from the web stayed
+   * alive on the phone forever, because a pull is `serverSeq > cursor`.
+   */
+  it("sequenceServerWrites gives server-authored rows a fresh seq and clears dirty", async () => {
+    const rowId = testId(5);
+    const queries: string[] = [];
+    callDataApi.mockImplementation(
+      async (_id: string, options?: { body?: Record<string, unknown> }) => {
+        const sql = String(options?.body?.query ?? "");
+        queries.push(sql);
+        if (sql.startsWith("SELECT id FROM transactions")) return [{ id: rowId }];
+        if (sql.startsWith("SELECT id FROM")) return [];
+        if (sql.includes("INSERT INTO syncSequence")) {
+          return { insertId: 90, affectedRows: 1 };
+        }
+        return { insertId: null, affectedRows: 1 };
+      },
+    );
+
+    const { sequenceServerWrites } = await import(
+      "@/server/_core/sync-engine"
+    );
+    const sequenced = await sequenceServerWrites(SYNC_TABLES, testId(1));
+
+    expect(sequenced).toBe(1);
+    const update = queries.find((q) => q.includes("SET serverSeq = ?"));
+    expect(update).toContain("dirty = 0");
+    // Only rows this side wrote are candidates — a row a device pushed is
+    // already clean and must not be re-sequenced into a pull loop.
+    expect(queries.some((q) => q.includes("dirty = 1"))).toBe(true);
+  });
+
+  it("sequenceServerWrites allocates nothing when the server has no local writes", async () => {
+    callDataApi.mockResolvedValue([]);
+    const { sequenceServerWrites } = await import(
+      "@/server/_core/sync-engine"
+    );
+
+    expect(await sequenceServerWrites(SYNC_TABLES, testId(1))).toBe(0);
+    expect(
+      callDataApi.mock.calls.some(([, o]) =>
+        String((o as never as { body?: { query?: string } })?.body?.query ?? "").includes("INSERT INTO syncSequence"),
+      ),
+    ).toBe(false);
+  });
+
   it("allocateServerSeqBlock is a no-op for zero rows", async () => {
     const { allocateServerSeqBlock } =
       await import("@/server/_core/sync-engine");
@@ -315,6 +364,32 @@ describe("sync-engine against real SQLite (the device-side operations)", () => {
 
     await db.deleteCategory(catId, userId);
     expect(await accountHasAnyData(SYNC_TABLES, userId)).toBe(false);
+  });
+
+  // A brand-new user is seeded with default categories and a "Cash" account
+  // before they have entered anything. Counting those as data made every
+  // fresh phone report a conflict against every account, putting the
+  // first-sync prompt — and its destructive "keep this phone's data" option
+  // — in front of a user with nothing to choose between.
+  it("accountHasAnyData ignores the rows a new user is auto-seeded with", async () => {
+    const db = await import("@/server/db");
+    const { accountHasAnyData } = await import("@/server/_core/sync-engine");
+    const { ensureUserSeeded } = await import("@/server/_core/user-seeding");
+    const userId = testId(1);
+
+    await ensureUserSeeded(userId);
+    expect((await db.getUserCategories(userId)).length).toBeGreaterThan(0);
+    expect(await accountHasAnyData(SYNC_TABLES, userId)).toBe(false);
+
+    await db.createCategory({
+      userId,
+      name: "Something the user actually made",
+      type: "expense",
+      color: "#111111",
+      icon: "cart",
+      isDefault: false,
+    });
+    expect(await accountHasAnyData(SYNC_TABLES, userId)).toBe(true);
   });
 
   it("markAllDirty flags every one of this user's rows across every synced table, regardless of current state", async () => {

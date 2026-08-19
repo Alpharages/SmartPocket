@@ -11,6 +11,7 @@ export type MigrationSummary = {
 
 type CreditCardRow = {
   id: Id;
+  userId: Id;
   cardNumber: string;
 };
 
@@ -18,17 +19,16 @@ export function formatMigrationSummary(summary: MigrationSummary): string {
   return `Card encryption migration: total=${summary.total} encrypted=${summary.encrypted} skipped=${summary.skipped} failed=${summary.failed}`;
 }
 
-/** Validates the encryption key before any database access or mutation. */
-export async function assertEncryptionKeyReady(): Promise<void> {
-  await encryptCardNumber("__migration_key_probe__");
-}
-
 export async function migrateEncryptCardNumbers(): Promise<MigrationSummary> {
-  await assertEncryptionKeyReady();
-
+  // There used to be an `assertEncryptionKeyReady()` probe here, encrypting a
+  // dummy value up front so a misconfigured global CARD_ENCRYPTION_KEY failed
+  // before the migration touched anything. That global precondition no longer
+  // exists: keys are per-account and minted on demand
+  // (server/_core/card-key.ts), so there is nothing to validate ahead of time
+  // and a per-row failure is already counted in `summary.failed`.
   const result = await callDataApi("Database/query", {
     body: {
-      query: "SELECT id, cardNumber FROM creditCards",
+      query: "SELECT id, userId, cardNumber FROM creditCards",
       params: [],
     },
   });
@@ -48,7 +48,7 @@ export async function migrateEncryptCardNumbers(): Promise<MigrationSummary> {
     }
 
     try {
-      const encrypted = await encryptCardNumber(row.cardNumber);
+      const encrypted = await encryptCardNumber(row.cardNumber, row.userId);
       await callDataApi("Database/query", {
         body: {
           query: "UPDATE creditCards SET cardNumber = ? WHERE id = ?",

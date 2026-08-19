@@ -1,10 +1,18 @@
-import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "../../shared/const.js";
+import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "@shared/const";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
+  // local-first-sync-plan.md phase 3 runs this exact router *inside the app*
+  // via lib/trpc.native.ts's in-process link. tRPC's own server check
+  // (`isServerDefault`) is `typeof window === "undefined"`, and React Native
+  // defines `window` — so without this flag every screen that touches the
+  // router throws "You're trying to use @trpc/server in a non-server
+  // environment" on device. Invisible to the test suite, which sets
+  // VITEST_WORKER_ID and therefore passes tRPC's check for free.
+  allowOutsideOfServer: true,
 });
 
 export const router = t.router;

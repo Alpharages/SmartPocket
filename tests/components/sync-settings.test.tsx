@@ -51,6 +51,11 @@ const remoteClient = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/sync/remote-client", () => remoteClient);
 
+const expense = vi.hoisted(() => ({
+  useExpense: vi.fn(() => ({ refreshAll: vi.fn(async () => {}) })),
+}));
+vi.mock("@/lib/expense-context", () => expense);
+
 const syncWorker = vi.hoisted(() => ({
   runSync: vi.fn(),
   resolveFirstSync: vi.fn(),
@@ -60,6 +65,7 @@ vi.mock("@/lib/sync/sync-worker", () => syncWorker);
 
 let renderer: TestRenderer.ReactTestRenderer | null = null;
 
+// The section refreshes the expense context after a pull.
 function render(): ReactTestInstance {
   act(() => {
     renderer = TestRenderer.create(React.createElement(SyncSettingsSection));

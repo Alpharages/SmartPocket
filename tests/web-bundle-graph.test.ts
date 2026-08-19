@@ -133,8 +133,14 @@ describe("web bundle import graph", () => {
     }
   });
 
-  it("components/sync-settings.web.tsx (the actual web-resolved file) has no value imports at all", () => {
-    const webStub = path.join(ROOT, "components/sync-settings.web.tsx");
+  // Both stubs, not just the Settings one: sync-gate.tsx is mounted from
+  // app/_layout.tsx, so a value import leaking out of it would pull the DB
+  // driver into every web page rather than just the Settings route.
+  it.each([
+    "components/sync-settings.web.tsx",
+    "components/sync-gate.web.tsx",
+  ])("%s (the actual web-resolved file) has no value imports at all", (stub) => {
+    const webStub = path.join(ROOT, stub);
     expect(fs.existsSync(webStub)).toBe(true);
     expect(extractImportSpecifiers(webStub).filter((i) => !i.typeOnly)).toEqual(
       [],

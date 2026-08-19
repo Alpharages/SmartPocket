@@ -1,6 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { testId, syncColumns } from "./helpers/ids";
 
+// The card key is per-account now and read off the user row. These tests
+// mock `callDataApi` wholesale for their own purposes, so the key lookup is
+// stubbed rather than fed through that mock — key provisioning has its own
+// coverage in tests/card-crypto.test.ts.
+const TEST_USER_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+const TEST_CARD_KEY = new Uint8Array(32).fill(7);
+vi.mock("@/server/_core/card-key", () => ({
+  getOrCreateAccountCardKey: vi.fn(async () => TEST_CARD_KEY),
+  getAccountCardKeyBase64: vi.fn(async () => "unused"),
+}));
+
 const TEST_KEY_HEX =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -79,7 +90,7 @@ describe("credit card db encryption", () => {
 
   it("decrypts cardNumber on getCreditCardById then masks the response", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const ciphertext = await encryptCardNumber("4111111111111111");
+    const ciphertext = await encryptCardNumber("4111111111111111", TEST_USER_ID);
 
     callDataApi.mockResolvedValue([
       {
@@ -104,7 +115,7 @@ describe("credit card db encryption", () => {
 
   it("decrypts cardNumber on getUserCreditCards then masks each row", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const ciphertext = await encryptCardNumber("4111111111111111");
+    const ciphertext = await encryptCardNumber("4111111111111111", TEST_USER_ID);
 
     callDataApi.mockResolvedValue([
       {

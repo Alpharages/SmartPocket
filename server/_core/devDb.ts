@@ -1,5 +1,4 @@
 import { DEFAULT_CATEGORY_ICON } from "../../shared/theme";
-import { encryptCardNumber } from "./crypto";
 import { ulid } from "../../shared/ulid";
 import type { Id } from "../../drizzle/schema";
 
@@ -164,7 +163,13 @@ function seedOnce() {
   insertRow("creditCards", {
     userId: devUserId,
     name: "Everyday Visa",
-    cardNumber: encryptCardNumber("4111111111111234"),
+    // Plaintext on purpose. `decryptCardNumber` passes anything without the
+    // "v1:" prefix straight through (legacy pre-encryption rows), so the dev
+    // seed does not need a key at all — and cannot get one, since the
+    // per-account key is read through `callDataApi`, which is what this
+    // module *is*. It was also being called without `await`, so the seeded
+    // value was a Promise rather than a card number.
+    cardNumber: "4111111111111234",
     cardholderName: "Dev User",
     expiryMonth: 8,
     expiryYear: 2028,

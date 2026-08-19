@@ -12,8 +12,17 @@ const syncEngine = vi.hoisted(() => ({
 }));
 vi.mock("@/server/_core/sync-engine", () => syncEngine);
 
+// The card-key adoption pass is expo-secure-store backed and has its own
+// coverage (tests/card-key-sync.test.ts); here it is just another thing first
+// sync does exactly once.
+const cardKeySync = vi.hoisted(() => ({
+  adoptAccountCardKeyForDevice: vi.fn(async () => null),
+}));
+vi.mock("@/lib/sync/card-key-sync", () => cardKeySync);
+
 const localContext = vi.hoisted(() => ({
   getLocalUserId: vi.fn(),
+  adoptAccountIdentity: vi.fn(),
 }));
 vi.mock("@/server/_core/local-context", () => localContext);
 
@@ -33,6 +42,7 @@ function fakeClient() {
       pull: { query: vi.fn().mockResolvedValue([]) },
       accountHasData: { query: vi.fn().mockResolvedValue(false) },
       getPurgeWatermark: { query: vi.fn().mockResolvedValue(0) },
+      getHeadSeq: { query: vi.fn().mockResolvedValue(0) },
     },
     data: {
       clearAll: { mutate: vi.fn().mockResolvedValue(undefined) },
@@ -82,6 +92,7 @@ describe("runSync", () => {
       async ({ table }: { table: string }) =>
         table === "categories" ? [pulledRow] : [],
     );
+    client.sync.getHeadSeq.query.mockResolvedValue(7);
 
     const outcome = await runSync(client as never, accountUserId);
 
@@ -98,6 +109,39 @@ describe("runSync", () => {
       pulledRow,
     );
     expect(syncState.setLastPulledSeq).toHaveBeenCalledWith(7);
+  });
+
+  // The cursor tracks the server's head-of-sequence as of the *start* of the
+  // cycle, not the highest seq the cycle happened to see. Tables are pulled
+  // one after another, so a row written to an already-pulled table while a
+  // later table is still being pulled carries a seq below the cycle's
+  // high-water mark — advancing to that mark would step over it forever.
+  it("does not advance the cursor past rows written mid-cycle to an already-pulled table", async () => {
+    const { runSync } = await import("@/lib/sync/sync-worker");
+    const client = fakeClient();
+
+    // The head as this cycle begins. The row at seq 40 below lands *after*
+    // this point, in a table the cycle has already walked past.
+    client.sync.getHeadSeq.query.mockResolvedValue(10);
+    client.sync.pull.query.mockImplementation(
+      async ({ table, sinceSeq }: { table: string; sinceSeq: number }) => {
+        if (table === "categories" && sinceSeq < 10) {
+          return [{ id: testId(20), serverSeq: 10 }];
+        }
+        // A far-later table in SYNC_TABLES order returns a much higher seq.
+        if (table === "transactions" && sinceSeq < 40) {
+          return [{ id: testId(21), serverSeq: 40 }];
+        }
+        return [];
+      },
+    );
+
+    await runSync(client as never, accountUserId);
+
+    // 40 was seen, but only 10 is safe to claim: anything the account wrote
+    // to `categories` between seq 11 and 40 has not been pulled.
+    expect(syncState.setLastPulledSeq).toHaveBeenCalledWith(10);
+    expect(syncState.setLastPulledSeq).not.toHaveBeenCalledWith(40);
   });
 
   it("reports needs-first-sync-choice when both the phone and the account already hold data", async () => {
@@ -171,6 +215,21 @@ describe("runSync", () => {
 
     expect(outcome).toEqual({ status: "synced", pushed: 200, pulled: 0 });
     expect(client.sync.push.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  // Answering the stale-cursor prompt resets the cursor to 0. That is below
+  // every watermark, so re-checking naively re-prompts on the very next
+  // cycle — a device that hit a purge watermark could never sync again, and
+  // choosing an option never got it out. Caught on a real device.
+  it("does not re-prompt stale-cursor once the cursor has been reset for a full resync", async () => {
+    syncState.getLastPulledSeq.mockResolvedValue(0);
+    const { runSync } = await import("@/lib/sync/sync-worker");
+    const client = fakeClient();
+    client.sync.getPurgeWatermark.query.mockResolvedValue(500);
+
+    const outcome = await runSync(client as never, accountUserId);
+
+    expect(outcome.status).toBe("synced");
   });
 
   it("reports needs-first-sync-choice with reason stale-cursor when the pull cursor is behind the purge watermark", async () => {

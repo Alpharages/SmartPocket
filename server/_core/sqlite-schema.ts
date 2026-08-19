@@ -242,6 +242,18 @@ export const SQLITE_MIGRATIONS: readonly string[] = [
     CREATE INDEX IF NOT EXISTS repayments_loanId_idx ON repayments (loanId);
     CREATE INDEX IF NOT EXISTS repayments_userId_idx ON repayments (userId);
   `,
+  // Migration 2 — mirrors drizzle/0015_user_card_key.sql. Appended as its own
+  // entry rather than edited into migration 0: the runner only applies scripts
+  // at or above the database's current `user_version`, so a device that has
+  // already installed migration 0 would never see a column added to it.
+  //
+  // The device does not read this column — `crypto.native.ts` holds the
+  // account's card key in expo-secure-store (the OS keychain), not in the
+  // database. It exists so a row read locally has the same shape as the same
+  // row read on the server.
+  `
+    ALTER TABLE users ADD COLUMN cardKey TEXT;
+  `,
 ];
 
 /**

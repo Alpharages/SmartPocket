@@ -116,6 +116,123 @@ export async function applyPushedRows(
   return results;
 }
 
+/**
+ * Server-only: gives a `serverSeq` to every row that was written *on the
+ * server* since the last pull, so devices can see it.
+ *
+ * The web client is a first-class client that writes straight to MySQL
+ * through `server/db.ts` — it has no local SQLite and no push step. Those
+ * writes stamp `dirty = 1` (see TOUCH_SET / TOMBSTONE_SET) but leave
+ * `serverSeq` on whatever value it already had, and a pull is
+ * `WHERE serverSeq > cursor`. So an edit or a delete made on the web was
+ * invisible to every phone on the account, permanently: the row's seq was
+ * already behind every device's cursor. A deletion is the worst case — the
+ * row simply stays alive on every device forever.
+ *
+ * `dirty = 1` is exactly the right marker here. On a device it means "not yet
+ * pushed", but on the server nothing pushes *from* here, so the only thing
+ * that sets it is a local write — and `applyPushedRows` clears it on
+ * everything arriving from a device. Sequencing those rows and clearing the
+ * flag turns a server-side write into an ordinary pullable change.
+ */
+export async function sequenceServerWrites(
+  tables: readonly SyncTable[],
+  userId: Id,
+): Promise<number> {
+  let sequenced = 0;
+
+  for (const table of tables) {
+    const rows = (await callDataApi("Database/query", {
+      body: {
+        query: `SELECT id FROM ${table} WHERE userId = ? AND dirty = 1 ORDER BY updatedAt ASC`,
+        params: [userId],
+      },
+    })) as Array<{ id: Id }>;
+
+    if (rows.length === 0) continue;
+
+    const firstSeq = await allocateServerSeqBlock(rows.length);
+    for (let i = 0; i < rows.length; i++) {
+      await callDataApi("Database/query", {
+        body: {
+          query: `UPDATE ${table} SET serverSeq = ?, dirty = 0 WHERE id = ?`,
+          params: [firstSeq + i, rows[i].id],
+        },
+      });
+    }
+    sequenced += rows.length;
+  }
+
+  return sequenced;
+}
+
+/**
+ * Server-only: the highest `serverSeq` handed out so far, across every table.
+ *
+ * A pull cycle reads this *before* it starts and uses it as the cursor it
+ * advances to afterwards. Advancing to the highest seq actually *seen* is
+ * what the naive version did, and it silently drops rows: the tables are
+ * pulled one after another, so a row written to an already-pulled table
+ * while a later table is still being pulled gets a seq below the
+ * cycle's high-water mark and is never fetched again. Reading the head up
+ * front means anything written during the cycle sorts above the cursor and
+ * is picked up by the next one.
+ */
+export async function getHeadSeq(): Promise<number> {
+  const rows = (await callDataApi("Database/query", {
+    body: { query: "SELECT MAX(seq) AS head FROM syncSequence", params: [] },
+  })) as Array<{ head: number | null }>;
+  return rows[0]?.head ?? 0;
+}
+
+/**
+ * Server-only: gives every row that has never been assigned a `serverSeq` one.
+ *
+ * A pull is `WHERE serverSeq > ?`, and in SQL `NULL > 0` is not true — so a
+ * row with no seq is invisible to every pull, on every device, forever. Rows
+ * only get a seq by being *pushed* (`applyPushedRows`), which means every row
+ * that already existed server-side before sync shipped — everything an
+ * existing user has ever entered — is unreachable until it is given one.
+ *
+ * Runs as part of the phase 1 migration (server/migrate-phase1.ts). Seqs come
+ * from the same `syncSequence` allocator every push uses, so the backfilled
+ * rows sort before anything written afterwards and a device pulls them
+ * exactly once, in one pass, like any other batch.
+ */
+export async function backfillServerSeq(
+  tables: readonly SyncTable[],
+): Promise<Record<string, number>> {
+  const assigned: Record<string, number> = {};
+
+  for (const table of tables) {
+    const rows = (await callDataApi("Database/query", {
+      body: {
+        query: `SELECT id FROM ${table} WHERE serverSeq IS NULL ORDER BY id ASC`,
+        params: [],
+      },
+    })) as Array<{ id: Id }>;
+
+    if (rows.length === 0) continue;
+
+    const firstSeq = await allocateServerSeqBlock(rows.length);
+    for (let i = 0; i < rows.length; i++) {
+      await callDataApi("Database/query", {
+        body: {
+          // `dirty` is a client-side concept — a row sitting on the server is
+          // by definition not pending upload. These rows carry the column
+          // default (1) simply because nothing ever wrote them through the
+          // sync path.
+          query: `UPDATE ${table} SET serverSeq = ?, dirty = 0 WHERE id = ?`,
+          params: [firstSeq + i, rows[i].id],
+        },
+      });
+    }
+    assigned[table] = rows.length;
+  }
+
+  return assigned;
+}
+
 /** Server-only: rows this user's account has above `sinceSeq`, oldest first. */
 export async function getRowsSince(
   table: SyncTable,
@@ -265,15 +382,33 @@ export async function discardLocalData(
   }
 }
 
+/**
+ * Rows the app creates for a user without being asked — `ensureUserSeeded`
+ * gives every new user a set of default categories and a "Cash" account,
+ * both flagged `isDefault`. They are not data the user has *entered*, so
+ * they must not count as "this side already holds data": counting them made
+ * a brand-new phone report a conflict against every account, pushing the
+ * first-sync prompt (and its destructive "keep this phone's data" option) in
+ * front of a user who had nothing to lose or choose between. Symmetric —
+ * an account holding only its own seeded defaults is just as empty.
+ */
+const SEEDED_DEFAULT_TABLES: ReadonlySet<string> = new Set([
+  "categories",
+  "accounts",
+]);
+
 /** True if this user's account already holds any synced row, anywhere. */
 export async function accountHasAnyData(
   tables: readonly SyncTable[],
   userId: Id,
 ): Promise<boolean> {
   for (const table of tables) {
+    const ignoreSeeded = SEEDED_DEFAULT_TABLES.has(table)
+      ? " AND isDefault = 0"
+      : "";
     const result = await callDataApi("Database/query", {
       body: {
-        query: `SELECT id FROM ${table} WHERE userId = ? AND deletedAt IS NULL LIMIT 1`,
+        query: `SELECT id FROM ${table} WHERE userId = ? AND deletedAt IS NULL${ignoreSeeded} LIMIT 1`,
         params: [userId],
       },
     });

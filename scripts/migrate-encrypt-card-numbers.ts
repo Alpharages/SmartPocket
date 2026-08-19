@@ -11,6 +11,9 @@ async function main(): Promise<void> {
     if (summary.failed > 0) {
       process.exit(1);
     }
+    // See the note in migrate-ulid-ids.ts: dataApi.ts's mysql2 pool keeps the
+    // event loop alive, so the script must exit explicitly on success.
+    process.exit(0);
   } catch (error) {
     const message =
       error instanceof Error

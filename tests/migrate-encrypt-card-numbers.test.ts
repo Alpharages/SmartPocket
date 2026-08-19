@@ -1,6 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testId, syncColumns } from "./helpers/ids";
 
+// The card key is per-account now and read off the user row. These tests
+// mock `callDataApi` wholesale for their own purposes, so the key lookup is
+// stubbed rather than fed through that mock — key provisioning has its own
+// coverage in tests/card-crypto.test.ts.
+const TEST_USER_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+const TEST_CARD_KEY = new Uint8Array(32).fill(7);
+vi.mock("@/server/_core/card-key", () => ({
+  getOrCreateAccountCardKey: vi.fn(async () => TEST_CARD_KEY),
+  getAccountCardKeyBase64: vi.fn(async () => "unused"),
+}));
+
 const TEST_KEY_HEX =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -53,12 +64,12 @@ describe("migrateEncryptCardNumbers", () => {
     expect(updateCall.body.query).toContain("UPDATE creditCards");
     const stored = updateCall.body.params[0] as string;
     expect(isEncryptedCardNumber(stored)).toBe(true);
-    expect(await decryptCardNumber(stored)).toBe("4111111111111111");
+    expect(await decryptCardNumber(stored, TEST_USER_ID)).toBe("4111111111111111");
   });
 
   it("skips already-encrypted rows (idempotent re-run)", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const encrypted = await encryptCardNumber("4111111111111111");
+    const encrypted = await encryptCardNumber("4111111111111111", TEST_USER_ID);
 
     callDataApi.mockResolvedValueOnce([
       { id: testId(2), cardNumber: encrypted },
@@ -79,7 +90,7 @@ describe("migrateEncryptCardNumbers", () => {
 
   it("handles a mixed table of plaintext and encrypted rows", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const encrypted = await encryptCardNumber("5555555555554444");
+    const encrypted = await encryptCardNumber("5555555555554444", TEST_USER_ID);
 
     callDataApi
       .mockResolvedValueOnce([
@@ -191,27 +202,36 @@ describe("migrateEncryptCardNumbers", () => {
     expect(logged).not.toMatch(/5555555555554444/);
   });
 
-  it("aborts before mutating rows when CARD_ENCRYPTION_KEY is missing", async () => {
+  // This used to abort up front when the global CARD_ENCRYPTION_KEY was
+  // missing or malformed, because that key was the only one there was. Keys
+  // are per-account now (server/_core/card-key.ts) and minted on demand, so
+  // there is no global precondition left to check — the migration encrypts
+  // each row under its own owner's key, and a row that genuinely fails is
+  // counted rather than aborting the run.
+  it("runs without a global CARD_ENCRYPTION_KEY, encrypting each row under its owner's key", async () => {
     delete process.env.CARD_ENCRYPTION_KEY;
     vi.resetModules();
 
-    const { migrateEncryptCardNumbers } =
-      await import("@/server/migrate-encrypt-card-numbers");
+    callDataApi.mockImplementation(async (_apiId, options) => {
+      const sql = String(options?.body?.query ?? "");
+      if (sql.startsWith("SELECT")) {
+        return [
+          { id: testId(1), userId: testId(9), cardNumber: "4111111111111111" },
+        ];
+      }
+      return { affectedRows: 1 };
+    });
 
-    await expect(migrateEncryptCardNumbers()).rejects.toThrow(
-      /CARD_ENCRYPTION_KEY/,
+    const { migrateEncryptCardNumbers } = await import(
+      "@/server/migrate-encrypt-card-numbers"
     );
-    expect(callDataApi).not.toHaveBeenCalled();
-  });
+    const summary = await migrateEncryptCardNumbers();
 
-  it("aborts before mutating rows when CARD_ENCRYPTION_KEY is wrong length", async () => {
-    process.env.CARD_ENCRYPTION_KEY = "tooshort";
-    vi.resetModules();
+    expect(summary).toMatchObject({ total: 1, encrypted: 1, failed: 0 });
 
-    const { migrateEncryptCardNumbers } =
-      await import("@/server/migrate-encrypt-card-numbers");
-
-    await expect(migrateEncryptCardNumbers()).rejects.toThrow(/32 bytes/);
-    expect(callDataApi).not.toHaveBeenCalled();
+    const update = callDataApi.mock.calls.find(([, options]) =>
+      String(options?.body?.query ?? "").startsWith("UPDATE"),
+    );
+    expect(String(update?.[1]?.body?.params?.[0])).toMatch(/^v1:/);
   });
 });

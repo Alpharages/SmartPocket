@@ -4,11 +4,14 @@ import { isUlid } from "../shared/ulid";
 import { SYNC_TABLES, type Id } from "../drizzle/schema";
 import { router, protectedProcedure, publicProcedure } from "./_core/trpc";
 import * as db from "./db";
+import { getAccountCardKeyBase64 } from "./_core/card-key";
 import {
   accountHasAnyData,
   applyPushedRows,
   getPurgeWatermark,
   getRowsSince,
+  getHeadSeq,
+  sequenceServerWrites,
 } from "./_core/sync-engine";
 import {
   CATEGORY_DEFAULT_COLOR,
@@ -1242,6 +1245,16 @@ async function assertCurrentPinProof(
 }
 
 const securityRouter = router({
+  /**
+   * This account's card-number key, base64. Handed only to a caller that has
+   * already proved it holds the account's session — the same bar as reading
+   * the card numbers it decrypts. See server/_core/card-key.ts for why this
+   * is per-account rather than the global env key.
+   */
+  getCardKey: protectedProcedure.query(({ ctx }) => {
+    return getAccountCardKeyBase64(ctx.user.id);
+  }),
+
   getPinStatus: protectedProcedure.query(async ({ ctx }) => {
     const state = await db.getUserPinState(ctx.user.id);
     return { pinSet: state.pinHash !== null };
@@ -1379,6 +1392,21 @@ const syncRouter = router({
     .query(({ ctx, input }) => {
       return getRowsSince(input.table, ctx.user.id, input.sinceSeq);
     }),
+
+  /**
+   * The highest serverSeq handed out so far. A pull cycle reads this before
+   * it starts and advances its cursor to it afterwards, so a row written
+   * mid-cycle to a table the device has already pulled is not skipped.
+   */
+  getHeadSeq: protectedProcedure.query(async ({ ctx }) => {
+    // Read once at the start of every pull cycle, which makes it the natural
+    // place to sequence anything written on the server since the last one —
+    // the web client writes directly to the database and never pushes, so
+    // without this its edits and deletes carry a stale seq and no device ever
+    // pulls them. Done before reading the head so the new seqs are included.
+    await sequenceServerWrites(SYNC_TABLES, ctx.user.id);
+    return getHeadSeq();
+  }),
 
   /** Whether this account already holds any data — drives the first-sync choice. */
   accountHasData: protectedProcedure.query(({ ctx }) => {

@@ -92,6 +92,15 @@ export const users = mysqlTable("users", {
    * the PIN from this value.
    */
   pinHash: varchar("pinHash", { length: 255 }),
+  /**
+   * This account's AES-256 card-number key, base64. Minted on first use
+   * (server/_core/card-key.ts) and handed to authenticated devices over the
+   * existing session, so a card encrypted on one phone is decryptable on
+   * every other device on the account — local-first-sync-plan.md blocker 3,
+   * "the key has to be derived from account credentials, not generated
+   * per-device". Null until this account first touches a card number.
+   */
+  cardKey: varchar("cardKey", { length: 64 }),
   /** Consecutive failed server-side PIN verification attempts since the last success or reset. */
   pinFailedAttempts: int("pinFailedAttempts").default(0).notNull(),
   /** Set once pinFailedAttempts crosses the lockout threshold; verifyPin rejects until this passes. */

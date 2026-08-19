@@ -5,7 +5,9 @@ import {
   isEncryptedCardNumber,
   maskCardNumber,
 } from "./card-cipher";
+import { getOrCreateAccountCardKey } from "./card-key";
 import { base64ToBytes, hexToBytes } from "../../shared/base64";
+import type { Id } from "../../drizzle/schema";
 
 export { isEncryptedCardNumber, maskCardNumber };
 
@@ -30,28 +32,60 @@ function parseEncryptionKey(raw: string): Uint8Array {
   );
 }
 
-function getEncryptionKey(): Uint8Array {
-  return parseEncryptionKey(ENV.cardEncryptionKey);
+/**
+ * The pre-per-account global key. Decrypt-only now: every row written from
+ * here on uses the account key, but rows written before
+ * `drizzle/0015_user_card_key.sql` are still sitting in the database
+ * encrypted under this one. Keep `CARD_ENCRYPTION_KEY` set until you are
+ * confident none remain — a re-encryption happens naturally on the next write
+ * to each card, so the set shrinks on its own.
+ */
+export function parseLegacyCardKey(): Uint8Array | null {
+  try {
+    return parseEncryptionKey(ENV.cardEncryptionKey);
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Encrypt a plaintext PAN for storage. Idempotent when already encrypted.
  *
- * Async to match `crypto.native.ts`'s signature — the device build resolves
- * its key from `expo-secure-store`, which has no synchronous read API, so
- * both platforms present the same `Promise`-returning shape and every call
- * site in `server/db.ts` awaits either one unmodified. The server's own key
- * lookup (an env var) is synchronous; wrapping it in `Promise.resolve` here
- * costs nothing.
+ * Takes `userId` because the key is per-account (see `card-key.ts`) — this is
+ * what lets the same ciphertext be read by the server and by every device on
+ * the account, which is the whole point of a synced field. `crypto.native.ts`
+ * presents the identical signature so `server/db.ts` runs unmodified against
+ * whichever one Metro picked.
  */
-export async function encryptCardNumber(plain: string): Promise<string> {
-  return encryptWithKey(plain, getEncryptionKey());
+export async function encryptCardNumber(
+  plain: string,
+  userId: Id,
+): Promise<string> {
+  return encryptWithKey(plain, await getOrCreateAccountCardKey(userId));
 }
 
 /**
  * Decrypt a stored card number. Legacy plaintext rows (pre-migration) pass
- * through unchanged. See `encryptCardNumber` for why this is async.
+ * through unchanged. See `encryptCardNumber` for why this takes a `userId`.
+ *
+ * Falls back to the global env key when the account key cannot open the
+ * value: a row written before the per-account key existed is still encrypted
+ * under the old one, and there is no marker in the ciphertext to distinguish
+ * the two — trying and failing is the only way to tell. AES-GCM's auth tag
+ * makes that safe rather than a guess: a wrong key throws, it does not return
+ * plausible garbage.
  */
-export async function decryptCardNumber(stored: string): Promise<string> {
-  return decryptWithKey(stored, getEncryptionKey());
+export async function decryptCardNumber(
+  stored: string,
+  userId: Id,
+): Promise<string> {
+  if (!isEncryptedCardNumber(stored)) return stored;
+
+  try {
+    return decryptWithKey(stored, await getOrCreateAccountCardKey(userId));
+  } catch (err) {
+    const legacy = parseLegacyCardKey();
+    if (!legacy) throw err;
+    return decryptWithKey(stored, legacy);
+  }
 }

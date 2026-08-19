@@ -47,6 +47,7 @@ export default defineConfig({
         "./__mocks__/expo-file-system.ts",
       ),
       "expo-sharing": path.resolve(__dirname, "./__mocks__/expo-sharing.ts"),
+      "expo-crypto": path.resolve(__dirname, "./__mocks__/expo-crypto.ts"),
       "expo-blur": path.resolve(__dirname, "./__mocks__/expo-blur.ts"),
       "expo-linear-gradient": path.resolve(
         __dirname,

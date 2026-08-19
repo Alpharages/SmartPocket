@@ -17,6 +17,7 @@
     "db:seed": "tsx drizzle/seed.ts",
     "db:migrate:encrypt-cards": "tsx scripts/migrate-encrypt-card-numbers.ts",
     "db:migrate:ulid-ids": "tsx scripts/migrate-ulid-ids.ts",
+    "db:migrate:phase1": "tsx scripts/migrate-phase1.ts",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "qr": "node scripts/generate_qr.mjs"
@@ -44,6 +45,7 @@
     "expo-blur": "~15.0.8",
     "expo-build-properties": "^1.0.10",
     "expo-constants": "~18.0.12",
+    "expo-crypto": "~15.0.9",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.0",
     "expo-font": "~14.0.10",

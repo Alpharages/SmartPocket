@@ -65,6 +65,28 @@ export async function getLocalUserId(): Promise<Id> {
   return user.id;
 }
 
+/**
+ * Associates this device's local user with a signed-in account, so that
+ * every subsequent read and write through the in-process link resolves to
+ * the account's id — the same id `reownLocalData` re-owns local rows to and
+ * the same id every pulled row arrives owned by.
+ *
+ * Called once per device at first sync (lib/sync/sync-worker.ts), on every
+ * branch of the first-sync choice: even "keep the account's data", which
+ * discards the local rows rather than re-owning them, still needs the
+ * identity moved or the pulled rows would be invisible to the app.
+ * Idempotent — re-running after the identity has already moved is a no-op.
+ */
+export async function adoptAccountIdentity(accountUserId: Id): Promise<void> {
+  const local = await getLocalUser();
+  if (local.id === accountUserId) return;
+
+  await db.reassignUserId(local.id, accountUserId);
+  // The memoized User still carries the pre-association id; drop it so the
+  // next context resolution re-reads the row.
+  ensuredLocalUser = null;
+}
+
 /** Test-only: undo the in-memory memoization between cases. */
 export function __resetLocalContextCacheForTests(): void {
   ensuredLocalUser = null;
