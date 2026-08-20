@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { getTableColumns } from "drizzle-orm";
 import { callDataApi } from "./dataApi";
 import * as schema from "../../drizzle/schema";
@@ -71,6 +72,49 @@ export async function allocateServerSeqBlock(count: number): Promise<number> {
 }
 
 /**
+ * Server-only: refuses a push batch that targets a row belonging to another
+ * account.
+ *
+ * `applyPushedRows` already forces `userId` to the caller, which stops a
+ * device *claiming* another account on a row it creates. But the write is an
+ * `INSERT ... ON DUPLICATE KEY UPDATE` keyed on the client-supplied `id`, and
+ * MySQL has no `WHERE` clause on the update half — so a push carrying an id
+ * that already exists under someone else's account overwrote that row *and*
+ * moved it to the pusher (`userId = VALUES(userId)`). The victim's row simply
+ * vanishes from their side. ULIDs are not guessable, but authorization must
+ * not rest on that.
+ *
+ * One query for the whole batch, before any write, so a batch mixing
+ * legitimate rows with a hijack attempt lands none of them.
+ */
+async function assertRowsOwnedByCaller(
+  table: SyncTable,
+  userId: Id,
+  rows: Record<string, unknown>[],
+): Promise<void> {
+  const ids = rows.map((row) => row.id).filter((id) => typeof id === "string");
+  if (ids.length === 0) return;
+
+  const foreign = await callDataApi("Database/query", {
+    body: {
+      query: `SELECT id FROM ${table} WHERE id IN (${ids
+        .map(() => "?")
+        .join(", ")}) AND userId <> ?`,
+      params: [...ids, userId],
+    },
+  });
+
+  if (Array.isArray(foreign) && foreign.length > 0) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Push rejected: ${table} row ${
+        (foreign[0] as { id: string }).id
+      } belongs to another account`,
+    });
+  }
+}
+
+/**
  * Server-only: applies a batch of pushed rows for one table, forcing
  * `userId` to the authenticated caller (never trusting whatever the wire
  * payload claims) and assigning each row a fresh `serverSeq`. Returns the
@@ -82,6 +126,8 @@ export async function applyPushedRows(
   rows: Record<string, unknown>[],
 ): Promise<Array<{ id: Id; serverSeq: number }>> {
   if (rows.length === 0) return [];
+
+  await assertRowsOwnedByCaller(table, userId, rows);
 
   const columns = syncTableColumns(table);
   const firstSeq = await allocateServerSeqBlock(rows.length);

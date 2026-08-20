@@ -71,6 +71,37 @@ describe("sync router against real SQLite", () => {
     expect((rows[0] as { id: string }).id).toBe(mine);
   });
 
+  it("push refuses to overwrite a row that belongs to another account", async () => {
+    const db = await import("@/server/db");
+    const { appRouter } = await import("@/server/routers");
+    const userId = testId(1);
+    const otherUserId = testId(2);
+
+    const victimRow = await db.createCategory({
+      userId: otherUserId,
+      name: "Victim",
+      type: "expense",
+      color: "#222222",
+      icon: "cart",
+      isDefault: false,
+    });
+
+    const caller = appRouter.createCaller(createUserContext(userId));
+    await expect(
+      caller.sync.push({
+        table: "categories",
+        rows: [{ id: victimRow, userId, name: "Hijacked", type: "expense" }],
+      }),
+    ).rejects.toThrow(/another account/);
+
+    // The victim still owns it, untouched — the guard runs before any write.
+    const stillTheirs = await caller.sync.pull({
+      table: "categories",
+      sinceSeq: 0,
+    });
+    expect(stillTheirs).toHaveLength(0);
+  });
+
   it("accountHasData reflects whether the caller's account holds any live row", async () => {
     const db = await import("@/server/db");
     const { appRouter } = await import("@/server/routers");

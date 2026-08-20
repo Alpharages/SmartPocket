@@ -39,7 +39,8 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
       async (_id: string, options?: { body?: Record<string, unknown> }) => {
         const sql = String(options?.body?.query ?? "");
         queries.push(sql);
-        if (sql.startsWith("SELECT id FROM transactions")) return [{ id: rowId }];
+        if (sql.startsWith("SELECT id FROM transactions"))
+          return [{ id: rowId }];
         if (sql.startsWith("SELECT id FROM")) return [];
         if (sql.includes("INSERT INTO syncSequence")) {
           return { insertId: 90, affectedRows: 1 };
@@ -48,9 +49,7 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
       },
     );
 
-    const { sequenceServerWrites } = await import(
-      "@/server/_core/sync-engine"
-    );
+    const { sequenceServerWrites } = await import("@/server/_core/sync-engine");
     const sequenced = await sequenceServerWrites(SYNC_TABLES, testId(1));
 
     expect(sequenced).toBe(1);
@@ -63,14 +62,14 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
 
   it("sequenceServerWrites allocates nothing when the server has no local writes", async () => {
     callDataApi.mockResolvedValue([]);
-    const { sequenceServerWrites } = await import(
-      "@/server/_core/sync-engine"
-    );
+    const { sequenceServerWrites } = await import("@/server/_core/sync-engine");
 
     expect(await sequenceServerWrites(SYNC_TABLES, testId(1))).toBe(0);
     expect(
       callDataApi.mock.calls.some(([, o]) =>
-        String((o as never as { body?: { query?: string } })?.body?.query ?? "").includes("INSERT INTO syncSequence"),
+        String(
+          (o as never as { body?: { query?: string } })?.body?.query ?? "",
+        ).includes("INSERT INTO syncSequence"),
       ),
     ).toBe(false);
   });
@@ -93,6 +92,7 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
 
   it("applyPushedRows forces userId to the caller's account, ignores the row's own dirty/serverSeq, and assigns a contiguous block", async () => {
     callDataApi
+      .mockResolvedValueOnce([]) // assertRowsOwnedByCaller: no foreign rows
       .mockResolvedValueOnce({ insertId: 100, affectedRows: 2 }) // allocateServerSeqBlock
       .mockResolvedValueOnce(undefined) // row 1 upsert
       .mockResolvedValueOnce(undefined); // row 2 upsert
@@ -127,7 +127,7 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
     ]);
 
     // Row 1's insert: userId is the authenticated caller, not the forged value.
-    const row1Call = callDataApi.mock.calls[1][1] as {
+    const row1Call = callDataApi.mock.calls[2][1] as {
       body: { query: string; params: unknown[] };
     };
     expect(row1Call.body.query).toMatch(/INSERT INTO categories/);
