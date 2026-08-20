@@ -6,6 +6,12 @@ import { Switch, Text } from "react-native";
 import { testId } from "../helpers/ids";
 import { SyncSettingsSection } from "@/components/sync-settings";
 
+// The signed-out state offers a "Sign in" button, so the component now pulls in
+// expo-router. Importing it for real drags the whole untransformed router into
+// this suite; the mock is also the assertion target for where that button goes.
+const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+vi.mock("expo-router", () => ({ useRouter: () => routerMock }));
+
 vi.mock("@/hooks/use-colors", () => ({
   useColors: () => ({
     border: "#eee",

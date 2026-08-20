@@ -28,7 +28,7 @@ const TITLES: Record<string, string> = {
   "/security": "Security",
   "/settings": "Settings",
   "/login": "Sign in",
-  "/oauth/callback": "Signing in",
+  "/signup": "Create account",
   "/loan/record-repayment": "Record Repayment",
   "/dev/theme-lab": "Theme Lab",
 };

@@ -738,28 +738,34 @@ export default function SettingsScreen() {
           </SettingsSectionGroup>
         ) : null}
 
-        <SettingsSectionGroup title="Account">
-          {user ? (
-            <>
-              <SettingsRow
-                icon="person-circle-outline"
-                label={user.name ?? "Signed in"}
-                trailingValue={user.email ?? undefined}
-                showChevron={false}
-                disabled
-                accessibilityLabel={`Signed in as ${user.name ?? user.email ?? "user"}`}
-              />
-              <SectionDivider />
-            </>
-          ) : null}
-          <SettingsRow
-            icon="log-out-outline"
-            label="Sign out"
-            destructive
-            onPress={() => setSignOutSheetVisible(true)}
-            accessibilityLabel="Sign out"
-          />
-        </SettingsSectionGroup>
+        {/*
+          The whole section is gated on `user`, not just the identity row.
+          Only the row was before, which left a signed-out visitor looking at
+          an "Account" heading whose single entry was "Sign out" — an offer to
+          leave somewhere they are not. On native that state is ordinary rather
+          than rare: the app works signed out, and an account is only needed
+          for sync. The way *in* lives in the Sync section above.
+        */}
+        {user ? (
+          <SettingsSectionGroup title="Account">
+            <SettingsRow
+              icon="person-circle-outline"
+              label={user.name ?? "Signed in"}
+              trailingValue={user.email ?? undefined}
+              showChevron={false}
+              disabled
+              accessibilityLabel={`Signed in as ${user.name ?? user.email ?? "user"}`}
+            />
+            <SectionDivider />
+            <SettingsRow
+              icon="log-out-outline"
+              label="Sign out"
+              destructive
+              onPress={() => setSignOutSheetVisible(true)}
+              accessibilityLabel="Sign out"
+            />
+          </SettingsSectionGroup>
+        ) : null}
 
         <SettingsSectionGroup title="About">
           <SettingsRow

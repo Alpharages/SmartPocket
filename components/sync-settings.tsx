@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Switch, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useExpense } from "@/lib/expense-context";
@@ -107,6 +108,7 @@ function FirstSyncChoiceSheet({
  */
 export function SyncSettingsSection() {
   const { user, isAuthenticated } = useAuth();
+  const router = useRouter();
   const colors = useColors();
   const toast = useToast();
   const { refreshAll } = useExpense();
@@ -215,11 +217,25 @@ export function SyncSettingsSection() {
   if (!isSyncSupported()) return null;
 
   if (!isAuthenticated) {
+    // This copy used to be the whole signed-out state — an instruction to sign
+    // in, with nothing to sign in *with*. On native that made sync unreachable
+    // on a fresh install: `AuthGate` only redirects on web, and every other
+    // route to /login (signing out, forgetting a PIN) is reachable only by
+    // someone who already has an account. The button is the entry point.
     return (
       <View className="px-lg py-md">
         <Text className="text-body text-muted">
           Sign in to back up this phone&apos;s data and use it on other devices.
         </Text>
+        <View className="mt-md">
+          <Button
+            variant="secondary"
+            label="Sign in"
+            onPress={() => router.push("/login")}
+            testID="sync-sign-in"
+            accessibilityLabel="Sign in to enable sync"
+          />
+        </View>
       </View>
     );
   }
