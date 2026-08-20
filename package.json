@@ -20,7 +20,8 @@
     "db:migrate:phase1": "tsx scripts/migrate-phase1.ts",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "qr": "node scripts/generate_qr.mjs"
+    "qr": "node scripts/generate_qr.mjs",
+    "build:server": "esbuild server/_core/index.ts --platform=node --bundle --format=cjs --outfile=dist/server.cjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

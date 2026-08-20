@@ -1,0 +1,29 @@
+# The builder stage runs its own `pnpm install`, so a local node_modules must
+# never be copied in — it is ~5 GB here and would be the wrong platform anyway.
+node_modules
+dist
+
+# Native app halves. The image only ever builds server/_core/index.ts; these
+# directories are the largest thing in the repo and nothing in the bundle
+# reaches them.
+android
+ios
+.expo
+assets
+
+# Secrets. Compose injects the real values via env_file at *run* time; baking
+# them into an image layer would leave them readable in the image forever.
+.env
+.env.*
+
+.git
+.gitnexus
+.claude
+logs
+docs
+references
+*.md
+
+# NOT ignored, and load-bearing: .npmrc (node-linker=hoisted — the install
+# layout changes without it), pnpm-lock.yaml, drizzle/ (the migrate service
+# reads drizzle/meta/_journal.json).
