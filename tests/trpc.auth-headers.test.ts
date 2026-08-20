@@ -9,7 +9,7 @@ const oauth = {
 };
 
 vi.mock("@/lib/_core/auth", () => auth);
-vi.mock("@/constants/oauth", () => oauth);
+vi.mock("@/constants/api", () => oauth);
 
 // Regression coverage for Bug 86exvgjme: the originally reported failure was
 // tRPC requests 401ing on web because the client sent no Authorization header.

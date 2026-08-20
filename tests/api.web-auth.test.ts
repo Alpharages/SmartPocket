@@ -10,7 +10,7 @@ const oauth = {
 };
 
 vi.mock("@/lib/_core/auth", () => auth);
-vi.mock("@/constants/oauth", () => oauth);
+vi.mock("@/constants/api", () => oauth);
 
 describe("apiCall web auth", () => {
   beforeEach(() => {

@@ -33,7 +33,7 @@ describe("getApiBaseUrl native dev loopback rewrite", () => {
 
   it("rewrites localhost to Metro LAN host on iOS", async () => {
     vi.doMock("react-native", () => ({ Platform: { OS: "ios" } }));
-    const { getApiBaseUrl } = await import("@/constants/oauth");
+    const { getApiBaseUrl } = await import("@/constants/api");
     expect(getApiBaseUrl()).toBe("http://192.168.2.15:3000");
   });
 
@@ -52,7 +52,7 @@ describe("getApiBaseUrl native dev loopback rewrite", () => {
         },
       },
     }));
-    const { getApiBaseUrl } = await import("@/constants/oauth");
+    const { getApiBaseUrl } = await import("@/constants/api");
     expect(getApiBaseUrl()).toBe("http://10.0.2.2:3000");
   });
 
@@ -68,27 +68,27 @@ describe("getApiBaseUrl native dev loopback rewrite", () => {
         },
       },
     }));
-    const { getApiBaseUrl } = await import("@/constants/oauth");
+    const { getApiBaseUrl } = await import("@/constants/api");
     expect(getApiBaseUrl()).toBe("http://localhost:3000");
   });
 
   it("uses Metro LAN host on Android when available", async () => {
     vi.doMock("react-native", () => ({ Platform: { OS: "android" } }));
-    const { getApiBaseUrl } = await import("@/constants/oauth");
+    const { getApiBaseUrl } = await import("@/constants/api");
     expect(getApiBaseUrl()).toBe("http://192.168.2.15:3000");
   });
 
   it("keeps localhost on web", async () => {
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "http://localhost:3000");
     vi.doMock("react-native", () => ({ Platform: { OS: "web" } }));
-    const { getApiBaseUrl } = await import("@/constants/oauth");
+    const { getApiBaseUrl } = await import("@/constants/api");
     expect(getApiBaseUrl()).toBe("http://localhost:3000");
   });
 
   it("derives native URL from Metro when env is unset", async () => {
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "");
     vi.doMock("react-native", () => ({ Platform: { OS: "ios" } }));
-    const { getApiBaseUrl } = await import("@/constants/oauth");
+    const { getApiBaseUrl } = await import("@/constants/api");
     expect(getApiBaseUrl()).toBe("http://192.168.2.15:3000");
   });
 });
@@ -114,7 +114,7 @@ describe("getApiBaseUrl web host derivation when env is unset", () => {
         hostname: "8081-abc123.region.example.dev",
       },
     });
-    const { getApiBaseUrl } = await import("@/constants/oauth");
+    const { getApiBaseUrl } = await import("@/constants/api");
     expect(getApiBaseUrl()).toBe("https://3000-abc123.region.example.dev");
   });
 
@@ -122,7 +122,7 @@ describe("getApiBaseUrl web host derivation when env is unset", () => {
     vi.stubGlobal("window", {
       location: { protocol: "http:", hostname: "localhost" },
     });
-    const { getApiBaseUrl } = await import("@/constants/oauth");
+    const { getApiBaseUrl } = await import("@/constants/api");
     expect(getApiBaseUrl()).toBe("http://localhost:3000");
   });
 
@@ -130,7 +130,7 @@ describe("getApiBaseUrl web host derivation when env is unset", () => {
     vi.stubGlobal("window", {
       location: { protocol: "http:", hostname: "192.168.2.15" },
     });
-    const { getApiBaseUrl } = await import("@/constants/oauth");
+    const { getApiBaseUrl } = await import("@/constants/api");
     expect(getApiBaseUrl()).toBe("http://192.168.2.15:3000");
   });
 
@@ -139,7 +139,7 @@ describe("getApiBaseUrl web host derivation when env is unset", () => {
     vi.stubGlobal("window", {
       location: { protocol: "https:", hostname: "app.smartpocket.example" },
     });
-    const { getApiBaseUrl } = await import("@/constants/oauth");
+    const { getApiBaseUrl } = await import("@/constants/api");
     expect(getApiBaseUrl()).toBe("");
   });
 });

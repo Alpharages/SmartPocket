@@ -12,7 +12,7 @@ const oauth = vi.hoisted(() => ({
 }));
 
 vi.mock("expo-secure-store", () => secureStore);
-vi.mock("@/constants/oauth", () => oauth);
+vi.mock("@/constants/api", () => oauth);
 
 function createLocalStorageMock() {
   const store = new Map<string, string>();

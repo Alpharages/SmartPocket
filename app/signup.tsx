@@ -8,24 +8,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { useThemeTokens } from "@/lib/theme-provider";
 
 /**
- * Sign-in screen.
- *
- * QA report SP-006: the app had no login UI at all, so outside `__DEV__` a
- * release build booted straight to an authenticated shell whose every request
- * 401'd, with no way to sign in and no way to recover.
- *
- * The form itself is shared with `signup.tsx` — see `components/auth-form.tsx`.
- * All this screen owns is the "already signed in" redirect and refreshing the
- * auth state once credentials have been accepted.
+ * Account creation. Signing up issues the session in the same response, so a
+ * new user lands straight in the app rather than being bounced to sign in with
+ * credentials they typed thirty seconds ago.
  */
-export default function LoginScreen() {
+export default function SignupScreen() {
   const { colors } = useThemeTokens();
   const { isAuthenticated, loading, refresh } = useAuth();
 
   const handleAuthenticated = useCallback(() => {
-    // `refresh` re-reads the session that AuthForm just stored; the redirect
-    // below then fires on the next render. Navigating here instead would race
-    // that state update and land on a screen that still thinks it is signed out.
     refresh();
   }, [refresh]);
 
@@ -46,5 +37,5 @@ export default function LoginScreen() {
     return <Redirect href="/dashboard" />;
   }
 
-  return <AuthForm mode="login" onAuthenticated={handleAuthenticated} />;
+  return <AuthForm mode="signup" onAuthenticated={handleAuthenticated} />;
 }

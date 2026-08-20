@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from "@/constants/oauth";
+import { getApiBaseUrl } from "@/constants/api";
 import * as Auth from "./auth";
 import type { Id } from "@/drizzle/schema";
 
@@ -93,31 +93,41 @@ export async function apiCall<T>(
   }
 }
 
-// OAuth callback handler - exchange code for session token
-// Calls /api/oauth/mobile endpoint which returns JSON with app_session_id and user
-export async function exchangeOAuthCode(
-  code: string,
-  state: string,
-): Promise<{ sessionToken: string; user: any }> {
-  console.log("[API] exchangeOAuthCode called");
-  // Use GET with query params
-  const params = new URLSearchParams({ code, state });
-  const endpoint = `/api/oauth/mobile?${params.toString()}`;
-  console.log("[API] Calling OAuth mobile endpoint:", endpoint);
-  const result = await apiCall<{ app_session_id: string; user: any }>(endpoint);
+export type AuthUser = {
+  id: Id;
+  openId: string;
+  name: string | null;
+  email: string | null;
+  loginMethod: string | null;
+  lastSignedIn: string;
+};
 
-  // Convert app_session_id to sessionToken for compatibility
-  const sessionToken = result.app_session_id;
-  console.log("[API] OAuth exchange result:", {
-    hasSessionToken: !!sessionToken,
-    hasUser: !!result.user,
-    sessionToken: sessionToken ? `${sessionToken.substring(0, 50)}...` : null,
+type AuthResult = { token: string; user: AuthUser };
+
+/**
+ * Create an account. The server issues the session in the same response — a
+ * cookie for web and the raw token for native — so a successful signup never
+ * needs a second round trip to log in.
+ */
+export async function signup(input: {
+  email: string;
+  password: string;
+  name?: string;
+}): Promise<AuthResult> {
+  return apiCall<AuthResult>("/api/auth/signup", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
+}
 
-  return {
-    sessionToken,
-    user: result.user,
-  };
+export async function login(input: {
+  email: string;
+  password: string;
+}): Promise<AuthResult> {
+  return apiCall<AuthResult>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 // Logout

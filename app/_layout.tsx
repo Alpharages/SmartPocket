@@ -29,10 +29,6 @@ import {
 import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
 import { trpc, createTRPCClient } from "@/lib/trpc";
-import {
-  initManusRuntime,
-  subscribeSafeAreaInsets,
-} from "@/lib/_core/manus-runtime";
 import { ExpenseProvider } from "@/lib/expense-context";
 import { AuthGate } from "@/components/auth-gate";
 import { SyncGate } from "@/components/sync-gate";
@@ -40,7 +36,7 @@ import { AppLockGate } from "@/components/app-lock-gate";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import * as Auth from "@/lib/_core/auth";
-import { getApiBaseUrl, SESSION_TOKEN_KEY } from "@/constants/oauth";
+import { getApiBaseUrl, SESSION_TOKEN_KEY } from "@/constants/api";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -168,11 +164,6 @@ export default function RootLayout() {
   const [shellError, setShellError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
-  // Initialize Manus runtime for cookie injection from parent container
-  useEffect(() => {
-    initManusRuntime();
-  }, []);
-
   useEffect(() => {
     if (Platform.OS !== "ios" && Platform.OS !== "android") {
       return;
@@ -287,16 +278,11 @@ export default function RootLayout() {
     };
   }, [retryToken]);
 
-  const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
-    setInsets(metrics.insets);
-    setFrame(metrics.frame);
-  }, []);
-
-  useEffect(() => {
-    if (Platform.OS !== "web") return;
-    const unsubscribe = subscribeSafeAreaInsets(handleSafeAreaUpdate);
-    return () => unsubscribe();
-  }, [handleSafeAreaUpdate]);
+  // Web safe-area insets used to arrive by postMessage from the Manus preview
+  // container, which wrapped the app in an iframe and owned the device chrome.
+  // Outside that container there is no parent to ask, so the ordinary
+  // react-native-safe-area-context provider is the only source — which is what
+  // native has always used.
 
   // Create clients once and reuse them
   const [queryClient] = useState(
@@ -388,7 +374,6 @@ export default function RootLayout() {
                             }}
                           />
                           <Stack.Screen name="recurring" />
-                          <Stack.Screen name="oauth/callback" />
                           <Stack.Screen name="card/[id]" />
                           <Stack.Screen name="loan/[id]" />
                           <Stack.Screen name="import-csv" />
@@ -403,6 +388,10 @@ export default function RootLayout() {
                           <Stack.Screen name="security" />
                           <Stack.Screen
                             name="login"
+                            options={{ presentation: "fullScreenModal" }}
+                          />
+                          <Stack.Screen
+                            name="signup"
                             options={{ presentation: "fullScreenModal" }}
                           />
                         </Stack>

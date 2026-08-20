@@ -106,7 +106,7 @@ const appLockGate = vi.hoisted(() => ({
 vi.mock("@/lib/_core/auth", () => auth);
 vi.mock("@/lib/app-lock", () => appLock);
 vi.mock("@/lib/_core/manus-runtime", () => runtime);
-vi.mock("@/constants/oauth", () => oauth);
+vi.mock("@/constants/api", () => oauth);
 vi.mock("@/lib/trpc", () => trpc);
 vi.mock("@/lib/theme-provider", () => providers);
 vi.mock("@/lib/currency-provider", () => providers);
