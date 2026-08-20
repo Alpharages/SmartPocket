@@ -147,3 +147,28 @@ describe("server/db.ts recordFailedPinAttempt via devDb — left-to-right SET se
     expect(state.pinLockedUntil).not.toBeNull();
   });
 });
+
+describe("devDb — NOW() in a SET clause", () => {
+  // MySQL evaluates NOW() natively and the SQLite engine rewrites it to a
+  // bound parameter, so a statement assigning it is correct on both. devDb
+  // understood NOW() only in a WHERE clause, which made `SET updatedAt =
+  // NOW()` throw in local development alone — and `touchLastSignedIn`'s
+  // caller treats its write as best-effort, so the failure surfaced as a log
+  // line and a timestamp that silently never moved.
+  it("assigns the current time rather than throwing", async () => {
+    const id = ulid() as Id;
+    const before = new Date("2020-01-01T00:00:00Z");
+    await devQuery(
+      "INSERT INTO users (id, openId, name, email, loginMethod, lastSignedIn) VALUES (?, ?, ?, ?, ?, ?)",
+      [id, `open-${id}`, "NOW test", "now@example.com", "password", before],
+    );
+
+    await devQuery("UPDATE users SET lastSignedIn = NOW() WHERE id = ?", [id]);
+
+    const rows = (await devQuery(
+      "SELECT lastSignedIn FROM users WHERE id = ?",
+      [id],
+    )) as { lastSignedIn: Date }[];
+    expect(rows[0].lastSignedIn.getTime()).toBeGreaterThan(before.getTime());
+  });
+});

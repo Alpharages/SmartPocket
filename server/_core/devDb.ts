@@ -513,6 +513,14 @@ function evalSetValue(
 
   if (/^\w+$/.test(trimmed)) return workingRow[trimmed];
 
+  // `NOW()` was understood in a WHERE clause (SP-077) but not here, so any
+  // statement that *assigned* it — `SET updatedAt = NOW()` — threw. MySQL
+  // evaluates it natively and the SQLite engine rewrites it to a bound
+  // parameter (sqlite-engine.ts's rewriteNow), so devDb was the only one of
+  // the three backends that could not, which made a statement correct
+  // everywhere else fail only in local development.
+  if (/^NOW\(\)$/i.test(trimmed)) return new Date();
+
   throw new Error(`devDb: unsupported SET expression "${trimmed}"`);
 }
 
