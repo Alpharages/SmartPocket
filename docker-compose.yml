@@ -13,8 +13,13 @@
 # mandatory — the server deliberately refuses to boot in production without them.
 #
 #   docker compose build
-#   docker compose run --rm migrate     # once per deploy, before up
+#   docker compose --profile tools run --rm migrate   # once per deploy, before up
 #   docker compose up -d
+#
+# `--profile tools` is not optional on the migrate line. Without it compose
+# still builds and runs the container, but hands it none of the env_file — so
+# drizzle-kit dies on "DATABASE_URL is required" while `docker compose config`
+# shows the variable resolving perfectly. Confirmed on compose v2.34.0.
 #
 services:
   api:
