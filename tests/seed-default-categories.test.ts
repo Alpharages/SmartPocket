@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CATEGORIES } from "@/server/_core/default-categories";
 import { testId } from "./helpers/ids";
 
+/**
+ * The old envelope shape, rebuilt from the (sql, params) argument pair so these
+ * assertions keep reading as "what statement, with what values".
+ */
+function bodyOf(call: unknown[]) {
+  return { query: String(call[0]), params: (call[1] ?? []) as unknown[] };
+}
+
 const dbQuery = vi.fn();
 
 vi.mock("@/server/_core/db-query", () => ({
@@ -9,20 +17,13 @@ vi.mock("@/server/_core/db-query", () => ({
 }));
 
 function countQueryBody(callIndex: number) {
-  return (
-    dbQuery.mock.calls[callIndex][1] as {
-      body: { query: string; params: unknown[] };
-    }
-  ).body;
+  return bodyOf(dbQuery.mock.calls[callIndex]);
 }
 
 function insertQueryBodies() {
   return dbQuery.mock.calls
     .slice(1)
-    .map(
-      (call) =>
-        (call[1] as { body: { query: string; params: unknown[] } }).body,
-    )
+    .map((call) => bodyOf(call))
     .filter((body) => body.query.includes("INSERT INTO categories"));
 }
 

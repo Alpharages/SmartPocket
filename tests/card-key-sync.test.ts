@@ -24,22 +24,20 @@ const rows = vi.hoisted(
   () => [] as Array<{ id: string; cardNumber: string; dirty: number }>,
 );
 vi.mock("@/server/_core/db-query", () => ({
-  dbQuery: vi.fn(
-    async (_apiId: string, options?: { body?: Record<string, unknown> }) => {
-      const sql = String(options?.body?.query ?? "");
-      const params = (options?.body?.params ?? []) as unknown[];
-      if (sql.startsWith("SELECT")) return rows.map((r) => ({ ...r }));
-      if (sql.startsWith("UPDATE creditCards")) {
-        const row = rows.find((r) => r.id === params[1]);
-        if (row) {
-          row.cardNumber = params[0] as string;
-          row.dirty = 1;
-        }
-        return { affectedRows: 1 };
+  dbQuery: vi.fn(async (rawSql: string, rawParams?: unknown[]) => {
+    const sql = String(rawSql ?? "");
+    const params = (rawParams ?? []) as unknown[];
+    if (sql.startsWith("SELECT")) return rows.map((r) => ({ ...r }));
+    if (sql.startsWith("UPDATE creditCards")) {
+      const row = rows.find((r) => r.id === params[1]);
+      if (row) {
+        row.cardNumber = params[0] as string;
+        row.dirty = 1;
       }
-      return [];
-    },
-  ),
+      return { affectedRows: 1 };
+    }
+    return [];
+  }),
 }));
 
 const ACCOUNT_KEY = Buffer.alloc(32, 3).toString("base64");

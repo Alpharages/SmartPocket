@@ -21,13 +21,10 @@ describe("account db helpers", () => {
       getAccountTransactionCount(testId(7), testId(42)),
     ).resolves.toBe(4);
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ? AND deletedAt IS NULL",
-        params: [testId(42), testId(7)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ? AND deletedAt IS NULL",
+      [testId(42), testId(7)],
+    );
   });
 
   it("propagates transaction count query failures", async () => {
@@ -45,14 +42,12 @@ describe("account db helpers", () => {
 
     await reassignAccountTransactions(testId(3), testId(9), testId(42));
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining(
-          "UPDATE transactions SET accountId = ?, updatedAt = ?, dirty = 1 WHERE userId = ? AND accountId = ?",
-        ),
-        params: [testId(9), expect.any(Date), testId(42), testId(3)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "UPDATE transactions SET accountId = ?, updatedAt = ?, dirty = 1 WHERE userId = ? AND accountId = ?",
+      ),
+      [testId(9), expect.any(Date), testId(42), testId(3)],
+    );
   });
 
   it("rejects reassign-and-delete when source and target are the same account", async () => {
@@ -78,13 +73,10 @@ describe("account db helpers", () => {
       [testId(2)]: 25,
     });
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT id, accountId, type, amount FROM transactions WHERE userId = ? AND deletedAt IS NULL",
-        params: [testId(42)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT id, accountId, type, amount FROM transactions WHERE userId = ? AND deletedAt IS NULL",
+      [testId(42)],
+    );
   });
 
   it("propagates a query failure instead of reporting empty balances", async () => {

@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testId, syncColumns } from "./helpers/ids";
 
+/**
+ * The old envelope shape, rebuilt from the (sql, params) argument pair so these
+ * assertions keep reading as "what statement, with what values".
+ */
+function bodyOf(call: unknown[]) {
+  return { query: String(call[0]), params: (call[1] ?? []) as unknown[] };
+}
+
 // The card key is per-account now and read off the user row. These tests
 // mock `dbQuery` wholesale for their own purposes, so the key lookup is
 // stubbed rather than fed through that mock — key provisioning has its own
@@ -58,11 +66,9 @@ describe("migrateEncryptCardNumbers", () => {
       failed: 0,
     });
 
-    const updateCall = dbQuery.mock.calls[1][1] as {
-      body: { query: string; params: unknown[] };
-    };
-    expect(updateCall.body.query).toContain("UPDATE creditCards");
-    const stored = updateCall.body.params[0] as string;
+    const updateCall = bodyOf(dbQuery.mock.calls[1]);
+    expect(updateCall.query).toContain("UPDATE creditCards");
+    const stored = updateCall.params[0] as string;
     expect(isEncryptedCardNumber(stored)).toBe(true);
     expect(await decryptCardNumber(stored, TEST_USER_ID)).toBe(
       "4111111111111111",
@@ -212,8 +218,8 @@ describe("migrateEncryptCardNumbers", () => {
     delete process.env.CARD_ENCRYPTION_KEY;
     vi.resetModules();
 
-    dbQuery.mockImplementation(async (_apiId, options) => {
-      const sql = String(options?.body?.query ?? "");
+    dbQuery.mockImplementation(async (rawSql) => {
+      const sql = String(rawSql ?? "");
       if (sql.startsWith("SELECT")) {
         return [
           { id: testId(1), userId: testId(9), cardNumber: "4111111111111111" },
@@ -228,9 +234,9 @@ describe("migrateEncryptCardNumbers", () => {
 
     expect(summary).toMatchObject({ total: 1, encrypted: 1, failed: 0 });
 
-    const update = dbQuery.mock.calls.find(([, options]) =>
-      String(options?.body?.query ?? "").startsWith("UPDATE"),
+    const update = dbQuery.mock.calls.find(([sql]) =>
+      String(sql ?? "").startsWith("UPDATE"),
     );
-    expect(String(update?.[1]?.body?.params?.[0])).toMatch(/^v1:/);
+    expect(String(update?.[1]?.[0])).toMatch(/^v1:/);
   });
 });

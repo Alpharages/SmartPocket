@@ -14,18 +14,16 @@ const USER_ID = testId(1);
  */
 const dbApi = vi.hoisted(() => {
   const store = { cardKey: null as string | null };
-  const dbQuery = vi.fn(
-    async (_apiId: string, options?: { body?: Record<string, unknown> }) => {
-      const sql = String(options?.body?.query ?? "");
-      const params = (options?.body?.params ?? []) as unknown[];
-      if (sql.includes("SELECT cardKey")) return [{ cardKey: store.cardKey }];
-      if (sql.includes("UPDATE users SET cardKey")) {
-        store.cardKey ??= params[0] as string;
-        return { affectedRows: 1 };
-      }
-      return [];
-    },
-  );
+  const dbQuery = vi.fn(async (rawSql: string, rawParams?: unknown[]) => {
+    const sql = String(rawSql ?? "");
+    const params = (rawParams ?? []) as unknown[];
+    if (sql.includes("SELECT cardKey")) return [{ cardKey: store.cardKey }];
+    if (sql.includes("UPDATE users SET cardKey")) {
+      store.cardKey ??= params[0] as string;
+      return { affectedRows: 1 };
+    }
+    return [];
+  });
   return { store, dbQuery };
 });
 vi.mock("@/server/_core/db-query", () => ({ dbQuery: dbApi.dbQuery }));

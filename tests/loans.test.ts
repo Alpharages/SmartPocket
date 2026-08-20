@@ -111,13 +111,10 @@ describe("loans db layer", () => {
 
     await expect(getUserLoans(testId(5))).resolves.toEqual([sampleLoan]);
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM loans WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
-        params: [testId(5)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT * FROM loans WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
+      [testId(5)],
+    );
   });
 
   it("createLoan inserts with parameterized SQL and returns the created row", async () => {
@@ -140,12 +137,11 @@ describe("loans db layer", () => {
     });
 
     expect(created?.id).toBe(testId(42));
-    expect(dbQuery).toHaveBeenNthCalledWith(1, "Database/query", {
-      body: {
-        query: expect.stringContaining("INSERT INTO loans"),
-        params: expect.arrayContaining([testId(1), "lend", "Alex", "1000.00"]),
-      },
-    });
+    expect(dbQuery).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("INSERT INTO loans"),
+      expect.arrayContaining([testId(1), "lend", "Alex", "1000.00"]),
+    );
   });
 
   it("getLoanById scopes by userId", async () => {
@@ -155,13 +151,10 @@ describe("loans db layer", () => {
       sampleLoan,
     );
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM loans WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [testId(1), testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT * FROM loans WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [testId(1), testId(1)],
+    );
   });
 
   it("updateLoan scopes by userId", async () => {
@@ -169,14 +162,12 @@ describe("loans db layer", () => {
 
     await updateLoan(testId(7), testId(3), { counterparty: "Sam" });
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringMatching(
-          /UPDATE loans SET counterparty = \?, updatedAt = \?, dirty = 1 WHERE id = \? AND userId = \? AND deletedAt IS NULL/,
-        ),
-        params: ["Sam", expect.any(Date), testId(7), testId(3)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /UPDATE loans SET counterparty = \?, updatedAt = \?, dirty = 1 WHERE id = \? AND userId = \? AND deletedAt IS NULL/,
+      ),
+      ["Sam", expect.any(Date), testId(7), testId(3)],
+    );
   });
 
   it("deleteLoan scopes by userId", async () => {
@@ -184,14 +175,12 @@ describe("loans db layer", () => {
 
     await deleteLoan(testId(7), testId(3));
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining(
-          "UPDATE loans SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
-        ),
-        params: [expect.any(Date), expect.any(Date), testId(7), testId(3)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "UPDATE loans SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
+      ),
+      [expect.any(Date), expect.any(Date), testId(7), testId(3)],
+    );
   });
 
   it("createRepayment verifies loan ownership before insert", async () => {
@@ -225,19 +214,18 @@ describe("loans db layer", () => {
     });
 
     expect(created).toEqual(sampleRepayment);
-    expect(dbQuery).toHaveBeenNthCalledWith(2, "Database/query", {
-      body: {
-        query: expect.stringContaining("INSERT INTO repayments"),
-        params: [
-          expect.any(String),
-          testId(1),
-          testId(1),
-          "400.00",
-          sampleRepayment.date,
-          "First payment",
-        ],
-      },
-    });
+    expect(dbQuery).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("INSERT INTO repayments"),
+      [
+        expect.any(String),
+        testId(1),
+        testId(1),
+        "400.00",
+        sampleRepayment.date,
+        "First payment",
+      ],
+    );
   });
 
   it("recordRepayment rejects over-payment before insert", async () => {
@@ -281,16 +269,15 @@ describe("loans db layer", () => {
     });
 
     expect(result?.remainingBalance).toBe("800.00");
-    expect(dbQuery).toHaveBeenNthCalledWith(4, "Database/query", {
-      body: {
-        query: expect.stringMatching(/UPDATE loans SET nextDueDate = \?/),
-        params: expect.arrayContaining([
-          new Date("2026-08-01T00:00:00.000Z"),
-          testId(1),
-          testId(1),
-        ]),
-      },
-    });
+    expect(dbQuery).toHaveBeenNthCalledWith(
+      4,
+      expect.stringMatching(/UPDATE loans SET nextDueDate = \?/),
+      expect.arrayContaining([
+        new Date("2026-08-01T00:00:00.000Z"),
+        testId(1),
+        testId(1),
+      ]),
+    );
   });
 
   it("recordRepayment settles loan when balance reaches zero", async () => {
@@ -311,12 +298,11 @@ describe("loans db layer", () => {
     });
 
     expect(result?.remainingBalance).toBe("0.00");
-    expect(dbQuery).toHaveBeenNthCalledWith(4, "Database/query", {
-      body: {
-        query: expect.stringMatching(/UPDATE loans SET/),
-        params: expect.arrayContaining(["settled", testId(1), testId(1)]),
-      },
-    });
+    expect(dbQuery).toHaveBeenNthCalledWith(
+      4,
+      expect.stringMatching(/UPDATE loans SET/),
+      expect.arrayContaining(["settled", testId(1), testId(1)]),
+    );
   });
 
   it("getRepaymentsByLoan scopes by loanId and userId", async () => {
@@ -326,13 +312,10 @@ describe("loans db layer", () => {
       sampleRepayment,
     ]);
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM repayments WHERE loanId = ? AND userId = ? AND deletedAt IS NULL ORDER BY date DESC",
-        params: [testId(1), testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT * FROM repayments WHERE loanId = ? AND userId = ? AND deletedAt IS NULL ORDER BY date DESC",
+      [testId(1), testId(1)],
+    );
   });
 
   it("deleteRepayment scopes by userId", async () => {
@@ -340,14 +323,12 @@ describe("loans db layer", () => {
 
     await deleteRepayment(testId(10), testId(1));
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining(
-          "UPDATE repayments SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
-        ),
-        params: [expect.any(Date), expect.any(Date), testId(10), testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "UPDATE repayments SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
+      ),
+      [expect.any(Date), expect.any(Date), testId(10), testId(1)],
+    );
   });
 
   it("getLoanWithBalance computes remaining balance from repayments", async () => {
@@ -409,11 +390,12 @@ describe("loans router", () => {
 
     dbQuery.mockResolvedValueOnce(undefined);
     await callerB.loans.delete({ id: testId(1) });
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: expect.objectContaining({
-        params: [expect.any(Date), expect.any(Date), testId(1), testId(2)],
-      }),
-    });
+    expect(dbQuery).toHaveBeenLastCalledWith(expect.any(String), [
+      expect.any(Date),
+      expect.any(Date),
+      testId(1),
+      testId(2),
+    ]);
   });
 
   it("rejects invalid direction and non-positive principal", async () => {

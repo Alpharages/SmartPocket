@@ -21,41 +21,35 @@ function installFakeDb(initialTables: Record<string, Row[]>) {
     tables[table] = rows.map((row) => ({ ...row }));
   }
 
-  dbQuery.mockImplementation(
-    async (
-      _api: string,
-      opts: { body: { query: string; params: unknown[] } },
-    ) => {
-      const sql = opts.body.query.trim();
-      const params = opts.body.params ?? [];
+  dbQuery.mockImplementation(async (rawSql: string, params: unknown[] = []) => {
+    const sql = String(rawSql ?? "").trim();
 
-      let m = sql.match(/^SELECT id FROM (\w+)$/);
-      if (m) {
-        const [, table] = m;
-        return tables[table].map((row) => ({ id: row.id }));
-      }
+    let m = sql.match(/^SELECT id FROM (\w+)$/);
+    if (m) {
+      const [, table] = m;
+      return tables[table].map((row) => ({ id: row.id }));
+    }
 
-      m = sql.match(/^SELECT id, (\w+) FROM (\w+)$/);
-      if (m) {
-        const [, column, table] = m;
-        return tables[table].map((row) => ({
-          id: row.id,
-          [column]: row[column],
-        }));
-      }
+    m = sql.match(/^SELECT id, (\w+) FROM (\w+)$/);
+    if (m) {
+      const [, column, table] = m;
+      return tables[table].map((row) => ({
+        id: row.id,
+        [column]: row[column],
+      }));
+    }
 
-      m = sql.match(/^UPDATE (\w+) SET (\w+) = \? WHERE id = \?$/);
-      if (m) {
-        const [, table, column] = m;
-        const [value, id] = params;
-        const row = tables[table].find((r) => r.id === id);
-        if (row) row[column] = value;
-        return undefined;
-      }
+    m = sql.match(/^UPDATE (\w+) SET (\w+) = \? WHERE id = \?$/);
+    if (m) {
+      const [, table, column] = m;
+      const [value, id] = params;
+      const row = tables[table].find((r) => r.id === id);
+      if (row) row[column] = value;
+      return undefined;
+    }
 
-      throw new Error(`Unhandled fake query: ${sql}`);
-    },
-  );
+    throw new Error(`Unhandled fake query: ${sql}`);
+  });
 
   return tables;
 }

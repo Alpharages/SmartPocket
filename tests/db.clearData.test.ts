@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { testId } from "./helpers/ids";
 
+/**
+ * The old envelope shape, rebuilt from the (sql, params) argument pair so these
+ * assertions keep reading as "what statement, with what values".
+ */
+function bodyOf(call: unknown[]) {
+  return { query: String(call[0]), params: (call[1] ?? []) as unknown[] };
+}
+
 const dbQuery = vi.fn();
 
 vi.mock("@/server/_core/db-query", () => ({
@@ -38,10 +46,7 @@ describe("deleteAllUserData", () => {
     // never propagate to another device) plus the PIN clear.
     expect(dbQuery).toHaveBeenCalledTimes(TOMBSTONED_TABLES.length + 1);
 
-    const queries = dbQuery.mock.calls.map(
-      (call) =>
-        (call[1] as { body: { query: string; params: unknown[] } }).body,
-    );
+    const queries = dbQuery.mock.calls.map((call) => bodyOf(call));
 
     TOMBSTONED_TABLES.forEach((table, index) => {
       expect(queries[index].query).toContain(

@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+/**
+ * The old envelope shape, rebuilt from the (sql, params) argument pair so these
+ * assertions keep reading as "what statement, with what values".
+ */
+function bodyOf(call: unknown[]) {
+  return { query: String(call[0]), params: (call[1] ?? []) as unknown[] };
+}
+
 const dbQuery = vi.fn();
 
 vi.mock("../server/_core/db-query", () => ({
@@ -54,14 +62,12 @@ describe("transfers do not affect income/expense summaries (AC2)", () => {
       netBalance: 750,
     });
     expect(dbQuery).toHaveBeenCalledTimes(1);
-    expect(dbQuery.mock.calls[0]?.[1]).toMatchObject({
-      body: expect.objectContaining({
+    expect(bodyOf(dbQuery.mock.calls[0])).toMatchObject(
+      expect.objectContaining({
         query: expect.stringMatching(/FROM transactions/i),
       }),
-    });
-    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
-      /transfers/i,
     );
+    expect(String(dbQuery.mock.calls[0]?.[0])).not.toMatch(/transfers/i);
   });
 
   it("getMonthlyTrend only queries transactions", async () => {
@@ -70,12 +76,8 @@ describe("transfers do not affect income/expense summaries (AC2)", () => {
     await getMonthlyTrend(testId(1), 2026, 6, 3);
 
     expect(dbQuery).toHaveBeenCalledTimes(1);
-    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).toMatch(
-      /FROM transactions/i,
-    );
-    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
-      /transfers/i,
-    );
+    expect(String(dbQuery.mock.calls[0]?.[0])).toMatch(/FROM transactions/i);
+    expect(String(dbQuery.mock.calls[0]?.[0])).not.toMatch(/transfers/i);
   });
 
   it("getExpensesByCategory only queries transactions", async () => {
@@ -84,12 +86,8 @@ describe("transfers do not affect income/expense summaries (AC2)", () => {
     await getExpensesByCategory(testId(1), 2026, 6);
 
     expect(dbQuery).toHaveBeenCalledTimes(1);
-    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).toMatch(
-      /FROM transactions/i,
-    );
-    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
-      /transfers/i,
-    );
+    expect(String(dbQuery.mock.calls[0]?.[0])).toMatch(/FROM transactions/i);
+    expect(String(dbQuery.mock.calls[0]?.[0])).not.toMatch(/transfers/i);
   });
 
   it("getCategoryAnomalies only queries transactions", async () => {
@@ -98,12 +96,8 @@ describe("transfers do not affect income/expense summaries (AC2)", () => {
     await getCategoryAnomalies(testId(1), 2026, 6, 3);
 
     expect(dbQuery).toHaveBeenCalledTimes(1);
-    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).toMatch(
-      /FROM transactions/i,
-    );
-    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
-      /transfers/i,
-    );
+    expect(String(dbQuery.mock.calls[0]?.[0])).toMatch(/FROM transactions/i);
+    expect(String(dbQuery.mock.calls[0]?.[0])).not.toMatch(/transfers/i);
   });
 
   it("getRecentTransactions only queries transactions", async () => {
@@ -112,11 +106,7 @@ describe("transfers do not affect income/expense summaries (AC2)", () => {
     await getRecentTransactions(testId(1), 5);
 
     expect(dbQuery).toHaveBeenCalledTimes(1);
-    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).toMatch(
-      /FROM transactions/i,
-    );
-    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
-      /transfers/i,
-    );
+    expect(String(dbQuery.mock.calls[0]?.[0])).toMatch(/FROM transactions/i);
+    expect(String(dbQuery.mock.calls[0]?.[0])).not.toMatch(/transfers/i);
   });
 });

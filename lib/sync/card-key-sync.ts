@@ -33,13 +33,10 @@ export async function adoptAccountCardKeyForDevice(
 
   const accountKey = await client.security.getCardKey.query();
 
-  const rows = (await dbQuery("Database/query", {
-    body: {
-      query:
-        "SELECT id, cardNumber FROM creditCards WHERE cardNumber IS NOT NULL",
-      params: [],
-    },
-  })) as Array<{ id: Id; cardNumber: string }>;
+  const rows = (await dbQuery(
+    "SELECT id, cardNumber FROM creditCards WHERE cardNumber IS NOT NULL",
+    [],
+  )) as Array<{ id: Id; cardNumber: string }>;
 
   let reencrypted = 0;
   for (const row of rows) {
@@ -52,12 +49,10 @@ export async function adoptAccountCardKeyForDevice(
     // `dirty = 1` so the re-encrypted value actually reaches the account. A
     // card that had already synced under the device key is otherwise clean,
     // and would leave the unreadable ciphertext sitting on the server.
-    await dbQuery("Database/query", {
-      body: {
-        query: "UPDATE creditCards SET cardNumber = ?, dirty = 1 WHERE id = ?",
-        params: [rewritten, row.id],
-      },
-    });
+    await dbQuery(
+      "UPDATE creditCards SET cardNumber = ?, dirty = 1 WHERE id = ?",
+      [rewritten, row.id],
+    );
     reencrypted++;
   }
 

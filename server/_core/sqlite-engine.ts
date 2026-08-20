@@ -7,7 +7,7 @@ import {
 
 /**
  * The local data engine — everything `db-query.native.ts` needs to answer a
- * `dbQuery("Database/query", ...)` call against on-device SQLite,
+ * `dbQuery(sql, params)` call against on-device SQLite,
  * factored out from any concrete SQLite binding.
  *
  * `server/db.ts` was written against `mysql2`'s query/param/result shapes
@@ -278,23 +278,8 @@ function isSelectLike(sql: string): boolean {
  */
 export function createSqliteDataApi(
   driver: SqliteDriver,
-): (
-  apiId: string,
-  options?: { body?: Record<string, unknown> },
-) => Promise<unknown> {
-  return async function dbQuery(apiId, options = {}) {
-    if (apiId !== "Database/query") {
-      throw new Error(
-        `sqlite-engine: API "${apiId}" is not implemented by the local data layer`,
-      );
-    }
-
-    const rawSql = options.body?.query as string | undefined;
-    const rawParams = (options.body?.params as unknown[]) ?? [];
-    if (!rawSql) {
-      throw new Error("sqlite-engine: Database/query requires body.query");
-    }
-
+): (sql: string, params?: unknown[]) => Promise<unknown> {
+  return async function dbQuery(rawSql, rawParams = []) {
     const { sql, params } = translateStatement(rawSql, rawParams);
 
     if (isSelectLike(sql)) {

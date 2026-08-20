@@ -37,12 +37,10 @@ export async function getDirtyRows(
   userId: Id,
   limit = 500,
 ): Promise<Record<string, unknown>[]> {
-  const result = await dbQuery("Database/query", {
-    body: {
-      query: `SELECT * FROM ${table} WHERE userId = ? AND dirty = 1 ORDER BY updatedAt ASC LIMIT ?`,
-      params: [userId, limit],
-    },
-  });
+  const result = await dbQuery(
+    `SELECT * FROM ${table} WHERE userId = ? AND dirty = 1 ORDER BY updatedAt ASC LIMIT ?`,
+    [userId, limit],
+  );
   return Array.isArray(result) ? (result as Record<string, unknown>[]) : [];
 }
 
@@ -56,14 +54,12 @@ export async function getDirtyRows(
  */
 export async function allocateServerSeqBlock(count: number): Promise<number> {
   if (count <= 0) return 0;
-  const result = (await dbQuery("Database/query", {
-    body: {
-      query: `INSERT INTO syncSequence (createdAt) VALUES ${Array(count)
-        .fill("(NOW())")
-        .join(", ")}`,
-      params: [],
-    },
-  })) as { insertId?: number };
+  const result = (await dbQuery(
+    `INSERT INTO syncSequence (createdAt) VALUES ${Array(count)
+      .fill("(NOW())")
+      .join(", ")}`,
+    [],
+  )) as { insertId?: number };
   const firstSeq = result?.insertId;
   if (!firstSeq) {
     throw new Error("Failed to allocate a serverSeq block");
@@ -95,14 +91,12 @@ async function assertRowsOwnedByCaller(
   const ids = rows.map((row) => row.id).filter((id) => typeof id === "string");
   if (ids.length === 0) return;
 
-  const foreign = await dbQuery("Database/query", {
-    body: {
-      query: `SELECT id FROM ${table} WHERE id IN (${ids
-        .map(() => "?")
-        .join(", ")}) AND userId <> ?`,
-      params: [...ids, userId],
-    },
-  });
+  const foreign = await dbQuery(
+    `SELECT id FROM ${table} WHERE id IN (${ids
+      .map(() => "?")
+      .join(", ")}) AND userId <> ?`,
+    [...ids, userId],
+  );
 
   if (Array.isArray(foreign) && foreign.length > 0) {
     throw new TRPCError({
@@ -147,16 +141,14 @@ export async function applyPushedRows(
       return row[c];
     });
 
-    await dbQuery("Database/query", {
-      body: {
-        query: `
+    await dbQuery(
+      `
           INSERT INTO ${table} (${columns.join(", ")})
           VALUES (${columns.map(() => "?").join(", ")})
           ON DUPLICATE KEY UPDATE ${updateClause}
         `,
-        params: values,
-      },
-    });
+      values,
+    );
     results.push({ id: row.id as Id, serverSeq });
   }
   return results;
@@ -188,23 +180,19 @@ export async function sequenceServerWrites(
   let sequenced = 0;
 
   for (const table of tables) {
-    const rows = (await dbQuery("Database/query", {
-      body: {
-        query: `SELECT id FROM ${table} WHERE userId = ? AND dirty = 1 ORDER BY updatedAt ASC`,
-        params: [userId],
-      },
-    })) as Array<{ id: Id }>;
+    const rows = (await dbQuery(
+      `SELECT id FROM ${table} WHERE userId = ? AND dirty = 1 ORDER BY updatedAt ASC`,
+      [userId],
+    )) as Array<{ id: Id }>;
 
     if (rows.length === 0) continue;
 
     const firstSeq = await allocateServerSeqBlock(rows.length);
     for (let i = 0; i < rows.length; i++) {
-      await dbQuery("Database/query", {
-        body: {
-          query: `UPDATE ${table} SET serverSeq = ?, dirty = 0 WHERE id = ?`,
-          params: [firstSeq + i, rows[i].id],
-        },
-      });
+      await dbQuery(
+        `UPDATE ${table} SET serverSeq = ?, dirty = 0 WHERE id = ?`,
+        [firstSeq + i, rows[i].id],
+      );
     }
     sequenced += rows.length;
   }
@@ -225,9 +213,10 @@ export async function sequenceServerWrites(
  * is picked up by the next one.
  */
 export async function getHeadSeq(): Promise<number> {
-  const rows = (await dbQuery("Database/query", {
-    body: { query: "SELECT MAX(seq) AS head FROM syncSequence", params: [] },
-  })) as Array<{ head: number | null }>;
+  const rows = (await dbQuery(
+    "SELECT MAX(seq) AS head FROM syncSequence",
+    [],
+  )) as Array<{ head: number | null }>;
   return rows[0]?.head ?? 0;
 }
 
@@ -251,27 +240,22 @@ export async function backfillServerSeq(
   const assigned: Record<string, number> = {};
 
   for (const table of tables) {
-    const rows = (await dbQuery("Database/query", {
-      body: {
-        query: `SELECT id FROM ${table} WHERE serverSeq IS NULL ORDER BY id ASC`,
-        params: [],
-      },
-    })) as Array<{ id: Id }>;
+    const rows = (await dbQuery(
+      `SELECT id FROM ${table} WHERE serverSeq IS NULL ORDER BY id ASC`,
+      [],
+    )) as Array<{ id: Id }>;
 
     if (rows.length === 0) continue;
 
     const firstSeq = await allocateServerSeqBlock(rows.length);
     for (let i = 0; i < rows.length; i++) {
-      await dbQuery("Database/query", {
-        body: {
-          // `dirty` is a client-side concept — a row sitting on the server is
-          // by definition not pending upload. These rows carry the column
-          // default (1) simply because nothing ever wrote them through the
-          // sync path.
-          query: `UPDATE ${table} SET serverSeq = ?, dirty = 0 WHERE id = ?`,
-          params: [firstSeq + i, rows[i].id],
-        },
-      });
+      // `dirty` is a client-side concept — a row sitting on the server is by
+      // definition not pending upload. These rows carry the column default (1)
+      // simply because nothing ever wrote them through the sync path.
+      await dbQuery(
+        `UPDATE ${table} SET serverSeq = ?, dirty = 0 WHERE id = ?`,
+        [firstSeq + i, rows[i].id],
+      );
     }
     assigned[table] = rows.length;
   }
@@ -286,12 +270,10 @@ export async function getRowsSince(
   sinceSeq: number,
   limit = 500,
 ): Promise<Record<string, unknown>[]> {
-  const result = await dbQuery("Database/query", {
-    body: {
-      query: `SELECT * FROM ${table} WHERE userId = ? AND serverSeq > ? ORDER BY serverSeq ASC LIMIT ?`,
-      params: [userId, sinceSeq, limit],
-    },
-  });
+  const result = await dbQuery(
+    `SELECT * FROM ${table} WHERE userId = ? AND serverSeq > ? ORDER BY serverSeq ASC LIMIT ?`,
+    [userId, sinceSeq, limit],
+  );
   return Array.isArray(result) ? (result as Record<string, unknown>[]) : [];
 }
 
@@ -315,12 +297,9 @@ export async function applyIncomingRow(
   incoming: Record<string, unknown>,
 ): Promise<"applied" | "skipped-local-newer"> {
   const columns = syncTableColumns(table);
-  const existingRows = (await dbQuery("Database/query", {
-    body: {
-      query: `SELECT * FROM ${table} WHERE id = ?`,
-      params: [incoming.id],
-    },
-  })) as Record<string, unknown>[];
+  const existingRows = (await dbQuery(`SELECT * FROM ${table} WHERE id = ?`, [
+    incoming.id,
+  ])) as Record<string, unknown>[];
   const existing = existingRows[0];
 
   if (existing && rowUpdatedAtMs(existing) > rowUpdatedAtMs(incoming)) {
@@ -333,16 +312,14 @@ export async function applyIncomingRow(
     .join(", ");
   const values = columns.map((c) => (c === "dirty" ? false : incoming[c]));
 
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO ${table} (${columns.join(", ")})
         VALUES (${columns.map(() => "?").join(", ")})
         ON DUPLICATE KEY UPDATE ${updateClause}
       `,
-      params: values,
-    },
-  });
+    values,
+  );
   return "applied";
 }
 
@@ -352,12 +329,10 @@ export async function markRowsSynced(
   updates: Array<{ id: Id; serverSeq: number }>,
 ): Promise<void> {
   for (const { id, serverSeq } of updates) {
-    await dbQuery("Database/query", {
-      body: {
-        query: `UPDATE ${table} SET serverSeq = ?, dirty = 0 WHERE id = ?`,
-        params: [serverSeq, id],
-      },
-    });
+    await dbQuery(`UPDATE ${table} SET serverSeq = ?, dirty = 0 WHERE id = ?`, [
+      serverSeq,
+      id,
+    ]);
   }
 }
 
@@ -377,12 +352,10 @@ export async function reownLocalData(
   toUserId: Id,
 ): Promise<void> {
   for (const table of tables) {
-    await dbQuery("Database/query", {
-      body: {
-        query: `UPDATE ${table} SET userId = ?, dirty = 1 WHERE userId = ?`,
-        params: [toUserId, fromUserId],
-      },
-    });
+    await dbQuery(
+      `UPDATE ${table} SET userId = ?, dirty = 1 WHERE userId = ?`,
+      [toUserId, fromUserId],
+    );
   }
 }
 
@@ -399,12 +372,7 @@ export async function markAllDirty(
   userId: Id,
 ): Promise<void> {
   for (const table of tables) {
-    await dbQuery("Database/query", {
-      body: {
-        query: `UPDATE ${table} SET dirty = 1 WHERE userId = ?`,
-        params: [userId],
-      },
-    });
+    await dbQuery(`UPDATE ${table} SET dirty = 1 WHERE userId = ?`, [userId]);
   }
 }
 
@@ -419,12 +387,7 @@ export async function discardLocalData(
   userId: Id,
 ): Promise<void> {
   for (const table of tables) {
-    await dbQuery("Database/query", {
-      body: {
-        query: `DELETE FROM ${table} WHERE userId = ?`,
-        params: [userId],
-      },
-    });
+    await dbQuery(`DELETE FROM ${table} WHERE userId = ?`, [userId]);
   }
 }
 
@@ -452,12 +415,10 @@ export async function accountHasAnyData(
     const ignoreSeeded = SEEDED_DEFAULT_TABLES.has(table)
       ? " AND isDefault = 0"
       : "";
-    const result = await dbQuery("Database/query", {
-      body: {
-        query: `SELECT id FROM ${table} WHERE userId = ? AND deletedAt IS NULL${ignoreSeeded} LIMIT 1`,
-        params: [userId],
-      },
-    });
+    const result = await dbQuery(
+      `SELECT id FROM ${table} WHERE userId = ? AND deletedAt IS NULL${ignoreSeeded} LIMIT 1`,
+      [userId],
+    );
     if (Array.isArray(result) && result.length > 0) return true;
   }
   return false;
@@ -476,12 +437,10 @@ const PURGE_WATERMARK_ID = 1;
  * have carried every tombstone it needed.
  */
 export async function getPurgeWatermark(): Promise<number> {
-  const rows = (await dbQuery("Database/query", {
-    body: {
-      query: "SELECT purgedUpToSeq FROM syncPurgeWatermark WHERE id = ?",
-      params: [PURGE_WATERMARK_ID],
-    },
-  })) as Array<{ purgedUpToSeq: number }>;
+  const rows = (await dbQuery(
+    "SELECT purgedUpToSeq FROM syncPurgeWatermark WHERE id = ?",
+    [PURGE_WATERMARK_ID],
+  )) as Array<{ purgedUpToSeq: number }>;
   return rows[0]?.purgedUpToSeq ?? 0;
 }
 
@@ -502,12 +461,10 @@ export async function purgeOldTombstones(
   let maxSeqSeen = await getPurgeWatermark();
 
   for (const table of tables) {
-    const candidates = (await dbQuery("Database/query", {
-      body: {
-        query: `SELECT id, serverSeq FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`,
-        params: [olderThan],
-      },
-    })) as Array<{ id: string; serverSeq: number | null }>;
+    const candidates = (await dbQuery(
+      `SELECT id, serverSeq FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`,
+      [olderThan],
+    )) as Array<{ id: string; serverSeq: number | null }>;
 
     if (candidates.length === 0) continue;
 
@@ -520,22 +477,17 @@ export async function purgeOldTombstones(
       }
     }
 
-    await dbQuery("Database/query", {
-      body: {
-        query: `DELETE FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`,
-        params: [olderThan],
-      },
-    });
+    await dbQuery(
+      `DELETE FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`,
+      [olderThan],
+    );
     purgedCount += candidates.length;
   }
 
-  await dbQuery("Database/query", {
-    body: {
-      query:
-        "UPDATE syncPurgeWatermark SET purgedUpToSeq = ? WHERE id = ? AND purgedUpToSeq < ?",
-      params: [maxSeqSeen, PURGE_WATERMARK_ID, maxSeqSeen],
-    },
-  });
+  await dbQuery(
+    "UPDATE syncPurgeWatermark SET purgedUpToSeq = ? WHERE id = ? AND purgedUpToSeq < ?",
+    [maxSeqSeen, PURGE_WATERMARK_ID, maxSeqSeen],
+  );
 
   return { purgedCount, newWatermark: maxSeqSeen };
 }

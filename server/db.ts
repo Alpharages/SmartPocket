@@ -52,9 +52,7 @@ import {
  */
 async function getDb() {
   try {
-    const result = await dbQuery("Database/query", {
-      body: { query: "SELECT 1" },
-    });
+    const result = await dbQuery("SELECT 1");
     return result ? true : null;
   } catch {
     return null;
@@ -66,12 +64,9 @@ async function getDb() {
 // ============================================================================
 
 export async function getUserByOpenId(openId: string) {
-  const result = await dbQuery("Database/query", {
-    body: {
-      query: "SELECT * FROM users WHERE openId = ?",
-      params: [openId],
-    },
-  });
+  const result = await dbQuery("SELECT * FROM users WHERE openId = ?", [
+    openId,
+  ]);
   return result && Array.isArray(result) ? result[0] : null;
 }
 
@@ -84,12 +79,9 @@ export async function getUserByOpenId(openId: string) {
  * out which one holds their data.
  */
 export async function getUserByEmail(email: string) {
-  const result = await dbQuery("Database/query", {
-    body: {
-      query: "SELECT * FROM users WHERE email = ?",
-      params: [email.trim().toLowerCase()],
-    },
-  });
+  const result = await dbQuery("SELECT * FROM users WHERE email = ?", [
+    email.trim().toLowerCase(),
+  ]);
   return result && Array.isArray(result) ? result[0] : null;
 }
 
@@ -111,39 +103,32 @@ export async function createPasswordUser(data: {
   name?: string | null;
 }): Promise<Id> {
   const id = ulid();
-  await dbQuery("Database/query", {
-    body: {
-      // Every value is a parameter — no `'password'` or `NOW()` literals in
-      // the statement. The dev database (server/_core/devDb.ts) maps columns
-      // onto params positionally and does not evaluate SQL expressions, so a
-      // literal silently lands as NULL there while working fine against real
-      // MySQL. That is a difference the dev environment should not have.
-      query: `
+  // Every value is a parameter — no `'password'` or `NOW()` literals in the
+  // statement. The dev database (server/_core/devDb.ts) maps columns onto
+  // params positionally and does not evaluate SQL expressions, so a literal
+  // silently lands as NULL there while working fine against real MySQL. That
+  // is a difference the dev environment should not have.
+  await dbQuery(
+    `
         INSERT INTO users (id, openId, email, passwordHash, name, loginMethod, lastSignedIn)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        id,
-        ulid(),
-        data.email.trim().toLowerCase(),
-        data.passwordHash,
-        data.name ?? null,
-        "password",
-        new Date(),
-      ],
-    },
-  });
+    [
+      id,
+      ulid(),
+      data.email.trim().toLowerCase(),
+      data.passwordHash,
+      data.name ?? null,
+      "password",
+      new Date(),
+    ],
+  );
   return id;
 }
 
 /** Stamps a successful sign-in. Best-effort: a failed write must not fail the login. */
 export async function touchLastSignedIn(id: Id): Promise<void> {
-  await dbQuery("Database/query", {
-    body: {
-      query: "UPDATE users SET lastSignedIn = NOW() WHERE id = ?",
-      params: [id],
-    },
-  });
+  await dbQuery("UPDATE users SET lastSignedIn = NOW() WHERE id = ?", [id]);
 }
 
 /**
@@ -164,12 +149,7 @@ export async function touchLastSignedIn(id: Id): Promise<void> {
  * the server's own `users` table is never touched by this path.
  */
 export async function reassignUserId(fromId: Id, toId: Id) {
-  await dbQuery("Database/query", {
-    body: {
-      query: "UPDATE users SET id = ? WHERE id = ?",
-      params: [toId, fromId],
-    },
-  });
+  await dbQuery("UPDATE users SET id = ? WHERE id = ?", [toId, fromId]);
 }
 
 export async function upsertUser(data: {
@@ -199,17 +179,15 @@ export async function upsertUser(data: {
     .filter((column) => column !== "openId" && column !== "id")
     .map((column) => `${column} = VALUES(${column})`);
 
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO users (${columns.join(", ")})
         VALUES (${columns.map(() => "?").join(", ")})
         ON DUPLICATE KEY UPDATE
           ${updates.length > 0 ? updates.join(", ") : "openId = openId"}
       `,
-      params: values,
-    },
-  });
+    values,
+  );
 }
 
 /**
@@ -244,12 +222,10 @@ function coerceDbBoolean(value: unknown): boolean {
 export async function getUserSettings(
   userId: Id,
 ): Promise<{ aiEnabled: boolean; remindersEnabled: boolean }> {
-  const result = await dbQuery("Database/query", {
-    body: {
-      query: "SELECT aiEnabled, remindersEnabled FROM users WHERE id = ?",
-      params: [userId],
-    },
-  });
+  const result = await dbQuery(
+    "SELECT aiEnabled, remindersEnabled FROM users WHERE id = ?",
+    [userId],
+  );
 
   const row = result && Array.isArray(result) ? result[0] : null;
   if (!row) {
@@ -266,12 +242,10 @@ export async function updateAiEnabled(
   userId: Id,
   enabled: boolean,
 ): Promise<void> {
-  await dbQuery("Database/query", {
-    body: {
-      query: "UPDATE users SET aiEnabled = ? WHERE id = ?",
-      params: [enabled, userId],
-    },
-  });
+  await dbQuery("UPDATE users SET aiEnabled = ? WHERE id = ?", [
+    enabled,
+    userId,
+  ]);
 }
 
 // ============================================================================
@@ -285,13 +259,10 @@ export interface UserPinState {
 }
 
 export async function getUserPinState(userId: Id): Promise<UserPinState> {
-  const result = await dbQuery("Database/query", {
-    body: {
-      query:
-        "SELECT pinHash, pinFailedAttempts, pinLockedUntil FROM users WHERE id = ?",
-      params: [userId],
-    },
-  });
+  const result = await dbQuery(
+    "SELECT pinHash, pinFailedAttempts, pinLockedUntil FROM users WHERE id = ?",
+    [userId],
+  );
   const row = Array.isArray(result)
     ? (result[0] as Record<string, unknown>)
     : null;
@@ -309,34 +280,25 @@ export async function getUserPinState(userId: Id): Promise<UserPinState> {
 
 /** Stores the salted hash and resets attempt/lockout state — a fresh PIN starts with a clean slate. */
 export async function setUserPin(userId: Id, pinHash: string): Promise<void> {
-  await dbQuery("Database/query", {
-    body: {
-      query:
-        "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-      params: [pinHash, 0, null, userId],
-    },
-  });
+  await dbQuery(
+    "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+    [pinHash, 0, null, userId],
+  );
 }
 
 export async function clearUserPin(userId: Id): Promise<void> {
-  await dbQuery("Database/query", {
-    body: {
-      query:
-        "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-      params: [null, 0, null, userId],
-    },
-  });
+  await dbQuery(
+    "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+    [null, 0, null, userId],
+  );
 }
 
 /** Clears failed-attempt/lockout state without touching the hash — used after a successful verify. */
 export async function resetPinAttempts(userId: Id): Promise<void> {
-  await dbQuery("Database/query", {
-    body: {
-      query:
-        "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-      params: [0, null, userId],
-    },
-  });
+  await dbQuery(
+    "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+    [0, null, userId],
+  );
 }
 
 /**
@@ -349,13 +311,10 @@ export async function resetExpiredPinLockout(
   userId: Id,
   now: Date,
 ): Promise<void> {
-  await dbQuery("Database/query", {
-    body: {
-      query:
-        "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ? AND pinLockedUntil IS NOT NULL AND pinLockedUntil <= ?",
-      params: [0, null, userId, now],
-    },
-  });
+  await dbQuery(
+    "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ? AND pinLockedUntil IS NOT NULL AND pinLockedUntil <= ?",
+    [0, null, userId, now],
+  );
 }
 
 /**
@@ -383,13 +342,10 @@ export async function recordFailedPinAttempt(
   userId: Id,
   data: { maxAttempts: number; lockedUntilIfTripped: Date; now: Date },
 ): Promise<{ counted: boolean }> {
-  const result = await dbQuery("Database/query", {
-    body: {
-      query:
-        "UPDATE users SET pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL), pinFailedAttempts = pinFailedAttempts + 1 WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
-      params: [data.maxAttempts, data.lockedUntilIfTripped, userId, data.now],
-    },
-  });
+  const result = await dbQuery(
+    "UPDATE users SET pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL), pinFailedAttempts = pinFailedAttempts + 1 WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
+    [data.maxAttempts, data.lockedUntilIfTripped, userId, data.now],
+  );
   const affectedRows =
     result && typeof result === "object" && "affectedRows" in result
       ? (result as { affectedRows: number }).affectedRows
@@ -424,9 +380,7 @@ export async function getUserCategories(
       : "SELECT * FROM categories WHERE userId = ? AND deletedAt IS NULL ORDER BY name";
     const params = type ? [userId, type] : [userId];
 
-    const result = await dbQuery("Database/query", {
-      body: { query, params },
-    });
+    const result = await dbQuery(query, params);
     return Array.isArray(result) ? result : [];
   } catch (error) {
     rethrowReadFailure("getUserCategories", error);
@@ -435,36 +389,31 @@ export async function getUserCategories(
 
 export async function createCategory(data: InsertCategory) {
   const id = ulid();
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO categories (id, userId, name, type, color, icon, isDefault)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        id,
-        data.userId,
-        data.name,
-        data.type,
-        // Assign a distinct palette token by name when no color is supplied.
-        data.color || getCategoryColorForName(data.name),
-        data.icon || DEFAULT_CATEGORY_ICON,
-        data.isDefault || false,
-      ],
-    },
-  });
+    [
+      id,
+      data.userId,
+      data.name,
+      data.type,
+      // Assign a distinct palette token by name when no color is supplied.
+      data.color || getCategoryColorForName(data.name),
+      data.icon || DEFAULT_CATEGORY_ICON,
+      data.isDefault || false,
+    ],
+  );
   return id;
 }
 
 /** Idempotent: seeds DEFAULT_CATEGORIES once per user when they have zero categories. */
 export async function seedDefaultCategories(userId: Id): Promise<void> {
-  const countResult = await dbQuery("Database/query", {
-    body: {
-      query:
-        "SELECT COUNT(*) as categoryCount FROM categories WHERE userId = ? AND deletedAt IS NULL",
-      params: [userId],
-    },
-  });
+  const countResult = await dbQuery(
+    "SELECT COUNT(*) as categoryCount FROM categories WHERE userId = ? AND deletedAt IS NULL",
+    [userId],
+  );
 
   const row =
     Array.isArray(countResult) && countResult.length > 0
@@ -539,33 +488,26 @@ export async function updateCategory(
   const { clause, values } = buildUpdate("categories", data);
   if (!clause) return;
 
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE categories SET ${clause}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [...values, writeStamp(), id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE categories SET ${clause}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [...values, writeStamp(), id, userId],
+  );
 }
 
 export async function deleteCategory(id: Id, userId: Id) {
   const stamp = writeStamp();
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE categories SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [stamp, stamp, id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE categories SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [stamp, stamp, id, userId],
+  );
 }
 
 export async function getCategoryById(id: Id, userId: Id) {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM categories WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [id, userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM categories WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [id, userId],
+    );
     return Array.isArray(result) ? (result[0] ?? null) : null;
   } catch (error) {
     rethrowReadFailure("getCategoryById", error);
@@ -608,13 +550,10 @@ export async function getUserCreditCards(
   userId: Id,
 ): Promise<SafeCreditCard[]> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM creditCards WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
-        params: [userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM creditCards WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
+      [userId],
+    );
     const rows = Array.isArray(result) ? result : [];
     return await Promise.all(
       rows.map((row) => toSafeCreditCard(row as CreditCard)),
@@ -628,26 +567,24 @@ export async function createCreditCard(
   data: InsertCreditCard,
 ): Promise<SafeCreditCard | null> {
   const id = ulid();
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO creditCards (id, userId, name, cardNumber, cardholderName, expiryMonth, expiryYear, creditLimit, color, cardType)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        id,
-        data.userId,
-        data.name,
-        await encryptCardNumber(data.cardNumber, data.userId),
-        data.cardholderName,
-        data.expiryMonth,
-        data.expiryYear,
-        data.creditLimit,
-        data.color || CATEGORY_DEFAULT_COLOR,
-        data.cardType || "credit",
-      ],
-    },
-  });
+    [
+      id,
+      data.userId,
+      data.name,
+      await encryptCardNumber(data.cardNumber, data.userId),
+      data.cardholderName,
+      data.expiryMonth,
+      data.expiryYear,
+      data.creditLimit,
+      data.color || CATEGORY_DEFAULT_COLOR,
+      data.cardType || "credit",
+    ],
+  );
   return getCreditCardById(id, data.userId);
 }
 
@@ -669,12 +606,10 @@ export async function updateCreditCard(
   const { clause, values } = buildUpdate("creditCards", payload);
 
   if (clause) {
-    await dbQuery("Database/query", {
-      body: {
-        query: `UPDATE creditCards SET ${clause}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-        params: [...values, writeStamp(), id, userId],
-      },
-    });
+    await dbQuery(
+      `UPDATE creditCards SET ${clause}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+      [...values, writeStamp(), id, userId],
+    );
   }
 
   return getCreditCardById(id, userId);
@@ -682,12 +617,10 @@ export async function updateCreditCard(
 
 export async function deleteCreditCard(id: Id, userId: Id) {
   const stamp = writeStamp();
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE creditCards SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [stamp, stamp, id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE creditCards SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [stamp, stamp, id, userId],
+  );
 }
 
 export async function getCreditCardById(
@@ -695,13 +628,10 @@ export async function getCreditCardById(
   userId: Id,
 ): Promise<SafeCreditCard | null> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM creditCards WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [id, userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM creditCards WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [id, userId],
+    );
     const row = Array.isArray(result) ? result[0] : null;
     return row ? await toSafeCreditCard(row as CreditCard) : null;
   } catch (error) {
@@ -715,13 +645,10 @@ export async function getCreditCardById(
 
 export async function getUserAccounts(userId: Id): Promise<Account[]> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM accounts WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
-        params: [userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM accounts WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
+      [userId],
+    );
     return Array.isArray(result) ? (result as Account[]) : [];
   } catch (error) {
     rethrowReadFailure("getUserAccounts", error);
@@ -732,22 +659,20 @@ export async function createAccount(
   data: InsertAccount,
 ): Promise<Account | null> {
   const id = ulid();
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO accounts (id, userId, name, type, currency, isDefault)
         VALUES (?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        id,
-        data.userId,
-        data.name,
-        data.type,
-        data.currency ?? "USD",
-        data.isDefault ?? false,
-      ],
-    },
-  });
+    [
+      id,
+      data.userId,
+      data.name,
+      data.type,
+      data.currency ?? "USD",
+      data.isDefault ?? false,
+    ],
+  );
   return getAccountById(id, data.userId);
 }
 
@@ -765,24 +690,20 @@ export async function updateAccount(
     return getAccountById(id, userId);
   }
 
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE accounts SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [...values, writeStamp(), id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE accounts SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [...values, writeStamp(), id, userId],
+  );
 
   return getAccountById(id, userId);
 }
 
 export async function deleteAccount(id: Id, userId: Id): Promise<void> {
   const stamp = writeStamp();
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE accounts SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [stamp, stamp, id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE accounts SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [stamp, stamp, id, userId],
+  );
 }
 
 export async function getAccountById(
@@ -790,13 +711,10 @@ export async function getAccountById(
   userId: Id,
 ): Promise<Account | null> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [id, userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [id, userId],
+    );
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Account) : null;
   } catch (error) {
@@ -808,13 +726,10 @@ export async function getAccountTransactionCount(
   accountId: Id,
   userId: Id,
 ): Promise<number> {
-  const result = await dbQuery("Database/query", {
-    body: {
-      query:
-        "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ? AND deletedAt IS NULL",
-      params: [userId, accountId],
-    },
-  });
+  const result = await dbQuery(
+    "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ? AND deletedAt IS NULL",
+    [userId, accountId],
+  );
   const row =
     Array.isArray(result) && result.length > 0
       ? (result[0] as Record<string, unknown>)
@@ -826,13 +741,10 @@ export async function getAccountTransferCount(
   accountId: Id,
   userId: Id,
 ): Promise<number> {
-  const result = await dbQuery("Database/query", {
-    body: {
-      query:
-        "SELECT COUNT(*) as transferCount FROM transfers WHERE userId = ? AND (fromAccountId = ? OR toAccountId = ?) AND deletedAt IS NULL",
-      params: [userId, accountId, accountId],
-    },
-  });
+  const result = await dbQuery(
+    "SELECT COUNT(*) as transferCount FROM transfers WHERE userId = ? AND (fromAccountId = ? OR toAccountId = ?) AND deletedAt IS NULL",
+    [userId, accountId, accountId],
+  );
   const row =
     Array.isArray(result) && result.length > 0
       ? (result[0] as Record<string, unknown>)
@@ -844,23 +756,21 @@ export async function createTransfer(
   data: InsertTransfer,
 ): Promise<Transfer | null> {
   const id = ulid();
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO transfers (id, userId, fromAccountId, toAccountId, amount, description, date)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        id,
-        data.userId,
-        data.fromAccountId,
-        data.toAccountId,
-        data.amount,
-        data.description || null,
-        data.date,
-      ],
-    },
-  });
+    [
+      id,
+      data.userId,
+      data.fromAccountId,
+      data.toAccountId,
+      data.amount,
+      data.description || null,
+      data.date,
+    ],
+  );
   return getTransferById(id, data.userId);
 }
 
@@ -869,13 +779,10 @@ export async function getTransferById(
   userId: Id,
 ): Promise<Transfer | null> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transfers WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [id, userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM transfers WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [id, userId],
+    );
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Transfer) : null;
   } catch (error) {
@@ -885,13 +792,10 @@ export async function getTransferById(
 
 export async function getUserTransfers(userId: Id): Promise<Transfer[]> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transfers WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC, id DESC",
-        params: [userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM transfers WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC, id DESC",
+      [userId],
+    );
     return Array.isArray(result) ? (result as Transfer[]) : [];
   } catch (error) {
     rethrowReadFailure("getUserTransfers", error);
@@ -906,30 +810,22 @@ export async function reassignAccountTransfers(
   // Direct legs between source and target are absorbed when merging accounts.
   // Tombstoned rather than dropped so the absorption reaches other devices.
   const stamp = writeStamp();
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE transfers SET ${TOMBSTONE_SET} WHERE userId = ? AND fromAccountId = ? AND toAccountId = ? AND deletedAt IS NULL`,
-      params: [stamp, stamp, userId, fromAccountId, toAccountId],
-    },
-  });
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE transfers SET ${TOMBSTONE_SET} WHERE userId = ? AND fromAccountId = ? AND toAccountId = ? AND deletedAt IS NULL`,
-      params: [stamp, stamp, userId, toAccountId, fromAccountId],
-    },
-  });
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE transfers SET fromAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND fromAccountId = ? AND deletedAt IS NULL`,
-      params: [toAccountId, writeStamp(), userId, fromAccountId],
-    },
-  });
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE transfers SET toAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND toAccountId = ? AND deletedAt IS NULL`,
-      params: [toAccountId, writeStamp(), userId, fromAccountId],
-    },
-  });
+  await dbQuery(
+    `UPDATE transfers SET ${TOMBSTONE_SET} WHERE userId = ? AND fromAccountId = ? AND toAccountId = ? AND deletedAt IS NULL`,
+    [stamp, stamp, userId, fromAccountId, toAccountId],
+  );
+  await dbQuery(
+    `UPDATE transfers SET ${TOMBSTONE_SET} WHERE userId = ? AND fromAccountId = ? AND toAccountId = ? AND deletedAt IS NULL`,
+    [stamp, stamp, userId, toAccountId, fromAccountId],
+  );
+  await dbQuery(
+    `UPDATE transfers SET fromAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND fromAccountId = ? AND deletedAt IS NULL`,
+    [toAccountId, writeStamp(), userId, fromAccountId],
+  );
+  await dbQuery(
+    `UPDATE transfers SET toAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND toAccountId = ? AND deletedAt IS NULL`,
+    [toAccountId, writeStamp(), userId, fromAccountId],
+  );
 }
 
 export async function reassignAccountTransactions(
@@ -937,12 +833,10 @@ export async function reassignAccountTransactions(
   toAccountId: Id,
   userId: Id,
 ): Promise<void> {
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId = ? AND deletedAt IS NULL`,
-      params: [toAccountId, writeStamp(), userId, fromAccountId],
-    },
-  });
+  await dbQuery(
+    `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId = ? AND deletedAt IS NULL`,
+    [toAccountId, writeStamp(), userId, fromAccountId],
+  );
 }
 
 export async function reassignAndDeleteAccount(
@@ -967,13 +861,10 @@ export async function reassignAndDeleteAccount(
 
 /** Idempotent: creates a default Cash account and backfills null accountId rows. */
 export async function ensureDefaultAccount(userId: Id): Promise<void> {
-  const countResult = await dbQuery("Database/query", {
-    body: {
-      query:
-        "SELECT COUNT(*) as accountCount FROM accounts WHERE userId = ? AND deletedAt IS NULL",
-      params: [userId],
-    },
-  });
+  const countResult = await dbQuery(
+    "SELECT COUNT(*) as accountCount FROM accounts WHERE userId = ? AND deletedAt IS NULL",
+    [userId],
+  );
 
   const row =
     Array.isArray(countResult) && countResult.length > 0
@@ -995,12 +886,10 @@ export async function ensureDefaultAccount(userId: Id): Promise<void> {
     return;
   }
 
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId IS NULL AND deletedAt IS NULL`,
-      params: [created.id, writeStamp(), userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId IS NULL AND deletedAt IS NULL`,
+    [created.id, writeStamp(), userId],
+  );
 }
 
 // ============================================================================
@@ -1026,9 +915,7 @@ export async function getUserTransactions(
       params.push(offset);
     }
 
-    const result = await dbQuery("Database/query", {
-      body: { query, params },
-    });
+    const result = await dbQuery(query, params);
     return Array.isArray(result) ? result : [];
   } catch (error) {
     rethrowReadFailure("getUserTransactions", error);
@@ -1041,13 +928,10 @@ export async function getTransactionsByDateRange(
   endDate: Date,
 ) {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL ORDER BY date DESC",
-        params: [userId, startDate, endDate],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL ORDER BY date DESC",
+      [userId, startDate, endDate],
+    );
     return Array.isArray(result) ? result : [];
   } catch (error) {
     rethrowReadFailure("getTransactionsByDateRange", error);
@@ -1056,13 +940,10 @@ export async function getTransactionsByDateRange(
 
 export async function getTransactionsByCategory(userId: Id, categoryId: Id) {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transactions WHERE userId = ? AND categoryId = ? AND deletedAt IS NULL ORDER BY date DESC",
-        params: [userId, categoryId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM transactions WHERE userId = ? AND categoryId = ? AND deletedAt IS NULL ORDER BY date DESC",
+      [userId, categoryId],
+    );
     return Array.isArray(result) ? result : [];
   } catch (error) {
     rethrowReadFailure("getTransactionsByCategory", error);
@@ -1074,13 +955,10 @@ export async function getTransactionsByCreditCard(
   creditCardId: Id,
 ) {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transactions WHERE userId = ? AND creditCardId = ? AND deletedAt IS NULL ORDER BY date DESC",
-        params: [userId, creditCardId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM transactions WHERE userId = ? AND creditCardId = ? AND deletedAt IS NULL ORDER BY date DESC",
+      [userId, creditCardId],
+    );
     return Array.isArray(result) ? result : [];
   } catch (error) {
     rethrowReadFailure("getTransactionsByCreditCard", error);
@@ -1089,25 +967,23 @@ export async function getTransactionsByCreditCard(
 
 export async function createTransaction(data: InsertTransaction) {
   const id = ulid();
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO transactions (id, userId, categoryId, creditCardId, accountId, type, amount, description, date)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        id,
-        data.userId,
-        data.categoryId,
-        data.creditCardId || null,
-        data.accountId ?? null,
-        data.type,
-        data.amount,
-        data.description || null,
-        data.date,
-      ],
-    },
-  });
+    [
+      id,
+      data.userId,
+      data.categoryId,
+      data.creditCardId || null,
+      data.accountId ?? null,
+      data.type,
+      data.amount,
+      data.description || null,
+      data.date,
+    ],
+  );
   return id;
 }
 
@@ -1126,15 +1002,13 @@ export async function createTransactionsBulk(rows: InsertTransaction[]) {
     data.date,
   ]);
 
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO transactions (id, userId, categoryId, creditCardId, accountId, type, amount, description, date)
         VALUES ${rows.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}
       `,
-      params,
-    },
-  });
+    params,
+  );
   return rows.length;
 }
 
@@ -1151,22 +1025,18 @@ export async function updateTransaction(
   const updates = entries.map(([key]) => `${key} = ?`).join(", ");
   const values = entries.map(([, value]) => value);
 
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE transactions SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [...values, writeStamp(), id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE transactions SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [...values, writeStamp(), id, userId],
+  );
 }
 
 export async function deleteTransaction(id: Id, userId: Id) {
   const stamp = writeStamp();
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE transactions SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [stamp, stamp, id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE transactions SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [stamp, stamp, id, userId],
+  );
 }
 
 /** Wipes all user-owned rows. Three separate DELETEs (not transactional) — on partial failure, retry clears any remainder. */
@@ -1187,12 +1057,10 @@ export async function deleteAllUserData(userId: Id) {
     "creditCards",
     "categories",
   ]) {
-    await dbQuery("Database/query", {
-      body: {
-        query: `UPDATE ${table} SET ${TOMBSTONE_SET} WHERE userId = ? AND deletedAt IS NULL`,
-        params: [stamp, stamp, userId],
-      },
-    });
+    await dbQuery(
+      `UPDATE ${table} SET ${TOMBSTONE_SET} WHERE userId = ? AND deletedAt IS NULL`,
+      [stamp, stamp, userId],
+    );
   }
   // N7: "clear all data" must also drop the account-linked PIN — otherwise a
   // wiped account keeps a stale hash and lockout state.
@@ -1201,13 +1069,10 @@ export async function deleteAllUserData(userId: Id) {
 
 export async function getTransactionById(id: Id, userId: Id) {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [id, userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM transactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [id, userId],
+    );
     return Array.isArray(result) ? result[0] : null;
   } catch (error) {
     rethrowReadFailure("getTransactionById", error);
@@ -1222,13 +1087,10 @@ export async function getUserRecurringTransactions(
   userId: Id,
 ): Promise<RecurringTransaction[]> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM recurringTransactions WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
-        params: [userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM recurringTransactions WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
+      [userId],
+    );
     return Array.isArray(result) ? (result as RecurringTransaction[]) : [];
   } catch (error) {
     rethrowReadFailure("getUserRecurringTransactions", error);
@@ -1239,9 +1101,8 @@ export async function createRecurringTransaction(
   data: InsertRecurringTransaction,
 ): Promise<Id> {
   const id = ulid();
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO recurringTransactions (
           id, userId, categoryId, creditCardId, type, amount, description, frequency, \`interval\`,
           endCondition, occurrenceCount, endDate, startDate, nextRunDate, lastRunDate,
@@ -1249,27 +1110,26 @@ export async function createRecurringTransaction(
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        id,
-        data.userId,
-        data.categoryId,
-        data.creditCardId ?? null,
-        data.type,
-        data.amount,
-        data.description ?? null,
-        data.frequency,
-        data.interval ?? 1,
-        data.endCondition,
-        data.occurrenceCount ?? null,
-        data.endDate ?? null,
-        data.startDate,
-        data.nextRunDate,
-        data.lastRunDate ?? null,
-        data.generatedCount ?? 0,
-        data.isActive ?? true,
-      ],
-    },
-  });
+    [
+      id,
+      data.userId,
+      data.categoryId,
+      data.creditCardId ?? null,
+      data.type,
+      data.amount,
+      data.description ?? null,
+      data.frequency,
+      data.interval ?? 1,
+      data.endCondition,
+      data.occurrenceCount ?? null,
+      data.endDate ?? null,
+      data.startDate,
+      data.nextRunDate,
+      data.lastRunDate ?? null,
+      data.generatedCount ?? 0,
+      data.isActive ?? true,
+    ],
+  );
   return id;
 }
 
@@ -1289,12 +1149,10 @@ export async function updateRecurringTransaction(
     return;
   }
   const values = Object.values(data);
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE recurringTransactions SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [...values, writeStamp(), id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE recurringTransactions SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [...values, writeStamp(), id, userId],
+  );
 }
 
 export async function deleteRecurringTransaction(
@@ -1302,12 +1160,10 @@ export async function deleteRecurringTransaction(
   userId: Id,
 ): Promise<void> {
   const stamp = writeStamp();
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE recurringTransactions SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [stamp, stamp, id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE recurringTransactions SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [stamp, stamp, id, userId],
+  );
 }
 
 export async function getRecurringTransactionById(
@@ -1315,13 +1171,10 @@ export async function getRecurringTransactionById(
   userId: Id,
 ): Promise<RecurringTransaction | null> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM recurringTransactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [id, userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM recurringTransactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [id, userId],
+    );
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as RecurringTransaction) : null;
   } catch (error) {
@@ -1333,13 +1186,10 @@ export async function getDueRecurringTransactions(
   now: Date,
 ): Promise<RecurringTransaction[]> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM recurringTransactions WHERE isActive = 1 AND nextRunDate <= ? AND deletedAt IS NULL ORDER BY nextRunDate ASC",
-        params: [now],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM recurringTransactions WHERE isActive = 1 AND nextRunDate <= ? AND deletedAt IS NULL ORDER BY nextRunDate ASC",
+      [now],
+    );
     return Array.isArray(result) ? (result as RecurringTransaction[]) : [];
   } catch (error) {
     rethrowReadFailure("getDueRecurringTransactions", error);
@@ -1353,23 +1203,21 @@ export async function advanceRecurringTransaction(
     "nextRunDate" | "lastRunDate" | "generatedCount" | "isActive"
   >,
 ): Promise<void> {
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         UPDATE recurringTransactions
         SET nextRunDate = ?, lastRunDate = ?, generatedCount = ?, isActive = ?, ${TOUCH_SET}
         WHERE id = ? AND deletedAt IS NULL
       `,
-      params: [
-        updates.nextRunDate,
-        updates.lastRunDate ?? null,
-        updates.generatedCount,
-        updates.isActive,
-        writeStamp(),
-        id,
-      ],
-    },
-  });
+    [
+      updates.nextRunDate,
+      updates.lastRunDate ?? null,
+      updates.generatedCount,
+      updates.isActive,
+      writeStamp(),
+      id,
+    ],
+  );
 }
 
 // ============================================================================
@@ -1378,13 +1226,10 @@ export async function advanceRecurringTransaction(
 
 export async function getUserBudgets(userId: Id): Promise<Budget[]> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM budgets WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
-        params: [userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM budgets WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
+      [userId],
+    );
     return Array.isArray(result) ? (result as Budget[]) : [];
   } catch (error) {
     rethrowReadFailure("getUserBudgets", error);
@@ -1393,23 +1238,21 @@ export async function getUserBudgets(userId: Id): Promise<Budget[]> {
 
 export async function createBudget(data: InsertBudget): Promise<Id> {
   const id = ulid();
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO budgets (id, userId, categoryId, period, amount, startDate, endDate)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        id,
-        data.userId,
-        data.categoryId,
-        data.period,
-        data.amount,
-        data.startDate ?? null,
-        data.endDate ?? null,
-      ],
-    },
-  });
+    [
+      id,
+      data.userId,
+      data.categoryId,
+      data.period,
+      data.amount,
+      data.startDate ?? null,
+      data.endDate ?? null,
+    ],
+  );
   return id;
 }
 
@@ -1427,22 +1270,18 @@ export async function updateBudget(
     return;
   }
 
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE budgets SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [...values, writeStamp(), id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE budgets SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [...values, writeStamp(), id, userId],
+  );
 }
 
 export async function deleteBudget(id: Id, userId: Id): Promise<void> {
   const stamp = writeStamp();
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE budgets SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [stamp, stamp, id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE budgets SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [stamp, stamp, id, userId],
+  );
 }
 
 export async function getBudgetById(
@@ -1450,13 +1289,10 @@ export async function getBudgetById(
   userId: Id,
 ): Promise<Budget | null> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM budgets WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [id, userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM budgets WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [id, userId],
+    );
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Budget) : null;
   } catch (error) {
@@ -1505,13 +1341,10 @@ export async function getBudgetProgress(
       }
 
       try {
-        const result = await dbQuery("Database/query", {
-          body: {
-            query:
-              "SELECT amount FROM transactions WHERE userId = ? AND type = 'expense' AND categoryId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
-            params: [userId, budget.categoryId, start, end],
-          },
-        });
+        const result = await dbQuery(
+          "SELECT amount FROM transactions WHERE userId = ? AND type = 'expense' AND categoryId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
+          [userId, budget.categoryId, start, end],
+        );
 
         const spent = (Array.isArray(result) ? result : []).reduce(
           (sum, row: Record<string, unknown>) =>
@@ -1544,9 +1377,8 @@ export async function findActiveBudget(
       params.push(options.excludeId);
     }
 
-    const result = await dbQuery("Database/query", {
-      body: {
-        query: `
+    const result = await dbQuery(
+      `
           SELECT * FROM budgets
           WHERE userId = ? AND categoryId = ? AND period = ?
             AND deletedAt IS NULL
@@ -1555,9 +1387,8 @@ export async function findActiveBudget(
             ${excludeClause}
           LIMIT 1
         `,
-        params,
-      },
-    });
+      params,
+    );
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Budget) : null;
   } catch (error) {
@@ -1575,13 +1406,10 @@ export async function getMonthlySummary(
   month: number,
 ) {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM monthlySummaries WHERE userId = ? AND year = ? AND month = ? AND deletedAt IS NULL",
-        params: [userId, year, month],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM monthlySummaries WHERE userId = ? AND year = ? AND month = ? AND deletedAt IS NULL",
+      [userId, year, month],
+    );
     return Array.isArray(result) ? result[0] : null;
   } catch (error) {
     rethrowReadFailure("getMonthlySummary", error);
@@ -1590,23 +1418,21 @@ export async function getMonthlySummary(
 
 export async function createMonthlySummary(data: InsertMonthlySummary) {
   const id = ulid();
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO monthlySummaries (id, userId, year, month, totalIncome, totalExpense, netBalance)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        id,
-        data.userId,
-        data.year,
-        data.month,
-        data.totalIncome || 0,
-        data.totalExpense || 0,
-        data.netBalance || 0,
-      ],
-    },
-  });
+    [
+      id,
+      data.userId,
+      data.year,
+      data.month,
+      data.totalIncome || 0,
+      data.totalExpense || 0,
+      data.netBalance || 0,
+    ],
+  );
   return id;
 }
 
@@ -1619,12 +1445,10 @@ export async function updateMonthlySummary(
     .join(", ");
   const values = Object.values(data);
 
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE monthlySummaries SET ${updates}, ${TOUCH_SET} WHERE id = ? AND deletedAt IS NULL`,
-      params: [...values, writeStamp(), id],
-    },
-  });
+  await dbQuery(
+    `UPDATE monthlySummaries SET ${updates}, ${TOUCH_SET} WHERE id = ? AND deletedAt IS NULL`,
+    [...values, writeStamp(), id],
+  );
 }
 
 // ============================================================================
@@ -1638,13 +1462,10 @@ export async function getAccountBalances(
   userId: Id,
 ): Promise<Record<Id, number>> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT id, accountId, type, amount FROM transactions WHERE userId = ? AND deletedAt IS NULL",
-        params: [userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT id, accountId, type, amount FROM transactions WHERE userId = ? AND deletedAt IS NULL",
+      [userId],
+    );
 
     const rows = Array.isArray(result) ? result : [];
     const txnBalances = reduceAccountBalances(
@@ -1678,13 +1499,10 @@ export async function getMonthlyStats(userId: Id, year: number, month: number) {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
-        params: [userId, startDate, endDate],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
+      [userId, startDate, endDate],
+    );
 
     const txns = Array.isArray(result) ? result : [];
     let totalIncome = 0;
@@ -1730,13 +1548,10 @@ export async function getMonthlyTrend(
     const startDate = new Date(year, month - count, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
-        params: [userId, startDate, endDate],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
+      [userId, startDate, endDate],
+    );
 
     const txns = Array.isArray(result) ? result : [];
     const monthMap = new Map<
@@ -1815,13 +1630,10 @@ export async function getCategoryAnomalies(
     const startDate = new Date(year, month - 1 - lookbackMonths, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",
-        params: [userId, startDate, endDate],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",
+      [userId, startDate, endDate],
+    );
 
     const txns = Array.isArray(result) ? result : [];
     const monthSpend = new Map<string, Map<Id, number>>();
@@ -1889,13 +1701,10 @@ export async function getExpensesByCategory(
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",
-        params: [userId, startDate, endDate],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",
+      [userId, startDate, endDate],
+    );
 
     const txns = Array.isArray(result) ? result : [];
     const categoryMap = new Map<Id, { total: number; count: number }>();
@@ -1925,13 +1734,10 @@ export async function getExpensesByCategory(
  */
 export async function getRecentTransactions(userId: Id, limit: number = 7) {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transactions WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC LIMIT ?",
-        params: [userId, limit],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM transactions WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC LIMIT ?",
+      [userId, limit],
+    );
     return Array.isArray(result) ? result : [];
   } catch (error) {
     rethrowReadFailure("getRecentTransactions", error);
@@ -1967,13 +1773,10 @@ export class RepaymentExceedsBalanceError extends Error {
 
 export async function getUserLoans(userId: Id): Promise<Loan[]> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM loans WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
-        params: [userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM loans WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
+      [userId],
+    );
     return Array.isArray(result) ? (result as Loan[]) : [];
   } catch (error) {
     rethrowReadFailure("getUserLoans", error);
@@ -1982,43 +1785,38 @@ export async function getUserLoans(userId: Id): Promise<Loan[]> {
 
 export async function createLoan(data: InsertLoan): Promise<Loan | null> {
   const id = ulid();
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO loans (
           id, userId, direction, counterparty, principal, rate, periodicity,
           installmentCount, endDate, nextDueDate, status, note
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        id,
-        data.userId,
-        data.direction,
-        data.counterparty ?? null,
-        data.principal,
-        data.rate ?? null,
-        data.periodicity,
-        data.installmentCount ?? null,
-        data.endDate ?? null,
-        data.nextDueDate ?? null,
-        data.status ?? "active",
-        data.note ?? null,
-      ],
-    },
-  });
+    [
+      id,
+      data.userId,
+      data.direction,
+      data.counterparty ?? null,
+      data.principal,
+      data.rate ?? null,
+      data.periodicity,
+      data.installmentCount ?? null,
+      data.endDate ?? null,
+      data.nextDueDate ?? null,
+      data.status ?? "active",
+      data.note ?? null,
+    ],
+  );
   return getLoanById(id, data.userId);
 }
 
 export async function getLoanById(id: Id, userId: Id): Promise<Loan | null> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM loans WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [id, userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM loans WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [id, userId],
+    );
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Loan) : null;
   } catch (error) {
@@ -2040,22 +1838,18 @@ export async function updateLoan(
     return;
   }
 
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE loans SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [...values, writeStamp(), id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE loans SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [...values, writeStamp(), id, userId],
+  );
 }
 
 export async function deleteLoan(id: Id, userId: Id): Promise<void> {
   const stamp = writeStamp();
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE loans SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [stamp, stamp, id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE loans SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [stamp, stamp, id, userId],
+  );
 }
 
 export async function createRepayment(
@@ -2067,22 +1861,13 @@ export async function createRepayment(
   }
 
   const id = ulid();
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO repayments (id, loanId, userId, amount, date, note)
         VALUES (?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        id,
-        data.loanId,
-        data.userId,
-        data.amount,
-        data.date,
-        data.note ?? null,
-      ],
-    },
-  });
+    [id, data.loanId, data.userId, data.amount, data.date, data.note ?? null],
+  );
   return getRepaymentById(id, data.userId);
 }
 
@@ -2107,22 +1892,20 @@ export async function recordRepayment(
     throw new RepaymentExceedsBalanceError(remainingBefore);
   }
 
-  await dbQuery("Database/query", {
-    body: {
-      query: `
+  await dbQuery(
+    `
         INSERT INTO repayments (id, loanId, userId, amount, date, note)
         VALUES (?, ?, ?, ?, ?, ?)
       `,
-      params: [
-        ulid(),
-        data.loanId,
-        data.userId,
-        data.amount,
-        data.date,
-        data.note ?? null,
-      ],
-    },
-  });
+    [
+      ulid(),
+      data.loanId,
+      data.userId,
+      data.amount,
+      data.date,
+      data.note ?? null,
+    ],
+  );
 
   const remainingAfter = computeRemainingBalance(loan.principal, [
     ...existingRepayments,
@@ -2155,13 +1938,10 @@ export async function getRepaymentById(
   userId: Id,
 ): Promise<Repayment | null> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM repayments WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [id, userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM repayments WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [id, userId],
+    );
     const row = Array.isArray(result) ? result[0] : null;
     return row ? (row as Repayment) : null;
   } catch (error) {
@@ -2174,13 +1954,10 @@ export async function getRepaymentsByLoan(
   userId: Id,
 ): Promise<Repayment[]> {
   try {
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM repayments WHERE loanId = ? AND userId = ? AND deletedAt IS NULL ORDER BY date DESC",
-        params: [loanId, userId],
-      },
-    });
+    const result = await dbQuery(
+      "SELECT * FROM repayments WHERE loanId = ? AND userId = ? AND deletedAt IS NULL ORDER BY date DESC",
+      [loanId, userId],
+    );
     return Array.isArray(result) ? (result as Repayment[]) : [];
   } catch (error) {
     rethrowReadFailure("getRepaymentsByLoan", error);
@@ -2189,12 +1966,10 @@ export async function getRepaymentsByLoan(
 
 export async function deleteRepayment(id: Id, userId: Id): Promise<void> {
   const stamp = writeStamp();
-  await dbQuery("Database/query", {
-    body: {
-      query: `UPDATE repayments SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
-      params: [stamp, stamp, id, userId],
-    },
-  });
+  await dbQuery(
+    `UPDATE repayments SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
+    [stamp, stamp, id, userId],
+  );
 }
 
 export async function getLoanWithBalance(

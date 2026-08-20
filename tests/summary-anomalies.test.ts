@@ -119,16 +119,9 @@ describe("getCategoryAnomalies", () => {
 
     await getCategoryAnomalies(testId(42), 2026, 6, 3);
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",
-        params: [
-          testId(42),
-          new Date(2026, 2, 1),
-          new Date(2026, 6, 0, 23, 59, 59),
-        ],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",
+      [testId(42), new Date(2026, 2, 1), new Date(2026, 6, 0, 23, 59, 59)],
+    );
   });
 });

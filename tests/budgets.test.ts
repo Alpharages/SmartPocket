@@ -71,13 +71,10 @@ describe("budgets db layer", () => {
 
     await expect(getUserBudgets(testId(5))).resolves.toEqual([sampleBudget]);
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM budgets WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
-        params: [testId(5)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT * FROM budgets WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
+      [testId(5)],
+    );
   });
 
   it("createBudget inserts with parameterized SQL", async () => {
@@ -93,12 +90,10 @@ describe("budgets db layer", () => {
     // The id is minted client-side now, not read back from an autoincrement
     // insertId — assert the shape instead of a specific value.
     expect(isUlid(id)).toBe(true);
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining("INSERT INTO budgets"),
-        params: [id, testId(1), testId(10), "monthly", "100.00", null, null],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO budgets"),
+      [id, testId(1), testId(10), "monthly", "100.00", null, null],
+    );
   });
 
   it("updateBudget scopes by userId", async () => {
@@ -106,14 +101,12 @@ describe("budgets db layer", () => {
 
     await updateBudget(testId(7), testId(3), { amount: "200.00" });
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringMatching(
-          /UPDATE budgets SET amount = \?, updatedAt = \?, dirty = 1 WHERE id = \? AND userId = \? AND deletedAt IS NULL/,
-        ),
-        params: ["200.00", expect.any(Date), testId(7), testId(3)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /UPDATE budgets SET amount = \?, updatedAt = \?, dirty = 1 WHERE id = \? AND userId = \? AND deletedAt IS NULL/,
+      ),
+      ["200.00", expect.any(Date), testId(7), testId(3)],
+    );
   });
 
   it("deleteBudget scopes by userId", async () => {
@@ -121,14 +114,12 @@ describe("budgets db layer", () => {
 
     await deleteBudget(testId(7), testId(3));
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining(
-          "UPDATE budgets SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
-        ),
-        params: [expect.any(Date), expect.any(Date), testId(7), testId(3)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "UPDATE budgets SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
+      ),
+      [expect.any(Date), expect.any(Date), testId(7), testId(3)],
+    );
   });
 
   it("getBudgetById scopes by userId", async () => {
@@ -138,13 +129,10 @@ describe("budgets db layer", () => {
       sampleBudget,
     );
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM budgets WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [testId(1), testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT * FROM budgets WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [testId(1), testId(1)],
+    );
   });
 
   it("findActiveBudget scopes by userId, category, period, and active window", async () => {
@@ -154,14 +142,10 @@ describe("budgets db layer", () => {
       findActiveBudget(testId(1), testId(10), "monthly"),
     ).resolves.toEqual(sampleBudget);
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining(
-          "startDate IS NULL OR startDate <= NOW()",
-        ),
-        params: [testId(1), testId(10), "monthly"],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining("startDate IS NULL OR startDate <= NOW()"),
+      [testId(1), testId(10), "monthly"],
+    );
   });
 
   it("findActiveBudget excludes id when provided", async () => {
@@ -173,12 +157,10 @@ describe("budgets db layer", () => {
       }),
     ).resolves.toBeNull();
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining("AND id <> ?"),
-        params: [testId(1), testId(10), "weekly", testId(5)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining("AND id <> ?"),
+      [testId(1), testId(10), "weekly", testId(5)],
+    );
   });
 });
 
@@ -203,12 +185,10 @@ describe("getBudgetProgress", () => {
       { budgetId: testId(1), spent: "80.00", limit: "100.00" },
     ]);
 
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining("type = 'expense'"),
-        params: [testId(1), testId(10), monthStart, monthEnd],
-      },
-    });
+    expect(dbQuery).toHaveBeenLastCalledWith(
+      expect.stringContaining("type = 'expense'"),
+      [testId(1), testId(10), monthStart, monthEnd],
+    );
   });
 
   it("uses weekly window for weekly budgets", async () => {
@@ -227,11 +207,12 @@ describe("getBudgetProgress", () => {
       { budgetId: testId(2), spent: "25.00", limit: "100.00" },
     ]);
 
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: expect.objectContaining({
-        params: [testId(1), testId(10), weekStart, weekEnd],
-      }),
-    });
+    expect(dbQuery).toHaveBeenLastCalledWith(expect.any(String), [
+      testId(1),
+      testId(10),
+      weekStart,
+      weekEnd,
+    ]);
   });
 
   it("returns spent 0 when budget active window does not overlap period", async () => {
@@ -266,11 +247,12 @@ describe("getBudgetProgress", () => {
       { budgetId: testId(1), spent: "40.00", limit: "100.00" },
     ]);
 
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: expect.objectContaining({
-        params: [testId(1), testId(10), monthStart, midMonthBudget.endDate],
-      }),
-    });
+    expect(dbQuery).toHaveBeenLastCalledWith(expect.any(String), [
+      testId(1),
+      testId(10),
+      monthStart,
+      midMonthBudget.endDate,
+    ]);
   });
 
   it("returns empty array when user has no budgets", async () => {
@@ -320,9 +302,7 @@ describe("budgets router", () => {
     await expect(caller.budgets.list()).resolves.toEqual([sampleBudget]);
 
     const insertCall = dbQuery.mock.calls[1];
-    expect(
-      (insertCall[1] as { body: { params: unknown[] } }).body.params[0],
-    ).toBe(id);
+    expect((insertCall[1] as unknown[])[0]).toBe(id);
   });
 
   it("user B cannot see or mutate user A budget", async () => {
@@ -343,11 +323,10 @@ describe("budgets router", () => {
       period: "monthly",
       amount: "50.00",
     });
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: expect.objectContaining({
-        params: expect.arrayContaining([testId(1), testId(2)]),
-      }),
-    });
+    expect(dbQuery).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.arrayContaining([testId(1), testId(2)]),
+    );
   });
 
   it("rejects invalid period", async () => {
@@ -455,12 +434,8 @@ describe("budgets router", () => {
     ).toBe(true);
 
     expect(dbQuery.mock.calls[0]).toEqual([
-      "Database/query",
-      expect.objectContaining({
-        body: expect.objectContaining({
-          params: [testId(1), testId(10), "monthly"],
-        }),
-      }),
+      expect.any(String),
+      [testId(1), testId(10), "monthly"],
     ]);
   });
 
@@ -476,12 +451,10 @@ describe("budgets router", () => {
       amount: "75.50",
     });
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: expect.objectContaining({
-        query: expect.stringContaining("AND id <> ?"),
-        params: [testId(1), testId(10), "weekly", testId(5)],
-      }),
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining("AND id <> ?"),
+      [testId(1), testId(10), "weekly", testId(5)],
+    );
   });
 
   it("rejects update that collides with another active budget", async () => {
@@ -511,23 +484,19 @@ describe("budgets router", () => {
       amount: "75.50",
     });
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: expect.objectContaining({
-        query: expect.stringMatching(/UPDATE budgets SET/),
-        params: expect.arrayContaining([testId(5), testId(1)]),
-      }),
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringMatching(/UPDATE budgets SET/),
+      expect.arrayContaining([testId(5), testId(1)]),
+    );
 
     await caller.budgets.delete({ id: testId(5) });
 
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining(
-          "UPDATE budgets SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
-        ),
-        params: expect.arrayContaining([testId(5), testId(1)]),
-      },
-    });
+    expect(dbQuery).toHaveBeenLastCalledWith(
+      expect.stringContaining(
+        "UPDATE budgets SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
+      ),
+      expect.arrayContaining([testId(5), testId(1)]),
+    );
   });
 
   it("rejects unauthenticated list", async () => {

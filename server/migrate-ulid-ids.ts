@@ -29,14 +29,12 @@ import { ulid } from "../shared/ulid";
 type Row = Record<string, unknown>;
 
 async function query(sql: string, params: unknown[] = []): Promise<Row[]> {
-  const result = await dbQuery("Database/query", {
-    body: { query: sql, params },
-  });
+  const result = await dbQuery(sql, params);
   return Array.isArray(result) ? (result as Row[]) : [];
 }
 
 async function exec(sql: string, params: unknown[] = []): Promise<void> {
-  await dbQuery("Database/query", { body: { query: sql, params } });
+  await dbQuery(sql, params);
 }
 
 /**

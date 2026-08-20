@@ -7,6 +7,12 @@ vi.mock("@/server/_core/db-query", () => ({
   dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
+/** The old envelope shape, rebuilt from the (sql, params) argument pair so these
+ * assertions keep reading as "what statement, with what values". */
+function bodyOf(call: unknown[]) {
+  return { query: String(call[0]), params: (call[1] ?? []) as unknown[] };
+}
+
 describe("upsertUser", () => {
   beforeEach(() => {
     dbQuery.mockReset();
@@ -25,11 +31,9 @@ describe("upsertUser", () => {
     });
 
     expect(dbQuery).toHaveBeenCalledTimes(1);
-    const body = dbQuery.mock.calls[0][1] as {
-      body: { query: string; params: unknown[] };
-    };
-    expect(body.body.query).toMatch(/INSERT INTO users \(id, openId/);
-    const insertedId = body.body.params[0] as string;
+    const body = bodyOf(dbQuery.mock.calls[0]);
+    expect(body.query).toMatch(/INSERT INTO users \(id, openId/);
+    const insertedId = body.params[0] as string;
     expect(isUlid(insertedId)).toBe(true);
   });
 
@@ -38,11 +42,9 @@ describe("upsertUser", () => {
 
     await upsertUser({ openId: "user-123", name: "Returning User" });
 
-    const body = dbQuery.mock.calls[0][1] as {
-      body: { query: string };
-    };
-    expect(body.body.query).not.toMatch(/id = VALUES\(id\)/);
-    expect(body.body.query).toMatch(/name = VALUES\(name\)/);
+    const body = bodyOf(dbQuery.mock.calls[0]);
+    expect(body.query).not.toMatch(/id = VALUES\(id\)/);
+    expect(body.query).toMatch(/name = VALUES\(name\)/);
   });
 
   it("mints a distinct id on every call", async () => {
@@ -51,12 +53,8 @@ describe("upsertUser", () => {
     await upsertUser({ openId: "user-a" });
     await upsertUser({ openId: "user-b" });
 
-    const firstId = (
-      dbQuery.mock.calls[0][1] as { body: { params: unknown[] } }
-    ).body.params[0];
-    const secondId = (
-      dbQuery.mock.calls[1][1] as { body: { params: unknown[] } }
-    ).body.params[0];
+    const firstId = bodyOf(dbQuery.mock.calls[0]).params[0];
+    const secondId = bodyOf(dbQuery.mock.calls[1]).params[0];
     expect(firstId).not.toBe(secondId);
   });
 });

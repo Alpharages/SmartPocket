@@ -54,12 +54,10 @@ describe("getUserSettings", () => {
       remindersEnabled: false,
     });
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: "SELECT aiEnabled, remindersEnabled FROM users WHERE id = ?",
-        params: [testId(42)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT aiEnabled, remindersEnabled FROM users WHERE id = ?",
+      [testId(42)],
+    );
   });
 
   it("coerces MySQL 1 to boolean true", async () => {
@@ -109,12 +107,10 @@ describe("updateAiEnabled", () => {
 
     await updateAiEnabled(testId(5), true);
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: "UPDATE users SET aiEnabled = ? WHERE id = ?",
-        params: [true, testId(5)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "UPDATE users SET aiEnabled = ? WHERE id = ?",
+      [true, testId(5)],
+    );
   });
 });
 
@@ -163,17 +159,11 @@ describe("settings router", () => {
     });
 
     const updateCalls = dbQuery.mock.calls.filter((call) =>
-      (call[1] as { body: { query: string } }).body.query.includes(
-        "UPDATE users SET aiEnabled",
-      ),
+      (call[0] as string).includes("UPDATE users SET aiEnabled"),
     );
     expect(updateCalls).toHaveLength(2);
-    expect(
-      (updateCalls[0][1] as { body: { params: unknown[] } }).body.params,
-    ).toEqual([true, testId(10)]);
-    expect(
-      (updateCalls[1][1] as { body: { params: unknown[] } }).body.params,
-    ).toEqual([false, testId(10)]);
+    expect(updateCalls[0][1] as unknown[]).toEqual([true, testId(10)]);
+    expect(updateCalls[1][1] as unknown[]).toEqual([false, testId(10)]);
   });
 
   it("scopes settings.get to ctx.user.id", async () => {
@@ -182,12 +172,10 @@ describe("settings router", () => {
 
     await caller.settings.get();
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: "SELECT aiEnabled, remindersEnabled FROM users WHERE id = ?",
-        params: [testId(3)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT aiEnabled, remindersEnabled FROM users WHERE id = ?",
+      [testId(3)],
+    );
   });
 
   it("rejects unauthenticated settings.get", async () => {

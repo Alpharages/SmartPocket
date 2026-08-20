@@ -49,12 +49,10 @@ export async function getOrCreateAccountCardKey(
   if (existing) return existing;
 
   const minted = bytesToBase64(randomBytes(KEY_BYTES));
-  await dbQuery("Database/query", {
-    body: {
-      query: "UPDATE users SET cardKey = ? WHERE id = ? AND cardKey IS NULL",
-      params: [minted, userId],
-    },
-  });
+  await dbQuery(
+    "UPDATE users SET cardKey = ? WHERE id = ? AND cardKey IS NULL",
+    [minted, userId],
+  );
 
   const stored = await readCardKey(userId);
   if (!stored) {
@@ -66,12 +64,9 @@ export async function getOrCreateAccountCardKey(
 }
 
 async function readCardKey(userId: Id): Promise<Uint8Array | null> {
-  const rows = (await dbQuery("Database/query", {
-    body: {
-      query: "SELECT cardKey FROM users WHERE id = ?",
-      params: [userId],
-    },
-  })) as Array<{ cardKey: string | null }>;
+  const rows = (await dbQuery("SELECT cardKey FROM users WHERE id = ?", [
+    userId,
+  ])) as Array<{ cardKey: string | null }>;
 
   const raw = rows[0]?.cardKey;
   return raw ? base64ToBytes(raw) : null;
@@ -100,13 +95,10 @@ export async function getAccountCardKeyBase64(userId: Id): Promise<string> {
 export async function reencryptLegacyCardNumbers(
   legacyKey: Uint8Array | null,
 ): Promise<{ converted: number; alreadyCurrent: number; unreadable: number }> {
-  const rows = (await dbQuery("Database/query", {
-    body: {
-      query:
-        "SELECT id, userId, cardNumber FROM creditCards WHERE cardNumber IS NOT NULL",
-      params: [],
-    },
-  })) as Array<{ id: Id; userId: Id; cardNumber: string }>;
+  const rows = (await dbQuery(
+    "SELECT id, userId, cardNumber FROM creditCards WHERE cardNumber IS NOT NULL",
+    [],
+  )) as Array<{ id: Id; userId: Id; cardNumber: string }>;
 
   let converted = 0;
   let alreadyCurrent = 0;
@@ -146,13 +138,10 @@ export async function reencryptLegacyCardNumbers(
     // `updatedAt`, so an unbumped timestamp would make every device reject
     // the fix as older than the unreadable row it already holds.
     const [seq] = [await allocateServerSeqBlock(1)];
-    await dbQuery("Database/query", {
-      body: {
-        query:
-          "UPDATE creditCards SET cardNumber = ?, serverSeq = ?, updatedAt = NOW() WHERE id = ?",
-        params: [encryptWithKey(plain, accountKey), seq, row.id],
-      },
-    });
+    await dbQuery(
+      "UPDATE creditCards SET cardNumber = ?, serverSeq = ?, updatedAt = NOW() WHERE id = ?",
+      [encryptWithKey(plain, accountKey), seq, row.id],
+    );
     converted++;
   }
 

@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { testId, syncColumns } from "./helpers/ids";
 
+/**
+ * The old envelope shape, rebuilt from the (sql, params) argument pair so these
+ * assertions keep reading as "what statement, with what values".
+ */
+function bodyOf(call: unknown[]) {
+  return { query: String(call[0]), params: (call[1] ?? []) as unknown[] };
+}
+
 // The card key is per-account now and read off the user row. These tests
 // mock `dbQuery` wholesale for their own purposes, so the key lookup is
 // stubbed rather than fed through that mock — key provisioning has its own
@@ -45,7 +53,7 @@ describe("credit card db encryption", () => {
       cardType: "credit",
     });
 
-    const body = dbQuery.mock.calls[0][1].body as {
+    const body = bodyOf(dbQuery.mock.calls[0]) as {
       params: unknown[];
     };
     const stored = body.params[3] as string;
@@ -62,7 +70,7 @@ describe("credit card db encryption", () => {
       cardNumber: "5555555555554444",
     });
 
-    const body = dbQuery.mock.calls[0][1].body as {
+    const body = bodyOf(dbQuery.mock.calls[0]) as {
       params: unknown[];
     };
     const stored = body.params[0] as string;
@@ -75,7 +83,7 @@ describe("credit card db encryption", () => {
 
     await updateCreditCard(testId(1), testId(1), { name: "Renamed" });
 
-    const body = dbQuery.mock.calls[0][1].body as {
+    const body = bodyOf(dbQuery.mock.calls[0]) as {
       query: string;
       params: unknown[];
     };

@@ -96,13 +96,10 @@ describe("accounts router", () => {
     const caller = appRouter.createCaller(createUserContext(testId(1)));
     await expect(caller.accounts.list()).resolves.toEqual([sampleAccount]);
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM accounts WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
-        params: [testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT * FROM accounts WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
+      [testId(1)],
+    );
   });
 
   it("rejects invalid account type at the API boundary", async () => {
@@ -165,17 +162,10 @@ describe("accounts router", () => {
     });
 
     expect(isUlid(id)).toBe(true);
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: expect.objectContaining({
-        params: expect.arrayContaining([
-          testId(1),
-          testId(1),
-          null,
-          "expense",
-          "12.50",
-        ]),
-      }),
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.arrayContaining([testId(1), testId(1), null, "expense", "12.50"]),
+    );
   });
 
   it("persists accountId on transactions.create after ownership check", async () => {
@@ -194,25 +184,22 @@ describe("accounts router", () => {
     });
     expect(isUlid(id)).toBe(true);
 
-    expect(dbQuery).toHaveBeenNthCalledWith(1, "Database/query", {
-      body: {
-        query:
-          "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [testId(1), testId(1)],
-      },
-    });
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: expect.objectContaining({
-        params: expect.arrayContaining([
-          testId(1),
-          testId(1),
-          null,
-          testId(1),
-          "income",
-          "200.00",
-        ]),
-      }),
-    });
+    expect(dbQuery).toHaveBeenNthCalledWith(
+      1,
+      "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [testId(1), testId(1)],
+    );
+    expect(dbQuery).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.arrayContaining([
+        testId(1),
+        testId(1),
+        null,
+        testId(1),
+        "income",
+        "200.00",
+      ]),
+    );
   });
 
   it("rejects transactions.create with another user's account", async () => {
@@ -245,12 +232,10 @@ describe("accounts router", () => {
       accountId: null,
     });
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining("WHERE id = ? AND userId = ?"),
-        params: expect.arrayContaining([null, testId(7), testId(1)]),
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining("WHERE id = ? AND userId = ?"),
+      expect.arrayContaining([null, testId(7), testId(1)]),
+    );
   });
 
   it("rejects transactions.update with another user's account", async () => {
@@ -287,20 +272,15 @@ describe("accounts router", () => {
       caller.transactions.update({ id: testId(7), accountId: testId(11) }),
     ).resolves.not.toThrow();
 
-    expect(dbQuery).toHaveBeenNthCalledWith(1, "Database/query", {
-      body: {
-        query:
-          "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [testId(11), testId(1)],
-      },
-    });
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: {
-        query:
-          "UPDATE transactions SET accountId = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [testId(11), expect.any(Date), testId(7), testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenNthCalledWith(
+      1,
+      "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [testId(11), testId(1)],
+    );
+    expect(dbQuery).toHaveBeenLastCalledWith(
+      "UPDATE transactions SET accountId = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [testId(11), expect.any(Date), testId(7), testId(1)],
+    );
   });
 
   it("accepts a partial { id, accountId: null } clear payload without an ownership check", async () => {
@@ -311,13 +291,10 @@ describe("accounts router", () => {
 
     // null accountId skips ownership lookup → exactly one call: the UPDATE.
     expect(dbQuery).toHaveBeenCalledTimes(1);
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: {
-        query:
-          "UPDATE transactions SET accountId = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [null, expect.any(Date), testId(7), testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenLastCalledWith(
+      "UPDATE transactions SET accountId = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [null, expect.any(Date), testId(7), testId(1)],
+    );
   });
 
   it("emits no SQL when transactions.update has no fields to change", async () => {
@@ -334,13 +311,10 @@ describe("accounts router", () => {
     const caller = appRouter.createCaller(createUserContext(testId(1)));
     await caller.transactions.delete({ id: testId(7) });
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "UPDATE transactions SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [expect.any(Date), expect.any(Date), testId(7), testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "UPDATE transactions SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [expect.any(Date), expect.any(Date), testId(7), testId(1)],
+    );
   });
 
   it("scopes transactions.getById by the authenticated user (IDOR guard)", async () => {
@@ -349,13 +323,10 @@ describe("accounts router", () => {
     const caller = appRouter.createCaller(createUserContext(testId(1)));
     await caller.transactions.getById({ id: testId(7) });
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
-        params: [testId(7), testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT * FROM transactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
+      [testId(7), testId(1)],
+    );
   });
 
   it("returns transaction count scoped to the authenticated user", async () => {
@@ -368,13 +339,10 @@ describe("accounts router", () => {
       caller.accounts.transactionCount({ id: testId(1) }),
     ).resolves.toBe(3);
 
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ? AND deletedAt IS NULL",
-        params: [testId(1), testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenLastCalledWith(
+      "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ? AND deletedAt IS NULL",
+      [testId(1), testId(1)],
+    );
   });
 
   it("blocks delete when linked transactions exist", async () => {
@@ -411,36 +379,28 @@ describe("accounts router", () => {
       }),
     ).resolves.toBeUndefined();
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining("UPDATE transactions SET accountId = ?"),
-        params: expect.arrayContaining([testId(2), testId(1), testId(1)]),
-      },
-    });
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining(
-          "UPDATE transfers SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
-        ),
-        params: expect.arrayContaining([testId(1), testId(1), testId(2)]),
-      },
-    });
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining(
-          "UPDATE transfers SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
-        ),
-        params: expect.arrayContaining([testId(1), testId(2), testId(1)]),
-      },
-    });
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query: expect.stringContaining(
-          "UPDATE accounts SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
-        ),
-        params: expect.arrayContaining([testId(1), testId(1)]),
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE transactions SET accountId = ?"),
+      expect.arrayContaining([testId(2), testId(1), testId(1)]),
+    );
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "UPDATE transfers SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
+      ),
+      expect.arrayContaining([testId(1), testId(1), testId(2)]),
+    );
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "UPDATE transfers SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE userId = ? AND fromAccountId = ? AND toAccountId = ?",
+      ),
+      expect.arrayContaining([testId(1), testId(2), testId(1)]),
+    );
+    expect(dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "UPDATE accounts SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
+      ),
+      expect.arrayContaining([testId(1), testId(1)]),
+    );
   });
 
   it("returns transfer count scoped to the authenticated user", async () => {
@@ -453,13 +413,10 @@ describe("accounts router", () => {
       caller.accounts.transferCount({ id: testId(1) }),
     ).resolves.toBe(2);
 
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT COUNT(*) as transferCount FROM transfers WHERE userId = ? AND (fromAccountId = ? OR toAccountId = ?) AND deletedAt IS NULL",
-        params: [testId(1), testId(1), testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenLastCalledWith(
+      "SELECT COUNT(*) as transferCount FROM transfers WHERE userId = ? AND (fromAccountId = ? OR toAccountId = ?) AND deletedAt IS NULL",
+      [testId(1), testId(1), testId(1)],
+    );
   });
 
   it("rejects reassigning to the same account", async () => {
@@ -495,20 +452,16 @@ describe("accounts router", () => {
       { accountId: testId(1), balance: 30 },
     ]);
 
-    expect(dbQuery).toHaveBeenNthCalledWith(1, "Database/query", {
-      body: {
-        query:
-          "SELECT id, accountId, type, amount FROM transactions WHERE userId = ? AND deletedAt IS NULL",
-        params: [testId(1)],
-      },
-    });
-    expect(dbQuery).toHaveBeenNthCalledWith(2, "Database/query", {
-      body: {
-        query:
-          "SELECT * FROM transfers WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC, id DESC",
-        params: [testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenNthCalledWith(
+      1,
+      "SELECT id, accountId, type, amount FROM transactions WHERE userId = ? AND deletedAt IS NULL",
+      [testId(1)],
+    );
+    expect(dbQuery).toHaveBeenNthCalledWith(
+      2,
+      "SELECT * FROM transfers WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC, id DESC",
+      [testId(1)],
+    );
   });
 
   it("records a transfer and folds legs into balances (AC1, AC5)", async () => {

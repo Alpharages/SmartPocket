@@ -15,11 +15,7 @@ import { devQuery } from "@/server/_core/devDb";
 // sandbox; this is the next-best thing.
 
 vi.mock("@/server/_core/db-query", () => ({
-  dbQuery: (_apiId: string, options: { body?: Record<string, unknown> }) => {
-    const sql = options.body?.query as string;
-    const queryParams = (options.body?.params as unknown[]) ?? [];
-    return devQuery(sql, queryParams);
-  },
+  dbQuery: (sql: string, params: unknown[] = []) => devQuery(sql, params),
 }));
 
 const { getUserPinState, recordFailedPinAttempt, resetExpiredPinLockout } =

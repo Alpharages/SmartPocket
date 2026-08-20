@@ -73,9 +73,10 @@ describe("adding a card offline, through the real router and real SQLite", () =>
     expect(created).not.toHaveProperty("cardNumber");
 
     // At rest it is ciphertext, not the PAN.
-    const rows = (await dbQuery("Database/query", {
-      body: { query: "SELECT cardNumber FROM creditCards", params: [] },
-    })) as Array<{ cardNumber: string }>;
+    const rows = (await dbQuery(
+      "SELECT cardNumber FROM creditCards",
+      [],
+    )) as Array<{ cardNumber: string }>;
     expect(rows).toHaveLength(1);
     expect(rows[0].cardNumber).toMatch(/^v1:/);
     expect(rows[0].cardNumber).not.toContain("4111111111111111");

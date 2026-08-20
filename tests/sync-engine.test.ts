@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { testId } from "./helpers/ids";
 import { SYNC_TABLES } from "@/drizzle/schema";
 
+/**
+ * The old envelope shape, rebuilt from the (sql, params) argument pair so these
+ * assertions keep reading as "what statement, with what values".
+ */
+function bodyOf(call: unknown[]) {
+  return { query: String(call[0]), params: (call[1] ?? []) as unknown[] };
+}
+
 const dbQuery = vi.hoisted(() => vi.fn());
 vi.mock("@/server/_core/db-query", () => ({
   dbQuery: (...args: unknown[]) => dbQuery(...args),
@@ -20,8 +28,8 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
     const first = await allocateServerSeqBlock(3);
 
     expect(first).toBe(42);
-    const [, opts] = dbQuery.mock.calls[0];
-    expect((opts as { body: { query: string } }).body.query).toMatch(
+    const [sql] = dbQuery.mock.calls[0];
+    expect(sql as string).toMatch(
       /INSERT INTO syncSequence \(createdAt\) VALUES \(NOW\(\)\), \(NOW\(\)\), \(NOW\(\)\)/,
     );
   });
@@ -35,19 +43,16 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
   it("sequenceServerWrites gives server-authored rows a fresh seq and clears dirty", async () => {
     const rowId = testId(5);
     const queries: string[] = [];
-    dbQuery.mockImplementation(
-      async (_id: string, options?: { body?: Record<string, unknown> }) => {
-        const sql = String(options?.body?.query ?? "");
-        queries.push(sql);
-        if (sql.startsWith("SELECT id FROM transactions"))
-          return [{ id: rowId }];
-        if (sql.startsWith("SELECT id FROM")) return [];
-        if (sql.includes("INSERT INTO syncSequence")) {
-          return { insertId: 90, affectedRows: 1 };
-        }
-        return { insertId: null, affectedRows: 1 };
-      },
-    );
+    dbQuery.mockImplementation(async (rawSql: string) => {
+      const sql = String(rawSql ?? "");
+      queries.push(sql);
+      if (sql.startsWith("SELECT id FROM transactions")) return [{ id: rowId }];
+      if (sql.startsWith("SELECT id FROM")) return [];
+      if (sql.includes("INSERT INTO syncSequence")) {
+        return { insertId: 90, affectedRows: 1 };
+      }
+      return { insertId: null, affectedRows: 1 };
+    });
 
     const { sequenceServerWrites } = await import("@/server/_core/sync-engine");
     const sequenced = await sequenceServerWrites(SYNC_TABLES, testId(1));
@@ -67,9 +72,9 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
     expect(await sequenceServerWrites(SYNC_TABLES, testId(1))).toBe(0);
     expect(
       dbQuery.mock.calls.some(([, o]) =>
-        String(
-          (o as never as { body?: { query?: string } })?.body?.query ?? "",
-        ).includes("INSERT INTO syncSequence"),
+        String((o as never as string) ?? "").includes(
+          "INSERT INTO syncSequence",
+        ),
       ),
     ).toBe(false);
   });
@@ -127,20 +132,18 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
     ]);
 
     // Row 1's insert: userId is the authenticated caller, not the forged value.
-    const row1Call = dbQuery.mock.calls[2][1] as {
-      body: { query: string; params: unknown[] };
-    };
-    expect(row1Call.body.query).toMatch(/INSERT INTO categories/);
-    const columns = row1Call.body.query
+    const row1Call = bodyOf(dbQuery.mock.calls[2]);
+    expect(row1Call.query).toMatch(/INSERT INTO categories/);
+    const columns = row1Call.query
       .match(/INSERT INTO categories \(([^)]+)\)/)![1]
       .split(",")
       .map((c) => c.trim());
     const userIdIndex = columns.indexOf("userId");
     const dirtyIndex = columns.indexOf("dirty");
     const serverSeqIndex = columns.indexOf("serverSeq");
-    expect(row1Call.body.params[userIdIndex]).toBe(testId(9));
-    expect(row1Call.body.params[dirtyIndex]).toBe(false);
-    expect(row1Call.body.params[serverSeqIndex]).toBe(100);
+    expect(row1Call.params[userIdIndex]).toBe(testId(9));
+    expect(row1Call.params[dirtyIndex]).toBe(false);
+    expect(row1Call.params[serverSeqIndex]).toBe(100);
   });
 
   it("applyPushedRows is a no-op for an empty batch", async () => {
@@ -461,20 +464,14 @@ describe("tombstone purge (mocked MySQL — watermark-driven, server-only)", () 
 
     expect(result).toEqual({ purgedCount: 2, newWatermark: 8 });
 
-    const deleteCall = dbQuery.mock.calls.find(([, opts]) =>
-      (opts as { body: { query: string } }).body.query.includes(
-        "DELETE FROM categories",
-      ),
+    const deleteCall = dbQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("DELETE FROM categories"),
     );
     expect(deleteCall).toBeDefined();
-    const watermarkUpdateCall = dbQuery.mock.calls.find(([, opts]) =>
-      (opts as { body: { query: string } }).body.query.includes(
-        "UPDATE syncPurgeWatermark",
-      ),
+    const watermarkUpdateCall = dbQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("UPDATE syncPurgeWatermark"),
     );
-    expect(
-      (watermarkUpdateCall![1] as { body: { params: unknown[] } }).body.params,
-    ).toEqual([8, 1, 8]);
+    expect(watermarkUpdateCall![1] as unknown[]).toEqual([8, 1, 8]);
   });
 
   it("purgeOldTombstones never moves the watermark backwards", async () => {
@@ -486,15 +483,11 @@ describe("tombstone purge (mocked MySQL — watermark-driven, server-only)", () 
     const result = await purgeOldTombstones(SYNC_TABLES, new Date());
 
     expect(result).toEqual({ purgedCount: 0, newWatermark: 100 });
-    const watermarkUpdateCall = dbQuery.mock.calls.find(([, opts]) =>
-      (opts as { body: { query: string } }).body.query.includes(
-        "UPDATE syncPurgeWatermark",
-      ),
+    const watermarkUpdateCall = dbQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("UPDATE syncPurgeWatermark"),
     );
     // WHERE purgedUpToSeq < ? guards this from ever lowering the watermark,
     // even though it's still issued with the unchanged value.
-    expect(
-      (watermarkUpdateCall![1] as { body: { params: unknown[] } }).body.params,
-    ).toEqual([100, 1, 100]);
+    expect(watermarkUpdateCall![1] as unknown[]).toEqual([100, 1, 100]);
   });
 });

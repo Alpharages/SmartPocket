@@ -2,13 +2,6 @@ import { ENV } from "./env";
 import { devQuery } from "./devDb";
 import mysql from "mysql2/promise";
 
-export type DbQueryOptions = {
-  query?: Record<string, unknown>;
-  body?: Record<string, unknown>;
-  pathParams?: Record<string, unknown>;
-  formData?: Record<string, unknown>;
-};
-
 let pool: mysql.Pool | null = null;
 
 function getPool() {
@@ -23,21 +16,19 @@ function getPool() {
   return pool;
 }
 
+/**
+ * Runs one parameterized SQL statement.
+ *
+ * The signature used to be a request envelope inherited from the Manus Data
+ * API this once called: a literal apiId, then the two values that actually
+ * mattered wrapped in two layers of object. All 126 call sites passed the same
+ * apiId (anything else threw). The envelope described a remote API that no
+ * longer exists; what is left is a mysql2 pool.
+ */
 export async function dbQuery(
-  apiId: string,
-  options: DbQueryOptions = {},
+  sql: string,
+  params: unknown[] = [],
 ): Promise<unknown> {
-  if (apiId !== "Database/query") {
-    throw new Error(
-      `Unsupported data API "${apiId}" — only Database/query is implemented`,
-    );
-  }
-
-  const sql = options.body?.query as string | undefined;
-  const params = (options.body?.params as unknown[]) ?? [];
-  if (!sql)
-    throw new Error("Database/query requires a SQL query in body.query");
-
   const db = getPool();
   if (!db) {
     return devQuery(sql, params);

@@ -26,12 +26,10 @@ export async function migrateEncryptCardNumbers(): Promise<MigrationSummary> {
   // exists: keys are per-account and minted on demand
   // (server/_core/card-key.ts), so there is nothing to validate ahead of time
   // and a per-row failure is already counted in `summary.failed`.
-  const result = await dbQuery("Database/query", {
-    body: {
-      query: "SELECT id, userId, cardNumber FROM creditCards",
-      params: [],
-    },
-  });
+  const result = await dbQuery(
+    "SELECT id, userId, cardNumber FROM creditCards",
+    [],
+  );
   const rows = Array.isArray(result) ? (result as CreditCardRow[]) : [];
 
   const summary: MigrationSummary = {
@@ -49,12 +47,10 @@ export async function migrateEncryptCardNumbers(): Promise<MigrationSummary> {
 
     try {
       const encrypted = await encryptCardNumber(row.cardNumber, row.userId);
-      await dbQuery("Database/query", {
-        body: {
-          query: "UPDATE creditCards SET cardNumber = ? WHERE id = ?",
-          params: [encrypted, row.id],
-        },
-      });
+      await dbQuery("UPDATE creditCards SET cardNumber = ? WHERE id = ?", [
+        encrypted,
+        row.id,
+      ]);
       summary.encrypted++;
     } catch {
       summary.failed++;

@@ -2,6 +2,15 @@ import type { Id } from "@/drizzle/schema";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { appRouter } from "../server/routers";
 import type { TrpcContext } from "../server/_core/context";
+
+/**
+ * The old envelope shape, rebuilt from the (sql, params) argument pair so these
+ * assertions keep reading as "what statement, with what values".
+ */
+function bodyOf(call: unknown[]) {
+  return { query: String(call[0]), params: (call[1] ?? []) as unknown[] };
+}
+
 import {
   hashPin,
   MAX_PIN_ATTEMPTS,
@@ -78,13 +87,10 @@ describe("getUserPinState", () => {
       pinLockedUntil: null,
     });
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "SELECT pinHash, pinFailedAttempts, pinLockedUntil FROM users WHERE id = ?",
-        params: [testId(1)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "SELECT pinHash, pinFailedAttempts, pinLockedUntil FROM users WHERE id = ?",
+      [testId(1)],
+    );
   });
 
   it("parses a stored hash and lockout timestamp", async () => {
@@ -124,13 +130,10 @@ describe("setUserPin / clearUserPin / resetPinAttempts", () => {
 
     await setUserPin(testId(5), "scrypt:v1:salt:hash");
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-        params: ["scrypt:v1:salt:hash", 0, null, testId(5)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+      ["scrypt:v1:salt:hash", 0, null, testId(5)],
+    );
   });
 
   it("clearUserPin nulls the hash and resets attempt state, scoped by id", async () => {
@@ -138,13 +141,10 @@ describe("setUserPin / clearUserPin / resetPinAttempts", () => {
 
     await clearUserPin(testId(5));
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-        params: [null, 0, null, testId(5)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+      [null, 0, null, testId(5)],
+    );
   });
 
   it("resetPinAttempts clears failedAttempts and lockedUntil without touching the hash", async () => {
@@ -152,13 +152,10 @@ describe("setUserPin / clearUserPin / resetPinAttempts", () => {
 
     await resetPinAttempts(testId(5));
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-        params: [0, null, testId(5)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+      [0, null, testId(5)],
+    );
   });
 });
 
@@ -173,13 +170,10 @@ describe("resetExpiredPinLockout (B2)", () => {
 
     await resetExpiredPinLockout(testId(5), now);
 
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ? AND pinLockedUntil IS NOT NULL AND pinLockedUntil <= ?",
-        params: [0, null, testId(5), now],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ? AND pinLockedUntil IS NOT NULL AND pinLockedUntil <= ?",
+      [0, null, testId(5), now],
+    );
   });
 });
 
@@ -200,16 +194,13 @@ describe("recordFailedPinAttempt (B1 — atomic, guarded increment)", () => {
     });
 
     expect(result).toEqual({ counted: true });
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          // pinLockedUntil is assigned BEFORE pinFailedAttempts deliberately —
-          // MySQL evaluates SET assignments left to right, so this order is
-          // what makes the IF() read the pre-increment count (round-2 R1).
-          "UPDATE users SET pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL), pinFailedAttempts = pinFailedAttempts + 1 WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
-        params: [MAX_PIN_ATTEMPTS, lockedUntilIfTripped, testId(5), now],
-      },
-    });
+    // pinLockedUntil is assigned BEFORE pinFailedAttempts deliberately — MySQL
+    // evaluates SET assignments left to right, so this order is what makes the
+    // IF() read the pre-increment count (round-2 R1).
+    expect(dbQuery).toHaveBeenCalledWith(
+      "UPDATE users SET pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL), pinFailedAttempts = pinFailedAttempts + 1 WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
+      [MAX_PIN_ATTEMPTS, lockedUntilIfTripped, testId(5), now],
+    );
   });
 
   it("reports counted: false when the WHERE guard excludes an already-locked row (concurrent race)", async () => {
@@ -268,11 +259,9 @@ describe("security router", () => {
       pinSet: true,
     });
 
-    const call = dbQuery.mock.calls[1][1] as {
-      body: { query: string; params: unknown[] };
-    };
-    expect(call.body.query).toContain("UPDATE users SET pinHash");
-    const storedHash = call.body.params[0] as string;
+    const call = bodyOf(dbQuery.mock.calls[1]);
+    expect(call.query).toContain("UPDATE users SET pinHash");
+    const storedHash = call.params[0] as string;
     expect(storedHash).not.toBe("1234");
     expect(storedHash).not.toContain("1234");
     expect(storedHash.startsWith("scrypt:v1:")).toBe(true);
@@ -388,13 +377,10 @@ describe("security router", () => {
     await expect(caller.security.clearPin()).resolves.toEqual({
       pinSet: false,
     });
-    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
-      body: {
-        query:
-          "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-        params: [null, 0, null, testId(7)],
-      },
-    });
+    expect(dbQuery).toHaveBeenCalledWith(
+      "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+      [null, 0, null, testId(7)],
+    );
   });
 
   it("verifyPin succeeds for the correct PIN and resets attempt state", async () => {
@@ -411,13 +397,10 @@ describe("security router", () => {
       valid: true,
     });
 
-    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
-      body: {
-        query:
-          "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
-        params: [0, null, testId(3)],
-      },
-    });
+    expect(dbQuery).toHaveBeenLastCalledWith(
+      "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
+      [0, null, testId(3)],
+    );
   });
 
   it("verifyPin fails for the wrong PIN and atomically increments attempts", async () => {

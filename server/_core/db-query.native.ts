@@ -5,7 +5,6 @@ import {
   type Row,
   type SqliteDriver,
 } from "./sqlite-engine";
-import type { DbQueryOptions } from "./db-query";
 
 /**
  * The on-device replacement for `db-query.ts`. Metro resolves `.native.ts`
@@ -14,7 +13,7 @@ import type { DbQueryOptions } from "./db-query";
  * branching exists anywhere on the data path. `server/db.ts` and all 64 tRPC
  * procedures built on it run completely unmodified against whichever file
  * Metro picked; this file's only job is to make `dbQuery` answer the
- * same `{apiId, options} -> result` shape `db-query.ts` does, backed by a
+ * same `(sql, params) -> result` shape `db-query.ts` does, backed by a
  * local SQLite database instead of a MySQL connection over HTTP.
  *
  * All of the actual translation/marshaling logic lives in
@@ -65,7 +64,7 @@ function createExpoSqliteDriver(db: SQLite.SQLiteDatabase): SqliteDriver {
  * the same open-and-migrate sequence instead of opening the database twice.
  */
 let readyApi: Promise<
-  (apiId: string, options?: DbQueryOptions) => Promise<unknown>
+  (sql: string, params?: unknown[]) => Promise<unknown>
 > | null = null;
 
 async function getReadyApi() {
@@ -86,9 +85,9 @@ async function getReadyApi() {
 }
 
 export async function dbQuery(
-  apiId: string,
-  options: DbQueryOptions = {},
+  sql: string,
+  params: unknown[] = [],
 ): Promise<unknown> {
   const api = await getReadyApi();
-  return api(apiId, options);
+  return api(sql, params);
 }

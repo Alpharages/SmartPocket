@@ -102,23 +102,20 @@ describe("createSqliteDataApi", () => {
   it("runs an INSERT and reports affectedRows, with insertId absent (ids are minted client-side)", async () => {
     const id = testId(1);
     const now = new Date("2026-06-01T00:00:00.000Z");
-    const result = await dbQuery("Database/query", {
-      body: {
-        query:
-          "INSERT INTO categories (id, userId, name, type, color, icon, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        params: [
-          id,
-          testId(2),
-          "Groceries",
-          "expense",
-          "#10B981",
-          "cart",
-          true,
-          now,
-          now,
-        ],
-      },
-    });
+    const result = await dbQuery(
+      "INSERT INTO categories (id, userId, name, type, color, icon, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [
+        id,
+        testId(2),
+        "Groceries",
+        "expense",
+        "#10B981",
+        "cart",
+        true,
+        now,
+        now,
+      ],
+    );
 
     expect(result).toEqual({ insertId: null, affectedRows: 1 });
   });
@@ -127,30 +124,15 @@ describe("createSqliteDataApi", () => {
     const id = testId(1);
     const userId = testId(2);
     const now = new Date("2026-06-01T12:30:00.000Z");
-    await dbQuery("Database/query", {
-      body: {
-        query:
-          "INSERT INTO categories (id, userId, name, type, color, icon, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        params: [
-          id,
-          userId,
-          "Groceries",
-          "expense",
-          "#10B981",
-          "cart",
-          true,
-          now,
-          now,
-        ],
-      },
-    });
+    await dbQuery(
+      "INSERT INTO categories (id, userId, name, type, color, icon, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [id, userId, "Groceries", "expense", "#10B981", "cart", true, now, now],
+    );
 
-    const rows = (await dbQuery("Database/query", {
-      body: {
-        query: "SELECT * FROM categories WHERE id = ? AND deletedAt IS NULL",
-        params: [id],
-      },
-    })) as Array<Record<string, unknown>>;
+    const rows = (await dbQuery(
+      "SELECT * FROM categories WHERE id = ? AND deletedAt IS NULL",
+      [id],
+    )) as Array<Record<string, unknown>>;
 
     expect(rows).toHaveLength(1);
     const row = rows[0];
@@ -164,90 +146,72 @@ describe("createSqliteDataApi", () => {
   it("excludes tombstoned rows and reports the tombstone write's affectedRows", async () => {
     const id = testId(1);
     const now = new Date("2026-06-01T00:00:00.000Z");
-    await dbQuery("Database/query", {
-      body: {
-        query:
-          "INSERT INTO categories (id, userId, name, type, color, icon, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        params: [
-          id,
-          testId(2),
-          "Groceries",
-          "expense",
-          "#10B981",
-          "cart",
-          false,
-          now,
-          now,
-        ],
-      },
-    });
+    await dbQuery(
+      "INSERT INTO categories (id, userId, name, type, color, icon, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [
+        id,
+        testId(2),
+        "Groceries",
+        "expense",
+        "#10B981",
+        "cart",
+        false,
+        now,
+        now,
+      ],
+    );
 
-    const deleteResult = await dbQuery("Database/query", {
-      body: {
-        query:
-          "UPDATE categories SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND deletedAt IS NULL",
-        params: [now, now, id],
-      },
-    });
+    const deleteResult = await dbQuery(
+      "UPDATE categories SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND deletedAt IS NULL",
+      [now, now, id],
+    );
     expect(deleteResult).toEqual({ insertId: null, affectedRows: 1 });
 
-    const rows = (await dbQuery("Database/query", {
-      body: {
-        query: "SELECT * FROM categories WHERE id = ? AND deletedAt IS NULL",
-        params: [id],
-      },
-    })) as unknown[];
+    const rows = (await dbQuery(
+      "SELECT * FROM categories WHERE id = ? AND deletedAt IS NULL",
+      [id],
+    )) as unknown[];
     expect(rows).toHaveLength(0);
 
     // Re-running the same tombstone write is a no-op (0 rows matched) —
     // proves the `AND deletedAt IS NULL` guard makes deletes idempotent.
-    const secondDelete = (await dbQuery("Database/query", {
-      body: {
-        query:
-          "UPDATE categories SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND deletedAt IS NULL",
-        params: [now, now, id],
-      },
-    })) as { affectedRows: number };
+    const secondDelete = (await dbQuery(
+      "UPDATE categories SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND deletedAt IS NULL",
+      [now, now, id],
+    )) as { affectedRows: number };
     expect(secondDelete.affectedRows).toBe(0);
   });
 
   it("upserts a user without duplicating the id on a second call for the same openId", async () => {
     const firstId = testId(1);
     const now = new Date("2026-06-01T00:00:00.000Z");
-    await dbQuery("Database/query", {
-      body: {
-        query: `
+    await dbQuery(
+      `
           INSERT INTO users (id, openId, name, createdAt, updatedAt, lastSignedIn)
           VALUES (?, ?, ?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE
             name = VALUES(name)
         `,
-        params: [firstId, "open-1", "First Name", now, now, now],
-      },
-    });
+      [firstId, "open-1", "First Name", now, now, now],
+    );
 
     // A second upsert for the same openId with a *different* candidate id —
     // the real caller (server/db.ts's upsertUser) always mints a fresh ULID
     // per call, so this is the realistic shape of a returning-user sign-in.
     const secondId = testId(2);
-    await dbQuery("Database/query", {
-      body: {
-        query: `
+    await dbQuery(
+      `
           INSERT INTO users (id, openId, name, createdAt, updatedAt, lastSignedIn)
           VALUES (?, ?, ?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE
             name = VALUES(name)
         `,
-        params: [secondId, "open-1", "Updated Name", now, now, now],
-      },
-    });
+      [secondId, "open-1", "Updated Name", now, now, now],
+    );
 
-    const rows = (await dbQuery("Database/query", {
-      body: {
-        query: "SELECT * FROM users WHERE openId = ?",
-        params: ["open-1"],
-      },
-    })) as Array<Record<string, unknown>>;
+    const rows = (await dbQuery("SELECT * FROM users WHERE openId = ?", [
+      "open-1",
+    ])) as Array<Record<string, unknown>>;
 
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(firstId); // never overwritten

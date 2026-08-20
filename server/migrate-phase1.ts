@@ -43,9 +43,7 @@ async function query<T = Record<string, unknown>>(
   sql: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  const result = await dbQuery("Database/query", {
-    body: { query: sql, params },
-  });
+  const result = await dbQuery(sql, params);
   return Array.isArray(result) ? (result as T[]) : [];
 }
 
@@ -63,9 +61,7 @@ export function splitSqlStatements(sql: string): string[] {
 async function runSqlFile(file: string): Promise<void> {
   const path = join(process.cwd(), "drizzle", file);
   for (const statement of splitSqlStatements(readFileSync(path, "utf8"))) {
-    await dbQuery("Database/query", {
-      body: { query: statement, params: [] },
-    });
+    await dbQuery(statement, []);
   }
 }
 
