@@ -31,7 +31,7 @@ containerised CI environment. It combines three evidence streams:
 
 4. **Live browser session.** The application was installed, built and run, and was exercised
    interactively in Chromium via Playwright at three viewports and in both colour schemes.
-   `server/_core/dataApi.ts` falls back to an in-memory dev database (`devDb.ts`, seeded with
+   `server/_core/db-query.ts` falls back to an in-memory dev database (`devDb.ts`, seeded with
    sample data) whenever `DATABASE_URL` is unset, so **no MySQL or Manus OAuth issuer was
    required**; `POST /api/dev/login` supplied the session. 29 screenshots were captured and
    computed styles and contrast ratios were measured against the live DOM.
@@ -1459,7 +1459,7 @@ captured; computed styles and contrast ratios were read from the live DOM.
 | Component | Command / value | Result |
 | --- | --- | --- |
 | Dependencies | `pnpm install` | OK |
-| Database | none — `DATABASE_URL` unset, so `dataApi.ts` fell through to the seeded in-memory `devDb.ts` | OK, 4 transactions / 4 categories / 1 card seeded |
+| Database | none — `DATABASE_URL` unset, so `db-query.ts` fell through to the seeded in-memory `devDb.ts` | OK, 4 transactions / 4 categories / 1 card seeded |
 | API | `NODE_ENV=development npx tsx server/_core/index.ts` | `[api] server listening on port 3000` |
 | Session | `POST /api/dev/login` | JWT issued |
 | Client | `EXPO_OFFLINE=1 npx expo start --web --port 8081` | HTTP 200 (`EXPO_OFFLINE` is required — the Expo CLI's dependency-version check cannot reach its API through the sandbox proxy and aborts startup without it) |

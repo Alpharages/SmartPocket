@@ -8,17 +8,14 @@ import { devQuery } from "@/server/_core/devDb";
 // real (in-memory, but MySQL-semantics-faithful) devDb executor — not a
 // hand-copied SQL string — so a regression in either the SQL text or its
 // column order is genuinely caught here (round-2 review R1/R3). Mocking
-// callDataApi to delegate to devQuery, rather than asserting query strings
+// dbQuery to delegate to devQuery, rather than asserting query strings
 // the way tests/security-pin.test.ts does, is what makes this catch R1: a
 // mocked-string assertion can't see that MySQL evaluates SET assignments
 // left to right. A real MySQL instance isn't reliably available in this
 // sandbox; this is the next-best thing.
 
-vi.mock("@/server/_core/dataApi", () => ({
-  callDataApi: (
-    _apiId: string,
-    options: { body?: Record<string, unknown> },
-  ) => {
+vi.mock("@/server/_core/db-query", () => ({
+  dbQuery: (_apiId: string, options: { body?: Record<string, unknown> }) => {
     const sql = options.body?.query as string;
     const queryParams = (options.body?.params as unknown[]) ?? [];
     return devQuery(sql, queryParams);

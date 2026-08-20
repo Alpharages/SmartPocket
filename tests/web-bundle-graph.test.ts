@@ -7,10 +7,10 @@ import path from "node:path";
  * build (unit tests mock every server import, so they never notice this):
  * components/sync-settings.tsx unconditionally imported lib/sync/sync-worker.ts,
  * which pulls in server/_core/sync-engine.ts and server/_core/local-context.ts,
- * which import server/db.ts -> server/_core/dataApi.ts -> `mysql2` — a
+ * which import server/db.ts -> server/_core/db-query.ts -> `mysql2` — a
  * Node-only package that crashes at runtime in a browser (no `process.env`
- * Node polyfill). Metro resolves `./_core/dataApi` to dataApi.native.ts on
- * native (SQLite, no mysql2), but there is no dataApi.web.ts, so web got the
+ * Node polyfill). Metro resolves `./_core/db-query` to db-query.native.ts on
+ * native (SQLite, no mysql2), but there is no db-query.web.ts, so web got the
  * plain MySQL-backed default and the whole app failed to load.
  *
  * This is a lightweight static walk of the import graph, not a real bundler —
@@ -136,14 +136,14 @@ describe("web bundle import graph", () => {
   // Both stubs, not just the Settings one: sync-gate.tsx is mounted from
   // app/_layout.tsx, so a value import leaking out of it would pull the DB
   // driver into every web page rather than just the Settings route.
-  it.each([
-    "components/sync-settings.web.tsx",
-    "components/sync-gate.web.tsx",
-  ])("%s (the actual web-resolved file) has no value imports at all", (stub) => {
-    const webStub = path.join(ROOT, stub);
-    expect(fs.existsSync(webStub)).toBe(true);
-    expect(extractImportSpecifiers(webStub).filter((i) => !i.typeOnly)).toEqual(
-      [],
-    );
-  });
+  it.each(["components/sync-settings.web.tsx", "components/sync-gate.web.tsx"])(
+    "%s (the actual web-resolved file) has no value imports at all",
+    (stub) => {
+      const webStub = path.join(ROOT, stub);
+      expect(fs.existsSync(webStub)).toBe(true);
+      expect(
+        extractImportSpecifiers(webStub).filter((i) => !i.typeOnly),
+      ).toEqual([]);
+    },
+  );
 });

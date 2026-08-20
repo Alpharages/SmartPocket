@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { getTableColumns } from "drizzle-orm";
-import { callDataApi } from "./dataApi";
+import { dbQuery } from "./db-query";
 import * as schema from "../../drizzle/schema";
 import type { Id, SyncTable } from "../../drizzle/schema";
 
@@ -37,7 +37,7 @@ export async function getDirtyRows(
   userId: Id,
   limit = 500,
 ): Promise<Record<string, unknown>[]> {
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: {
       query: `SELECT * FROM ${table} WHERE userId = ? AND dirty = 1 ORDER BY updatedAt ASC LIMIT ?`,
       params: [userId, limit],
@@ -56,7 +56,7 @@ export async function getDirtyRows(
  */
 export async function allocateServerSeqBlock(count: number): Promise<number> {
   if (count <= 0) return 0;
-  const result = (await callDataApi("Database/query", {
+  const result = (await dbQuery("Database/query", {
     body: {
       query: `INSERT INTO syncSequence (createdAt) VALUES ${Array(count)
         .fill("(NOW())")
@@ -95,7 +95,7 @@ async function assertRowsOwnedByCaller(
   const ids = rows.map((row) => row.id).filter((id) => typeof id === "string");
   if (ids.length === 0) return;
 
-  const foreign = await callDataApi("Database/query", {
+  const foreign = await dbQuery("Database/query", {
     body: {
       query: `SELECT id FROM ${table} WHERE id IN (${ids
         .map(() => "?")
@@ -147,7 +147,7 @@ export async function applyPushedRows(
       return row[c];
     });
 
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query: `
           INSERT INTO ${table} (${columns.join(", ")})
@@ -188,7 +188,7 @@ export async function sequenceServerWrites(
   let sequenced = 0;
 
   for (const table of tables) {
-    const rows = (await callDataApi("Database/query", {
+    const rows = (await dbQuery("Database/query", {
       body: {
         query: `SELECT id FROM ${table} WHERE userId = ? AND dirty = 1 ORDER BY updatedAt ASC`,
         params: [userId],
@@ -199,7 +199,7 @@ export async function sequenceServerWrites(
 
     const firstSeq = await allocateServerSeqBlock(rows.length);
     for (let i = 0; i < rows.length; i++) {
-      await callDataApi("Database/query", {
+      await dbQuery("Database/query", {
         body: {
           query: `UPDATE ${table} SET serverSeq = ?, dirty = 0 WHERE id = ?`,
           params: [firstSeq + i, rows[i].id],
@@ -225,7 +225,7 @@ export async function sequenceServerWrites(
  * is picked up by the next one.
  */
 export async function getHeadSeq(): Promise<number> {
-  const rows = (await callDataApi("Database/query", {
+  const rows = (await dbQuery("Database/query", {
     body: { query: "SELECT MAX(seq) AS head FROM syncSequence", params: [] },
   })) as Array<{ head: number | null }>;
   return rows[0]?.head ?? 0;
@@ -251,7 +251,7 @@ export async function backfillServerSeq(
   const assigned: Record<string, number> = {};
 
   for (const table of tables) {
-    const rows = (await callDataApi("Database/query", {
+    const rows = (await dbQuery("Database/query", {
       body: {
         query: `SELECT id FROM ${table} WHERE serverSeq IS NULL ORDER BY id ASC`,
         params: [],
@@ -262,7 +262,7 @@ export async function backfillServerSeq(
 
     const firstSeq = await allocateServerSeqBlock(rows.length);
     for (let i = 0; i < rows.length; i++) {
-      await callDataApi("Database/query", {
+      await dbQuery("Database/query", {
         body: {
           // `dirty` is a client-side concept — a row sitting on the server is
           // by definition not pending upload. These rows carry the column
@@ -286,7 +286,7 @@ export async function getRowsSince(
   sinceSeq: number,
   limit = 500,
 ): Promise<Record<string, unknown>[]> {
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: {
       query: `SELECT * FROM ${table} WHERE userId = ? AND serverSeq > ? ORDER BY serverSeq ASC LIMIT ?`,
       params: [userId, sinceSeq, limit],
@@ -315,7 +315,7 @@ export async function applyIncomingRow(
   incoming: Record<string, unknown>,
 ): Promise<"applied" | "skipped-local-newer"> {
   const columns = syncTableColumns(table);
-  const existingRows = (await callDataApi("Database/query", {
+  const existingRows = (await dbQuery("Database/query", {
     body: {
       query: `SELECT * FROM ${table} WHERE id = ?`,
       params: [incoming.id],
@@ -333,7 +333,7 @@ export async function applyIncomingRow(
     .join(", ");
   const values = columns.map((c) => (c === "dirty" ? false : incoming[c]));
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO ${table} (${columns.join(", ")})
@@ -352,7 +352,7 @@ export async function markRowsSynced(
   updates: Array<{ id: Id; serverSeq: number }>,
 ): Promise<void> {
   for (const { id, serverSeq } of updates) {
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query: `UPDATE ${table} SET serverSeq = ?, dirty = 0 WHERE id = ?`,
         params: [serverSeq, id],
@@ -377,7 +377,7 @@ export async function reownLocalData(
   toUserId: Id,
 ): Promise<void> {
   for (const table of tables) {
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query: `UPDATE ${table} SET userId = ?, dirty = 1 WHERE userId = ?`,
         params: [toUserId, fromUserId],
@@ -399,7 +399,7 @@ export async function markAllDirty(
   userId: Id,
 ): Promise<void> {
   for (const table of tables) {
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query: `UPDATE ${table} SET dirty = 1 WHERE userId = ?`,
         params: [userId],
@@ -419,7 +419,7 @@ export async function discardLocalData(
   userId: Id,
 ): Promise<void> {
   for (const table of tables) {
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query: `DELETE FROM ${table} WHERE userId = ?`,
         params: [userId],
@@ -452,7 +452,7 @@ export async function accountHasAnyData(
     const ignoreSeeded = SEEDED_DEFAULT_TABLES.has(table)
       ? " AND isDefault = 0"
       : "";
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query: `SELECT id FROM ${table} WHERE userId = ? AND deletedAt IS NULL${ignoreSeeded} LIMIT 1`,
         params: [userId],
@@ -476,7 +476,7 @@ const PURGE_WATERMARK_ID = 1;
  * have carried every tombstone it needed.
  */
 export async function getPurgeWatermark(): Promise<number> {
-  const rows = (await callDataApi("Database/query", {
+  const rows = (await dbQuery("Database/query", {
     body: {
       query: "SELECT purgedUpToSeq FROM syncPurgeWatermark WHERE id = ?",
       params: [PURGE_WATERMARK_ID],
@@ -502,7 +502,7 @@ export async function purgeOldTombstones(
   let maxSeqSeen = await getPurgeWatermark();
 
   for (const table of tables) {
-    const candidates = (await callDataApi("Database/query", {
+    const candidates = (await dbQuery("Database/query", {
       body: {
         query: `SELECT id, serverSeq FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`,
         params: [olderThan],
@@ -520,7 +520,7 @@ export async function purgeOldTombstones(
       }
     }
 
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query: `DELETE FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`,
         params: [olderThan],
@@ -529,7 +529,7 @@ export async function purgeOldTombstones(
     purgedCount += candidates.length;
   }
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query:
         "UPDATE syncPurgeWatermark SET purgedUpToSeq = ? WHERE id = ? AND purgedUpToSeq < ?",

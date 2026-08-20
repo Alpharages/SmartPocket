@@ -131,8 +131,12 @@ describe("Color-independent income/expense (AC5) — all 6 theme x variant combi
         // Sign character differs too (+/-), independent of the icon.
         const incomeText = textOf(incomeRow);
         const expenseText = textOf(expenseRow);
-        expect(incomeText).toBe(formatCurrency(3000, "USD", { sign: "positive" }));
-        expect(expenseText).toBe(formatCurrency(1200, "USD", { sign: "negative" }));
+        expect(incomeText).toBe(
+          formatCurrency(3000, "USD", { sign: "positive" }),
+        );
+        expect(expenseText).toBe(
+          formatCurrency(1200, "USD", { sign: "negative" }),
+        );
         expect(incomeText.startsWith("+")).toBe(true);
         expect(expenseText.startsWith("-")).toBe(true);
       });

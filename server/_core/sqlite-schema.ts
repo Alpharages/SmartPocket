@@ -315,7 +315,7 @@ export const UPSERT_CONFLICT_COLUMN: Readonly<Record<string, string>> = {
  * attribute, so `sqlite-engine.ts` fills these in itself at insert time
  * (`injectMissingTimestamps`) rather than requiring every call site in
  * `server/db.ts` to start passing them explicitly — the whole point of the
- * `dataApi.native.ts` seam is that `server/db.ts` doesn't change per backend.
+ * `db-query.native.ts` seam is that `server/db.ts` doesn't change per backend.
  *
  * This only covers the INSERT-time defaults. The `ON UPDATE CURRENT_TIMESTAMP`
  * half is already handled for every synced table by the explicit

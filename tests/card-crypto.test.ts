@@ -9,12 +9,12 @@ const USER_ID = testId(1);
 
 /**
  * The card key is per-account now (server/_core/card-key.ts), so it lives on
- * the user row and is read through `callDataApi` like anything else. Just
+ * the user row and is read through `dbQuery` like anything else. Just
  * enough of a users table to mint and remember one.
  */
-const dataApi = vi.hoisted(() => {
+const dbApi = vi.hoisted(() => {
   const store = { cardKey: null as string | null };
-  const callDataApi = vi.fn(
+  const dbQuery = vi.fn(
     async (_apiId: string, options?: { body?: Record<string, unknown> }) => {
       const sql = String(options?.body?.query ?? "");
       const params = (options?.body?.params ?? []) as unknown[];
@@ -26,14 +26,14 @@ const dataApi = vi.hoisted(() => {
       return [];
     },
   );
-  return { store, callDataApi };
+  return { store, dbQuery };
 });
-vi.mock("@/server/_core/dataApi", () => ({ callDataApi: dataApi.callDataApi }));
+vi.mock("@/server/_core/db-query", () => ({ dbQuery: dbApi.dbQuery }));
 
 describe("card crypto", () => {
   beforeEach(() => {
     process.env.CARD_ENCRYPTION_KEY = TEST_KEY_HEX;
-    dataApi.store.cardKey = null;
+    dbApi.store.cardKey = null;
     vi.resetModules();
   });
 
@@ -135,18 +135,20 @@ describe("card crypto", () => {
     );
     // ...and the account key really is a different key, so that was a genuine
     // fallback rather than the same value twice.
-    expect(dataApi.store.cardKey).not.toBe(bytesToBase64(hexToBytes(TEST_KEY_HEX)));
+    expect(dbApi.store.cardKey).not.toBe(
+      bytesToBase64(hexToBytes(TEST_KEY_HEX)),
+    );
   });
 
   it("gives two accounts different keys", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
     await encryptCardNumber("4111111111111111", USER_ID);
-    const first = dataApi.store.cardKey;
+    const first = dbApi.store.cardKey;
 
-    dataApi.store.cardKey = null;
+    dbApi.store.cardKey = null;
     await encryptCardNumber("4111111111111111", testId(2));
 
-    expect(dataApi.store.cardKey).not.toBe(first);
+    expect(dbApi.store.cardKey).not.toBe(first);
   });
 
   it("round-trips min(13) and max(19) length PANs", async () => {
@@ -156,21 +158,32 @@ describe("card crypto", () => {
     const maxPan = "4111111111111111111";
     expect(minPan).toHaveLength(13);
     expect(maxPan).toHaveLength(19);
-    expect(await decryptCardNumber(await encryptCardNumber(minPan, USER_ID), USER_ID)).toBe(
-      minPan,
-    );
-    expect(await decryptCardNumber(await encryptCardNumber(maxPan, USER_ID), USER_ID)).toBe(
-      maxPan,
-    );
+    expect(
+      await decryptCardNumber(
+        await encryptCardNumber(minPan, USER_ID),
+        USER_ID,
+      ),
+    ).toBe(minPan);
+    expect(
+      await decryptCardNumber(
+        await encryptCardNumber(maxPan, USER_ID),
+        USER_ID,
+      ),
+    ).toBe(maxPan);
   });
 
   it("round-trips empty and non-numeric input", async () => {
     const { decryptCardNumber, encryptCardNumber } =
       await import("@/server/_core/crypto");
-    expect(await decryptCardNumber(await encryptCardNumber("", USER_ID), USER_ID)).toBe("");
+    expect(
+      await decryptCardNumber(await encryptCardNumber("", USER_ID), USER_ID),
+    ).toBe("");
     const nonNumeric = "abcd-efgh-ijkl";
     expect(
-      await decryptCardNumber(await encryptCardNumber(nonNumeric, USER_ID), USER_ID),
+      await decryptCardNumber(
+        await encryptCardNumber(nonNumeric, USER_ID),
+        USER_ID,
+      ),
     ).toBe(nonNumeric);
   });
 
@@ -178,9 +191,12 @@ describe("card crypto", () => {
     const { decryptCardNumber, encryptCardNumber } =
       await import("@/server/_core/crypto");
     const unicode = "カード番号テスト";
-    expect(await decryptCardNumber(await encryptCardNumber(unicode, USER_ID), USER_ID)).toBe(
-      unicode,
-    );
+    expect(
+      await decryptCardNumber(
+        await encryptCardNumber(unicode, USER_ID),
+        USER_ID,
+      ),
+    ).toBe(unicode);
   });
 
   it("accepts a base64-encoded 32-byte key", async () => {
@@ -189,8 +205,8 @@ describe("card crypto", () => {
     const { decryptCardNumber, encryptCardNumber } =
       await import("@/server/_core/crypto");
     const plain = "4111111111111111";
-    expect(await decryptCardNumber(await encryptCardNumber(plain, USER_ID), USER_ID)).toBe(
-      plain,
-    );
+    expect(
+      await decryptCardNumber(await encryptCardNumber(plain, USER_ID), USER_ID),
+    ).toBe(plain);
   });
 });

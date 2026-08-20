@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isUlid } from "@shared/ulid";
 
-const callDataApi = vi.fn();
+const dbQuery = vi.fn();
 
-vi.mock("@/server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+vi.mock("@/server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 describe("upsertUser", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
-    callDataApi.mockResolvedValue(undefined);
+    dbQuery.mockReset();
+    dbQuery.mockResolvedValue(undefined);
   });
 
   it("mints and inserts a ULID id — a raw INSERT never picks up the schema's $defaultFn", async () => {
@@ -24,8 +24,8 @@ describe("upsertUser", () => {
       lastSignedIn: new Date("2026-06-01"),
     });
 
-    expect(callDataApi).toHaveBeenCalledTimes(1);
-    const body = callDataApi.mock.calls[0][1] as {
+    expect(dbQuery).toHaveBeenCalledTimes(1);
+    const body = dbQuery.mock.calls[0][1] as {
       body: { query: string; params: unknown[] };
     };
     expect(body.body.query).toMatch(/INSERT INTO users \(id, openId/);
@@ -38,7 +38,7 @@ describe("upsertUser", () => {
 
     await upsertUser({ openId: "user-123", name: "Returning User" });
 
-    const body = callDataApi.mock.calls[0][1] as {
+    const body = dbQuery.mock.calls[0][1] as {
       body: { query: string };
     };
     expect(body.body.query).not.toMatch(/id = VALUES\(id\)/);
@@ -52,10 +52,10 @@ describe("upsertUser", () => {
     await upsertUser({ openId: "user-b" });
 
     const firstId = (
-      callDataApi.mock.calls[0][1] as { body: { params: unknown[] } }
+      dbQuery.mock.calls[0][1] as { body: { params: unknown[] } }
     ).body.params[0];
     const secondId = (
-      callDataApi.mock.calls[1][1] as { body: { params: unknown[] } }
+      dbQuery.mock.calls[1][1] as { body: { params: unknown[] } }
     ).body.params[0];
     expect(firstId).not.toBe(secondId);
   });

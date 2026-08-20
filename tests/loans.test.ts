@@ -19,10 +19,10 @@ import type { Loan, Repayment } from "@/drizzle/schema";
 import type { Id } from "@/drizzle/schema";
 import { testId, syncColumns } from "./helpers/ids";
 
-const callDataApi = vi.fn();
+const dbQuery = vi.fn();
 
-vi.mock("../server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+vi.mock("../server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -39,7 +39,7 @@ function createUserContext(userId: Id): TrpcContext {
     aiEnabled: false,
     remindersEnabled: false,
     pinHash: null,
-  cardKey: null,
+    cardKey: null,
     pinFailedAttempts: 0,
     pinLockedUntil: null,
     createdAt: new Date(),
@@ -103,15 +103,15 @@ describe("computeRemainingBalance", () => {
 
 describe("loans db layer", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
+    dbQuery.mockReset();
   });
 
   it("getUserLoans scopes by userId", async () => {
-    callDataApi.mockResolvedValueOnce([sampleLoan]);
+    dbQuery.mockResolvedValueOnce([sampleLoan]);
 
     await expect(getUserLoans(testId(5))).resolves.toEqual([sampleLoan]);
 
-    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
           "SELECT * FROM loans WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
@@ -121,7 +121,7 @@ describe("loans db layer", () => {
   });
 
   it("createLoan inserts with parameterized SQL and returns the created row", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce({ insertId: 42 })
       .mockResolvedValueOnce([{ ...sampleLoan, id: testId(42) }]);
 
@@ -140,7 +140,7 @@ describe("loans db layer", () => {
     });
 
     expect(created?.id).toBe(testId(42));
-    expect(callDataApi).toHaveBeenNthCalledWith(1, "Database/query", {
+    expect(dbQuery).toHaveBeenNthCalledWith(1, "Database/query", {
       body: {
         query: expect.stringContaining("INSERT INTO loans"),
         params: expect.arrayContaining([testId(1), "lend", "Alex", "1000.00"]),
@@ -149,13 +149,13 @@ describe("loans db layer", () => {
   });
 
   it("getLoanById scopes by userId", async () => {
-    callDataApi.mockResolvedValueOnce([sampleLoan]);
+    dbQuery.mockResolvedValueOnce([sampleLoan]);
 
     await expect(getLoanById(testId(1), testId(1))).resolves.toEqual(
       sampleLoan,
     );
 
-    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
           "SELECT * FROM loans WHERE id = ? AND userId = ? AND deletedAt IS NULL",
@@ -165,11 +165,11 @@ describe("loans db layer", () => {
   });
 
   it("updateLoan scopes by userId", async () => {
-    callDataApi.mockResolvedValueOnce(undefined);
+    dbQuery.mockResolvedValueOnce(undefined);
 
     await updateLoan(testId(7), testId(3), { counterparty: "Sam" });
 
-    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
       body: {
         query: expect.stringMatching(
           /UPDATE loans SET counterparty = \?, updatedAt = \?, dirty = 1 WHERE id = \? AND userId = \? AND deletedAt IS NULL/,
@@ -180,11 +180,11 @@ describe("loans db layer", () => {
   });
 
   it("deleteLoan scopes by userId", async () => {
-    callDataApi.mockResolvedValueOnce(undefined);
+    dbQuery.mockResolvedValueOnce(undefined);
 
     await deleteLoan(testId(7), testId(3));
 
-    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
       body: {
         query: expect.stringContaining(
           "UPDATE loans SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
@@ -195,7 +195,7 @@ describe("loans db layer", () => {
   });
 
   it("createRepayment verifies loan ownership before insert", async () => {
-    callDataApi.mockResolvedValueOnce([]);
+    dbQuery.mockResolvedValueOnce([]);
 
     await expect(
       createRepayment({
@@ -207,11 +207,11 @@ describe("loans db layer", () => {
       }),
     ).resolves.toBeNull();
 
-    expect(callDataApi).toHaveBeenCalledTimes(1);
+    expect(dbQuery).toHaveBeenCalledTimes(1);
   });
 
   it("createRepayment inserts when loan belongs to user", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce({ insertId: 11 })
       .mockResolvedValueOnce([sampleRepayment]);
@@ -225,7 +225,7 @@ describe("loans db layer", () => {
     });
 
     expect(created).toEqual(sampleRepayment);
-    expect(callDataApi).toHaveBeenNthCalledWith(2, "Database/query", {
+    expect(dbQuery).toHaveBeenNthCalledWith(2, "Database/query", {
       body: {
         query: expect.stringContaining("INSERT INTO repayments"),
         params: [
@@ -241,7 +241,7 @@ describe("loans db layer", () => {
   });
 
   it("recordRepayment rejects over-payment before insert", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce([{ amount: "900.00" }]);
 
@@ -255,11 +255,11 @@ describe("loans db layer", () => {
       }),
     ).rejects.toBeInstanceOf(RepaymentExceedsBalanceError);
 
-    expect(callDataApi).toHaveBeenCalledTimes(2);
+    expect(dbQuery).toHaveBeenCalledTimes(2);
   });
 
   it("recordRepayment advances nextDueDate and updates loan", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ insertId: 11 })
@@ -281,7 +281,7 @@ describe("loans db layer", () => {
     });
 
     expect(result?.remainingBalance).toBe("800.00");
-    expect(callDataApi).toHaveBeenNthCalledWith(4, "Database/query", {
+    expect(dbQuery).toHaveBeenNthCalledWith(4, "Database/query", {
       body: {
         query: expect.stringMatching(/UPDATE loans SET nextDueDate = \?/),
         params: expect.arrayContaining([
@@ -294,7 +294,7 @@ describe("loans db layer", () => {
   });
 
   it("recordRepayment settles loan when balance reaches zero", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ insertId: 12 })
@@ -311,7 +311,7 @@ describe("loans db layer", () => {
     });
 
     expect(result?.remainingBalance).toBe("0.00");
-    expect(callDataApi).toHaveBeenNthCalledWith(4, "Database/query", {
+    expect(dbQuery).toHaveBeenNthCalledWith(4, "Database/query", {
       body: {
         query: expect.stringMatching(/UPDATE loans SET/),
         params: expect.arrayContaining(["settled", testId(1), testId(1)]),
@@ -320,13 +320,13 @@ describe("loans db layer", () => {
   });
 
   it("getRepaymentsByLoan scopes by loanId and userId", async () => {
-    callDataApi.mockResolvedValueOnce([sampleRepayment]);
+    dbQuery.mockResolvedValueOnce([sampleRepayment]);
 
     await expect(getRepaymentsByLoan(testId(1), testId(1))).resolves.toEqual([
       sampleRepayment,
     ]);
 
-    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
           "SELECT * FROM repayments WHERE loanId = ? AND userId = ? AND deletedAt IS NULL ORDER BY date DESC",
@@ -336,11 +336,11 @@ describe("loans db layer", () => {
   });
 
   it("deleteRepayment scopes by userId", async () => {
-    callDataApi.mockResolvedValueOnce(undefined);
+    dbQuery.mockResolvedValueOnce(undefined);
 
     await deleteRepayment(testId(10), testId(1));
 
-    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
       body: {
         query: expect.stringContaining(
           "UPDATE repayments SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND userId = ?",
@@ -358,7 +358,7 @@ describe("loans db layer", () => {
       amount: "100.00",
     };
 
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce([repaymentA, repaymentB]);
 
@@ -372,11 +372,11 @@ describe("loans db layer", () => {
 
 describe("loans router", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
+    dbQuery.mockReset();
   });
 
   it("create then list returns loan for authenticated user", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce({ insertId: 1 })
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce([sampleLoan]);
@@ -400,16 +400,16 @@ describe("loans router", () => {
   });
 
   it("user B cannot read or mutate user A loan", async () => {
-    callDataApi.mockResolvedValueOnce([]).mockResolvedValueOnce(null);
+    dbQuery.mockResolvedValueOnce([]).mockResolvedValueOnce(null);
 
     const callerB = appRouter.createCaller(createUserContext(testId(2)));
 
     await expect(callerB.loans.list()).resolves.toEqual([]);
     await expect(callerB.loans.getById({ id: testId(1) })).resolves.toBeNull();
 
-    callDataApi.mockResolvedValueOnce(undefined);
+    dbQuery.mockResolvedValueOnce(undefined);
     await callerB.loans.delete({ id: testId(1) });
-    expect(callDataApi).toHaveBeenLastCalledWith("Database/query", {
+    expect(dbQuery).toHaveBeenLastCalledWith("Database/query", {
       body: expect.objectContaining({
         params: [expect.any(Date), expect.any(Date), testId(1), testId(2)],
       }),
@@ -459,7 +459,7 @@ describe("loans router", () => {
   });
 
   it("addRepayment returns null for a foreign loan", async () => {
-    callDataApi.mockResolvedValueOnce([]);
+    dbQuery.mockResolvedValueOnce([]);
 
     const callerB = appRouter.createCaller(createUserContext(testId(2)));
 
@@ -473,7 +473,7 @@ describe("loans router", () => {
   });
 
   it("addRepayment persists for owned loan and getById reflects balance", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ insertId: 10 })
@@ -503,7 +503,7 @@ describe("loans router", () => {
   });
 
   it("recordRepayment rejects over-payment at router layer", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([sampleLoan])
       .mockResolvedValueOnce([{ amount: "950.00" }]);
 

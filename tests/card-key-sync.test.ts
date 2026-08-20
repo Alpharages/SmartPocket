@@ -23,8 +23,8 @@ vi.mock("expo-secure-store", () => ({
 const rows = vi.hoisted(
   () => [] as Array<{ id: string; cardNumber: string; dirty: number }>,
 );
-vi.mock("@/server/_core/dataApi", () => ({
-  callDataApi: vi.fn(
+vi.mock("@/server/_core/db-query", () => ({
+  dbQuery: vi.fn(
     async (_apiId: string, options?: { body?: Record<string, unknown> }) => {
       const sql = String(options?.body?.query ?? "");
       const params = (options?.body?.params ?? []) as unknown[];
@@ -57,15 +57,13 @@ describe("adoptAccountCardKeyForDevice", () => {
   });
 
   it("re-encrypts a device-key card so the account can read it, and marks it dirty", async () => {
-    const { encryptCardNumber, decryptCardNumber } = await import(
-      "@/server/_core/crypto.native"
-    );
+    const { encryptCardNumber, decryptCardNumber } =
+      await import("@/server/_core/crypto.native");
     const deviceCiphertext = await encryptCardNumber("4111111111111111");
     rows.push({ id: testId(2), cardNumber: deviceCiphertext, dirty: 0 });
 
-    const { adoptAccountCardKeyForDevice } = await import(
-      "@/lib/sync/card-key-sync"
-    );
+    const { adoptAccountCardKeyForDevice } =
+      await import("@/lib/sync/card-key-sync");
     const result = await adoptAccountCardKeyForDevice(
       fakeClient() as never,
       userId,
@@ -83,9 +81,8 @@ describe("adoptAccountCardKeyForDevice", () => {
   });
 
   it("makes the account key current, so new cards encrypt under it", async () => {
-    const { adoptAccountCardKeyForDevice } = await import(
-      "@/lib/sync/card-key-sync"
-    );
+    const { adoptAccountCardKeyForDevice } =
+      await import("@/lib/sync/card-key-sync");
     await adoptAccountCardKeyForDevice(fakeClient() as never, userId);
 
     const { encryptCardNumber } = await import("@/server/_core/crypto.native");
@@ -93,14 +90,16 @@ describe("adoptAccountCardKeyForDevice", () => {
 
     const { decryptWithKey } = await import("@/server/_core/card-cipher");
     expect(
-      decryptWithKey(stored, new Uint8Array(Buffer.from(ACCOUNT_KEY, "base64"))),
+      decryptWithKey(
+        stored,
+        new Uint8Array(Buffer.from(ACCOUNT_KEY, "base64")),
+      ),
     ).toBe("5555555555554444");
   });
 
   it("runs once — a second call is a no-op and never refetches the key", async () => {
-    const { adoptAccountCardKeyForDevice } = await import(
-      "@/lib/sync/card-key-sync"
-    );
+    const { adoptAccountCardKeyForDevice } =
+      await import("@/lib/sync/card-key-sync");
     const client = fakeClient();
 
     await adoptAccountCardKeyForDevice(client as never, userId);
@@ -126,9 +125,8 @@ describe("adoptAccountCardKeyForDevice", () => {
         getCardKey: { query: vi.fn(async () => "not-valid-base64-key!!") },
       },
     };
-    const { adoptAccountCardKeyForDevice } = await import(
-      "@/lib/sync/card-key-sync"
-    );
+    const { adoptAccountCardKeyForDevice } =
+      await import("@/lib/sync/card-key-sync");
     await expect(
       adoptAccountCardKeyForDevice(failing as never, userId),
     ).rejects.toThrow();

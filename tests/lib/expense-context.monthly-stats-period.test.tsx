@@ -22,7 +22,9 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@/lib/trpc", () => {
   const query = () => ({ refetch: mocks.emptyRefetch, data: [] });
-  const mutation = () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined) });
+  const mutation = () => ({
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
+  });
   const slice = {
     list: { useQuery: query },
     create: { useMutation: mutation },

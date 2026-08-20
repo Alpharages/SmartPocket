@@ -1,7 +1,10 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 
-export type NotificationPermissionStatus = "granted" | "denied" | "undetermined";
+export type NotificationPermissionStatus =
+  | "granted"
+  | "denied"
+  | "undetermined";
 
 export const NOTIFICATION_PERMISSION_DENIED_MESSAGE =
   "Reminders are off — enable notifications in system settings.";

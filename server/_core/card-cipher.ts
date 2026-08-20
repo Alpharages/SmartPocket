@@ -33,7 +33,9 @@ export function encryptWithKey(plain: string, key: Uint8Array): string {
   // one opaque blob, unlike Node's `getAuthTag()` split. Stored as two
   // base64 segments (iv, ciphertext+tag) rather than Node's crypto.ts three
   // (iv, authTag, ciphertext).
-  const ciphertextAndTag = gcm(key, iv).encrypt(new TextEncoder().encode(plain));
+  const ciphertextAndTag = gcm(key, iv).encrypt(
+    new TextEncoder().encode(plain),
+  );
 
   return `${VERSION_PREFIX}${bytesToBase64(iv)}:${bytesToBase64(ciphertextAndTag)}`;
 }

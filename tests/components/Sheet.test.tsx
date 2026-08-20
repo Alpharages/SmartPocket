@@ -174,7 +174,10 @@ describe("Sheet", () => {
   it("lifts the panel above the keyboard by its height", () => {
     const spy = vi
       .spyOn(Reanimated, "useAnimatedKeyboard")
-      .mockReturnValue({ height: { value: 300 }, state: { value: 2 } } as never);
+      .mockReturnValue({
+        height: { value: 300 },
+        state: { value: 2 },
+      } as never);
     try {
       const root = render(
         <Sheet visible onClose={vi.fn()} title="T">

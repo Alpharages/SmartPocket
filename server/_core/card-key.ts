@@ -1,7 +1,11 @@
 import { randomBytes } from "@noble/ciphers/utils.js";
-import { callDataApi } from "./dataApi";
+import { dbQuery } from "./db-query";
 import { allocateServerSeqBlock } from "./sync-engine";
-import { decryptWithKey, encryptWithKey, isEncryptedCardNumber } from "./card-cipher";
+import {
+  decryptWithKey,
+  encryptWithKey,
+  isEncryptedCardNumber,
+} from "./card-cipher";
 import { bytesToBase64, base64ToBytes } from "../../shared/base64";
 import type { Id } from "../../drizzle/schema";
 
@@ -45,7 +49,7 @@ export async function getOrCreateAccountCardKey(
   if (existing) return existing;
 
   const minted = bytesToBase64(randomBytes(KEY_BYTES));
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: "UPDATE users SET cardKey = ? WHERE id = ? AND cardKey IS NULL",
       params: [minted, userId],
@@ -62,7 +66,7 @@ export async function getOrCreateAccountCardKey(
 }
 
 async function readCardKey(userId: Id): Promise<Uint8Array | null> {
-  const rows = (await callDataApi("Database/query", {
+  const rows = (await dbQuery("Database/query", {
     body: {
       query: "SELECT cardKey FROM users WHERE id = ?",
       params: [userId],
@@ -77,7 +81,6 @@ async function readCardKey(userId: Id): Promise<Uint8Array | null> {
 export async function getAccountCardKeyBase64(userId: Id): Promise<string> {
   return bytesToBase64(await getOrCreateAccountCardKey(userId));
 }
-
 
 /**
  * Re-encrypts card numbers still sitting under the old global env key so they
@@ -97,9 +100,10 @@ export async function getAccountCardKeyBase64(userId: Id): Promise<string> {
 export async function reencryptLegacyCardNumbers(
   legacyKey: Uint8Array | null,
 ): Promise<{ converted: number; alreadyCurrent: number; unreadable: number }> {
-  const rows = (await callDataApi("Database/query", {
+  const rows = (await dbQuery("Database/query", {
     body: {
-      query: "SELECT id, userId, cardNumber FROM creditCards WHERE cardNumber IS NOT NULL",
+      query:
+        "SELECT id, userId, cardNumber FROM creditCards WHERE cardNumber IS NOT NULL",
       params: [],
     },
   })) as Array<{ id: Id; userId: Id; cardNumber: string }>;
@@ -142,7 +146,7 @@ export async function reencryptLegacyCardNumbers(
     // `updatedAt`, so an unbumped timestamp would make every device reject
     // the fix as older than the unreadable row it already holds.
     const [seq] = [await allocateServerSeqBlock(1)];
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query:
           "UPDATE creditCards SET cardNumber = ?, serverSeq = ?, updatedAt = NOW() WHERE id = ?",

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testId, syncColumns } from "./helpers/ids";
 
 // The card key is per-account now and read off the user row. These tests
-// mock `callDataApi` wholesale for their own purposes, so the key lookup is
+// mock `dbQuery` wholesale for their own purposes, so the key lookup is
 // stubbed rather than fed through that mock — key provisioning has its own
 // coverage in tests/card-crypto.test.ts.
 const TEST_USER_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
@@ -15,10 +15,10 @@ vi.mock("@/server/_core/card-key", () => ({
 const TEST_KEY_HEX =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-const callDataApi = vi.fn();
+const dbQuery = vi.fn();
 
-vi.mock("@/server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+vi.mock("@/server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 describe("migrateEncryptCardNumbers", () => {
@@ -28,7 +28,7 @@ describe("migrateEncryptCardNumbers", () => {
 
   beforeEach(() => {
     process.env.CARD_ENCRYPTION_KEY = TEST_KEY_HEX;
-    callDataApi.mockReset();
+    dbQuery.mockReset();
     consoleErrorSpy.mockClear();
     vi.resetModules();
   });
@@ -38,7 +38,7 @@ describe("migrateEncryptCardNumbers", () => {
   });
 
   it("encrypts plaintext rows and updates the database", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([
         { id: testId(1), cardNumber: "4111111111111111" },
       ])
@@ -58,22 +58,22 @@ describe("migrateEncryptCardNumbers", () => {
       failed: 0,
     });
 
-    const updateCall = callDataApi.mock.calls[1][1] as {
+    const updateCall = dbQuery.mock.calls[1][1] as {
       body: { query: string; params: unknown[] };
     };
     expect(updateCall.body.query).toContain("UPDATE creditCards");
     const stored = updateCall.body.params[0] as string;
     expect(isEncryptedCardNumber(stored)).toBe(true);
-    expect(await decryptCardNumber(stored, TEST_USER_ID)).toBe("4111111111111111");
+    expect(await decryptCardNumber(stored, TEST_USER_ID)).toBe(
+      "4111111111111111",
+    );
   });
 
   it("skips already-encrypted rows (idempotent re-run)", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
     const encrypted = await encryptCardNumber("4111111111111111", TEST_USER_ID);
 
-    callDataApi.mockResolvedValueOnce([
-      { id: testId(2), cardNumber: encrypted },
-    ]);
+    dbQuery.mockResolvedValueOnce([{ id: testId(2), cardNumber: encrypted }]);
 
     const { migrateEncryptCardNumbers } =
       await import("@/server/migrate-encrypt-card-numbers");
@@ -85,14 +85,14 @@ describe("migrateEncryptCardNumbers", () => {
       skipped: 1,
       failed: 0,
     });
-    expect(callDataApi).toHaveBeenCalledTimes(1);
+    expect(dbQuery).toHaveBeenCalledTimes(1);
   });
 
   it("handles a mixed table of plaintext and encrypted rows", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
     const encrypted = await encryptCardNumber("5555555555554444", TEST_USER_ID);
 
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([
         { id: testId(1), cardNumber: "4111111111111111" },
         { id: testId(2), cardNumber: encrypted },
@@ -111,11 +111,11 @@ describe("migrateEncryptCardNumbers", () => {
       skipped: 1,
       failed: 0,
     });
-    expect(callDataApi).toHaveBeenCalledTimes(3);
+    expect(dbQuery).toHaveBeenCalledTimes(3);
   });
 
   it("returns a clean summary on an empty table", async () => {
-    callDataApi.mockResolvedValueOnce([]);
+    dbQuery.mockResolvedValueOnce([]);
 
     const { migrateEncryptCardNumbers } =
       await import("@/server/migrate-encrypt-card-numbers");
@@ -130,7 +130,7 @@ describe("migrateEncryptCardNumbers", () => {
   });
 
   it("treats a non-array SELECT response as an empty table", async () => {
-    callDataApi.mockResolvedValueOnce(null);
+    dbQuery.mockResolvedValueOnce(null);
 
     const { migrateEncryptCardNumbers } =
       await import("@/server/migrate-encrypt-card-numbers");
@@ -142,13 +142,13 @@ describe("migrateEncryptCardNumbers", () => {
       skipped: 0,
       failed: 0,
     });
-    expect(callDataApi).toHaveBeenCalledTimes(1);
+    expect(dbQuery).toHaveBeenCalledTimes(1);
   });
 
   it("logs counts only — never card numbers in output", async () => {
     const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([
         { id: testId(7), cardNumber: "4111111111111111" },
       ])
@@ -176,7 +176,7 @@ describe("migrateEncryptCardNumbers", () => {
   });
 
   it("isolates per-row failures and continues processing", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([
         { id: testId(10), cardNumber: "4111111111111111" },
         { id: testId(11), cardNumber: "5555555555554444" },
@@ -212,7 +212,7 @@ describe("migrateEncryptCardNumbers", () => {
     delete process.env.CARD_ENCRYPTION_KEY;
     vi.resetModules();
 
-    callDataApi.mockImplementation(async (_apiId, options) => {
+    dbQuery.mockImplementation(async (_apiId, options) => {
       const sql = String(options?.body?.query ?? "");
       if (sql.startsWith("SELECT")) {
         return [
@@ -222,14 +222,13 @@ describe("migrateEncryptCardNumbers", () => {
       return { affectedRows: 1 };
     });
 
-    const { migrateEncryptCardNumbers } = await import(
-      "@/server/migrate-encrypt-card-numbers"
-    );
+    const { migrateEncryptCardNumbers } =
+      await import("@/server/migrate-encrypt-card-numbers");
     const summary = await migrateEncryptCardNumbers();
 
     expect(summary).toMatchObject({ total: 1, encrypted: 1, failed: 0 });
 
-    const update = callDataApi.mock.calls.find(([, options]) =>
+    const update = dbQuery.mock.calls.find(([, options]) =>
       String(options?.body?.query ?? "").startsWith("UPDATE"),
     );
     expect(String(update?.[1]?.body?.params?.[0])).toMatch(/^v1:/);

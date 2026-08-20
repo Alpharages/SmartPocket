@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { testId, syncColumns } from "./helpers/ids";
 
 // The card key is per-account now and read off the user row. These tests
-// mock `callDataApi` wholesale for their own purposes, so the key lookup is
+// mock `dbQuery` wholesale for their own purposes, so the key lookup is
 // stubbed rather than fed through that mock — key provisioning has its own
 // coverage in tests/card-crypto.test.ts.
 const TEST_USER_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
@@ -15,21 +15,21 @@ vi.mock("@/server/_core/card-key", () => ({
 const TEST_KEY_HEX =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-const callDataApi = vi.fn();
+const dbQuery = vi.fn();
 
-vi.mock("@/server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+vi.mock("@/server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 describe("credit card db encryption", () => {
   beforeEach(() => {
     process.env.CARD_ENCRYPTION_KEY = TEST_KEY_HEX;
-    callDataApi.mockReset();
+    dbQuery.mockReset();
     vi.resetModules();
   });
 
   it("encrypts cardNumber on createCreditCard", async () => {
-    callDataApi.mockResolvedValue({ insertId: 42 });
+    dbQuery.mockResolvedValue({ insertId: 42 });
     const { createCreditCard } = await import("@/server/db");
     const { isEncryptedCardNumber } = await import("@/server/_core/crypto");
 
@@ -45,7 +45,7 @@ describe("credit card db encryption", () => {
       cardType: "credit",
     });
 
-    const body = callDataApi.mock.calls[0][1].body as {
+    const body = dbQuery.mock.calls[0][1].body as {
       params: unknown[];
     };
     const stored = body.params[3] as string;
@@ -54,7 +54,7 @@ describe("credit card db encryption", () => {
   });
 
   it("encrypts cardNumber on updateCreditCard when present", async () => {
-    callDataApi.mockResolvedValue(undefined);
+    dbQuery.mockResolvedValue(undefined);
     const { updateCreditCard } = await import("@/server/db");
     const { isEncryptedCardNumber } = await import("@/server/_core/crypto");
 
@@ -62,7 +62,7 @@ describe("credit card db encryption", () => {
       cardNumber: "5555555555554444",
     });
 
-    const body = callDataApi.mock.calls[0][1].body as {
+    const body = dbQuery.mock.calls[0][1].body as {
       params: unknown[];
     };
     const stored = body.params[0] as string;
@@ -70,12 +70,12 @@ describe("credit card db encryption", () => {
   });
 
   it("does not encrypt on update when cardNumber is omitted", async () => {
-    callDataApi.mockResolvedValue(undefined);
+    dbQuery.mockResolvedValue(undefined);
     const { updateCreditCard } = await import("@/server/db");
 
     await updateCreditCard(testId(1), testId(1), { name: "Renamed" });
 
-    const body = callDataApi.mock.calls[0][1].body as {
+    const body = dbQuery.mock.calls[0][1].body as {
       query: string;
       params: unknown[];
     };
@@ -90,9 +90,12 @@ describe("credit card db encryption", () => {
 
   it("decrypts cardNumber on getCreditCardById then masks the response", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const ciphertext = await encryptCardNumber("4111111111111111", TEST_USER_ID);
+    const ciphertext = await encryptCardNumber(
+      "4111111111111111",
+      TEST_USER_ID,
+    );
 
-    callDataApi.mockResolvedValue([
+    dbQuery.mockResolvedValue([
       {
         id: testId(1),
         userId: testId(1),
@@ -115,9 +118,12 @@ describe("credit card db encryption", () => {
 
   it("decrypts cardNumber on getUserCreditCards then masks each row", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    const ciphertext = await encryptCardNumber("4111111111111111", TEST_USER_ID);
+    const ciphertext = await encryptCardNumber(
+      "4111111111111111",
+      TEST_USER_ID,
+    );
 
-    callDataApi.mockResolvedValue([
+    dbQuery.mockResolvedValue([
       {
         id: testId(1),
         userId: testId(1),
@@ -133,7 +139,7 @@ describe("credit card db encryption", () => {
   });
 
   it("returns legacy plaintext rows masked on read", async () => {
-    callDataApi.mockResolvedValue([
+    dbQuery.mockResolvedValue([
       {
         id: testId(1),
         userId: testId(1),

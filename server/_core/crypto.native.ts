@@ -55,9 +55,7 @@ async function loadKeys(): Promise<{
     );
   }
 
-  const storedAccount = await SecureStore.getItemAsync(
-    ACCOUNT_KEY_STORAGE_KEY,
-  );
+  const storedAccount = await SecureStore.getItemAsync(ACCOUNT_KEY_STORAGE_KEY);
   return {
     device,
     current: storedAccount ? base64ToBytes(storedAccount) : device,

@@ -2,25 +2,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { testId } from "./helpers/ids";
 import { SYNC_TABLES } from "@/drizzle/schema";
 
-const callDataApi = vi.hoisted(() => vi.fn());
-vi.mock("@/server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+const dbQuery = vi.hoisted(() => vi.fn());
+vi.mock("@/server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 describe("sync-engine push mechanics (mocked MySQL — insertId-driven block allocation)", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
+    dbQuery.mockReset();
   });
 
   it("allocateServerSeqBlock inserts N blank rows and returns the first assigned id", async () => {
-    callDataApi.mockResolvedValueOnce({ insertId: 42, affectedRows: 3 });
+    dbQuery.mockResolvedValueOnce({ insertId: 42, affectedRows: 3 });
     const { allocateServerSeqBlock } =
       await import("@/server/_core/sync-engine");
 
     const first = await allocateServerSeqBlock(3);
 
     expect(first).toBe(42);
-    const [, opts] = callDataApi.mock.calls[0];
+    const [, opts] = dbQuery.mock.calls[0];
     expect((opts as { body: { query: string } }).body.query).toMatch(
       /INSERT INTO syncSequence \(createdAt\) VALUES \(NOW\(\)\), \(NOW\(\)\), \(NOW\(\)\)/,
     );
@@ -35,7 +35,7 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
   it("sequenceServerWrites gives server-authored rows a fresh seq and clears dirty", async () => {
     const rowId = testId(5);
     const queries: string[] = [];
-    callDataApi.mockImplementation(
+    dbQuery.mockImplementation(
       async (_id: string, options?: { body?: Record<string, unknown> }) => {
         const sql = String(options?.body?.query ?? "");
         queries.push(sql);
@@ -61,12 +61,12 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
   });
 
   it("sequenceServerWrites allocates nothing when the server has no local writes", async () => {
-    callDataApi.mockResolvedValue([]);
+    dbQuery.mockResolvedValue([]);
     const { sequenceServerWrites } = await import("@/server/_core/sync-engine");
 
     expect(await sequenceServerWrites(SYNC_TABLES, testId(1))).toBe(0);
     expect(
-      callDataApi.mock.calls.some(([, o]) =>
+      dbQuery.mock.calls.some(([, o]) =>
         String(
           (o as never as { body?: { query?: string } })?.body?.query ?? "",
         ).includes("INSERT INTO syncSequence"),
@@ -78,11 +78,11 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
     const { allocateServerSeqBlock } =
       await import("@/server/_core/sync-engine");
     expect(await allocateServerSeqBlock(0)).toBe(0);
-    expect(callDataApi).not.toHaveBeenCalled();
+    expect(dbQuery).not.toHaveBeenCalled();
   });
 
   it("allocateServerSeqBlock throws if the insert reports no insertId", async () => {
-    callDataApi.mockResolvedValueOnce({ insertId: 0 });
+    dbQuery.mockResolvedValueOnce({ insertId: 0 });
     const { allocateServerSeqBlock } =
       await import("@/server/_core/sync-engine");
     await expect(allocateServerSeqBlock(1)).rejects.toThrow(
@@ -91,7 +91,7 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
   });
 
   it("applyPushedRows forces userId to the caller's account, ignores the row's own dirty/serverSeq, and assigns a contiguous block", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([]) // assertRowsOwnedByCaller: no foreign rows
       .mockResolvedValueOnce({ insertId: 100, affectedRows: 2 }) // allocateServerSeqBlock
       .mockResolvedValueOnce(undefined) // row 1 upsert
@@ -127,7 +127,7 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
     ]);
 
     // Row 1's insert: userId is the authenticated caller, not the forged value.
-    const row1Call = callDataApi.mock.calls[2][1] as {
+    const row1Call = dbQuery.mock.calls[2][1] as {
       body: { query: string; params: unknown[] };
     };
     expect(row1Call.body.query).toMatch(/INSERT INTO categories/);
@@ -146,22 +146,22 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
   it("applyPushedRows is a no-op for an empty batch", async () => {
     const { applyPushedRows } = await import("@/server/_core/sync-engine");
     expect(await applyPushedRows("categories", testId(1), [])).toEqual([]);
-    expect(callDataApi).not.toHaveBeenCalled();
+    expect(dbQuery).not.toHaveBeenCalled();
   });
 });
 
 describe("sync-engine against real SQLite (the device-side operations)", () => {
   beforeEach(async () => {
     vi.resetModules();
-    callDataApi.mockReset();
+    dbQuery.mockReset();
     const { createNodeSqliteDriver } =
       await import("@/server/_core/sqlite-node-driver");
     const { runMigrations, createSqliteDataApi } =
       await import("@/server/_core/sqlite-engine");
     const driver = createNodeSqliteDriver();
     await runMigrations(driver);
-    vi.doMock("@/server/_core/dataApi", () => ({
-      callDataApi: createSqliteDataApi(driver),
+    vi.doMock("@/server/_core/db-query", () => ({
+      dbQuery: createSqliteDataApi(driver),
     }));
   });
 
@@ -418,35 +418,35 @@ describe("sync-engine against real SQLite (the device-side operations)", () => {
 
 describe("tombstone purge (mocked MySQL — watermark-driven, server-only)", () => {
   beforeEach(() => {
-    // The previous describe block's beforeEach left @/server/_core/dataApi
+    // The previous describe block's beforeEach left @/server/_core/db-query
     // doMock'd to a real SQLite backend. `vi.doUnmock` reverts all the way to
     // the *real* module (not just back to the top-level `vi.mock`), so
-    // re-doMock the same callDataApi proxy explicitly — this block asserts
-    // SQL shape against a mocked callDataApi, exactly like the "push
+    // re-doMock the same dbQuery proxy explicitly — this block asserts
+    // SQL shape against a mocked dbQuery, exactly like the "push
     // mechanics" block above, since syncPurgeWatermark, like syncSequence,
     // is server-only and never part of the device's schema.
     vi.resetModules();
-    vi.doMock("@/server/_core/dataApi", () => ({
-      callDataApi: (...args: unknown[]) => callDataApi(...args),
+    vi.doMock("@/server/_core/db-query", () => ({
+      dbQuery: (...args: unknown[]) => dbQuery(...args),
     }));
-    callDataApi.mockReset();
+    dbQuery.mockReset();
   });
 
   it("getPurgeWatermark returns 0 for an unseeded/missing watermark row", async () => {
-    callDataApi.mockResolvedValueOnce([]);
+    dbQuery.mockResolvedValueOnce([]);
     const { getPurgeWatermark } = await import("@/server/_core/sync-engine");
     expect(await getPurgeWatermark()).toBe(0);
   });
 
   it("getPurgeWatermark returns the stored value", async () => {
-    callDataApi.mockResolvedValueOnce([{ purgedUpToSeq: 42 }]);
+    dbQuery.mockResolvedValueOnce([{ purgedUpToSeq: 42 }]);
     const { getPurgeWatermark } = await import("@/server/_core/sync-engine");
     expect(await getPurgeWatermark()).toBe(42);
   });
 
   it("purgeOldTombstones deletes old tombstones per table and advances the watermark to the highest seq purged", async () => {
     const cutoff = new Date("2026-01-01");
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([{ purgedUpToSeq: 0 }]) // getPurgeWatermark
       .mockResolvedValueOnce([
         { id: testId(1), serverSeq: 5 },
@@ -461,13 +461,13 @@ describe("tombstone purge (mocked MySQL — watermark-driven, server-only)", () 
 
     expect(result).toEqual({ purgedCount: 2, newWatermark: 8 });
 
-    const deleteCall = callDataApi.mock.calls.find(([, opts]) =>
+    const deleteCall = dbQuery.mock.calls.find(([, opts]) =>
       (opts as { body: { query: string } }).body.query.includes(
         "DELETE FROM categories",
       ),
     );
     expect(deleteCall).toBeDefined();
-    const watermarkUpdateCall = callDataApi.mock.calls.find(([, opts]) =>
+    const watermarkUpdateCall = dbQuery.mock.calls.find(([, opts]) =>
       (opts as { body: { query: string } }).body.query.includes(
         "UPDATE syncPurgeWatermark",
       ),
@@ -478,7 +478,7 @@ describe("tombstone purge (mocked MySQL — watermark-driven, server-only)", () 
   });
 
   it("purgeOldTombstones never moves the watermark backwards", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([{ purgedUpToSeq: 100 }]) // watermark already ahead
       .mockResolvedValue([]); // no candidates in any table
 
@@ -486,7 +486,7 @@ describe("tombstone purge (mocked MySQL — watermark-driven, server-only)", () 
     const result = await purgeOldTombstones(SYNC_TABLES, new Date());
 
     expect(result).toEqual({ purgedCount: 0, newWatermark: 100 });
-    const watermarkUpdateCall = callDataApi.mock.calls.find(([, opts]) =>
+    const watermarkUpdateCall = dbQuery.mock.calls.find(([, opts]) =>
       (opts as { body: { query: string } }).body.query.includes(
         "UPDATE syncPurgeWatermark",
       ),

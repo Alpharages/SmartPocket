@@ -5,16 +5,16 @@ import {
   type Row,
   type SqliteDriver,
 } from "./sqlite-engine";
-import type { DataApiCallOptions } from "./dataApi";
+import type { DbQueryOptions } from "./db-query";
 
 /**
- * The on-device replacement for `dataApi.ts`. Metro resolves `.native.ts`
+ * The on-device replacement for `db-query.ts`. Metro resolves `.native.ts`
  * over the bare `.ts` file automatically for iOS/Android builds — nothing
  * elsewhere in the app imports this file by name, so no `if (Platform.OS)`
  * branching exists anywhere on the data path. `server/db.ts` and all 64 tRPC
  * procedures built on it run completely unmodified against whichever file
- * Metro picked; this file's only job is to make `callDataApi` answer the
- * same `{apiId, options} -> result` shape `dataApi.ts` does, backed by a
+ * Metro picked; this file's only job is to make `dbQuery` answer the
+ * same `{apiId, options} -> result` shape `db-query.ts` does, backed by a
  * local SQLite database instead of a MySQL connection over HTTP.
  *
  * All of the actual translation/marshaling logic lives in
@@ -61,11 +61,11 @@ function createExpoSqliteDriver(db: SQLite.SQLiteDatabase): SqliteDriver {
  * Opened once per process and reused — `expo-sqlite` documents opening a
  * database as comparatively expensive, and every call site already goes
  * through this single module. Memoizing the *promise* (not just the result)
- * means two calls to `callDataApi` racing on the very first query both await
+ * means two calls to `dbQuery` racing on the very first query both await
  * the same open-and-migrate sequence instead of opening the database twice.
  */
 let readyApi: Promise<
-  (apiId: string, options?: DataApiCallOptions) => Promise<unknown>
+  (apiId: string, options?: DbQueryOptions) => Promise<unknown>
 > | null = null;
 
 async function getReadyApi() {
@@ -85,9 +85,9 @@ async function getReadyApi() {
   return readyApi;
 }
 
-export async function callDataApi(
+export async function dbQuery(
   apiId: string,
-  options: DataApiCallOptions = {},
+  options: DbQueryOptions = {},
 ): Promise<unknown> {
   const api = await getReadyApi();
   return api(apiId, options);

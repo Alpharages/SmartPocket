@@ -91,18 +91,18 @@ describe("translateStatement", () => {
 });
 
 describe("createSqliteDataApi", () => {
-  let callDataApi: ReturnType<typeof createSqliteDataApi>;
+  let dbQuery: ReturnType<typeof createSqliteDataApi>;
 
   beforeEach(async () => {
     const driver = createNodeSqliteDriver();
     await runMigrations(driver);
-    callDataApi = createSqliteDataApi(driver);
+    dbQuery = createSqliteDataApi(driver);
   });
 
   it("runs an INSERT and reports affectedRows, with insertId absent (ids are minted client-side)", async () => {
     const id = testId(1);
     const now = new Date("2026-06-01T00:00:00.000Z");
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "INSERT INTO categories (id, userId, name, type, color, icon, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -127,7 +127,7 @@ describe("createSqliteDataApi", () => {
     const id = testId(1);
     const userId = testId(2);
     const now = new Date("2026-06-01T12:30:00.000Z");
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query:
           "INSERT INTO categories (id, userId, name, type, color, icon, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -145,7 +145,7 @@ describe("createSqliteDataApi", () => {
       },
     });
 
-    const rows = (await callDataApi("Database/query", {
+    const rows = (await dbQuery("Database/query", {
       body: {
         query: "SELECT * FROM categories WHERE id = ? AND deletedAt IS NULL",
         params: [id],
@@ -164,7 +164,7 @@ describe("createSqliteDataApi", () => {
   it("excludes tombstoned rows and reports the tombstone write's affectedRows", async () => {
     const id = testId(1);
     const now = new Date("2026-06-01T00:00:00.000Z");
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query:
           "INSERT INTO categories (id, userId, name, type, color, icon, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -182,7 +182,7 @@ describe("createSqliteDataApi", () => {
       },
     });
 
-    const deleteResult = await callDataApi("Database/query", {
+    const deleteResult = await dbQuery("Database/query", {
       body: {
         query:
           "UPDATE categories SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND deletedAt IS NULL",
@@ -191,7 +191,7 @@ describe("createSqliteDataApi", () => {
     });
     expect(deleteResult).toEqual({ insertId: null, affectedRows: 1 });
 
-    const rows = (await callDataApi("Database/query", {
+    const rows = (await dbQuery("Database/query", {
       body: {
         query: "SELECT * FROM categories WHERE id = ? AND deletedAt IS NULL",
         params: [id],
@@ -201,7 +201,7 @@ describe("createSqliteDataApi", () => {
 
     // Re-running the same tombstone write is a no-op (0 rows matched) —
     // proves the `AND deletedAt IS NULL` guard makes deletes idempotent.
-    const secondDelete = (await callDataApi("Database/query", {
+    const secondDelete = (await dbQuery("Database/query", {
       body: {
         query:
           "UPDATE categories SET deletedAt = ?, updatedAt = ?, dirty = 1 WHERE id = ? AND deletedAt IS NULL",
@@ -214,7 +214,7 @@ describe("createSqliteDataApi", () => {
   it("upserts a user without duplicating the id on a second call for the same openId", async () => {
     const firstId = testId(1);
     const now = new Date("2026-06-01T00:00:00.000Z");
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query: `
           INSERT INTO users (id, openId, name, createdAt, updatedAt, lastSignedIn)
@@ -230,7 +230,7 @@ describe("createSqliteDataApi", () => {
     // the real caller (server/db.ts's upsertUser) always mints a fresh ULID
     // per call, so this is the realistic shape of a returning-user sign-in.
     const secondId = testId(2);
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query: `
           INSERT INTO users (id, openId, name, createdAt, updatedAt, lastSignedIn)
@@ -242,7 +242,7 @@ describe("createSqliteDataApi", () => {
       },
     });
 
-    const rows = (await callDataApi("Database/query", {
+    const rows = (await dbQuery("Database/query", {
       body: {
         query: "SELECT * FROM users WHERE openId = ?",
         params: ["open-1"],
@@ -261,8 +261,8 @@ describe("server/db.ts against the SQLite engine end to end", () => {
     const driver = createNodeSqliteDriver();
     await runMigrations(driver);
     const sqliteDataApi = createSqliteDataApi(driver);
-    vi.doMock("@/server/_core/dataApi", () => ({
-      callDataApi: sqliteDataApi,
+    vi.doMock("@/server/_core/db-query", () => ({
+      dbQuery: sqliteDataApi,
     }));
   });
 

@@ -37,7 +37,7 @@ what stops `if (online)` branching leaking into 20 screens.
         │  tRPC client
         ▼
   in-process tRPC link  ─────────────────►  appRouter (server/routers.ts)
-                                                  │  callDataApi()
+                                                  │  dbQuery()
                                                   ▼
                                           local SQLite (expo-sqlite)
                                                   ▲
@@ -52,14 +52,14 @@ Three facts from the current code make it tractable:
 1. **`lib/expense-context.tsx` is a real seam.** 20 files use `useExpense()`; only 4 touch tRPC
    directly. The screens do not change.
 2. **`server/db.ts` (2,108 lines) reaches the database through exactly one chokepoint** —
-   `callDataApi("Database/query", { query, params })`, 88 call sites, all raw SQL. There is no
+   `dbQuery("Database/query", { query, params })`, 88 call sites, all raw SQL. There is no
    Drizzle query-builder usage to port dialect-by-dialect.
 3. **Only one Node-only import exists on that entire path** — `mysql2/promise` in
-   `server/_core/dataApi.ts`, which is precisely the file being replaced.
+   `server/_core/db-query.ts`, which is precisely the file being replaced.
 
 So the whole server data layer and all 64 tRPC procedures can run **inside the app** by swapping
-one ~50-line adapter. Metro picks up `dataApi.native.ts` automatically alongside the existing
-`dataApi.ts`.
+one ~50-line adapter. Metro picks up `db-query.native.ts` automatically alongside the existing
+`db-query.ts`.
 
 MySQL-specific SQL that needs rewriting for SQLite is small and countable:
 
@@ -72,7 +72,7 @@ MySQL-specific SQL that needs rewriting for SQLite is small and countable:
 
 **11 spots total.**
 
-The existing test suite already mocks `callDataApi`, so most of the 1,617 tests target the same
+The existing test suite already mocks `dbQuery`, so most of the 1,617 tests target the same
 chokepoint and should survive the port.
 
 ---
@@ -204,7 +204,7 @@ appear twice, because nothing can tell those apart.
 | Phase | Work | Ships something? |
 |---|---|---|
 | **1** | ULID + `deletedAt` migration across both schemas, FK rewrite, data-migration script, test updates | Yes — app still works online-only, no user-visible change |
-| **2** | `dataApi.native.ts` on `expo-sqlite`, the 11 SQL fixes, local schema bootstrap + migration runner | — |
+| **2** | `db-query.native.ts` on `expo-sqlite`, the 11 SQL fixes, local schema bootstrap + migration runner | — |
 | **3** | In-process tRPC link, local user identity, local card-encryption key, and the four auth changes above (ungate `AuthGate`, network-vs-rejection in `fetchUser`, synthetic local user for `protectedProcedure`, PIN lifetime follows the local user) | **Yes — this alone ships the fully offline app with no server** |
 | **4** | Sync worker (push dirty / pull by seq), Settings toggle, first-sync choice UI, conflict handling, tests | Yes — ships optional sync on top |
 
@@ -222,7 +222,7 @@ additive.
 | **Total** | **~8–12 focused days** |
 
 Phase 1 dominates because it is a schema migration across 11 tables plus every consumer. The
-port itself (phases 2–3) is small precisely because of the `callDataApi` chokepoint.
+port itself (phases 2–3) is small precisely because of the `dbQuery` chokepoint.
 
 ---
 
@@ -236,7 +236,7 @@ port itself (phases 2–3) is small precisely because of the `callDataApi` choke
 3. **Purging tombstones.** Delete them too early and a device that has been offline for months
    resurrects deleted rows on its next sync. Needs a retention window longer than any plausible
    offline period.
-4. **Test suite churn.** 1,617 tests currently pass. Most mock `callDataApi` and should survive,
+4. **Test suite churn.** 1,617 tests currently pass. Most mock `dbQuery` and should survive,
    but the ID change will touch a lot of fixtures.
 
 ---
@@ -244,6 +244,6 @@ port itself (phases 2–3) is small precisely because of the `callDataApi` choke
 ## Recommended first step
 
 A **half-day spike on risk 1**, before committing to phase 1: try importing `server/routers.ts`
-into the app bundle with a stub `dataApi` and see whether Metro resolves it cleanly. If it does,
+into the app bundle with a stub `db-query` and see whether Metro resolves it cleanly. If it does,
 the whole plan holds and phases 2–3 are as small as estimated. If it does not, the fallback is a
 hand-written local data layer, and phase 3 grows from ~2 days to ~5.

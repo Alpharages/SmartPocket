@@ -186,6 +186,8 @@ describe("notifications util", () => {
       new Error("not found"),
     );
     const { cancelScheduledNotification } = await loadNotifications();
-    await expect(cancelScheduledNotification("missing")).resolves.toBeUndefined();
+    await expect(
+      cancelScheduledNotification("missing"),
+    ).resolves.toBeUndefined();
   });
 });

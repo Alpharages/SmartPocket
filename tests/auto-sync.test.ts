@@ -50,9 +50,8 @@ describe("runGuardedSync", () => {
     });
     remoteClient.createRemoteSyncClient.mockClear();
     await setPlatform("android");
-    const { __resetAutoSyncStateForTests } = await import(
-      "@/lib/sync/auto-sync"
-    );
+    const { __resetAutoSyncStateForTests } =
+      await import("@/lib/sync/auto-sync");
     __resetAutoSyncStateForTests();
   });
 

@@ -47,9 +47,8 @@ describe("crypto.native", () => {
   });
 
   it("reuses the same key across calls instead of minting a new one each time", async () => {
-    const { encryptCardNumber, decryptCardNumber } = await import(
-      "@/server/_core/crypto.native"
-    );
+    const { encryptCardNumber, decryptCardNumber } =
+      await import("@/server/_core/crypto.native");
 
     const a = await encryptCardNumber("4111111111111111");
     const b = await encryptCardNumber("5555555555554444");
@@ -78,9 +77,8 @@ describe("crypto.native", () => {
   });
 
   it("does not mint two different keys when two calls race on first use", async () => {
-    const { encryptCardNumber, decryptCardNumber } = await import(
-      "@/server/_core/crypto.native"
-    );
+    const { encryptCardNumber, decryptCardNumber } =
+      await import("@/server/_core/crypto.native");
 
     const [a, b] = await Promise.all([
       encryptCardNumber("4111111111111111"),

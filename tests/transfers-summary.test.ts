@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const callDataApi = vi.fn();
+const dbQuery = vi.fn();
 
-vi.mock("../server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+vi.mock("../server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 import {
@@ -36,15 +36,15 @@ const juneTxns = [
 
 describe("transfers do not affect income/expense summaries (AC2)", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
+    dbQuery.mockReset();
   });
 
   it("getMonthlyStats only queries transactions and is unchanged when transfers exist", async () => {
-    callDataApi.mockResolvedValue(juneTxns);
+    dbQuery.mockResolvedValue(juneTxns);
     const before = await getMonthlyStats(testId(1), 2026, 6);
 
-    callDataApi.mockClear();
-    callDataApi.mockResolvedValue(juneTxns);
+    dbQuery.mockClear();
+    dbQuery.mockResolvedValue(juneTxns);
     const after = await getMonthlyStats(testId(1), 2026, 6);
 
     expect(after).toEqual(before);
@@ -53,69 +53,69 @@ describe("transfers do not affect income/expense summaries (AC2)", () => {
       totalExpense: 250,
       netBalance: 750,
     });
-    expect(callDataApi).toHaveBeenCalledTimes(1);
-    expect(callDataApi.mock.calls[0]?.[1]).toMatchObject({
+    expect(dbQuery).toHaveBeenCalledTimes(1);
+    expect(dbQuery.mock.calls[0]?.[1]).toMatchObject({
       body: expect.objectContaining({
         query: expect.stringMatching(/FROM transactions/i),
       }),
     });
-    expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
+    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
       /transfers/i,
     );
   });
 
   it("getMonthlyTrend only queries transactions", async () => {
-    callDataApi.mockResolvedValue(juneTxns);
+    dbQuery.mockResolvedValue(juneTxns);
 
     await getMonthlyTrend(testId(1), 2026, 6, 3);
 
-    expect(callDataApi).toHaveBeenCalledTimes(1);
-    expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).toMatch(
+    expect(dbQuery).toHaveBeenCalledTimes(1);
+    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).toMatch(
       /FROM transactions/i,
     );
-    expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
+    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
       /transfers/i,
     );
   });
 
   it("getExpensesByCategory only queries transactions", async () => {
-    callDataApi.mockResolvedValue(juneTxns);
+    dbQuery.mockResolvedValue(juneTxns);
 
     await getExpensesByCategory(testId(1), 2026, 6);
 
-    expect(callDataApi).toHaveBeenCalledTimes(1);
-    expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).toMatch(
+    expect(dbQuery).toHaveBeenCalledTimes(1);
+    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).toMatch(
       /FROM transactions/i,
     );
-    expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
+    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
       /transfers/i,
     );
   });
 
   it("getCategoryAnomalies only queries transactions", async () => {
-    callDataApi.mockResolvedValue(juneTxns);
+    dbQuery.mockResolvedValue(juneTxns);
 
     await getCategoryAnomalies(testId(1), 2026, 6, 3);
 
-    expect(callDataApi).toHaveBeenCalledTimes(1);
-    expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).toMatch(
+    expect(dbQuery).toHaveBeenCalledTimes(1);
+    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).toMatch(
       /FROM transactions/i,
     );
-    expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
+    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
       /transfers/i,
     );
   });
 
   it("getRecentTransactions only queries transactions", async () => {
-    callDataApi.mockResolvedValue(juneTxns);
+    dbQuery.mockResolvedValue(juneTxns);
 
     await getRecentTransactions(testId(1), 5);
 
-    expect(callDataApi).toHaveBeenCalledTimes(1);
-    expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).toMatch(
+    expect(dbQuery).toHaveBeenCalledTimes(1);
+    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).toMatch(
       /FROM transactions/i,
     );
-    expect(String(callDataApi.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
+    expect(String(dbQuery.mock.calls[0]?.[1]?.body?.query)).not.toMatch(
       /transfers/i,
     );
   });

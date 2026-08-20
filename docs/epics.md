@@ -78,7 +78,7 @@ already-built areas cover only the remaining gaps, not the completed functionali
 - **AR-3** `ExpenseProvider` duplicates TanStack Query caching — a simplification target, not a correctness issue. [optional / tech-debt]
 - **AR-4** No chart library integrated yet — required before FR-10 charting. [planned, enables FR-10]
 - **AR-5** `expo-notifications` not wired — required before FR-19. [planned, enables FR-19]
-- **AR-6** OAuth/JWT session + Manus Data API plumbing already in place (auth, context, dataApi). [built — foundation]
+- **AR-6** JWT session + database plumbing already in place (auth, context, db-query). [built — foundation]
 
 ### UX Design Requirements
 

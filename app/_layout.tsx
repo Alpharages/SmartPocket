@@ -153,7 +153,7 @@ export default function RootLayout() {
   // local-first-sync-plan.md phase 3: native no longer needs a session token
   // at all — the in-process tRPC link (lib/trpc.native.ts) always resolves to
   // the device's local user, with no server to log into. Only web (still
-  // server-backed over dataApi.ts) waits here.
+  // server-backed over db-query.ts) waits here.
   const [isAppShellReady, setIsAppShellReady] = useState(() => {
     if (!__DEV__) return true;
     // With auto-login switched off there is no token coming, so waiting for one

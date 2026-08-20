@@ -34,8 +34,8 @@ describe("sync router against real SQLite", () => {
     await driver.execScript(
       "CREATE TABLE syncSequence (seq INTEGER PRIMARY KEY AUTOINCREMENT, createdAt TEXT);",
     );
-    vi.doMock("@/server/_core/dataApi", () => ({
-      callDataApi: createSqliteDataApi(driver),
+    vi.doMock("@/server/_core/db-query", () => ({
+      dbQuery: createSqliteDataApi(driver),
     }));
   });
 
@@ -136,7 +136,7 @@ describe("sync router against real SQLite", () => {
 });
 
 // Separate describe: push's serverSeq-block allocation is exercised for real
-// in tests/sync-engine.test.ts (against a mocked callDataApi, since the
+// in tests/sync-engine.test.ts (against a mocked dbQuery, since the
 // SQLite test backend's insertId is deliberately always null — the on-device
 // SQLite never has real auto-increment ids to hand back). This block only
 // proves the *router* wires ctx.user.id and input through to applyPushedRows

@@ -11,7 +11,7 @@ export const trpc = createTRPCReact<AppRouter>();
  * talks to server/_core/index.ts (the Express server) over HTTP at all —
  * every procedure call is dispatched in the same process against
  * `appRouter.createCaller(ctx)`, which in turn reads and writes the on-device
- * SQLite through server/db.ts's `dataApi.native.ts` (phase 2). There is no
+ * SQLite through server/db.ts's `db-query.native.ts` (phase 2). There is no
  * serialization boundary here, so unlike lib/trpc.ts there is no transformer
  * to configure — `op.input` is already a plain JS value.
  *
@@ -78,7 +78,7 @@ export function createInProcessLink(): TRPCLink<AppRouter> {
 /**
  * Creates the tRPC client for native builds. Metro's platform-extension
  * resolution picks this file over lib/trpc.ts automatically — app/_layout.tsx
- * imports `@/lib/trpc` unchanged, exactly like server/db.ts's `./_core/dataApi`
+ * imports `@/lib/trpc` unchanged, exactly like server/db.ts's `./_core/db-query`
  * import already does for the SQLite split in phase 2.
  */
 export function createTRPCClient() {

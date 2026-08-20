@@ -25,7 +25,7 @@ connection.
 | API               | Express 4 + tRPC v11 (`@trpc/server`), superjson transformer                                                                                                                    |
 | Validation        | Zod 4 (shared between client types and server input parsing)                                                                                                                    |
 | ORM / schema      | Drizzle ORM (MySQL dialect) — schema-as-types; runtime queries use raw parameterized SQL                                                                                        |
-| Database          | MySQL, reached over a direct `mysql2` pool (`server/_core/dataApi.ts`)                                                                                                          |
+| Database          | MySQL, reached over a direct `mysql2` pool (`server/_core/db-query.ts`)                                                                                                         |
 | Auth              | Email + password → JWT session (jose); bearer token on native, cookie on web                                                                                                    |
 | AI inference      | Self-hosted / local LLM over an OpenAI-compatible `/v1/chat/completions` API, env-configured (`LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`) — **planned**, nothing implemented. |
 | Tooling           | pnpm, TypeScript strict, Vitest, ESLint (expo config), Prettier, drizzle-kit                                                                                                    |
@@ -64,10 +64,10 @@ server/
   _core/session.ts           JWT sign/verify and per-request authentication
   _core/auth-routes.ts       signup / login / logout / me
   _core/password.ts          password policy, hashing, login throttle
-  _core/dataApi.ts           callDataApi() — the mysql2 pool behind every query
+  _core/db-query.ts          dbQuery() — the mysql2 pool behind every query
   _core/env.ts               Server env var surface
   routers.ts                 tRPC app router: categories / creditCards / transactions / summary
-  db.ts                      Data-access functions (raw SQL via callDataApi)
+  db.ts                      Data-access functions (raw SQL via dbQuery)
 
 drizzle/
   schema.ts                  Tables: users, categories, creditCards, transactions, monthlySummaries
@@ -107,7 +107,7 @@ docs/                        Product + technical docs (this file, PRD, concept n
 │        │ createContext → sdk.authenticateRequest
 │        │ protectedProcedure requires ctx.user │
 │        ▼                                      │
-│  db.ts  → callDataApi("Database/query", …)    │
+│  db.ts  → dbQuery("Database/query", …)        │
 └───────────────────────┬──────────────────────┘
               ┌──────────┴───────────┐
               ▼                      ▼
@@ -169,7 +169,7 @@ All procedures except `health` are `protectedProcedure` (require an authenticate
 | `summary`      | `monthlyStats`                                            | query    | Income / expense / net for a month      |
 |                | `expensesByCategory`                                      | query    | Per-category expense totals for a month |
 
-`db.ts` implements each call as raw parameterized SQL through `callDataApi("Database/query", …)`.
+`db.ts` implements each call as raw parameterized SQL through `dbQuery("Database/query", …)`.
 Aggregations (`monthlyStats`, `expensesByCategory`) fetch rows and reduce in JS rather than using SQL
 `GROUP BY`.
 

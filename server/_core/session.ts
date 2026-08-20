@@ -74,9 +74,13 @@ class SessionService {
     if (!cookieValue) return null;
 
     try {
-      const { payload } = await jwtVerify(cookieValue, this.getSessionSecret(), {
-        algorithms: ["HS256"],
-      });
+      const { payload } = await jwtVerify(
+        cookieValue,
+        this.getSessionSecret(),
+        {
+          algorithms: ["HS256"],
+        },
+      );
       const { openId, name } = payload as Record<string, unknown>;
 
       if (!isNonEmptyString(openId)) {

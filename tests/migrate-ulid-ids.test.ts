@@ -3,10 +3,10 @@ import { isUlid } from "@shared/ulid";
 
 type Row = Record<string, unknown>;
 
-const callDataApi = vi.fn();
+const dbQuery = vi.fn();
 
-vi.mock("@/server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+vi.mock("@/server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 /**
@@ -21,7 +21,7 @@ function installFakeDb(initialTables: Record<string, Row[]>) {
     tables[table] = rows.map((row) => ({ ...row }));
   }
 
-  callDataApi.mockImplementation(
+  dbQuery.mockImplementation(
     async (
       _api: string,
       opts: { body: { query: string; params: unknown[] } },
@@ -62,7 +62,7 @@ function installFakeDb(initialTables: Record<string, Row[]>) {
 
 describe("assignUlidIds", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
+    dbQuery.mockReset();
     vi.resetModules();
   });
 
@@ -97,7 +97,7 @@ describe("assignUlidIds", () => {
 
 describe("remapForeignKey", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
+    dbQuery.mockReset();
     vi.resetModules();
   });
 
@@ -183,7 +183,7 @@ describe("remapForeignKey", () => {
 
 describe("migrateUlidIds", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
+    dbQuery.mockReset();
     vi.resetModules();
   });
 

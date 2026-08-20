@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { callDataApi } from "./_core/dataApi";
+import { dbQuery } from "./_core/db-query";
 import { migrateUlidIds, formatUlidMigrationSummary } from "./migrate-ulid-ids";
 import { backfillServerSeq } from "./_core/sync-engine";
 import { reencryptLegacyCardNumbers } from "./_core/card-key";
@@ -43,7 +43,7 @@ async function query<T = Record<string, unknown>>(
   sql: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: { query: sql, params },
   });
   return Array.isArray(result) ? (result as T[]) : [];
@@ -63,7 +63,7 @@ export function splitSqlStatements(sql: string): string[] {
 async function runSqlFile(file: string): Promise<void> {
   const path = join(process.cwd(), "drizzle", file);
   for (const statement of splitSqlStatements(readFileSync(path, "utf8"))) {
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: { query: statement, params: [] },
     });
   }
@@ -155,17 +155,29 @@ export async function migratePhase1(): Promise<Phase1Step[]> {
   const alreadyContracted = (await columnType("users", "id")) === "varchar";
 
   if (alreadyContracted) {
-    steps.push({ name: "0011 expand (shadow + sync columns)", status: "already-applied" });
+    steps.push({
+      name: "0011 expand (shadow + sync columns)",
+      status: "already-applied",
+    });
     steps.push({ name: "ULID backfill", status: "already-applied" });
-    steps.push({ name: "0012 contract (drop int ids)", status: "already-applied" });
+    steps.push({
+      name: "0012 contract (drop int ids)",
+      status: "already-applied",
+    });
   } else {
     // Step 1 — expand. `users.id_ulid` existing is the marker, and is only
     // meaningful while the database is still on int ids.
     if (await columnType("users", "id_ulid")) {
-      steps.push({ name: "0011 expand (shadow + sync columns)", status: "already-applied" });
+      steps.push({
+        name: "0011 expand (shadow + sync columns)",
+        status: "already-applied",
+      });
     } else {
       await runSqlFile("0011_ulid_shadow_columns.sql");
-      steps.push({ name: "0011 expand (shadow + sync columns)", status: "applied" });
+      steps.push({
+        name: "0011 expand (shadow + sync columns)",
+        status: "applied",
+      });
     }
 
     const summary = await migrateUlidIds();

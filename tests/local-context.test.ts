@@ -93,8 +93,8 @@ describe("createLocalContext against real SQLite end to end", () => {
       await import("@/server/_core/sqlite-engine");
     const driver = createNodeSqliteDriver();
     await runMigrations(driver);
-    vi.doMock("@/server/_core/dataApi", () => ({
-      callDataApi: createSqliteDataApi(driver),
+    vi.doMock("@/server/_core/db-query", () => ({
+      dbQuery: createSqliteDataApi(driver),
     }));
   });
 

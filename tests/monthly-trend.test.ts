@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const callDataApi = vi.fn();
+const dbQuery = vi.fn();
 
-vi.mock("../server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+vi.mock("../server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 import { getMonthlyTrend } from "../server/db";
@@ -11,11 +11,11 @@ import { testId } from "./helpers/ids";
 
 describe("getMonthlyTrend", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
+    dbQuery.mockReset();
   });
 
   it("returns zero-filled months oldest to newest for the anchor window", async () => {
-    callDataApi.mockResolvedValue([]);
+    dbQuery.mockResolvedValue([]);
 
     const trend = await getMonthlyTrend(testId(1), 2026, 6, 6);
 
@@ -37,7 +37,7 @@ describe("getMonthlyTrend", () => {
   });
 
   it("sums income, expense, and net per month", async () => {
-    callDataApi.mockResolvedValue([
+    dbQuery.mockResolvedValue([
       {
         type: "income",
         amount: "1000",
@@ -81,7 +81,7 @@ describe("getMonthlyTrend", () => {
   });
 
   it("crosses year boundaries when the window reaches into the prior year", async () => {
-    callDataApi.mockResolvedValue([
+    dbQuery.mockResolvedValue([
       {
         type: "expense",
         amount: "150",
@@ -109,7 +109,7 @@ describe("getMonthlyTrend", () => {
 
   it("propagates a query failure instead of reporting no history", async () => {
     // SP-014: silently returning [] rendered "No spending history".
-    callDataApi.mockRejectedValue(new Error("db down"));
+    dbQuery.mockRejectedValue(new Error("db down"));
 
     await expect(getMonthlyTrend(testId(1), 2026, 6, 6)).rejects.toThrow(
       "db down",
@@ -117,11 +117,11 @@ describe("getMonthlyTrend", () => {
   });
 
   it("scopes the query to the user and date window", async () => {
-    callDataApi.mockResolvedValue([]);
+    dbQuery.mockResolvedValue([]);
 
     await getMonthlyTrend(testId(42), 2026, 6, 6);
 
-    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
           "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",

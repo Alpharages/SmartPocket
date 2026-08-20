@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { testId } from "./helpers/ids";
 
-const callDataApi = vi.fn();
+const dbQuery = vi.fn();
 
-vi.mock("@/server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+vi.mock("@/server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 // The table list `deleteAllUserData` walks, in the FK-safe order server/db.ts
@@ -24,8 +24,8 @@ const TOMBSTONED_TABLES = [
 
 describe("deleteAllUserData", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
-    callDataApi.mockResolvedValue(undefined);
+    dbQuery.mockReset();
+    dbQuery.mockResolvedValue(undefined);
     vi.resetModules();
   });
 
@@ -36,9 +36,9 @@ describe("deleteAllUserData", () => {
 
     // Ten tombstoning UPDATEs (soft delete, not DELETE — a hard delete could
     // never propagate to another device) plus the PIN clear.
-    expect(callDataApi).toHaveBeenCalledTimes(TOMBSTONED_TABLES.length + 1);
+    expect(dbQuery).toHaveBeenCalledTimes(TOMBSTONED_TABLES.length + 1);
 
-    const queries = callDataApi.mock.calls.map(
+    const queries = dbQuery.mock.calls.map(
       (call) =>
         (call[1] as { body: { query: string; params: unknown[] } }).body,
     );
@@ -65,7 +65,7 @@ describe("deleteAllUserData", () => {
   });
 
   it("propagates errors from the data API", async () => {
-    callDataApi.mockRejectedValueOnce(new Error("db unavailable"));
+    dbQuery.mockRejectedValueOnce(new Error("db unavailable"));
     const { deleteAllUserData } = await import("@/server/db");
 
     await expect(deleteAllUserData(testId(1))).rejects.toThrow(

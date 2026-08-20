@@ -6,8 +6,8 @@ import {
 } from "./sqlite-schema";
 
 /**
- * The local data engine — everything `dataApi.native.ts` needs to answer a
- * `callDataApi("Database/query", ...)` call against on-device SQLite,
+ * The local data engine — everything `db-query.native.ts` needs to answer a
+ * `dbQuery("Database/query", ...)` call against on-device SQLite,
  * factored out from any concrete SQLite binding.
  *
  * `server/db.ts` was written against `mysql2`'s query/param/result shapes
@@ -20,7 +20,7 @@ import {
  * Nothing in this file imports a SQLite binding. `SqliteDriver` is the seam:
  * `sqlite-node-driver.ts` implements it over `node:sqlite` (used by every
  * test in this file, and available for a future Node-hosted dev harness),
- * `dataApi.native.ts` implements it over `expo-sqlite` for the real app.
+ * `db-query.native.ts` implements it over `expo-sqlite` for the real app.
  * Testing the translation and marshaling logic here against a genuine SQLite
  * engine is far stronger evidence than testing it against a hand-rolled
  * fake would be — the DDL, the rewritten SQL, and the round-tripped values
@@ -271,8 +271,8 @@ function isSelectLike(sql: string): boolean {
 }
 
 /**
- * Builds a `callDataApi`-compatible function backed by `driver`. This is
- * what `dataApi.native.ts` exports as its `callDataApi` — Metro picks that
+ * Builds a `dbQuery`-compatible function backed by `driver`. This is
+ * what `db-query.native.ts` exports as its `dbQuery` — Metro picks that
  * file automatically on native builds, so `server/db.ts` never has to know
  * which engine answered its query.
  */
@@ -282,7 +282,7 @@ export function createSqliteDataApi(
   apiId: string,
   options?: { body?: Record<string, unknown> },
 ) => Promise<unknown> {
-  return async function callDataApi(apiId, options = {}) {
+  return async function dbQuery(apiId, options = {}) {
     if (apiId !== "Database/query") {
       throw new Error(
         `sqlite-engine: API "${apiId}" is not implemented by the local data layer`,

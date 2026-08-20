@@ -3,7 +3,7 @@ import {
   applyTransferLegs,
   reduceAccountBalances,
 } from "@/lib/account-balances";
-import { callDataApi } from "./_core/dataApi";
+import { dbQuery } from "./_core/db-query";
 import { ulid } from "@shared/ulid";
 import {
   decryptCardNumber,
@@ -52,7 +52,7 @@ import {
  */
 async function getDb() {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: { query: "SELECT 1" },
     });
     return result ? true : null;
@@ -66,7 +66,7 @@ async function getDb() {
 // ============================================================================
 
 export async function getUserByOpenId(openId: string) {
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: {
       query: "SELECT * FROM users WHERE openId = ?",
       params: [openId],
@@ -84,7 +84,7 @@ export async function getUserByOpenId(openId: string) {
  * out which one holds their data.
  */
 export async function getUserByEmail(email: string) {
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: {
       query: "SELECT * FROM users WHERE email = ?",
       params: [email.trim().toLowerCase()],
@@ -111,7 +111,7 @@ export async function createPasswordUser(data: {
   name?: string | null;
 }): Promise<Id> {
   const id = ulid();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       // Every value is a parameter — no `'password'` or `NOW()` literals in
       // the statement. The dev database (server/_core/devDb.ts) maps columns
@@ -138,7 +138,7 @@ export async function createPasswordUser(data: {
 
 /** Stamps a successful sign-in. Best-effort: a failed write must not fail the login. */
 export async function touchLastSignedIn(id: Id): Promise<void> {
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: "UPDATE users SET lastSignedIn = NOW() WHERE id = ?",
       params: [id],
@@ -164,7 +164,7 @@ export async function touchLastSignedIn(id: Id): Promise<void> {
  * the server's own `users` table is never touched by this path.
  */
 export async function reassignUserId(fromId: Id, toId: Id) {
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: "UPDATE users SET id = ? WHERE id = ?",
       params: [toId, fromId],
@@ -199,7 +199,7 @@ export async function upsertUser(data: {
     .filter((column) => column !== "openId" && column !== "id")
     .map((column) => `${column} = VALUES(${column})`);
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO users (${columns.join(", ")})
@@ -244,7 +244,7 @@ function coerceDbBoolean(value: unknown): boolean {
 export async function getUserSettings(
   userId: Id,
 ): Promise<{ aiEnabled: boolean; remindersEnabled: boolean }> {
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: {
       query: "SELECT aiEnabled, remindersEnabled FROM users WHERE id = ?",
       params: [userId],
@@ -266,7 +266,7 @@ export async function updateAiEnabled(
   userId: Id,
   enabled: boolean,
 ): Promise<void> {
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: "UPDATE users SET aiEnabled = ? WHERE id = ?",
       params: [enabled, userId],
@@ -285,7 +285,7 @@ export interface UserPinState {
 }
 
 export async function getUserPinState(userId: Id): Promise<UserPinState> {
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: {
       query:
         "SELECT pinHash, pinFailedAttempts, pinLockedUntil FROM users WHERE id = ?",
@@ -309,7 +309,7 @@ export async function getUserPinState(userId: Id): Promise<UserPinState> {
 
 /** Stores the salted hash and resets attempt/lockout state — a fresh PIN starts with a clean slate. */
 export async function setUserPin(userId: Id, pinHash: string): Promise<void> {
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query:
         "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
@@ -319,7 +319,7 @@ export async function setUserPin(userId: Id, pinHash: string): Promise<void> {
 }
 
 export async function clearUserPin(userId: Id): Promise<void> {
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query:
         "UPDATE users SET pinHash = ?, pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
@@ -330,7 +330,7 @@ export async function clearUserPin(userId: Id): Promise<void> {
 
 /** Clears failed-attempt/lockout state without touching the hash — used after a successful verify. */
 export async function resetPinAttempts(userId: Id): Promise<void> {
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query:
         "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ?",
@@ -349,7 +349,7 @@ export async function resetExpiredPinLockout(
   userId: Id,
   now: Date,
 ): Promise<void> {
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query:
         "UPDATE users SET pinFailedAttempts = ?, pinLockedUntil = ? WHERE id = ? AND pinLockedUntil IS NOT NULL AND pinLockedUntil <= ?",
@@ -383,7 +383,7 @@ export async function recordFailedPinAttempt(
   userId: Id,
   data: { maxAttempts: number; lockedUntilIfTripped: Date; now: Date },
 ): Promise<{ counted: boolean }> {
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: {
       query:
         "UPDATE users SET pinLockedUntil = IF(pinFailedAttempts + 1 >= ?, ?, NULL), pinFailedAttempts = pinFailedAttempts + 1 WHERE id = ? AND (pinLockedUntil IS NULL OR pinLockedUntil <= ?)",
@@ -424,7 +424,7 @@ export async function getUserCategories(
       : "SELECT * FROM categories WHERE userId = ? AND deletedAt IS NULL ORDER BY name";
     const params = type ? [userId, type] : [userId];
 
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: { query, params },
     });
     return Array.isArray(result) ? result : [];
@@ -435,7 +435,7 @@ export async function getUserCategories(
 
 export async function createCategory(data: InsertCategory) {
   const id = ulid();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO categories (id, userId, name, type, color, icon, isDefault)
@@ -458,7 +458,7 @@ export async function createCategory(data: InsertCategory) {
 
 /** Idempotent: seeds DEFAULT_CATEGORIES once per user when they have zero categories. */
 export async function seedDefaultCategories(userId: Id): Promise<void> {
-  const countResult = await callDataApi("Database/query", {
+  const countResult = await dbQuery("Database/query", {
     body: {
       query:
         "SELECT COUNT(*) as categoryCount FROM categories WHERE userId = ? AND deletedAt IS NULL",
@@ -539,7 +539,7 @@ export async function updateCategory(
   const { clause, values } = buildUpdate("categories", data);
   if (!clause) return;
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE categories SET ${clause}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [...values, writeStamp(), id, userId],
@@ -549,7 +549,7 @@ export async function updateCategory(
 
 export async function deleteCategory(id: Id, userId: Id) {
   const stamp = writeStamp();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE categories SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [stamp, stamp, id, userId],
@@ -559,7 +559,7 @@ export async function deleteCategory(id: Id, userId: Id) {
 
 export async function getCategoryById(id: Id, userId: Id) {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM categories WHERE id = ? AND userId = ? AND deletedAt IS NULL",
@@ -608,7 +608,7 @@ export async function getUserCreditCards(
   userId: Id,
 ): Promise<SafeCreditCard[]> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM creditCards WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
@@ -628,7 +628,7 @@ export async function createCreditCard(
   data: InsertCreditCard,
 ): Promise<SafeCreditCard | null> {
   const id = ulid();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO creditCards (id, userId, name, cardNumber, cardholderName, expiryMonth, expiryYear, creditLimit, color, cardType)
@@ -669,7 +669,7 @@ export async function updateCreditCard(
   const { clause, values } = buildUpdate("creditCards", payload);
 
   if (clause) {
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query: `UPDATE creditCards SET ${clause}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
         params: [...values, writeStamp(), id, userId],
@@ -682,7 +682,7 @@ export async function updateCreditCard(
 
 export async function deleteCreditCard(id: Id, userId: Id) {
   const stamp = writeStamp();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE creditCards SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [stamp, stamp, id, userId],
@@ -695,7 +695,7 @@ export async function getCreditCardById(
   userId: Id,
 ): Promise<SafeCreditCard | null> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM creditCards WHERE id = ? AND userId = ? AND deletedAt IS NULL",
@@ -715,7 +715,7 @@ export async function getCreditCardById(
 
 export async function getUserAccounts(userId: Id): Promise<Account[]> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM accounts WHERE userId = ? AND deletedAt IS NULL ORDER BY name",
@@ -732,7 +732,7 @@ export async function createAccount(
   data: InsertAccount,
 ): Promise<Account | null> {
   const id = ulid();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO accounts (id, userId, name, type, currency, isDefault)
@@ -765,7 +765,7 @@ export async function updateAccount(
     return getAccountById(id, userId);
   }
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE accounts SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [...values, writeStamp(), id, userId],
@@ -777,7 +777,7 @@ export async function updateAccount(
 
 export async function deleteAccount(id: Id, userId: Id): Promise<void> {
   const stamp = writeStamp();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE accounts SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [stamp, stamp, id, userId],
@@ -790,7 +790,7 @@ export async function getAccountById(
   userId: Id,
 ): Promise<Account | null> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM accounts WHERE id = ? AND userId = ? AND deletedAt IS NULL",
@@ -808,7 +808,7 @@ export async function getAccountTransactionCount(
   accountId: Id,
   userId: Id,
 ): Promise<number> {
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: {
       query:
         "SELECT COUNT(*) as txCount FROM transactions WHERE userId = ? AND accountId = ? AND deletedAt IS NULL",
@@ -826,7 +826,7 @@ export async function getAccountTransferCount(
   accountId: Id,
   userId: Id,
 ): Promise<number> {
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: {
       query:
         "SELECT COUNT(*) as transferCount FROM transfers WHERE userId = ? AND (fromAccountId = ? OR toAccountId = ?) AND deletedAt IS NULL",
@@ -844,7 +844,7 @@ export async function createTransfer(
   data: InsertTransfer,
 ): Promise<Transfer | null> {
   const id = ulid();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO transfers (id, userId, fromAccountId, toAccountId, amount, description, date)
@@ -869,7 +869,7 @@ export async function getTransferById(
   userId: Id,
 ): Promise<Transfer | null> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM transfers WHERE id = ? AND userId = ? AND deletedAt IS NULL",
@@ -885,7 +885,7 @@ export async function getTransferById(
 
 export async function getUserTransfers(userId: Id): Promise<Transfer[]> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM transfers WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC, id DESC",
@@ -906,25 +906,25 @@ export async function reassignAccountTransfers(
   // Direct legs between source and target are absorbed when merging accounts.
   // Tombstoned rather than dropped so the absorption reaches other devices.
   const stamp = writeStamp();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE transfers SET ${TOMBSTONE_SET} WHERE userId = ? AND fromAccountId = ? AND toAccountId = ? AND deletedAt IS NULL`,
       params: [stamp, stamp, userId, fromAccountId, toAccountId],
     },
   });
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE transfers SET ${TOMBSTONE_SET} WHERE userId = ? AND fromAccountId = ? AND toAccountId = ? AND deletedAt IS NULL`,
       params: [stamp, stamp, userId, toAccountId, fromAccountId],
     },
   });
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE transfers SET fromAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND fromAccountId = ? AND deletedAt IS NULL`,
       params: [toAccountId, writeStamp(), userId, fromAccountId],
     },
   });
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE transfers SET toAccountId = ?, ${TOUCH_SET} WHERE userId = ? AND toAccountId = ? AND deletedAt IS NULL`,
       params: [toAccountId, writeStamp(), userId, fromAccountId],
@@ -937,7 +937,7 @@ export async function reassignAccountTransactions(
   toAccountId: Id,
   userId: Id,
 ): Promise<void> {
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId = ? AND deletedAt IS NULL`,
       params: [toAccountId, writeStamp(), userId, fromAccountId],
@@ -967,7 +967,7 @@ export async function reassignAndDeleteAccount(
 
 /** Idempotent: creates a default Cash account and backfills null accountId rows. */
 export async function ensureDefaultAccount(userId: Id): Promise<void> {
-  const countResult = await callDataApi("Database/query", {
+  const countResult = await dbQuery("Database/query", {
     body: {
       query:
         "SELECT COUNT(*) as accountCount FROM accounts WHERE userId = ? AND deletedAt IS NULL",
@@ -995,7 +995,7 @@ export async function ensureDefaultAccount(userId: Id): Promise<void> {
     return;
   }
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE transactions SET accountId = ?, ${TOUCH_SET} WHERE userId = ? AND accountId IS NULL AND deletedAt IS NULL`,
       params: [created.id, writeStamp(), userId],
@@ -1026,7 +1026,7 @@ export async function getUserTransactions(
       params.push(offset);
     }
 
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: { query, params },
     });
     return Array.isArray(result) ? result : [];
@@ -1041,7 +1041,7 @@ export async function getTransactionsByDateRange(
   endDate: Date,
 ) {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL ORDER BY date DESC",
@@ -1056,7 +1056,7 @@ export async function getTransactionsByDateRange(
 
 export async function getTransactionsByCategory(userId: Id, categoryId: Id) {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM transactions WHERE userId = ? AND categoryId = ? AND deletedAt IS NULL ORDER BY date DESC",
@@ -1074,7 +1074,7 @@ export async function getTransactionsByCreditCard(
   creditCardId: Id,
 ) {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM transactions WHERE userId = ? AND creditCardId = ? AND deletedAt IS NULL ORDER BY date DESC",
@@ -1089,7 +1089,7 @@ export async function getTransactionsByCreditCard(
 
 export async function createTransaction(data: InsertTransaction) {
   const id = ulid();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO transactions (id, userId, categoryId, creditCardId, accountId, type, amount, description, date)
@@ -1126,7 +1126,7 @@ export async function createTransactionsBulk(rows: InsertTransaction[]) {
     data.date,
   ]);
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO transactions (id, userId, categoryId, creditCardId, accountId, type, amount, description, date)
@@ -1151,7 +1151,7 @@ export async function updateTransaction(
   const updates = entries.map(([key]) => `${key} = ?`).join(", ");
   const values = entries.map(([, value]) => value);
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE transactions SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [...values, writeStamp(), id, userId],
@@ -1161,7 +1161,7 @@ export async function updateTransaction(
 
 export async function deleteTransaction(id: Id, userId: Id) {
   const stamp = writeStamp();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE transactions SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [stamp, stamp, id, userId],
@@ -1187,7 +1187,7 @@ export async function deleteAllUserData(userId: Id) {
     "creditCards",
     "categories",
   ]) {
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query: `UPDATE ${table} SET ${TOMBSTONE_SET} WHERE userId = ? AND deletedAt IS NULL`,
         params: [stamp, stamp, userId],
@@ -1201,7 +1201,7 @@ export async function deleteAllUserData(userId: Id) {
 
 export async function getTransactionById(id: Id, userId: Id) {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM transactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
@@ -1222,7 +1222,7 @@ export async function getUserRecurringTransactions(
   userId: Id,
 ): Promise<RecurringTransaction[]> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM recurringTransactions WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
@@ -1239,7 +1239,7 @@ export async function createRecurringTransaction(
   data: InsertRecurringTransaction,
 ): Promise<Id> {
   const id = ulid();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO recurringTransactions (
@@ -1289,7 +1289,7 @@ export async function updateRecurringTransaction(
     return;
   }
   const values = Object.values(data);
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE recurringTransactions SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [...values, writeStamp(), id, userId],
@@ -1302,7 +1302,7 @@ export async function deleteRecurringTransaction(
   userId: Id,
 ): Promise<void> {
   const stamp = writeStamp();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE recurringTransactions SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [stamp, stamp, id, userId],
@@ -1315,7 +1315,7 @@ export async function getRecurringTransactionById(
   userId: Id,
 ): Promise<RecurringTransaction | null> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM recurringTransactions WHERE id = ? AND userId = ? AND deletedAt IS NULL",
@@ -1333,7 +1333,7 @@ export async function getDueRecurringTransactions(
   now: Date,
 ): Promise<RecurringTransaction[]> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM recurringTransactions WHERE isActive = 1 AND nextRunDate <= ? AND deletedAt IS NULL ORDER BY nextRunDate ASC",
@@ -1353,7 +1353,7 @@ export async function advanceRecurringTransaction(
     "nextRunDate" | "lastRunDate" | "generatedCount" | "isActive"
   >,
 ): Promise<void> {
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         UPDATE recurringTransactions
@@ -1378,7 +1378,7 @@ export async function advanceRecurringTransaction(
 
 export async function getUserBudgets(userId: Id): Promise<Budget[]> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM budgets WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
@@ -1393,7 +1393,7 @@ export async function getUserBudgets(userId: Id): Promise<Budget[]> {
 
 export async function createBudget(data: InsertBudget): Promise<Id> {
   const id = ulid();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO budgets (id, userId, categoryId, period, amount, startDate, endDate)
@@ -1427,7 +1427,7 @@ export async function updateBudget(
     return;
   }
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE budgets SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [...values, writeStamp(), id, userId],
@@ -1437,7 +1437,7 @@ export async function updateBudget(
 
 export async function deleteBudget(id: Id, userId: Id): Promise<void> {
   const stamp = writeStamp();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE budgets SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [stamp, stamp, id, userId],
@@ -1450,7 +1450,7 @@ export async function getBudgetById(
   userId: Id,
 ): Promise<Budget | null> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM budgets WHERE id = ? AND userId = ? AND deletedAt IS NULL",
@@ -1505,7 +1505,7 @@ export async function getBudgetProgress(
       }
 
       try {
-        const result = await callDataApi("Database/query", {
+        const result = await dbQuery("Database/query", {
           body: {
             query:
               "SELECT amount FROM transactions WHERE userId = ? AND type = 'expense' AND categoryId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
@@ -1544,7 +1544,7 @@ export async function findActiveBudget(
       params.push(options.excludeId);
     }
 
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query: `
           SELECT * FROM budgets
@@ -1575,7 +1575,7 @@ export async function getMonthlySummary(
   month: number,
 ) {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM monthlySummaries WHERE userId = ? AND year = ? AND month = ? AND deletedAt IS NULL",
@@ -1590,7 +1590,7 @@ export async function getMonthlySummary(
 
 export async function createMonthlySummary(data: InsertMonthlySummary) {
   const id = ulid();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO monthlySummaries (id, userId, year, month, totalIncome, totalExpense, netBalance)
@@ -1619,7 +1619,7 @@ export async function updateMonthlySummary(
     .join(", ");
   const values = Object.values(data);
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE monthlySummaries SET ${updates}, ${TOUCH_SET} WHERE id = ? AND deletedAt IS NULL`,
       params: [...values, writeStamp(), id],
@@ -1638,7 +1638,7 @@ export async function getAccountBalances(
   userId: Id,
 ): Promise<Record<Id, number>> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT id, accountId, type, amount FROM transactions WHERE userId = ? AND deletedAt IS NULL",
@@ -1678,7 +1678,7 @@ export async function getMonthlyStats(userId: Id, year: number, month: number) {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
@@ -1730,7 +1730,7 @@ export async function getMonthlyTrend(
     const startDate = new Date(year, month - count, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM transactions WHERE userId = ? AND date >= ? AND date <= ? AND deletedAt IS NULL",
@@ -1815,7 +1815,7 @@ export async function getCategoryAnomalies(
     const startDate = new Date(year, month - 1 - lookbackMonths, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",
@@ -1889,7 +1889,7 @@ export async function getExpensesByCategory(
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",
@@ -1925,7 +1925,7 @@ export async function getExpensesByCategory(
  */
 export async function getRecentTransactions(userId: Id, limit: number = 7) {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM transactions WHERE userId = ? AND deletedAt IS NULL ORDER BY date DESC LIMIT ?",
@@ -1967,7 +1967,7 @@ export class RepaymentExceedsBalanceError extends Error {
 
 export async function getUserLoans(userId: Id): Promise<Loan[]> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM loans WHERE userId = ? AND deletedAt IS NULL ORDER BY createdAt DESC",
@@ -1982,7 +1982,7 @@ export async function getUserLoans(userId: Id): Promise<Loan[]> {
 
 export async function createLoan(data: InsertLoan): Promise<Loan | null> {
   const id = ulid();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO loans (
@@ -2012,7 +2012,7 @@ export async function createLoan(data: InsertLoan): Promise<Loan | null> {
 
 export async function getLoanById(id: Id, userId: Id): Promise<Loan | null> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM loans WHERE id = ? AND userId = ? AND deletedAt IS NULL",
@@ -2040,7 +2040,7 @@ export async function updateLoan(
     return;
   }
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE loans SET ${updates}, ${TOUCH_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [...values, writeStamp(), id, userId],
@@ -2050,7 +2050,7 @@ export async function updateLoan(
 
 export async function deleteLoan(id: Id, userId: Id): Promise<void> {
   const stamp = writeStamp();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE loans SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [stamp, stamp, id, userId],
@@ -2067,7 +2067,7 @@ export async function createRepayment(
   }
 
   const id = ulid();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO repayments (id, loanId, userId, amount, date, note)
@@ -2107,7 +2107,7 @@ export async function recordRepayment(
     throw new RepaymentExceedsBalanceError(remainingBefore);
   }
 
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `
         INSERT INTO repayments (id, loanId, userId, amount, date, note)
@@ -2155,7 +2155,7 @@ export async function getRepaymentById(
   userId: Id,
 ): Promise<Repayment | null> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM repayments WHERE id = ? AND userId = ? AND deletedAt IS NULL",
@@ -2174,7 +2174,7 @@ export async function getRepaymentsByLoan(
   userId: Id,
 ): Promise<Repayment[]> {
   try {
-    const result = await callDataApi("Database/query", {
+    const result = await dbQuery("Database/query", {
       body: {
         query:
           "SELECT * FROM repayments WHERE loanId = ? AND userId = ? AND deletedAt IS NULL ORDER BY date DESC",
@@ -2189,7 +2189,7 @@ export async function getRepaymentsByLoan(
 
 export async function deleteRepayment(id: Id, userId: Id): Promise<void> {
   const stamp = writeStamp();
-  await callDataApi("Database/query", {
+  await dbQuery("Database/query", {
     body: {
       query: `UPDATE repayments SET ${TOMBSTONE_SET} WHERE id = ? AND userId = ? AND deletedAt IS NULL`,
       params: [stamp, stamp, id, userId],

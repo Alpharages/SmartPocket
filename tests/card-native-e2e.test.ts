@@ -38,23 +38,21 @@ describe("adding a card offline, through the real router and real SQLite", () =>
     secureStore.clear();
     localUser.getLocalOpenId.mockReset().mockResolvedValue(testId(9));
 
-    const { createNodeSqliteDriver } = await import(
-      "@/server/_core/sqlite-node-driver"
-    );
-    const { runMigrations, createSqliteDataApi } = await import(
-      "@/server/_core/sqlite-engine"
-    );
+    const { createNodeSqliteDriver } =
+      await import("@/server/_core/sqlite-node-driver");
+    const { runMigrations, createSqliteDataApi } =
+      await import("@/server/_core/sqlite-engine");
     const driver = createNodeSqliteDriver();
     await runMigrations(driver);
-    vi.doMock("@/server/_core/dataApi", () => ({
-      callDataApi: createSqliteDataApi(driver),
+    vi.doMock("@/server/_core/db-query", () => ({
+      dbQuery: createSqliteDataApi(driver),
     }));
   });
 
   it("stores the PAN encrypted and never returns it to the client", async () => {
     const { createInProcessLink } = await import("@/lib/trpc.native");
     const { appRouter } = await import("@/server/routers");
-    const { callDataApi } = await import("@/server/_core/dataApi");
+    const { dbQuery } = await import("@/server/_core/db-query");
 
     const client = createVanillaTRPCClient<typeof appRouter>({
       links: [createInProcessLink()],
@@ -75,7 +73,7 @@ describe("adding a card offline, through the real router and real SQLite", () =>
     expect(created).not.toHaveProperty("cardNumber");
 
     // At rest it is ciphertext, not the PAN.
-    const rows = (await callDataApi("Database/query", {
+    const rows = (await dbQuery("Database/query", {
       body: { query: "SELECT cardNumber FROM creditCards", params: [] },
     })) as Array<{ cardNumber: string }>;
     expect(rows).toHaveLength(1);
@@ -109,9 +107,8 @@ describe("adding a card offline, through the real router and real SQLite", () =>
     // Drop the in-memory key cache the way relaunching the app would; the
     // key must come back from SecureStore, not be re-minted (which would
     // leave the stored card permanently unreadable).
-    const { __resetCardKeyCacheForTests } = await import(
-      "@/server/_core/crypto.native"
-    );
+    const { __resetCardKeyCacheForTests } =
+      await import("@/server/_core/crypto.native");
     __resetCardKeyCacheForTests();
 
     const listed = await client.creditCards.list.query();

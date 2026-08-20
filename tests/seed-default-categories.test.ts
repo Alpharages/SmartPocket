@@ -2,22 +2,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CATEGORIES } from "@/server/_core/default-categories";
 import { testId } from "./helpers/ids";
 
-const callDataApi = vi.fn();
+const dbQuery = vi.fn();
 
-vi.mock("@/server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+vi.mock("@/server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 function countQueryBody(callIndex: number) {
   return (
-    callDataApi.mock.calls[callIndex][1] as {
+    dbQuery.mock.calls[callIndex][1] as {
       body: { query: string; params: unknown[] };
     }
   ).body;
 }
 
 function insertQueryBodies() {
-  return callDataApi.mock.calls
+  return dbQuery.mock.calls
     .slice(1)
     .map(
       (call) =>
@@ -28,12 +28,12 @@ function insertQueryBodies() {
 
 describe("seedDefaultCategories", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
+    dbQuery.mockReset();
     vi.resetModules();
   });
 
   it("seeds all default categories when the user has none", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([{ categoryCount: 0 }])
       .mockResolvedValue({ insertId: 1 });
 
@@ -67,37 +67,37 @@ describe("seedDefaultCategories", () => {
   });
 
   it("no-ops when the user already has categories", async () => {
-    callDataApi.mockResolvedValueOnce([{ categoryCount: 3 }]);
+    dbQuery.mockResolvedValueOnce([{ categoryCount: 3 }]);
 
     const { seedDefaultCategories } = await import("@/server/db");
     await seedDefaultCategories(testId(7));
 
-    expect(callDataApi).toHaveBeenCalledTimes(1);
+    expect(dbQuery).toHaveBeenCalledTimes(1);
     expect(insertQueryBodies()).toHaveLength(0);
   });
 
   it("inserts defaults at most once when invoked twice", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce([{ categoryCount: 0 }])
       .mockResolvedValue({ insertId: 1 });
 
     const { seedDefaultCategories } = await import("@/server/db");
     await seedDefaultCategories(testId(99));
-    const callsAfterFirst = callDataApi.mock.calls.length;
+    const callsAfterFirst = dbQuery.mock.calls.length;
 
-    callDataApi.mockResolvedValueOnce([
+    dbQuery.mockResolvedValueOnce([
       { categoryCount: DEFAULT_CATEGORIES.length },
     ]);
     await seedDefaultCategories(testId(99));
 
     expect(insertQueryBodies()).toHaveLength(DEFAULT_CATEGORIES.length);
-    expect(callDataApi.mock.calls.length).toBe(callsAfterFirst + 1);
+    expect(dbQuery.mock.calls.length).toBe(callsAfterFirst + 1);
   });
 });
 
 describe("ensureUserSeeded", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
+    dbQuery.mockReset();
     vi.resetModules();
   });
 
@@ -105,7 +105,7 @@ describe("ensureUserSeeded", () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
-    callDataApi.mockRejectedValueOnce(new Error("db down"));
+    dbQuery.mockRejectedValueOnce(new Error("db down"));
 
     const { ensureUserSeeded } = await import("@/server/_core/user-seeding");
     await expect(ensureUserSeeded(testId(1))).resolves.toBeUndefined();

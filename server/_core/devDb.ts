@@ -5,7 +5,7 @@ import type { Id } from "../../drizzle/schema";
 /**
  * Dev-only in-memory database shim.
  *
- * When the app runs without a DATABASE_URL (local dev), `dataApi.ts`
+ * When the app runs without a DATABASE_URL (local dev), `db-query.ts`
  * routes every `Database/query` call here instead of to the platform database.
  * This implements just enough of a MySQL-ish executor to satisfy the finite set
  * of statements issued by `server/db.ts` (SELECT / INSERT / UPDATE / DELETE plus
@@ -166,7 +166,7 @@ function seedOnce() {
     // Plaintext on purpose. `decryptCardNumber` passes anything without the
     // "v1:" prefix straight through (legacy pre-encryption rows), so the dev
     // seed does not need a key at all — and cannot get one, since the
-    // per-account key is read through `callDataApi`, which is what this
+    // per-account key is read through `dbQuery`, which is what this
     // module *is*. It was also being called without `await`, so the seeded
     // value was a Promise rather than a card number.
     cardNumber: "4111111111111234",

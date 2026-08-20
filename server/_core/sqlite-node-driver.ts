@@ -20,14 +20,14 @@ const { DatabaseSync } = process.getBuiltinModule(
 /**
  * `SqliteDriver` over Node's built-in `node:sqlite`. Not part of the shipped
  * app — Metro never bundles this into the native build, since nothing under
- * `dataApi.native.ts` imports it. Its job is to let `sqlite-engine.ts` be
+ * `db-query.native.ts` imports it. Its job is to let `sqlite-engine.ts` be
  * tested against a genuine SQLite engine instead of a hand-rolled fake, and
  * to give any future Node-hosted tooling (a CLI import/export script, a
  * local dev harness) the same engine the app itself runs on.
  *
  * `node:sqlite` is synchronous (`DatabaseSync`); every method here still
  * returns a `Promise` to satisfy `SqliteDriver`, so a test written against
- * this driver exercises the exact same async call sites `dataApi.native.ts`
+ * this driver exercises the exact same async call sites `db-query.native.ts`
  * does against the genuinely-async `expo-sqlite`.
  */
 export function createNodeSqliteDriver(

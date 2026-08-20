@@ -1,10 +1,10 @@
 import type { Id } from "@/drizzle/schema";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const callDataApi = vi.fn();
+const dbQuery = vi.fn();
 
-vi.mock("../server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+vi.mock("../server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 import { getCategoryAnomalies } from "../server/db";
@@ -24,11 +24,11 @@ function expense(
 
 describe("getCategoryAnomalies", () => {
   beforeEach(() => {
-    callDataApi.mockReset();
+    dbQuery.mockReset();
   });
 
   it("flags a category when current spend exceeds mean * threshold (AC1)", async () => {
-    callDataApi.mockResolvedValue([
+    dbQuery.mockResolvedValue([
       expense(DINING, "100", new Date(2026, 0, 10)),
       expense(DINING, "100", new Date(2026, 1, 10)),
       expense(DINING, "100", new Date(2026, 2, 10)),
@@ -47,9 +47,7 @@ describe("getCategoryAnomalies", () => {
   });
 
   it("does not flag brand-new categories with no prior history (AC3)", async () => {
-    callDataApi.mockResolvedValue([
-      expense(NEW_CAT, "250", new Date(2026, 3, 10)),
-    ]);
+    dbQuery.mockResolvedValue([expense(NEW_CAT, "250", new Date(2026, 3, 10))]);
 
     const result = await getCategoryAnomalies(testId(1), 2026, 4, 3);
 
@@ -58,7 +56,7 @@ describe("getCategoryAnomalies", () => {
   });
 
   it("does not flag when only one prior month of history exists", async () => {
-    callDataApi.mockResolvedValue([
+    dbQuery.mockResolvedValue([
       expense(DINING, "50", new Date(2026, 2, 10)),
       expense(DINING, "500", new Date(2026, 3, 10)),
     ]);
@@ -69,7 +67,7 @@ describe("getCategoryAnomalies", () => {
   });
 
   it("does not flag at exactly the threshold boundary", async () => {
-    callDataApi.mockResolvedValue([
+    dbQuery.mockResolvedValue([
       expense(DINING, "100", new Date(2026, 0, 10)),
       expense(DINING, "100", new Date(2026, 1, 10)),
       expense(DINING, "150", new Date(2026, 3, 10)),
@@ -81,7 +79,7 @@ describe("getCategoryAnomalies", () => {
   });
 
   it("does not flag categories that dropped below their recent mean", async () => {
-    callDataApi.mockResolvedValue([
+    dbQuery.mockResolvedValue([
       expense(GROCERIES, "200", new Date(2026, 0, 10)),
       expense(GROCERIES, "200", new Date(2026, 1, 10)),
       expense(GROCERIES, "50", new Date(2026, 3, 10)),
@@ -95,7 +93,7 @@ describe("getCategoryAnomalies", () => {
   });
 
   it("crosses year boundaries in the lookback window", async () => {
-    callDataApi.mockResolvedValue([
+    dbQuery.mockResolvedValue([
       expense(DINING, "100", new Date(2025, 10, 10)),
       expense(DINING, "100", new Date(2025, 11, 10)),
       expense(DINING, "100", new Date(2026, 0, 10)),
@@ -109,7 +107,7 @@ describe("getCategoryAnomalies", () => {
 
   it("propagates a query failure instead of reporting no anomalies", async () => {
     // SP-014: silently returning [] made an outage look like clean spending.
-    callDataApi.mockRejectedValue(new Error("db down"));
+    dbQuery.mockRejectedValue(new Error("db down"));
 
     await expect(getCategoryAnomalies(testId(1), 2026, 4)).rejects.toThrow(
       "db down",
@@ -117,11 +115,11 @@ describe("getCategoryAnomalies", () => {
   });
 
   it("scopes the query to the user and date window", async () => {
-    callDataApi.mockResolvedValue([]);
+    dbQuery.mockResolvedValue([]);
 
     await getCategoryAnomalies(testId(42), 2026, 6, 3);
 
-    expect(callDataApi).toHaveBeenCalledWith("Database/query", {
+    expect(dbQuery).toHaveBeenCalledWith("Database/query", {
       body: {
         query:
           "SELECT * FROM transactions WHERE userId = ? AND type = 'expense' AND date >= ? AND date <= ? AND deletedAt IS NULL",

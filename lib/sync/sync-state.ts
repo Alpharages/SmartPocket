@@ -13,7 +13,7 @@ const LAST_PULLED_SEQ_KEY = "sync_last_pulled_seq";
 const FIRST_SYNC_DONE_KEY = "sync_first_sync_done";
 
 // Sync only means anything where the app is already local-first: web always
-// talks straight to the server (dataApi.ts, no local SQLite), so there is
+// talks straight to the server (db-query.ts, no local SQLite), so there is
 // nothing for it to sync. Mirrors lib/app-lock.ts's isAppLockSupported.
 export function isSyncSupported(): boolean {
   return Platform.OS !== "web";

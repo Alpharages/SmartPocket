@@ -1,4 +1,4 @@
-import { callDataApi } from "./_core/dataApi";
+import { dbQuery } from "./_core/db-query";
 import { encryptCardNumber, isEncryptedCardNumber } from "./_core/crypto";
 import type { Id } from "../drizzle/schema";
 
@@ -26,7 +26,7 @@ export async function migrateEncryptCardNumbers(): Promise<MigrationSummary> {
   // exists: keys are per-account and minted on demand
   // (server/_core/card-key.ts), so there is nothing to validate ahead of time
   // and a per-row failure is already counted in `summary.failed`.
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: {
       query: "SELECT id, userId, cardNumber FROM creditCards",
       params: [],
@@ -49,7 +49,7 @@ export async function migrateEncryptCardNumbers(): Promise<MigrationSummary> {
 
     try {
       const encrypted = await encryptCardNumber(row.cardNumber, row.userId);
-      await callDataApi("Database/query", {
+      await dbQuery("Database/query", {
         body: {
           query: "UPDATE creditCards SET cardNumber = ? WHERE id = ?",
           params: [encrypted, row.id],

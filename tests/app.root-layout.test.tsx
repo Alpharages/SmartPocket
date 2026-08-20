@@ -22,8 +22,7 @@ const auth = vi.hoisted(() => ({
   removeSessionToken: vi.fn(),
 }));
 
-const runtime = vi.hoisted(() => ({
-}));
+const runtime = vi.hoisted(() => ({}));
 
 // AuthGate's useAuth() (real, unmocked) now pulls in hooks/use-auth.ts's
 // logout()-clears-app-lock (Story 13.5), which imports lib/app-lock.ts and

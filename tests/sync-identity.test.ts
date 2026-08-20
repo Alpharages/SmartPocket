@@ -65,16 +65,14 @@ describe("first sync keeps the app's own data visible", () => {
     syncState.getLastPulledSeq.mockReset().mockResolvedValue(0);
     syncState.setLastPulledSeq.mockReset().mockResolvedValue(undefined);
 
-    const { createNodeSqliteDriver } = await import(
-      "@/server/_core/sqlite-node-driver"
-    );
-    const { runMigrations, createSqliteDataApi } = await import(
-      "@/server/_core/sqlite-engine"
-    );
+    const { createNodeSqliteDriver } =
+      await import("@/server/_core/sqlite-node-driver");
+    const { runMigrations, createSqliteDataApi } =
+      await import("@/server/_core/sqlite-engine");
     const driver = createNodeSqliteDriver();
     await runMigrations(driver);
-    vi.doMock("@/server/_core/dataApi", () => ({
-      callDataApi: createSqliteDataApi(driver),
+    vi.doMock("@/server/_core/db-query", () => ({
+      dbQuery: createSqliteDataApi(driver),
     }));
   });
 

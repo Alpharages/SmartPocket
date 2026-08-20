@@ -2,7 +2,7 @@ import { ENV } from "./env";
 import { devQuery } from "./devDb";
 import mysql from "mysql2/promise";
 
-export type DataApiCallOptions = {
+export type DbQueryOptions = {
   query?: Record<string, unknown>;
   body?: Record<string, unknown>;
   pathParams?: Record<string, unknown>;
@@ -23,9 +23,9 @@ function getPool() {
   return pool;
 }
 
-export async function callDataApi(
+export async function dbQuery(
   apiId: string,
-  options: DataApiCallOptions = {},
+  options: DbQueryOptions = {},
 ): Promise<unknown> {
   if (apiId !== "Database/query") {
     throw new Error(

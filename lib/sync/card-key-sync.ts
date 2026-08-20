@@ -1,4 +1,4 @@
-import { callDataApi } from "@/server/_core/dataApi";
+import { dbQuery } from "@/server/_core/db-query";
 import {
   adoptAccountCardKey,
   hasAccountCardKey,
@@ -33,9 +33,10 @@ export async function adoptAccountCardKeyForDevice(
 
   const accountKey = await client.security.getCardKey.query();
 
-  const rows = (await callDataApi("Database/query", {
+  const rows = (await dbQuery("Database/query", {
     body: {
-      query: "SELECT id, cardNumber FROM creditCards WHERE cardNumber IS NOT NULL",
+      query:
+        "SELECT id, cardNumber FROM creditCards WHERE cardNumber IS NOT NULL",
       params: [],
     },
   })) as Array<{ id: Id; cardNumber: string }>;
@@ -51,7 +52,7 @@ export async function adoptAccountCardKeyForDevice(
     // `dirty = 1` so the re-encrypted value actually reaches the account. A
     // card that had already synced under the device key is otherwise clean,
     // and would leave the unreadable ciphertext sitting on the server.
-    await callDataApi("Database/query", {
+    await dbQuery("Database/query", {
       body: {
         query: "UPDATE creditCards SET cardNumber = ?, dirty = 1 WHERE id = ?",
         params: [rewritten, row.id],

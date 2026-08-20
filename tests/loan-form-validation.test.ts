@@ -123,9 +123,9 @@ describe("isLoanFormValid", () => {
   });
 
   it("requires a valid next due date", () => {
-    expect(
-      isLoanFormValid({ ...validBase, nextDueDate: "" }, "create"),
-    ).toBe(false);
+    expect(isLoanFormValid({ ...validBase, nextDueDate: "" }, "create")).toBe(
+      false,
+    );
     expect(
       isLoanFormValid({ ...validBase, nextDueDate: "2026-13-40" }, "create"),
     ).toBe(false);
@@ -149,9 +149,9 @@ describe("createDefaultLoanForm", () => {
     expect(defaults.installmentCount).toBe("12");
     expect(defaults.nextDueDate).toBe("2026-07-19");
     expect(isLoanFormValid(defaults, "create")).toBe(false);
-    expect(
-      isLoanFormValid({ ...defaults, principal: "250" }, "create"),
-    ).toBe(true);
+    expect(isLoanFormValid({ ...defaults, principal: "250" }, "create")).toBe(
+      true,
+    );
   });
 });
 

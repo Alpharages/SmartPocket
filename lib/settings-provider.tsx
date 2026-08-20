@@ -78,7 +78,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       isReady: !settingsQuery.isLoading,
       refreshSettings,
     }),
-    [aiEnabled, setAiEnabled, isSavingAi, settingsQuery.isLoading, refreshSettings],
+    [
+      aiEnabled,
+      setAiEnabled,
+      isSavingAi,
+      settingsQuery.isLoading,
+      refreshSettings,
+    ],
   );
 
   return (

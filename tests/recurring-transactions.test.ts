@@ -29,7 +29,7 @@ function createUserContext(userId: Id): TrpcContext {
     aiEnabled: false,
     remindersEnabled: false,
     pinHash: null,
-  cardKey: null,
+    cardKey: null,
     pinFailedAttempts: 0,
     pinLockedUntil: null,
     createdAt: new Date(),

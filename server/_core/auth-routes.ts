@@ -1,10 +1,6 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import type { Express, Request, Response } from "express";
-import {
-  createPasswordUser,
-  getUserByEmail,
-  touchLastSignedIn,
-} from "../db";
+import { createPasswordUser, getUserByEmail, touchLastSignedIn } from "../db";
 import { ensureUserSeeded } from "./user-seeding";
 import { getSessionCookieOptions } from "./cookies";
 import { session } from "./session";

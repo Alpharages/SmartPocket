@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { testId, syncColumns } from "./helpers/ids";
 
 // The card key is per-account now and read off the user row. These tests
-// mock `callDataApi` wholesale for their own purposes, so the key lookup is
+// mock `dbQuery` wholesale for their own purposes, so the key lookup is
 // stubbed rather than fed through that mock — key provisioning has its own
 // coverage in tests/card-crypto.test.ts.
 const TEST_USER_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
@@ -15,10 +15,10 @@ vi.mock("@/server/_core/card-key", () => ({
 const TEST_KEY_HEX =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-const callDataApi = vi.fn();
+const dbQuery = vi.fn();
 
-vi.mock("@/server/_core/dataApi", () => ({
-  callDataApi: (...args: unknown[]) => callDataApi(...args),
+vi.mock("@/server/_core/db-query", () => ({
+  dbQuery: (...args: unknown[]) => dbQuery(...args),
 }));
 
 const baseRow = {
@@ -40,14 +40,17 @@ const baseRow = {
 describe("credit card response masking", () => {
   beforeEach(() => {
     process.env.CARD_ENCRYPTION_KEY = TEST_KEY_HEX;
-    callDataApi.mockReset();
+    dbQuery.mockReset();
     vi.resetModules();
   });
 
   it("masks list responses with cardNumberLast4 and no cardNumber key", async () => {
     const { encryptCardNumber } = await import("@/server/_core/crypto");
-    callDataApi.mockResolvedValue([
-      { ...baseRow, cardNumber: await encryptCardNumber("4111111111111111", TEST_USER_ID) },
+    dbQuery.mockResolvedValue([
+      {
+        ...baseRow,
+        cardNumber: await encryptCardNumber("4111111111111111", TEST_USER_ID),
+      },
     ]);
 
     const { getUserCreditCards } = await import("@/server/db");
@@ -59,9 +62,7 @@ describe("credit card response masking", () => {
   });
 
   it("masks getCreditCardById responses", async () => {
-    callDataApi.mockResolvedValue([
-      { ...baseRow, cardNumber: "5555555555554444" },
-    ]);
+    dbQuery.mockResolvedValue([{ ...baseRow, cardNumber: "5555555555554444" }]);
 
     const { getCreditCardById } = await import("@/server/db");
     const card = await getCreditCardById(testId(1), testId(1));
@@ -71,7 +72,7 @@ describe("credit card response masking", () => {
   });
 
   it("returns masked card from createCreditCard", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce({ insertId: 42 })
       .mockResolvedValueOnce([
         { ...baseRow, id: testId(42), cardNumber: "4111111111111111" },
@@ -95,7 +96,7 @@ describe("credit card response masking", () => {
   });
 
   it("returns masked card from updateCreditCard", async () => {
-    callDataApi
+    dbQuery
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce([
         { ...baseRow, name: "Renamed", cardNumber: "378282246310005" },

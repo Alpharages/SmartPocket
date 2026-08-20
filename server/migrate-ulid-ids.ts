@@ -1,4 +1,4 @@
-import { callDataApi } from "./_core/dataApi";
+import { dbQuery } from "./_core/db-query";
 import { ulid } from "../shared/ulid";
 
 /**
@@ -29,14 +29,14 @@ import { ulid } from "../shared/ulid";
 type Row = Record<string, unknown>;
 
 async function query(sql: string, params: unknown[] = []): Promise<Row[]> {
-  const result = await callDataApi("Database/query", {
+  const result = await dbQuery("Database/query", {
     body: { query: sql, params },
   });
   return Array.isArray(result) ? (result as Row[]) : [];
 }
 
 async function exec(sql: string, params: unknown[] = []): Promise<void> {
-  await callDataApi("Database/query", { body: { query: sql, params } });
+  await dbQuery("Database/query", { body: { query: sql, params } });
 }
 
 /**
