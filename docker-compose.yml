@@ -1,18 +1,16 @@
 # SmartPocket API.
 #
-# MySQL is NOT defined here — it already runs as its own container on the
-# server. This compose file joins that container's network instead, so
-# DATABASE_URL points at the MySQL *container name*, not at localhost:
+# MySQL is NOT defined here — it already runs as its own container, shared with
+# other apps on the box. Both services reach it through the host gateway rather
+# than by joining its network: the MySQL container sits on the default `bridge`
+# network, which gives no DNS, so a container name would not resolve. Its port
+# is published on the host, and `host.docker.internal` maps there:
 #
-#   DATABASE_URL=mysql://smartpocket:secret@mysql:3306/smartpocket
+#   DATABASE_URL=mysql://smartpocket:secret@host.docker.internal:3306/smartpocket
 #
-# Set DB_NETWORK to whatever `docker network ls` calls that network (it is
-# usually <project>_default for a compose-managed MySQL).
-#
-# Config comes from `.env`, which is gitignored and is also where compose
-# reads DB_NETWORK from. Everything the server needs is documented in
-# `.env.example`; JWT_SECRET, ALLOWED_ORIGINS and DATABASE_URL are mandatory —
-# the server deliberately refuses to boot in production without them.
+# Config comes from `.env`, which is gitignored. Everything the server needs is
+# documented in `.env.example`; JWT_SECRET, ALLOWED_ORIGINS and DATABASE_URL are
+# mandatory — the server deliberately refuses to boot in production without them.
 #
 #   docker compose build
 #   docker compose run --rm migrate     # once per deploy, before up
@@ -33,14 +31,14 @@ services:
       # knows about. Inside the container the port is always 3000; API_PORT
       # is the knob for the host side.
       PORT: 3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # Bound to loopback on purpose: TLS and the public origin are the reverse
     # proxy's job. The proxy MUST pass `X-Forwarded-Proto: https` — the session
     # cookie is only marked Secure when it sees that header
     # (server/_core/cookies.ts), and without it web sign-in breaks.
     ports:
       - "127.0.0.1:${API_PORT:-3000}:3000"
-    networks:
-      - db
 
   # Applies committed migrations. Runs from the builder stage because
   # drizzle-kit is a devDependency and is not in the runtime image.
@@ -57,10 +55,5 @@ services:
     profiles: [tools]
     env_file: .env
     command: pnpm exec drizzle-kit migrate
-    networks:
-      - db
-
-networks:
-  db:
-    external: true
-    name: ${DB_NETWORK:-mysql_default}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
