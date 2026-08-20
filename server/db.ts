@@ -113,9 +113,14 @@ export async function createPasswordUser(data: {
   const id = ulid();
   await callDataApi("Database/query", {
     body: {
+      // Every value is a parameter — no `'password'` or `NOW()` literals in
+      // the statement. The dev database (server/_core/devDb.ts) maps columns
+      // onto params positionally and does not evaluate SQL expressions, so a
+      // literal silently lands as NULL there while working fine against real
+      // MySQL. That is a difference the dev environment should not have.
       query: `
         INSERT INTO users (id, openId, email, passwordHash, name, loginMethod, lastSignedIn)
-        VALUES (?, ?, ?, ?, ?, 'password', NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -123,6 +128,8 @@ export async function createPasswordUser(data: {
         data.email.trim().toLowerCase(),
         data.passwordHash,
         data.name ?? null,
+        "password",
+        new Date(),
       ],
     },
   });

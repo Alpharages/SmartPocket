@@ -21,7 +21,13 @@ import { useAuth } from "@/hooks/use-auth";
  * server (dataApi.ts) and every procedure there is `protectedProcedure`, so
  * it keeps the redirect.
  */
-const PUBLIC_SEGMENTS = new Set(["login", "oauth"]);
+/**
+ * Routes a signed-out user is allowed to sit on. Miss one and the redirect
+ * below bounces them off it the instant it mounts — which is exactly what
+ * happened to `signup` when it was added: reachable by its link, unreachable
+ * in practice. `oauth` was here for the deleted OAuth callback route.
+ */
+const PUBLIC_SEGMENTS = new Set(["login", "signup"]);
 
 export function AuthGate() {
   const { isAuthenticated, loading } = useAuth();
@@ -38,7 +44,7 @@ export function AuthGate() {
       router.replace("/login");
       return;
     }
-    if (isAuthenticated && first === "login") {
+    if (isAuthenticated && first != null && PUBLIC_SEGMENTS.has(first)) {
       router.replace("/dashboard");
     }
   }, [isAuthenticated, loading, segments, router]);

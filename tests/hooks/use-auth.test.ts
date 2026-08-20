@@ -20,6 +20,15 @@ const auth = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/_core/auth", () => auth);
 
+// useAuth clears the React Query cache on sign-out so the next account cannot
+// see the previous one's data render from cache. The hook is always mounted
+// inside QueryClientProvider in the app; here it is rendered bare, so the
+// client is stubbed and doubles as the assertion target.
+const queryClient = vi.hoisted(() => ({ clear: vi.fn() }));
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => queryClient,
+}));
+
 let renderer: TestRenderer.ReactTestRenderer | null = null;
 
 function render(ui: React.ReactElement): ReactTestInstance {
@@ -138,6 +147,18 @@ describe("useAuth logout", () => {
     expect(syncState.resetSyncState).toHaveBeenCalledTimes(1);
   });
 
+  it("clears the query cache, so the next account never renders the previous one's data", async () => {
+    queryClient.clear.mockClear();
+    let hook!: ReturnType<typeof useAuth>;
+    render(React.createElement(Capture, { sink: (a) => (hook = a) }));
+
+    await act(async () => {
+      await hook.logout();
+    });
+
+    expect(queryClient.clear).toHaveBeenCalled();
+  });
+
   it("still clears the session even when the logout API call fails", async () => {
     api.logout.mockRejectedValueOnce(new Error("network error"));
     let hook!: ReturnType<typeof useAuth>;
@@ -181,7 +202,7 @@ const sampleApiUser = {
   name: "Alex",
   email: "alex@example.com",
   loginMethod: "password",
-    passwordHash: null,
+  passwordHash: null,
   lastSignedIn: "2026-06-01T00:00:00.000Z",
 };
 
@@ -191,7 +212,7 @@ const cachedUser = {
   name: "Cached Alex",
   email: "alex@example.com",
   loginMethod: "password",
-    passwordHash: null,
+  passwordHash: null,
   lastSignedIn: new Date("2026-05-01T00:00:00.000Z"),
 };
 

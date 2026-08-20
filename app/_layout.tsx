@@ -156,6 +156,10 @@ export default function RootLayout() {
   // server-backed over dataApi.ts) waits here.
   const [isAppShellReady, setIsAppShellReady] = useState(() => {
     if (!__DEV__) return true;
+    // With auto-login switched off there is no token coming, so waiting for one
+    // parks the app on "Connecting…" forever. Signed-out is the state being
+    // asked for here, and the login screen is what should render.
+    if (process.env.EXPO_PUBLIC_DEV_AUTOLOGIN === "0") return true;
     if (Platform.OS === "web") return hasWebSessionToken();
     return true;
   });
@@ -200,6 +204,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (!__DEV__) return;
     if (Platform.OS !== "web") return;
+    // Without an off switch the login and signup screens are unreachable in a
+    // dev web build — this effect signs you straight back in before either can
+    // render, so there is no way to look at them while working on them.
+    // `EXPO_PUBLIC_DEV_AUTOLOGIN=0 pnpm dev` gets you the signed-out app.
+    if (process.env.EXPO_PUBLIC_DEV_AUTOLOGIN === "0") return;
     let cancelled = false;
 
     (async () => {

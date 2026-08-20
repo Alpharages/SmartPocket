@@ -1,5 +1,6 @@
 import * as Api from "@/lib/_core/api";
 import * as Auth from "@/lib/_core/auth";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 import { isUlid } from "@shared/ulid";
@@ -7,6 +8,28 @@ import { isUlid } from "@shared/ulid";
 type UseAuthOptions = {
   autoFetch?: boolean;
 };
+
+/**
+ * The signed-in identity, shared by every `useAuth()` caller.
+ *
+ * Each call used to own a private `useState`, so instances could not see each
+ * other change. Signing out from Settings therefore left `AuthGate` — a
+ * separate instance, mounted beside the navigator — still holding the old
+ * user, and its redirect promptly bounced the freshly signed-out user off
+ * /login and back onto the dashboard. The session really was gone; only the
+ * gate's copy of it was stale.
+ *
+ * A module-level value plus a listener set is enough to fix that at the root:
+ * every instance mirrors one source, so whichever one signs out, all of them
+ * find out. No provider to mount and no call site to change.
+ */
+let sharedUser: Auth.User | null = null;
+const listeners = new Set<(user: Auth.User | null) => void>();
+
+function publishUser(user: Auth.User | null): void {
+  sharedUser = user;
+  for (const listener of listeners) listener(user);
+}
 
 type ApiUser = NonNullable<Awaited<ReturnType<typeof Api.getMe>>>;
 
@@ -21,9 +44,22 @@ const toUser = (apiUser: ApiUser): Auth.User => ({
 
 export function useAuth(options?: UseAuthOptions) {
   const { autoFetch = true } = options ?? {};
-  const [user, setUser] = useState<Auth.User | null>(null);
+  const queryClient = useQueryClient();
+  const [user, setLocalUser] = useState<Auth.User | null>(sharedUser);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+
+  // Every write goes through the shared value, so sibling instances update too.
+  const setUser = useCallback((next: Auth.User | null) => {
+    publishUser(next);
+  }, []);
+
+  useEffect(() => {
+    listeners.add(setLocalUser);
+    return () => {
+      listeners.delete(setLocalUser);
+    };
+  }, []);
 
   const fetchUser = useCallback(async () => {
     try {
@@ -144,10 +180,15 @@ export function useAuth(options?: UseAuthOptions) {
       // into every test that renders one.
       const { resetSyncState } = await import("@/lib/sync/sync-state");
       await resetSyncState();
+      // Every cached query was fetched as the account that is now signed out.
+      // Leaving them behind means the next person to sign in on this device
+      // sees the previous account's transactions and balances rendered from
+      // cache before their own data arrives.
+      queryClient.clear();
       setUser(null);
       setError(null);
     }
-  }, []);
+  }, [queryClient]);
 
   const isAuthenticated = useMemo(() => Boolean(user), [user]);
 

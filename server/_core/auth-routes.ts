@@ -130,10 +130,22 @@ export function registerAuthRoutes(app: Express) {
         passwordHash,
         name: credentials.name ?? null,
       });
-      await ensureUserSeeded(id);
 
       const user = await getUserByEmail(credentials.email);
       if (!user) throw new Error("Account vanished immediately after creation");
+
+      // The unique index is the race-free check, but it is not the only thing
+      // this can rely on: a store that does not enforce it (the in-memory dev
+      // database does not) would let a second signup for a taken address
+      // through, and the lookup above would then hand back somebody else's
+      // account — session included. Confirming the row we read is the row we
+      // just minted closes that without reintroducing a check-then-insert race.
+      if (user.id !== id) {
+        res.status(409).json({ error: "That email is already registered" });
+        return;
+      }
+
+      await ensureUserSeeded(id);
 
       const token = await issueSession(req, res, user);
       res.status(201).json({ token, user: buildUserResponse(user) });

@@ -70,6 +70,19 @@ describe("AuthGate", () => {
     expect(routerMock.replace).not.toHaveBeenCalled();
   });
 
+  it("web: leaves a signed-out user on /signup", () => {
+    // The signup screen is only ever reached from a signed-out state, so
+    // leaving it out of PUBLIC_SEGMENTS makes it unreachable in practice — the
+    // link works, then the gate bounces you straight back to /login.
+    Platform.OS = "web";
+    authState.isAuthenticated = false;
+    segments = ["signup"];
+
+    render();
+
+    expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
   it("web: redirects a signed-in user away from /login to the dashboard", () => {
     Platform.OS = "web";
     authState.isAuthenticated = true;

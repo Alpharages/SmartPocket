@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Platform, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Link } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { Button } from "@/components/ui/Button";
@@ -56,6 +57,7 @@ export function AuthForm({
 }) {
   const { colors } = useThemeTokens();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const { name: appName } = getAppMetadata();
   const copy = COPY[mode];
 
@@ -108,6 +110,12 @@ export function AuthForm({
           lastSignedIn: new Date(result.user.lastSignedIn),
         });
       }
+      // Anything already cached was fetched while signed out (or as a
+      // different account) and is either an error or somebody else's data.
+      // The old OAuth flow reloaded the whole page and never had to think
+      // about this; signing in place does. Without it the dashboard sits on
+      // skeletons until the user manually reloads.
+      queryClient.clear();
       onAuthenticated();
     } catch (error) {
       // `ApiError.message` is the server's own `error` field — "Incorrect email
@@ -131,6 +139,7 @@ export function AuthForm({
     name,
     toast,
     onAuthenticated,
+    queryClient,
   ]);
 
   const fieldStyle = {
