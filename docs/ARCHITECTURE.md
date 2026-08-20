@@ -4,8 +4,8 @@ Last updated: 2026-06-17
 Status: Authoritative — describes what is actually implemented in this repository.
 
 > **History:** The product was originally scoped as a Flutter app (see `prd.md`, `concept note.md`).
-> The codebase was rebuilt on **Expo / React Native (TypeScript)** and is now server-backed rather than
-> offline-first. This document reflects the React Native implementation. Where older docs still describe
+> The codebase was rebuilt on **Expo / React Native (TypeScript)** and is **local-first**: on-device
+> SQLite with opt-in server sync. This document reflects the React Native implementation. Where older docs still describe
 > Flutter/Dart, treat this file as the source of truth for technical detail.
 
 ---
@@ -13,22 +13,22 @@ Status: Authoritative — describes what is actually implemented in this reposit
 ## 1. Overview
 
 A cross-platform personal expense tracker that runs on **iOS, Android, and Web** from a single
-TypeScript codebase. Users authenticate via Manus OAuth and manage transactions, categories, and credit
-cards. The app is backed by a small Express + tRPC API and a managed MySQL database accessed through the
-Manus platform's Data API.
+TypeScript codebase. Users sign in with an email and password and manage transactions, categories, and
+credit cards. The app is backed by a small Express + tRPC API over MySQL, reached by a direct `mysql2`
+connection.
 
-| Concern           | Choice                                                                                                                                                                                                                                                 |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Client            | Expo SDK 54, React Native 0.81, React 19, Expo Router 6 (file-based routing)                                                                                                                                                                           |
-| Styling           | NativeWind 4 (Tailwind for RN) + Reanimated 4 animations                                                                                                                                                                                               |
-| Client data layer | tRPC v11 client + TanStack Query 5, wrapped by an `ExpenseProvider` context                                                                                                                                                                            |
-| API               | Express 4 + tRPC v11 (`@trpc/server`), superjson transformer                                                                                                                                                                                           |
-| Validation        | Zod 4 (shared between client types and server input parsing)                                                                                                                                                                                           |
-| ORM / schema      | Drizzle ORM (MySQL dialect) — schema-as-types; runtime queries use raw parameterized SQL                                                                                                                                                               |
-| Database          | MySQL, reached via Manus Data API (`callDataApi`), not a direct connection                                                                                                                                                                             |
-| Auth              | Manus OAuth → JWT session (jose); bearer token on native, cookie on web                                                                                                                                                                                |
-| AI inference      | Self-hosted / local LLM over an OpenAI-compatible `/v1/chat/completions` API, env-configured (`LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`) — **planned**. A legacy Manus Forge client (`server/_core/llm.ts`) exists but is unused and being retired. |
-| Tooling           | pnpm, TypeScript strict, Vitest, ESLint (expo config), Prettier, drizzle-kit                                                                                                                                                                           |
+| Concern           | Choice                                                                                                                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client            | Expo SDK 54, React Native 0.81, React 19, Expo Router 6 (file-based routing)                                                                                                    |
+| Styling           | NativeWind 4 (Tailwind for RN) + Reanimated 4 animations                                                                                                                        |
+| Client data layer | tRPC v11 client + TanStack Query 5, wrapped by an `ExpenseProvider` context                                                                                                     |
+| API               | Express 4 + tRPC v11 (`@trpc/server`), superjson transformer                                                                                                                    |
+| Validation        | Zod 4 (shared between client types and server input parsing)                                                                                                                    |
+| ORM / schema      | Drizzle ORM (MySQL dialect) — schema-as-types; runtime queries use raw parameterized SQL                                                                                        |
+| Database          | MySQL, reached over a direct `mysql2` pool (`server/_core/dataApi.ts`)                                                                                                          |
+| Auth              | Email + password → JWT session (jose); bearer token on native, cookie on web                                                                                                    |
+| AI inference      | Self-hosted / local LLM over an OpenAI-compatible `/v1/chat/completions` API, env-configured (`LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`) — **planned**, nothing implemented. |
+| Tooling           | pnpm, TypeScript strict, Vitest, ESLint (expo config), Prettier, drizzle-kit                                                                                                    |
 
 ---
 
@@ -45,26 +45,26 @@ app/                         Expo Router routes (screens)
   (tabs)/cards.tsx           "Cards"    — credit card management
   (tabs)/index.tsx           Hidden redirect entry (href: null)
   add-transaction.tsx        Add income/expense flow (modal-style route)
-  oauth/callback.tsx         OAuth deep-link / web callback handler
+  login.tsx / signup.tsx     Email + password screens (share components/auth-form.tsx)
   dev/theme-lab.tsx          Developer-only theme preview
 
 components/                  Reusable UI (screen-container, haptic-tab, themed-view, ui/*)
-constants/                   theme.ts, oauth.ts (OAuth + API base URL helpers), const.ts
+constants/                   theme.ts, api.ts (API base URL + session storage keys), const.ts
 hooks/                       use-auth, use-colors, use-color-scheme(.web)
 lib/
   trpc.ts                    tRPC React client factory
   expense-context.tsx        App-wide data/state provider over tRPC hooks
   theme-provider.tsx         Theme context
-  _core/                     Platform plumbing: auth (SecureStore), api, manus-runtime, theme
+  _core/                     Platform plumbing: auth (SecureStore), api client, theme
 
 server/
-  _core/index.ts             Express bootstrap: CORS, JSON, OAuth routes, storage proxy, tRPC mount
+  _core/index.ts             Express bootstrap: CORS, JSON, auth routes, scheduled jobs, tRPC mount
   _core/trpc.ts              router / publicProcedure / protectedProcedure / adminProcedure
   _core/context.ts           Per-request tRPC context (authenticates user, may be null)
-  _core/sdk.ts               Manus OAuth SDK: token exchange, JWT sign/verify, request auth
-  _core/oauth.ts             OAuth HTTP routes (login callback, session cookie issuance)
-  _core/dataApi.ts           callDataApi() — gateway to Manus Data API (DB + external APIs)
-  _core/llm.ts               invokeLLM() — legacy Forge chat-completions client (unused; AI features will use a self-hosted/local OpenAI-compatible client instead)
+  _core/session.ts           JWT sign/verify and per-request authentication
+  _core/auth-routes.ts       signup / login / logout / me
+  _core/password.ts          password policy, hashing, login throttle
+  _core/dataApi.ts           callDataApi() — the mysql2 pool behind every query
   _core/env.ts               Server env var surface
   routers.ts                 tRPC app router: categories / creditCards / transactions / summary
   db.ts                      Data-access functions (raw SQL via callDataApi)
@@ -101,7 +101,7 @@ docs/                        Product + technical docs (this file, PRD, concept n
 │  Express + tRPC API (server/_core/index.ts)  │
 │                                              │
 │  CORS (reflects origin, credentials: true)   │
-│  /api/oauth/*   OAuth callback + session      │
+│  /api/auth/*    signup / login / logout / me   │
 │  /api/health    liveness                      │
 │  /api/trpc/*    appRouter (server/routers.ts) │
 │        │ createContext → sdk.authenticateRequest
@@ -112,8 +112,8 @@ docs/                        Product + technical docs (this file, PRD, concept n
               ┌──────────┴───────────┐
               ▼                      ▼
    ┌────────────────────┐  ┌────────────────────┐
-   │ Manus Data API     │  │ Manus OAuth server  │
-   │ (MySQL queries)    │  │ (token / userinfo)  │
+   │ MySQL (mysql2)     │  │ users.passwordHash  │
+   │                    │  │ (scrypt, in MySQL)  │
    └────────────────────┘  └────────────────────┘
               │
               ▼ (planned — AI features, opt-in)
@@ -124,7 +124,7 @@ docs/                        Product + technical docs (this file, PRD, concept n
 
 Local dev: Metro/web on port **8081**, API server on port **3000** (`pnpm dev` runs both via
 `concurrently`). On web the client derives the API origin by rewriting the `8081-` host prefix to
-`3000-` when `EXPO_PUBLIC_API_BASE_URL` is unset (`constants/oauth.ts:getApiBaseUrl`).
+`3000-` when `EXPO_PUBLIC_API_BASE_URL` is unset (`constants/api.ts:getApiBaseUrl`).
 
 ---
 
@@ -132,7 +132,7 @@ Local dev: Metro/web on port **8081**, API server on port **3000** (`pnpm dev` r
 
 Defined in `drizzle/schema.ts` (MySQL). All money fields are `decimal(12,2)` stored as strings.
 
-- **users** — `id`, `openId` (unique, Manus OAuth identifier), `name`, `email`, `loginMethod`,
+- **users** — `id`, `openId` (unique, stable account id), `name`, `email` (unique, login identity), `passwordHash`, `loginMethod`,
   `role` (`user` | `admin`), timestamps, `lastSignedIn`.
 - **categories** — `id`, `userId`, `name`, `type` (`income` | `expense`), `color` (hex), `icon`,
   `isDefault`, timestamps.
@@ -191,21 +191,26 @@ Aggregations (`monthlyStats`, `expensesByCategory`) fetch rows and reduce in JS 
 
 ## 7. Authentication flow
 
-1. Client calls `startOAuthLogin()` (`constants/oauth.ts`): web redirects to the Manus OAuth portal;
-   native opens the system browser. The redirect URI is base64-encoded into the OAuth `state`.
-2. OAuth provider redirects back to `/api/oauth/callback` (web) or the `manus<timestamp>` deep link
-   (native) → handled by `app/oauth/callback.tsx` and `server/_core/oauth.ts`.
-3. Server exchanges the code for a token (`sdk.exchangeCodeForToken`), fetches user info, upserts the
-   user (`db.upsertUser`), and issues a JWT session (`jose`, HS256, 1-year expiry).
+1. The user submits an email and password on `app/login.tsx` or `app/signup.tsx` (both render
+   `components/auth-form.tsx`), which posts to `/api/auth/login` or `/api/auth/signup`.
+2. `server/_core/auth-routes.ts` verifies the password against the salted scrypt hash in
+   `users.passwordHash`, or creates the account, and seeds its default categories.
+3. The server issues a JWT session (`jose`, HS256, 1-year expiry) in the same response — there is no
+   redirect, no external portal, and no callback step.
 4. Session transport: **web** uses an HTTP-only cookie (`app_session_id`); **native** stores the token
    in `expo-secure-store` and sends it as a bearer header.
-5. On each request, `createContext` → `sdk.authenticateRequest` verifies the JWT, auto-syncs the user
-   from OAuth if missing, and sets `ctx.user`. `cron_`-prefixed openIds are treated as scheduled-task
-   users (`isCron`, `taskUid`).
+5. On each request, `createContext` → `session.authenticateRequest` verifies the JWT and resolves
+   `ctx.user`. A token whose subject has no row is simply invalid — there is no identity provider to
+   fall back to.
+6. The App Lock PIN (`users.pinHash`, `components/app-lock-gate.tsx`) sits _on top of_ an authenticated
+   session. It guards the device, not the account, and is never the credential that issues a session.
 
-Relevant env vars: server `VITE_APP_ID`, `JWT_SECRET`, `OAUTH_SERVER_URL`, `DATABASE_URL`,
-`LLM_BASE_URL`, `LLM_API_KEY` (optional), `LLM_MODEL`; client `EXPO_PUBLIC_OAUTH_PORTAL_URL`,
-`EXPO_PUBLIC_OAUTH_SERVER_URL`, `EXPO_PUBLIC_APP_ID`, `EXPO_PUBLIC_API_BASE_URL`.
+Brute-force defences: failed logins are throttled per email address (in-memory, per process); the
+"no such account" and "wrong password" answers are identical and both spend a real scrypt hash, so
+response time cannot be used to enumerate registered addresses.
+
+Relevant env vars: server `JWT_SECRET`, `DATABASE_URL`, `CARD_ENCRYPTION_KEY`, `ALLOWED_ORIGINS`,
+`CRON_SECRET`; client `EXPO_PUBLIC_API_BASE_URL`, `EXPO_PUBLIC_API_PORT`.
 
 ---
 
@@ -221,8 +226,7 @@ Relevant env vars: server `VITE_APP_ID`, `JWT_SECRET`, `OAUTH_SERVER_URL`, `DATA
   architecture and should be re-evaluated.
 - AI inference is planned to run against a **self-hosted / local LLM** (OpenAI-compatible, env-configured
   via `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`), **not** a third-party gateway — so transaction data
-  sent for AI features stays on infrastructure we control. The legacy Forge client (`server/_core/llm.ts`,
-  routing to Manus Forge) is unused and being retired. No feature currently sends transaction data to any
+  sent for AI features stays on infrastructure we control. No feature currently sends transaction data to any
   model, so the AI-privacy commitments in `openai_integration.md` / `natural_language_insights.md` are not
   yet relevant — but should be honored when those features land.
 
@@ -256,7 +260,7 @@ These features are described in the docs but **not implemented** in this reposit
   `concept note.md`) — none exist. The app does have **credit cards**, which the PRD does not mention.
 - **AI categorization** (`openai_integration.md`) — no categorization code yet; the legacy Forge client
   is unused. Planned implementation uses a self-hosted / local OpenAI-compatible LLM (env-configured model),
-  not Manus Forge and not a third-party API. The feature-design notes `openai_integration.md` /
+  and not a third-party API. The feature-design notes `openai_integration.md` /
   `natural_language_insights.md` reflect this self-hosted approach.
 - **Natural-language insights / chat / voice** (`natural_language_insights.md`) — not present despite
   the doc's "shipped" wording.

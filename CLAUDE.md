@@ -14,7 +14,7 @@ SmartPocket
 
   SmartPocket
   (`smartpocket`) - **Path:** `.` - **Stack:**
-  Expo, React Native, TypeScript, React 19, Expo Router, NativeWind, Reanimated, tRPC v11, TanStack Query, Zod, Drizzle ORM, MySQL, Manus Data API, Express, jose (JWT), Manus OAuth, Manus Forge LLM (gemini-2.5-flash),expo-secure-store, pnpm, Vitest, ESLint, Prettier, drizzle-kit
+  Expo, React Native, TypeScript, React 19, Expo Router, NativeWind, Reanimated, tRPC v11, TanStack Query, Zod, Drizzle ORM, MySQL, Express, jose (JWT), email+password auth, expo-secure-store, pnpm, Vitest, ESLint, Prettier, drizzle-kit
 
 ## Agent Standards - All code must follow the project's established conventions. -
 

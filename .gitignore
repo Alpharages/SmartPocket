@@ -64,7 +64,7 @@ Thumbs.db
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
 
-# Manus platform scratch config — contains live secrets (DB URL, AWS creds, API keys). Never commit.
+# Scratch config — contains live secrets (DB URL, API keys). Never commit.
 .project-config.json
 .gitnexus
 

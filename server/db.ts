@@ -49,7 +49,6 @@ import {
 
 /**
  * Get database connection.
- * Uses the Manus platform's managed database.
  */
 async function getDb() {
   try {

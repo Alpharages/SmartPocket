@@ -23,8 +23,6 @@ const auth = vi.hoisted(() => ({
 }));
 
 const runtime = vi.hoisted(() => ({
-  initManusRuntime: vi.fn(),
-  subscribeSafeAreaInsets: vi.fn(() => vi.fn()),
 }));
 
 // AuthGate's useAuth() (real, unmocked) now pulls in hooks/use-auth.ts's
@@ -105,7 +103,6 @@ const appLockGate = vi.hoisted(() => ({
 
 vi.mock("@/lib/_core/auth", () => auth);
 vi.mock("@/lib/app-lock", () => appLock);
-vi.mock("@/lib/_core/manus-runtime", () => runtime);
 vi.mock("@/constants/api", () => oauth);
 vi.mock("@/lib/trpc", () => trpc);
 vi.mock("@/lib/theme-provider", () => providers);
@@ -206,8 +203,6 @@ describe("RootLayout dev auth bootstrap", () => {
     Platform.OS = "web";
     auth.getSessionToken.mockReset();
     auth.setSessionToken.mockReset();
-    runtime.initManusRuntime.mockReset();
-    runtime.subscribeSafeAreaInsets.mockClear();
     trpc.createTRPCClient.mockClear();
 
     Object.defineProperty(globalThis, "localStorage", {

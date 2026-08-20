@@ -3,8 +3,8 @@
 This folder holds the product and technical documentation for the **Expense Tracker (SmartPocket)** app.
 
 > **Read this first:** the app was originally scoped for **Flutter** but is now built on
-> **Expo / React Native (TypeScript)** with a tRPC + MySQL backend on the Manus platform, and is
-> **server-backed rather than offline-first**. When any doc disagrees with the code,
+> **Expo / React Native (TypeScript)** with a tRPC + MySQL backend, and is **local-first**
+> (on-device SQLite, with opt-in sync). When any doc disagrees with the code,
 > [`ARCHITECTURE.md`](./ARCHITECTURE.md) is the source of truth.
 
 ## Documents
@@ -32,7 +32,7 @@ Status legend: ✅ matches the code · 📝 mixed vision + partial implementatio
 ## Implemented today (high level)
 
 Transactions, categories, and credit cards (CRUD); a dashboard with monthly balance + recent activity;
-a monthly Insights summary with per-category breakdown; Manus OAuth auth across iOS, Android, and web.
+a monthly Insights summary with per-category breakdown; email + password auth across iOS, Android, and web.
 
 **Not yet built** (described in docs as roadmap/design): loans, budgets, multiple accounts, recurring
 transactions, import/export, AI categorization, natural-language insights, localization, and a settings

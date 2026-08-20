@@ -29,7 +29,7 @@ export async function callDataApi(
 ): Promise<unknown> {
   if (apiId !== "Database/query") {
     throw new Error(
-      `API "${apiId}" is not configured without Forge credentials`,
+      `Unsupported data API "${apiId}" — only Database/query is implemented`,
     );
   }
 

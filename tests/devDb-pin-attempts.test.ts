@@ -37,7 +37,7 @@ async function insertUser(): Promise<Id> {
   const id = ulid();
   await devQuery(
     "INSERT INTO users (id, openId, name, email, loginMethod) VALUES (?, ?, ?, ?, ?)",
-    [id, "pin-attempt-test-user", "Test User", "test@example.com", "manus"],
+    [id, "pin-attempt-test-user", "Test User", "test@example.com", "password"],
   );
   return id;
 }

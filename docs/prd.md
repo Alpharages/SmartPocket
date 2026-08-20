@@ -6,7 +6,7 @@ Status: Draft for review
 
 > **Stack note (2026-05):** This product was originally scoped for **Flutter** (much of the vision
 > framing below predates the rebuild). It is now built on **Expo / React Native (TypeScript)** with a
-> tRPC + MySQL backend on the Manus platform, and is **server-backed rather than offline-first**. For
+> tRPC + MySQL backend, and is **local-first** (on-device SQLite with opt-in sync). For
 > the authoritative technical picture and the current implementation status, see
 > [`ARCHITECTURE.md`](./ARCHITECTURE.md). This PRD has been reconciled with that build: requirements carry
 > `FR-#`/`NFR-#` IDs and **[built]**/**[planned]** tags, and any remaining mentions of
@@ -14,7 +14,7 @@ Status: Draft for review
 
 ## 1. Executive Summary
 
-SmartPocket is a privacy‑conscious, AI‑assisted personal finance app built with **Expo / React Native**, running on iOS, Android, and web from one codebase. It targets users who want modern conveniences like categorization, budgeting, reminders, analytics, and an optional chat assistant. (The original vision was offline‑first and open‑source; the current build is server‑backed via the Manus platform — see the Stack note above.)
+SmartPocket is a privacy‑conscious, AI‑assisted personal finance app built with **Expo / React Native**, running on iOS, Android, and web from one codebase. It targets users who want modern conveniences like categorization, budgeting, reminders, analytics, and an optional chat assistant. (The original vision was offline‑first and open‑source; the current build is local‑first with opt‑in server sync — see the Stack note above.)
 
 ## 2. Problem Statement & Opportunity
 
@@ -139,12 +139,12 @@ Each has an ID (`NFR-#`) and a measurable target where applicable.
 - Styling/animation: NativeWind (Tailwind for RN) + Reanimated.
 - Client data layer: tRPC v11 client + TanStack Query, wrapped by an app‑wide `ExpenseProvider` context.
 - API: Express + tRPC v11 (superjson), Zod input validation.
-- Storage: **MySQL** accessed via the Manus Data API (`callDataApi`); Drizzle ORM defines the schema/types. The app is server‑backed (not offline‑first); local secure storage is used only for the auth session on native.
-- Auth: Manus OAuth → JWT session (bearer token on native, cookie on web).
+- Storage: on-device **SQLite** for every read and write, with opt‑in sync to **MySQL** on the server; Drizzle ORM defines the schema/types for both. Secure storage on native holds the auth session.
+- Auth: email + password → JWT session (bearer token on native, cookie on web).
 - Notifications: `expo-notifications` (local reminders) — planned, not yet wired.
 - Charts: pie/breakdown charts planned for the Insights screen (no chart lib integrated yet).
 - AI integrations
-  - Server‑side inference targets a **self‑hosted / local LLM** over an OpenAI‑compatible `/v1/chat/completions` API, configured via env (`LLM_BASE_URL`, optional `LLM_API_KEY`, `LLM_MODEL`); no third‑party gateway. Host/key/model live in server env, never hardcoded. _(A legacy Manus Forge client exists in `server/_core/llm.ts` but is unused and being retired.)_
+  - Server‑side inference targets a **self‑hosted / local LLM** over an OpenAI‑compatible `/v1/chat/completions` API, configured via env (`LLM_BASE_URL`, optional `LLM_API_KEY`, `LLM_MODEL`); no third‑party gateway. Host/key/model live in server env, never hardcoded. 
   - On‑device (user‑device) inference is not part of the architecture; the LLM runs server‑side on infrastructure we control.
 
 ## 11. Privacy, Security, and Compliance
@@ -178,7 +178,7 @@ Each criterion maps to the requirement(s) it satisfies.
 - Credit cards can be created/deleted and optionally linked to expenses. _(FR‑7, FR‑2)_
 - The Insights screen shows monthly income, expense, net, and a per‑category breakdown. _(FR‑9)_
 - The dashboard shows current‑month balance and recent activity. _(FR‑9)_
-- Auth via Manus OAuth works on iOS, Android, and web. _(NFR‑6)_
+- Email + password auth works on iOS, Android, and web. _(NFR‑6)_
 - Cold start and primary‑screen interactivity meet the §7 targets. _(NFR‑2)_
 
 ## 14. Metrics and Success Criteria
@@ -198,7 +198,7 @@ Each criterion maps to the requirement(s) it satisfies.
 ## 16. Dependencies and Assumptions
 
 - Node.js + pnpm; Expo SDK 54 / React Native 0.81 toolchain.
-- Manus platform services: OAuth server and Data API (MySQL), configured via env vars.
+- A reachable MySQL instance, configured via `DATABASE_URL`. No third-party identity or data service.
 - A self‑hosted / local LLM (OpenAI‑compatible endpoint) for AI features, reachable from the API server and configured via env vars (`LLM_BASE_URL`, optional `LLM_API_KEY`, `LLM_MODEL`).
 - Notification permissions granted by user (for planned local reminders).
 - License: **open‑source under MIT is the intended direction but not yet committed** — no `LICENSE` file exists in the repo today. Community/open‑source references elsewhere in this PRD (§2, §4, §14) are contingent on this decision being finalized. **Decision owner: Product.**
@@ -212,8 +212,8 @@ Each criterion maps to the requirement(s) it satisfies.
 
 ## 18. Decisions and Clarifications
 
-- Persistence: **MySQL via the Manus Data API** (server‑backed). The original offline‑first SQLite plan was dropped in the React Native rebuild.
-- AI: server‑side inference via a self‑hosted / local LLM (OpenAI‑compatible, env‑configured) — **not** Manus Forge (decision 2026‑06‑17); heuristic fallback still acceptable as a first step.
+- Persistence: on-device **SQLite** with opt-in sync to **MySQL**. The offline‑first plan was dropped in the React Native rebuild and then restored as the local‑first sync work.
+- AI: server‑side inference via a self‑hosted / local LLM (OpenAI‑compatible, env‑configured); no third‑party gateway (decision 2026‑06‑17). Heuristic fallback still acceptable as a first step.
 - Import/export: CSV (transactions) prioritized; JSON export supported — both still to be built.
 
 ## 19. Appendix and References

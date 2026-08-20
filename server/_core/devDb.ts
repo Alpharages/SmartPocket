@@ -5,7 +5,7 @@ import type { Id } from "../../drizzle/schema";
 /**
  * Dev-only in-memory database shim.
  *
- * When the app runs without Manus Forge credentials (local dev), `dataApi.ts`
+ * When the app runs without a DATABASE_URL (local dev), `dataApi.ts`
  * routes every `Database/query` call here instead of to the platform database.
  * This implements just enough of a MySQL-ish executor to satisfy the finite set
  * of statements issued by `server/db.ts` (SELECT / INSERT / UPDATE / DELETE plus

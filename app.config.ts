@@ -13,9 +13,13 @@ const bundleId =
     .map((segment) => {
       return /^[a-zA-Z]/.test(segment) ? segment : "x" + segment;
     })
-    .join(".") || "space.manus.app";
-const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
-const schemeFromBundleId = `manus${timestamp}`;
+    .join(".") || "com.app.smartpocket";
+// Deep-link scheme. Was `manus` + the bundle id's last segment, which existed
+// so the Manus OAuth portal could hand a session back to the app from an
+// external browser. Sign-in posts straight to our own API now, so nothing
+// external holds a registered redirect URI and the scheme is free to just be
+// the app's name.
+const appScheme = "smartpocket";
 
 const env = {
   // SP-093: shipped as "Expense Tracker" while the UI called itself
@@ -25,12 +29,12 @@ const env = {
   appName: "SmartPocket",
   // Left as-is deliberately: the slug is the Expo/EAS project identifier, not
   // a user-facing string, and renaming it re-points an existing project. The
-  // deep-link scheme is derived from the bundle id above, not from this, so
+  // deep-link scheme is `appScheme` above, not derived from this, so
   // the two are independent. Rename it as a separate, coordinated change.
   appSlug: "expense-tracker-app",
   logoUrl:
     "https://d2xsxph8kpxj0f.cloudfront.net/310519663047064921/hxpiTJvwMmNSu7di699jqw/icon-P5bkGGifnXEVDxAdLtvPBT.webp",
-  scheme: schemeFromBundleId,
+  scheme: appScheme,
   iosBundleId: bundleId,
   androidPackage: bundleId,
 };
