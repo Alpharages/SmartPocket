@@ -75,10 +75,22 @@ export const users = mysqlTable("users", {
   id: varchar("id", { length: ULID_LENGTH })
     .primaryKey()
     .$defaultFn(() => ulid()),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
+  /**
+   * Stable public identifier for the account — the subject the session JWT
+   * carries and the key `getUserByOpenId` looks up. A ULID minted at signup,
+   * deliberately NOT the email: an address the user can later change must
+   * never be the thing every issued session is bound to.
+   */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
-  email: varchar("email", { length: 320 }),
+  /** Login identity. Unique, and stored lowercased so it cannot be re-registered by case. */
+  email: varchar("email", { length: 320 }).unique(),
+  /**
+   * Salted scrypt hash of the account password, `scrypt:v1:<saltB64>:<hashB64>`
+   * (server/_core/secret-hash.ts). Never a reversible ciphertext — the server
+   * cannot recover the password from this value.
+   */
+  passwordHash: varchar("passwordHash", { length: 255 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   /** Explicit opt-in for AI features; default off for all users (FR-20, NFR-1). */

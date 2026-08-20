@@ -3,11 +3,11 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+import { registerAuthRoutes } from "./auth-routes";
 import { generateDueTransactions } from "./recurrenceGenerator";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { sdk } from "./sdk";
+import { session } from "./session";
 import * as db from "../db";
 import { ENV } from "./env";
 import { buildAllowedOrigins, isOriginAllowed } from "./cors";
@@ -34,21 +34,21 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 /** Authorize the recurring-generation cron endpoint (SP-011). */
-async function isCronRequestAuthorized(req: express.Request): Promise<boolean> {
+/**
+ * The scheduled endpoints act on every user's data, so they authenticate as
+ * the deployment rather than as a person: a shared secret, compared in full.
+ *
+ * This used to also accept the Manus platform's own cron identity as a second
+ * route in. That identity is gone with the rest of the Manus integration, and
+ * with it the fallback — an unset CRON_SECRET now means nothing can authorise
+ * these endpoints at all, which is the correct fail-closed behaviour and is
+ * called out in .env.example.
+ */
+function isCronRequestAuthorized(req: express.Request): boolean {
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const header = req.headers.authorization;
-    if (typeof header === "string" && header === `Bearer ${secret}`) {
-      return true;
-    }
-  }
-
-  try {
-    const user = await sdk.authenticateRequest(req);
-    return user?.isCron === true;
-  } catch {
-    return false;
-  }
+  if (!secret) return false;
+  const header = req.headers.authorization;
+  return typeof header === "string" && header === `Bearer ${secret}`;
 }
 
 async function startServer() {
@@ -103,17 +103,16 @@ async function startServer() {
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ limit: "1mb", extended: true }));
 
-  registerOAuthRoutes(app);
+  registerAuthRoutes(app);
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });
 
   // SP-011: this ran recurring generation for *every* user with no auth at
-  // all. It now requires either the platform's cron identity (which
-  // `sdk.authenticateRequest` already recognises) or a shared CRON_SECRET.
+  // all. It now requires the shared CRON_SECRET.
   app.post("/api/scheduled/generate-recurring", async (req, res) => {
-    const authorized = await isCronRequestAuthorized(req);
+    const authorized = isCronRequestAuthorized(req);
     if (!authorized) {
       res.status(401).json({ ok: false, error: "Unauthorized" });
       return;
@@ -136,7 +135,7 @@ async function startServer() {
   // not as the last line of defense.
   const TOMBSTONE_RETENTION_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
   app.post("/api/scheduled/purge-tombstones", async (req, res) => {
-    const authorized = await isCronRequestAuthorized(req);
+    const authorized = isCronRequestAuthorized(req);
     if (!authorized) {
       res.status(401).json({ ok: false, error: "Unauthorized" });
       return;
@@ -164,7 +163,7 @@ async function startServer() {
           loginMethod: "dev",
           lastSignedIn: new Date(),
         });
-        const token = await sdk.createSessionToken(DEV_OPEN_ID, {
+        const token = await session.createSessionToken(DEV_OPEN_ID, {
           name: "Dev User",
         });
         res.json({ token });

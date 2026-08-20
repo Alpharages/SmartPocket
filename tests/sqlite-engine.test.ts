@@ -429,7 +429,7 @@ describe("server/db.ts against the SQLite engine end to end", () => {
       openId: "oauth-user-1",
       name: "Alex",
       email: "alex@example.com",
-      loginMethod: "manus",
+      loginMethod: "password",
       lastSignedIn: new Date("2026-06-01"),
     });
     const firstFetch = await db.getUserByOpenId("oauth-user-1");
@@ -437,7 +437,7 @@ describe("server/db.ts against the SQLite engine end to end", () => {
     await db.upsertUser({
       openId: "oauth-user-1",
       name: "Alex Updated",
-      loginMethod: "manus",
+      loginMethod: "password",
       lastSignedIn: new Date("2026-06-02"),
     });
     const secondFetch = await db.getUserByOpenId("oauth-user-1");

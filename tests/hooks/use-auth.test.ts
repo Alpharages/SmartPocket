@@ -180,7 +180,8 @@ const sampleApiUser = {
   openId: "open-1",
   name: "Alex",
   email: "alex@example.com",
-  loginMethod: "manus",
+  loginMethod: "password",
+    passwordHash: null,
   lastSignedIn: "2026-06-01T00:00:00.000Z",
 };
 
@@ -189,7 +190,8 @@ const cachedUser = {
   openId: "open-1",
   name: "Cached Alex",
   email: "alex@example.com",
-  loginMethod: "manus",
+  loginMethod: "password",
+    passwordHash: null,
   lastSignedIn: new Date("2026-05-01T00:00:00.000Z"),
 };
 

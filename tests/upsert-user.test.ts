@@ -20,7 +20,7 @@ describe("upsertUser", () => {
       openId: "user-123",
       name: "New User",
       email: "new@example.com",
-      loginMethod: "manus",
+      loginMethod: "password",
       lastSignedIn: new Date("2026-06-01"),
     });
 

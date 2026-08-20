@@ -77,6 +77,70 @@ export async function getUserByOpenId(openId: string) {
 }
 
 /**
+ * Looks an account up by its login identity.
+ *
+ * Lowercased before the lookup, and stored lowercased by `createPasswordUser`,
+ * so "Ali@x.com" and "ali@x.com" are one account rather than two — a unique
+ * index alone would happily let both exist and leave the user unable to work
+ * out which one holds their data.
+ */
+export async function getUserByEmail(email: string) {
+  const result = await callDataApi("Database/query", {
+    body: {
+      query: "SELECT * FROM users WHERE email = ?",
+      params: [email.trim().toLowerCase()],
+    },
+  });
+  return result && Array.isArray(result) ? result[0] : null;
+}
+
+/**
+ * Creates an email+password account.
+ *
+ * A plain INSERT, not the `upsertUser` path: an ON DUPLICATE KEY UPDATE here
+ * would silently overwrite an existing account's password when someone
+ * re-registers a taken address. The duplicate-key error is the point — it is
+ * what tells the caller the address is taken, atomically, with no
+ * check-then-insert race in between.
+ *
+ * `openId` is a fresh ULID rather than the email so a later address change
+ * never invalidates issued sessions (see drizzle/schema.ts).
+ */
+export async function createPasswordUser(data: {
+  email: string;
+  passwordHash: string;
+  name?: string | null;
+}): Promise<Id> {
+  const id = ulid();
+  await callDataApi("Database/query", {
+    body: {
+      query: `
+        INSERT INTO users (id, openId, email, passwordHash, name, loginMethod, lastSignedIn)
+        VALUES (?, ?, ?, ?, ?, 'password', NOW())
+      `,
+      params: [
+        id,
+        ulid(),
+        data.email.trim().toLowerCase(),
+        data.passwordHash,
+        data.name ?? null,
+      ],
+    },
+  });
+  return id;
+}
+
+/** Stamps a successful sign-in. Best-effort: a failed write must not fail the login. */
+export async function touchLastSignedIn(id: Id): Promise<void> {
+  await callDataApi("Database/query", {
+    body: {
+      query: "UPDATE users SET lastSignedIn = NOW() WHERE id = ?",
+      params: [id],
+    },
+  });
+}
+
+/**
  * Re-points the device's local user row at the signed-in account's id.
  *
  * local-first-sync-plan.md's "signing in later *associates* that local user

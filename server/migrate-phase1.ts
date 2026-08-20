@@ -26,6 +26,7 @@ import { SYNC_TABLES } from "../drizzle/schema";
  *   verify        → refuse to contract while any shadow column is still NULL
  *   0012 contract → drop the int columns, rename the shadow columns in
  *   0013 / 0014   → the sync sequence and purge-watermark tables
+ *   0015 / 0016   → the account card key, and email+password auth
  *
  * Every step is guarded by a state check rather than a ledger, so running
  * this twice is a no-op and running it against a half-migrated database
@@ -181,16 +182,19 @@ export async function migratePhase1(): Promise<Phase1Step[]> {
     steps.push({ name: "0012 contract (drop int ids)", status: "applied" });
   }
 
-  // Steps 5-7 — the sync tables. Additive and independent of the id change.
+  // Steps 5-8 — additive schema, independent of the id change. A `users_<col>`
+  // marker means "check for that column on users"; anything else is a table
+  // name to probe for. Both forms are just idempotency markers, so re-running
+  // the whole migration on an up-to-date database is a no-op.
   for (const [table, file] of [
     ["syncSequence", "0013_sync_sequence.sql"],
     ["syncPurgeWatermark", "0014_sync_purge_watermark.sql"],
     ["users_cardKey", "0015_user_card_key.sql"],
+    ["users_passwordHash", "0016_password_auth.sql"],
   ] as const) {
-    const present =
-      table === "users_cardKey"
-        ? (await columnType("users", "cardKey")) !== null
-        : await tableExists(table);
+    const present = table.startsWith("users_")
+      ? (await columnType("users", table.slice("users_".length))) !== null
+      : await tableExists(table);
     if (present) {
       steps.push({ name: `${file} (${table})`, status: "already-applied" });
     } else {
