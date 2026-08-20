@@ -48,7 +48,26 @@ services:
   # Applies committed migrations. Runs from the builder stage because
   # drizzle-kit is a devDependency and is not in the runtime image.
   #
-  # `migrate` only — never `db:push`, which runs `drizzle-kit generate` first
+  # BOTH steps are required, in this order, and neither covers the other:
+  #
+  #   drizzle-kit migrate  applies everything registered in
+  #                        drizzle/meta/_journal.json — 0000 through 0010.
+  #   db:migrate:phase1    applies 0011-0015, which are deliberately absent
+  #                        from that journal. They cannot be journal entries:
+  #                        0012 drops the int id columns and must run *after*
+  #                        the ULID backfill, which is application code, not
+  #                        SQL. server/migrate-phase1.ts sequences
+  #                        expand -> backfill -> verify -> contract -> sync
+  #                        tables, and is idempotent, so re-running it on an
+  #                        up-to-date database reports "already-applied" and
+  #                        changes nothing.
+  #
+  # Running only the first leaves a database the app cannot query — every
+  # synced table is missing deletedAt/dirty/serverSeq, and the first thing to
+  # notice is the recurring-transaction cron failing with "Unknown column
+  # 'deletedAt' in 'where clause'".
+  #
+  # `drizzle-kit migrate` only — never `db:push`, which runs `generate` first
   # and would author a brand new migration inside the container from whatever
   # the schema happens to say. Generating is a development step; its output
   # belongs in git.
@@ -59,6 +78,6 @@ services:
     image: smartpocket-migrate
     profiles: [tools]
     env_file: .env
-    command: pnpm exec drizzle-kit migrate
+    command: sh -c "pnpm exec drizzle-kit migrate && pnpm db:migrate:phase1"
     extra_hosts:
       - "host.docker.internal:host-gateway"
