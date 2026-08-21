@@ -42,9 +42,12 @@ import {
 const MIN_TOUCH_TARGET = 44;
 const SHEET_MOTION = Motion.sheet;
 
-function sheetEasing() {
-  return Easing.out(Easing.cubic);
-}
+// Built once at module scope, not per call: `Easing.out(...)` returns a
+// worklet, but the factory wrapping it was a plain JS function — calling it
+// from the pan gesture's `onEnd` worklet crashed the app with
+// "Object is not a function" on every tap inside a sheet (RNGH runs `onEnd`
+// on FAILED/CANCELLED too, so a plain tap reached it).
+const SHEET_EASING = Easing.out(Easing.cubic);
 
 export type SheetProps = {
   visible: boolean;
@@ -129,12 +132,12 @@ export function Sheet({
   const animateOpen = useCallback(() => {
     translateY.value = motionDisabled
       ? 0
-      : withTiming(0, { duration, easing: sheetEasing() });
+      : withTiming(0, { duration, easing: SHEET_EASING });
     backdropOpacity.value = motionDisabled
       ? SHEET_MOTION.backdropOpacity
       : withTiming(SHEET_MOTION.backdropOpacity, {
           duration,
-          easing: sheetEasing(),
+          easing: SHEET_EASING,
         });
     dragOffset.value = 0;
   }, [backdropOpacity, dragOffset, duration, motionDisabled, translateY]);
@@ -156,7 +159,7 @@ export function Sheet({
     }
     translateY.value = withTiming(
       screenHeight,
-      { duration, easing: sheetEasing() },
+      { duration, easing: SHEET_EASING },
       (finished) => {
         if (finished) {
           runOnJS(onDone)();
@@ -165,7 +168,7 @@ export function Sheet({
     );
     backdropOpacity.value = withTiming(0, {
       duration,
-      easing: sheetEasing(),
+      easing: SHEET_EASING,
     });
     dragOffset.value = 0;
   }, [
@@ -226,7 +229,7 @@ export function Sheet({
           }
           dragOffset.value = motionDisabled
             ? 0
-            : withTiming(0, { duration, easing: sheetEasing() });
+            : withTiming(0, { duration, easing: SHEET_EASING });
         }),
     [dismissThresholdPx, dragOffset, duration, motionDisabled, requestClose],
   );
