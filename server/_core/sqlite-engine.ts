@@ -105,6 +105,17 @@ function unmarshalRow(row: Row): Row {
 }
 
 /**
+ * Strips the backticks `sync-engine.ts` puts around table and column names.
+ *
+ * Both rewrites below recover identifiers from the statement text and look
+ * them up in `UPSERT_CONFLICT_COLUMN` / `DEFAULT_NOW_COLUMNS`, whose keys are
+ * bare. Without this a quoted statement silently missed every lookup.
+ */
+function unquoteId(name: string): string {
+  return name.replace(/`/g, "");
+}
+
+/**
  * Rewrites one `INSERT ... ON DUPLICATE KEY UPDATE ...` statement (MySQL
  * upsert syntax) into SQLite's `INSERT ... ON CONFLICT (...) DO UPDATE SET
  * ...`. Structural, not a token substitution — MySQL resolves the conflicting
@@ -115,11 +126,12 @@ function unmarshalRow(row: Row): Row {
  */
 function rewriteUpsert(sql: string): string {
   const match = sql.match(
-    /^(\s*INSERT INTO\s+(\w+)\s*\([^)]+\)\s*VALUES\s*\([^)]+\))\s*ON DUPLICATE KEY UPDATE\s*([\s\S]+?)\s*$/i,
+    /^(\s*INSERT INTO\s+(`?\w+`?)\s*\([^)]+\)\s*VALUES\s*\([^)]+\))\s*ON DUPLICATE KEY UPDATE\s*([\s\S]+?)\s*$/i,
   );
   if (!match) return sql;
 
-  const [, insertClause, table, updateClause] = match;
+  const [, insertClause, rawTable, updateClause] = match;
+  const table = unquoteId(rawTable);
   const conflictColumn = UPSERT_CONFLICT_COLUMN[table];
   if (!conflictColumn) {
     throw new Error(
@@ -129,8 +141,8 @@ function rewriteUpsert(sql: string): string {
   }
 
   const rewrittenUpdates = updateClause.replace(
-    /(\w+)\s*=\s*VALUES\((\w+)\)/gi,
-    "$1 = excluded.$2",
+    /(`?\w+`?)\s*=\s*VALUES\((`?\w+`?)\)/gi,
+    (_m, target: string, source: string) => `${target} = excluded.${source}`,
   );
 
   return `${insertClause} ON CONFLICT (${conflictColumn}) DO UPDATE SET ${rewrittenUpdates}`;
@@ -212,16 +224,18 @@ function injectMissingTimestamps(
   // greedy `[\s\S]+$` on the tuples themselves would otherwise swallow and
   // silently discard.
   const match = sql.match(
-    /^(\s*INSERT INTO\s+(\w+)\s*)\(([^)]+)\)\s*VALUES\s*((?:\([^)]*\)\s*,?\s*)+)([\s\S]*)$/i,
+    /^(\s*INSERT INTO\s+(`?\w+`?)\s*)\(([^)]+)\)\s*VALUES\s*((?:\([^)]*\)\s*,?\s*)+)([\s\S]*)$/i,
   );
   if (!match) return { sql, params };
 
-  const [, prefix, table, columnsRaw, , suffix] = match;
+  const [, prefix, rawTable, columnsRaw, , suffix] = match;
+  const table = unquoteId(rawTable);
   const defaultable = DEFAULT_NOW_COLUMNS[table];
   if (!defaultable) return { sql, params };
 
   const columns = columnsRaw.split(",").map((c) => c.trim());
-  const missing = defaultable.filter((c) => !columns.includes(c));
+  const present = new Set(columns.map(unquoteId));
+  const missing = defaultable.filter((c) => !present.has(c));
   if (missing.length === 0) return { sql, params };
 
   const columnCount = columns.length;

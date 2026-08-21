@@ -133,17 +133,47 @@ describe("sync-engine push mechanics (mocked MySQL — insertId-driven block all
 
     // Row 1's insert: userId is the authenticated caller, not the forged value.
     const row1Call = bodyOf(dbQuery.mock.calls[2]);
-    expect(row1Call.query).toMatch(/INSERT INTO categories/);
+    expect(row1Call.query).toMatch(/INSERT INTO `categories`/);
     const columns = row1Call.query
-      .match(/INSERT INTO categories \(([^)]+)\)/)![1]
+      .match(/INSERT INTO `categories` \(([^)]+)\)/)![1]
       .split(",")
-      .map((c) => c.trim());
+      .map((c) => c.trim().replace(/`/g, ""));
     const userIdIndex = columns.indexOf("userId");
     const dirtyIndex = columns.indexOf("dirty");
     const serverSeqIndex = columns.indexOf("serverSeq");
     expect(row1Call.params[userIdIndex]).toBe(testId(9));
     expect(row1Call.params[dirtyIndex]).toBe(false);
     expect(row1Call.params[serverSeqIndex]).toBe(100);
+  });
+
+  /**
+   * Caught on the real deployment: every push of `recurringTransactions`
+   * returned 500 while the other nine tables synced fine. `interval` is one of
+   * its columns and a *reserved word* in MySQL, so the unquoted
+   * `INSERT INTO recurringTransactions (..., interval, ...)` was a syntax
+   * error. SQLite does not reserve it, so the device half never complained and
+   * the table simply never reached the server.
+   */
+  it("applyPushedRows quotes identifiers, so a reserved-word column like `interval` is legal SQL", async () => {
+    dbQuery
+      .mockResolvedValueOnce([]) // assertRowsOwnedByCaller
+      .mockResolvedValueOnce({ insertId: 500, affectedRows: 1 }) // seq block
+      .mockResolvedValueOnce(undefined); // upsert
+
+    const { applyPushedRows, syncTableColumns } =
+      await import("@/server/_core/sync-engine");
+
+    expect(syncTableColumns("recurringTransactions")).toContain("interval");
+
+    await applyPushedRows("recurringTransactions", testId(9), [
+      { id: testId(1), interval: 1, frequency: "monthly" },
+    ]);
+
+    const { query } = bodyOf(dbQuery.mock.calls[2]);
+    expect(query).toContain("`interval`");
+    expect(query).toMatch(/INSERT INTO `recurringTransactions`/);
+    // No bare `interval` anywhere — column list or ON DUPLICATE KEY UPDATE.
+    expect(query).not.toMatch(/(?<!`)\binterval\b(?!`)/);
   });
 
   it("applyPushedRows is a no-op for an empty batch", async () => {

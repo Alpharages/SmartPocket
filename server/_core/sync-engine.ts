@@ -31,6 +31,24 @@ export function syncTableColumns(table: SyncTable): string[] {
   return Object.keys(getTableColumns(SYNC_TABLE_OBJECTS[table] as never));
 }
 
+/**
+ * Backticks an identifier for the INSERTs below, which interpolate column and
+ * table names straight into SQL.
+ *
+ * `recurringTransactions.interval` is a *reserved* word in MySQL, so a bare
+ * `INSERT INTO recurringTransactions (..., interval, ...)` is a syntax error
+ * and every push of that table 500'd — the one table on the account that could
+ * never reach the server. SQLite does not reserve it, so the same statement
+ * ran fine on the device and only the server half broke.
+ *
+ * Backticks work on both engines, so both sides quote identically. Names come
+ * from the Drizzle schema, never from user input; the guard is only here so a
+ * future column named after a keyword cannot repeat this.
+ */
+function quoteId(name: string): string {
+  return `\`${name.replace(/`/g, "``")}\``;
+}
+
 /** Rows read off *this* side's data store that still need to reach the other side. */
 export async function getDirtyRows(
   table: SyncTable,
@@ -127,7 +145,7 @@ export async function applyPushedRows(
   const firstSeq = await allocateServerSeqBlock(rows.length);
   const updateClause = columns
     .filter((c) => c !== "id")
-    .map((c) => `${c} = VALUES(${c})`)
+    .map((c) => `${quoteId(c)} = VALUES(${quoteId(c)})`)
     .join(", ");
 
   const results: Array<{ id: Id; serverSeq: number }> = [];
@@ -143,7 +161,7 @@ export async function applyPushedRows(
 
     await dbQuery(
       `
-          INSERT INTO ${table} (${columns.join(", ")})
+          INSERT INTO ${quoteId(table)} (${columns.map(quoteId).join(", ")})
           VALUES (${columns.map(() => "?").join(", ")})
           ON DUPLICATE KEY UPDATE ${updateClause}
         `,
@@ -308,13 +326,13 @@ export async function applyIncomingRow(
 
   const updateClause = columns
     .filter((c) => c !== "id")
-    .map((c) => `${c} = VALUES(${c})`)
+    .map((c) => `${quoteId(c)} = VALUES(${quoteId(c)})`)
     .join(", ");
   const values = columns.map((c) => (c === "dirty" ? false : incoming[c]));
 
   await dbQuery(
     `
-        INSERT INTO ${table} (${columns.join(", ")})
+        INSERT INTO ${quoteId(table)} (${columns.map(quoteId).join(", ")})
         VALUES (${columns.map(() => "?").join(", ")})
         ON DUPLICATE KEY UPDATE ${updateClause}
       `,
