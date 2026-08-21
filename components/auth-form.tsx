@@ -1,5 +1,9 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Platform, Text, TextInput, View } from "react-native";
+import { Platform, ScrollView, Text, TextInput, View } from "react-native";
+import Animated, {
+  useAnimatedKeyboard,
+  useAnimatedStyle,
+} from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { Link } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -57,6 +61,13 @@ export function AuthForm({
 }) {
   const { colors } = useThemeTokens();
   const toast = useToast();
+  // SP-101 again, on a plain screen this time: the app is edge-to-edge, so
+  // Android does not resize the window for the IME and a centred flex:1 View
+  // simply stays put — the keyboard covered the password field and the submit
+  // button with no way to reach them. Same fix the Sheet uses: consume the IME
+  // inset ourselves. No JS `Keyboard` fallback needed here — unlike Sheet,
+  // this is the activity window, which is exactly what the hook reads.
+  const keyboard = useAnimatedKeyboard();
   const queryClient = useQueryClient();
   const { name: appName } = getAppMetadata();
   const copy = COPY[mode];
@@ -142,6 +153,12 @@ export function AuthForm({
     queryClient,
   ]);
 
+  // Grows with the keyboard so the centred content is centred in what is left
+  // above it, and the ScrollView can reach anything that still overflows.
+  const keyboardSpacer = useAnimatedStyle(() => ({
+    height: keyboard.height.value,
+  }));
+
   const fieldStyle = {
     borderWidth: 1,
     borderColor: colors.border,
@@ -162,9 +179,15 @@ export function AuthForm({
       edges={["top", "bottom", "left", "right"]}
       testID={`${mode}-screen`}
     >
-      <View
-        className="flex-1 items-center justify-center"
-        style={{ paddingHorizontal: Spacing["2xl"] }}
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          flexGrow: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          paddingHorizontal: Spacing["2xl"],
+        }}
       >
         <View
           className="items-center justify-center rounded-full"
@@ -282,7 +305,9 @@ export function AuthForm({
             </Link>
           </View>
         </View>
-      </View>
+
+        <Animated.View style={keyboardSpacer} />
+      </ScrollView>
     </ScreenContainer>
   );
 }
